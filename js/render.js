@@ -8,8 +8,18 @@ G.cam = { x: 0, y: 0, z: 1 };
 G.groundScale = 0.5;   // 地面缓存画布降采样
 G.groundOX = 0; G.groundOY = 0;
 G.needGround = true;
+G.groundDirty = new Set();  // 只变了道路/岩石的瓦片：局部重绘，不整图重建
 G.smoke = [];
 G.flakes = null;
+
+/* 夜色浓度（0-1）：20 点入夜 → 22 点全暗 → 4 点最暗 → 6 点天亮 */
+G.nightAlpha = function () {
+  const h = G.game.h;
+  if (h >= G.LIFE.restFrom || h < 4) return 0.42;
+  if (h >= 20) return 0.42 * (h - 20) / (G.LIFE.restFrom - 20);
+  if (h >= 4 && h < G.LIFE.restTo) return 0.42 * (1 - (h - 4) / (G.LIFE.restTo - 4));
+  return 0;
+};
 
 /* tile → z=1 屏幕坐标（返回瓦片顶角） */
 G.T2S = function (tx, ty) { return [(tx - ty) * 32, (tx + ty) * 16]; };
@@ -32,9 +42,66 @@ G.diamondPath = function (ctx, sx, sy) {
   ctx.closePath();
 };
 
-/* ---------- 地面缓存（半分辨率整图） ---------- */
+/* ---------- 地面缓存（半分辨率整图；道路/岩石改动只局部重绘脏瓦片） ---------- */
+G.markGroundDirty = function (x, y) {
+  if (!G.world || x < 0 || y < 0 || x >= G.world.N || y >= G.world.N) return;
+  G.groundDirty.add(y * G.world.N + x);
+};
+
+/* 画单个地面瓦片（陆地/道路/岩石 或 水体+岸线），整图与局部重绘共用 */
+G.drawGroundTile = function (c, w, pal, x, y) {
+  const N = w.N;
+  const i = y * N + x;
+  const [sx, sy] = G.T2S(x, y);
+  if (w.water[i] === 1) {
+    G.diamondPath(c, sx, sy);
+    c.fillStyle = pal.water;
+    c.fill();
+    c.strokeStyle = pal.water;
+    c.lineWidth = 1;
+    c.stroke();
+    c.strokeStyle = pal.shore;
+    c.lineWidth = 1.5;
+    const corner = [[sx, sy, sx + 32, sy + 16], [sx + 32, sy + 16, sx, sy + 32], [sx, sy + 32, sx - 32, sy + 16], [sx - 32, sy + 16, sx, sy]];
+    const nbs = [[x, y - 1], [x + 1, y], [x, y + 1], [x - 1, y]];
+    for (let k = 0; k < 4; k++) {
+      const nx = nbs[k][0], ny = nbs[k][1];
+      if (nx < 0 || ny < 0 || nx >= N || ny >= N || w.water[ny * N + nx] === 1) continue; // 只在邻格是陆地时描岸线
+      c.beginPath();
+      c.moveTo(corner[k][0], corner[k][1]);
+      c.lineTo(corner[k][2], corner[k][3]);
+      c.stroke();
+    }
+    return;
+  }
+  const h = G.h2(w.seed + 5, x, y);
+  let col = pal.grass;
+  if (w.water[i] === 2) col = pal.sand;
+  else col = h < 0.33 ? pal.grassAlt : (h > 0.8 ? pal.grassDark : pal.grass);
+  if (w.road[i]) col = h < 0.5 ? pal.road : pal.roadAlt;
+  G.diamondPath(c, sx, sy);
+  c.fillStyle = col;
+  c.fill();
+  c.strokeStyle = col;   // 同色描边消除瓦片接缝
+  c.lineWidth = 1;
+  c.stroke();
+  // 岩石露头
+  if (w.rock[i]) {
+    const cx = sx, cy = sy + 16;
+    c.fillStyle = pal.rockD;
+    c.beginPath(); c.ellipse(cx + 4, cy + 4, 9, 5, 0, 0, Math.PI * 2); c.fill();
+    c.fillStyle = pal.rock;
+    c.beginPath(); c.ellipse(cx - 2, cy - 1, 10, 6, 0, 0, Math.PI * 2); c.fill();
+    c.fillStyle = pal.rockD;
+    c.beginPath(); c.ellipse(cx - 6, cy + 5, 5, 3, 0, 0, Math.PI * 2); c.fill();
+    c.fillStyle = 'rgba(255,255,255,0.18)';
+    c.beginPath(); c.ellipse(cx - 4, cy - 3, 5, 2.5, 0, 0, Math.PI * 2); c.fill();
+  }
+};
+
 G.buildGround = function () {
   const w = G.world, N = w.N, s = G.groundScale;
+  const partial = !G.needGround && !!G._gcv && G.groundDirty.size > 0;
   G.groundOX = N * 32 + 40;
   G.groundOY = 40;
   const gw = Math.ceil((N * 64 + 80) * s), gh = Math.ceil((N * 32 + 80) * s);
@@ -43,66 +110,33 @@ G.buildGround = function () {
   const c = G._gcv.getContext('2d');
   c.setTransform(s, 0, 0, s, G.groundOX * s, G.groundOY * s);
   const pal = G.PAL[G.game.season];
-  c.clearRect(-G.groundOX, -G.groundOY, N * 64 + 80, N * 32 + 80);
-  c.fillStyle = pal.bg;
-  c.fillRect(-G.groundOX, -G.groundOY, N * 64 + 80, N * 32 + 80);
 
-  const land = (x, y) => x >= 0 && y >= 0 && x < N && y < N && w.water[y * N + x] !== 1;
-
-  // 陆地
-  for (let y = 0; y < N; y++)
-    for (let x = 0; x < N; x++) {
-      const i = y * N + x;
-      if (w.water[i] === 1) continue;
-      const [sx, sy] = G.T2S(x, y);
-      const h = G.h2(w.seed + 5, x, y);
-      let col = pal.grass;
-      if (w.water[i] === 2) col = pal.sand;
-      else col = h < 0.33 ? pal.grassAlt : (h > 0.8 ? pal.grassDark : pal.grass);
-      if (w.road[i]) col = h < 0.5 ? pal.road : pal.roadAlt;
-      G.diamondPath(c, sx, sy);
-      c.fillStyle = col;
-      c.fill();
-      c.strokeStyle = col;   // 同色描边消除瓦片接缝
-      c.lineWidth = 1;
-      c.stroke();
-      // 岩石露头
-      if (w.rock[i]) {
-        const cx = sx, cy = sy + 16;
-        c.fillStyle = pal.rockD;
-        c.beginPath(); c.ellipse(cx + 4, cy + 4, 9, 5, 0, 0, Math.PI * 2); c.fill();
-        c.fillStyle = pal.rock;
-        c.beginPath(); c.ellipse(cx - 2, cy - 1, 10, 6, 0, 0, Math.PI * 2); c.fill();
-        c.fillStyle = pal.rockD;
-        c.beginPath(); c.ellipse(cx - 6, cy + 5, 5, 3, 0, 0, Math.PI * 2); c.fill();
-        c.fillStyle = 'rgba(255,255,255,0.18)';
-        c.beginPath(); c.ellipse(cx - 4, cy - 3, 5, 2.5, 0, 0, Math.PI * 2); c.fill();
-      }
+  if (partial) {
+    // 局部重绘：脏瓦片 + 四邻（描边会轻微外溢到相邻瓦片）；先陆地后水体，保持岸线压在陆地上
+    const uniq = new Set();
+    for (const idx of G.groundDirty) {
+      const x = idx % N, y = (idx / N) | 0;
+      uniq.add(idx);
+      if (x > 0) uniq.add(idx - 1);
+      if (x < N - 1) uniq.add(idx + 1);
+      if (y > 0) uniq.add(idx - N);
+      if (y < N - 1) uniq.add(idx + N);
     }
-  // 水 + 岸线
-  for (let y = 0; y < N; y++)
-    for (let x = 0; x < N; x++) {
-      const i = y * N + x;
-      if (w.water[i] !== 1) continue;
-      const [sx, sy] = G.T2S(x, y);
-      G.diamondPath(c, sx, sy);
-      c.fillStyle = pal.water;
-      c.fill();
-      c.strokeStyle = pal.water;
-      c.lineWidth = 1;
-      c.stroke();
-      c.strokeStyle = pal.shore;
-      c.lineWidth = 1.5;
-      const corner = [[sx, sy, sx + 32, sy + 16], [sx + 32, sy + 16, sx, sy + 32], [sx, sy + 32, sx - 32, sy + 16], [sx - 32, sy + 16, sx, sy]];
-      const nbs = [[x, y - 1], [x + 1, y], [x, y + 1], [x - 1, y]];
-      for (let k = 0; k < 4; k++) {
-        if (!land(nbs[k][0], nbs[k][1])) continue; // 只在邻格是陆地时描岸线
-        c.beginPath();
-        c.moveTo(corner[k][0], corner[k][1]);
-        c.lineTo(corner[k][2], corner[k][3]);
-        c.stroke();
-      }
-    }
+    for (const idx of uniq) if (w.water[idx] !== 1) G.drawGroundTile(c, w, pal, idx % N, (idx / N) | 0);
+    for (const idx of uniq) if (w.water[idx] === 1) G.drawGroundTile(c, w, pal, idx % N, (idx / N) | 0);
+  } else {
+    c.clearRect(-G.groundOX, -G.groundOY, N * 64 + 80, N * 32 + 80);
+    c.fillStyle = pal.bg;
+    c.fillRect(-G.groundOX, -G.groundOY, N * 64 + 80, N * 32 + 80);
+    // 陆地（含道路、岩石），再水体（含岸线）——保持水面岸线压在陆地上
+    for (let y = 0; y < N; y++)
+      for (let x = 0; x < N; x++)
+        if (w.water[y * N + x] !== 1) G.drawGroundTile(c, w, pal, x, y);
+    for (let y = 0; y < N; y++)
+      for (let x = 0; x < N; x++)
+        if (w.water[y * N + x] === 1) G.drawGroundTile(c, w, pal, x, y);
+  }
+  G.groundDirty.clear();
   G.needGround = false;
 };
 
@@ -196,10 +230,10 @@ G.drawBuilding = function (ctx, b, time) {
   // 门（左墙中部）
   const mx = (L[0] + B[0]) / 2, my = (L[1] + B[1]) / 2 - H;
   quadFill(ctx, mx - 3, my + 6, mx + 1, my + 8, mx + 1, my + 13, mx - 3, my + 11, '#3a2a1a');
-  // 窗（右墙）
+  // 窗（右墙，冬夜亮灯）
   if (b.type === 'house') {
     const wx = (B[0] + R[0]) / 2, wy = (B[1] + R[1]) / 2 - H;
-    ctx.fillStyle = G.isWinter() ? '#ffd98a' : '#2e2013';
+    ctx.fillStyle = (G.isWinter() || G.nightAlpha() > 0.15) ? '#ffd98a' : '#2e2013';
     ctx.fillRect(wx - 2.5, wy + 3, 5, 4);
   }
   // 屋顶（整体上移，微外扩）
@@ -312,6 +346,8 @@ G.drawCitizen = function (ctx, c, time) {
   const s = child ? 0.72 : 1;
   const walking = c.state === 'walk' || c.state === 'haul';
   const bob = walking ? Math.abs(Math.sin(c.animT)) * 1.2 : (c.state === 'work' ? Math.abs(Math.sin(c.animT)) * 0.8 : 0);
+  const resting = c.state === 'rest';
+  if (resting) ctx.globalAlpha = 0.55; // 睡觉中的市民淡显
   // 阴影
   ctx.fillStyle = 'rgba(0,0,0,0.25)';
   ctx.beginPath();
@@ -338,6 +374,7 @@ G.drawCitizen = function (ctx, c, time) {
     ctx.ellipse(sx, sy, 5.5 * s, 2.8 * s, 0, 0, Math.PI * 2);
     ctx.stroke();
   }
+  if (resting) ctx.globalAlpha = 1;
 };
 
 /* ---------- 粒子 ---------- */
@@ -376,7 +413,7 @@ G.updateParticles = function (dt) {
 G.frame = function (dtReal) {
   const cv = G.cv, ctx = G.ctx;
   G.updateParticles(dtReal);
-  if (G.needGround) G.buildGround();
+  if (G.needGround || G.groundDirty.size) G.buildGround();
 
   ctx.setTransform(G.dpr, 0, 0, G.dpr, 0, 0);
   ctx.fillStyle = '#14181d';
@@ -406,7 +443,7 @@ G.frame = function (dtReal) {
   for (let y = ty0; y <= ty1; y++)
     for (let x = tx0; x <= tx1; x++) {
       const idx = w.treeIdx[y * w.N + x];
-      if (idx >= 0) items.push({ d: x + y, k: 0, x, y, t: w.trees[idx] });
+      if (idx >= 0) items.push({ d: x + y, k: 0, x, y, t: w.trees[idx], marked: w.marked.has(y * w.N + x) });
     }
   // 建筑
   for (const b of w.buildings) {
@@ -422,7 +459,16 @@ G.frame = function (dtReal) {
   items.sort((a, b) => a.d - b.d);
   const now = performance.now() / 1000;
   for (const it of items) {
-    if (it.k === 0) G.drawTree(ctx, it.t);
+    if (it.k === 0) {
+      G.drawTree(ctx, it.t);
+      if (it.marked) { // 待砍标记（原版 Harvest Trees 的选中态）
+        const [msx, msy] = G.T2S(it.x, it.y);
+        G.diamondPath(ctx, msx, msy);
+        ctx.strokeStyle = 'rgba(255,170,60,0.85)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
+    }
     else if (it.k === 1) {
       G.drawBuilding(ctx, it.b, now);
       // 警告标记
@@ -491,8 +537,13 @@ G.frame = function (dtReal) {
     ctx.fill();
   }
 
-  // 屏幕空间：雪
+  // 屏幕空间：夜色 + 雪
   ctx.setTransform(G.dpr, 0, 0, G.dpr, 0, 0);
+  const na = G.nightAlpha();
+  if (na > 0) {
+    ctx.fillStyle = `rgba(14,20,48,${na})`;
+    ctx.fillRect(0, 0, W, H);
+  }
   if (G.flakes) {
     ctx.fillStyle = 'rgba(255,255,255,0.8)';
     for (const f of G.flakes) {
@@ -501,5 +552,18 @@ G.frame = function (dtReal) {
       ctx.arc(fx, f.y * H, f.r, 0, Math.PI * 2);
       ctx.fill();
     }
+  }
+
+  // 地面缓存清晰度：缩放稳定后按当前倍率重建（上限 1 倍，控制内存）
+  const tgt = G.clamp(z, 0.55, 1);
+  if (Math.abs(tgt - G.groundScale) > 0.12 && !G._gsTimer) {
+    G._gsTimer = setTimeout(() => {
+      G._gsTimer = null;
+      G.groundScale = G.clamp(G.cam.z, 0.55, 1);
+      G.needGround = true;
+    }, 250);
+  } else if (Math.abs(tgt - G.groundScale) <= 0.12 && G._gsTimer) {
+    clearTimeout(G._gsTimer);
+    G._gsTimer = null;
   }
 };

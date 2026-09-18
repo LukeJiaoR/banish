@@ -35,6 +35,7 @@ G.genWorld = function (seed) {
     citizens: [],
     cmap: {},
     families: [],
+    marked: new Set(),  // 「砍伐」工具标记的树（散工来砍）
     start: { x: N >> 1, y: N >> 1 },
   };
 
@@ -107,6 +108,7 @@ G.clearRock = function (w, x, y) {
   if (!w.rock[i]) return false;
   w.rock[i] = 0;
   w.rockCleared.push(i);
+  G.markGroundDirty(x, y);
   if (G.game) G.game.res.stone += G.ROCK_STONE;
   return true;
 };
@@ -114,12 +116,36 @@ G.removeTree = function (w, x, y) {
   const i = y * w.N + x;
   const idx = w.treeIdx[i];
   if (idx < 0) return;
+  if (w.marked) w.marked.delete(i); // 树没了，标记随之清除
   const last = w.trees.pop();
   if (idx < w.trees.length) {
     w.trees[idx] = last;
     w.treeIdx[last.i] = idx;
   }
   w.treeIdx[i] = -1;
+};
+/* 「砍伐」工具：标记一棵树（原版 Harvest Trees），散工会来砍 */
+G.markFellAt = function (w, x, y) {
+  if (x < 0 || y < 0 || x >= w.N || y >= w.N) return;
+  const i = y * w.N + x;
+  if (w.treeIdx[i] < 0) return;
+  if (w.marked.size >= 300) return; // 队列上限，防误拖全图
+  const first = w.marked.size === 0;
+  w.marked.add(i);
+  if (first && G.ui && G.ui.toast) G.ui.toast('🪚 已标记砍伐：空闲的市民会自动前往（无人空闲则排队等候）', 'info');
+};
+/* 取离散工最近的标记树（claimed 中的坐标跳过：一人一树） */
+G.pickMarkedTree = function (w, x, y, claimed) {
+  let best = null, bd = Infinity;
+  for (const i of w.marked) {
+    if (claimed && claimed.has(i)) continue;
+    const idx = w.treeIdx[i];
+    if (idx < 0) continue;
+    const tx = i % w.N, ty = (i / w.N) | 0;
+    const d = G.d2(x, y, tx, ty);
+    if (d < bd) { bd = d; best = { x: tx, y: ty, tree: w.trees[idx] }; }
+  }
+  return best;
 };
 G.treeStage = function (t) {
   const day = G.game ? G.game.day : 9999;
@@ -185,7 +211,9 @@ G.onRoad = function (w, x, y) {
   return w.road[y * w.N + x] === 1;
 };
 
-/* A* 寻路（8 向，禁止穿角；路面加速） */
+/* A* 寻路（8 向，禁止穿角；二叉堆开表，路面加速） */
+const PF_DIRS = [[1, 0, 1], [-1, 0, 1], [0, 1, 1], [0, -1, 1], [1, 1, 1.42], [1, -1, 1.42], [-1, 1, 1.42], [-1, -1, 1.42]];
+
 G.findPath = function (w, sx, sy, tx, ty) {
   sx |= 0; sy |= 0; tx |= 0; ty |= 0;
   if (G.tileBlocked(w, tx, ty)) {
@@ -197,39 +225,67 @@ G.findPath = function (w, sx, sy, tx, ty) {
   const N = w.N;
   const gen = ++G._pfGen || (G._pfGen = 1);
   if (!w._pf) {
-    w._pf = { g: new Float32Array(N * N), f: new Float32Array(N * N), from: new Int32Array(N * N), gen: new Int32Array(N * N) };
+    w._pf = { g: new Float32Array(N * N), f: new Float32Array(N * N), from: new Int32Array(N * N), gen: new Int32Array(N * N), closed: new Int32Array(N * N) };
   }
   const pf = w._pf;
-  const open = [];
+  // 二叉小顶堆：按 f 取最小。允许重复入堆（代替 decrease-key），弹出时用 closed 标记跳过过期项
+  const heap = [];
+  let hn = 0;
+  const push = (i) => {
+    let k = hn++;
+    heap[k] = i;
+    while (k > 0) {
+      const p = (k - 1) >> 1;
+      if (pf.f[heap[p]] <= pf.f[heap[k]]) break;
+      const t = heap[p]; heap[p] = heap[k]; heap[k] = t;
+      k = p;
+    }
+  };
+  const pop = () => {
+    const top = heap[0];
+    hn--;
+    if (hn > 0) {
+      heap[0] = heap[hn];
+      let k = 0;
+      for (;;) {
+        const l = 2 * k + 1, r = l + 1;
+        let m = k;
+        if (l < hn && pf.f[heap[l]] < pf.f[heap[m]]) m = l;
+        if (r < hn && pf.f[heap[r]] < pf.f[heap[m]]) m = r;
+        if (m === k) break;
+        const t = heap[m]; heap[m] = heap[k]; heap[k] = t;
+        k = m;
+      }
+    }
+    return top;
+  };
   const start = sy * N + sx, goal = ty * N + tx;
-  pf.g[start] = 0; pf.f[start] = 0; pf.from[start] = -1; pf.gen[start] = gen;
-  open.push(start);
-  const DIRS = [[1,0,1],[-1,0,1],[0,1,1],[0,-1,1],[1,1,1.42],[1,-1,1.42],[-1,1,1.42],[-1,-1,1.42]];
+  pf.g[start] = 0; pf.f[start] = Math.hypot(tx - sx, ty - sy); pf.from[start] = -1; pf.gen[start] = gen;
+  push(start);
   let iter = 0, found = false;
-  while (open.length) {
+  while (hn > 0) {
     if (++iter > 20000) break;
-    // 取 f 最小
-    let bi = 0;
-    for (let k = 1; k < open.length; k++) if (pf.f[open[k]] < pf.f[open[bi]]) bi = k;
-    const cur = open.splice(bi, 1)[0];
+    const cur = pop();
+    if (pf.closed[cur] === gen) continue; // 过期堆项
+    pf.closed[cur] = gen;
     if (cur === goal) { found = true; break; }
     const cx = cur % N, cy = (cur / N) | 0;
-    for (const [dx, dy, base] of DIRS) {
-      const nx = cx + dx, ny = cy + dy;
+    for (let d = 0; d < 8; d++) {
+      const nx = cx + PF_DIRS[d][0], ny = cy + PF_DIRS[d][1], base = PF_DIRS[d][2];
       if (nx < 0 || ny < 0 || nx >= N || ny >= N) continue;
       if (G.tileBlocked(w, nx, ny)) continue;
-      if (dx !== 0 && dy !== 0) { // 禁止穿角
-        if (G.tileBlocked(w, cx + dx, cy) || G.tileBlocked(w, cx, cy + dy)) continue;
+      if (nx !== cx && ny !== cy) { // 禁止穿角
+        if (G.tileBlocked(w, cx + (nx - cx), cy) || G.tileBlocked(w, cx, cy + (ny - cy))) continue;
       }
       const ni = ny * N + nx;
-      let cost = base * (w.road[ni] ? 0.55 : 1);
-      const ng = pf.g[cur] + cost;
+      if (pf.closed[ni] === gen) continue;
+      const ng = pf.g[cur] + base * (w.road[ni] ? 0.55 : 1);
       if (pf.gen[ni] !== gen || ng < pf.g[ni]) {
         pf.gen[ni] = gen;
         pf.g[ni] = ng;
         pf.f[ni] = ng + Math.hypot(tx - nx, ty - ny);
         pf.from[ni] = cur;
-        open.push(ni);
+        push(ni);
       }
     }
   }

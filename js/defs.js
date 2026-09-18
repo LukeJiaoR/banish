@@ -32,19 +32,25 @@ G.BDEF = {
     id: 'forester', name: '护林小屋', icon: '🌲', w: 2, h: 2,
     cost: { wood: 20, stone: 12 }, buildWork: 70, jobs: 4, passable: false,
     wall: '#6b5a3e', wallD: '#54462f', roof: '#4a6b3a',
-    desc: '原版成本 20木+12石，4 名工人。砍树取原木（1 树=2 原木）并补种。约 30-50 原木/工人/年。',
+    desc: '原版成本 20木+12石，4 名工人。砍树取原木（1 树=2 原木）并补种，约 30-50 原木/工人/年。面板可分别开关「砍伐」与「补种」：只种不砍可育林，只砍不种会清光森林。',
   },
   woodcutter: {
     id: 'woodcutter', name: '伐木屋', icon: '🪓', w: 2, h: 2,
     cost: { wood: 24, stone: 8 }, buildWork: 70, jobs: 1, passable: false,
     wall: '#75563c', wallD: '#5b4230', roof: '#7a5230',
-    desc: '原版成本 24木+8石，1 名工人。1 原木 = 3 柴火（原版配比）。入冬前务必多储备。',
+    desc: '原版成本 24木+8石，1 名工人。把原木劈成柴火：1 原木 = 3 柴火（受教育 4）。工人自己去仓库背原木——建在仓库旁边效率更高。入冬前务必多储备。',
   },
   dock: {
     id: 'dock', name: '渔码头', icon: '🎣', w: 2, h: 2,
     cost: { wood: 30, stone: 16 }, buildWork: 90, jobs: 4, passable: false,
     wall: '#6f5b40', wallD: '#574732', roof: '#8a5a3a',
     desc: '原版成本 30木+16石，4 名工人，全年产约 350-500 食物/工人/年。必须紧邻水面。',
+  },
+  school: {
+    id: 'school', name: '学堂', icon: '🏫', w: 3, h: 3,
+    cost: { wood: 50, stone: 40 }, buildWork: 100, jobs: 1, passable: false,
+    wall: '#7d6f52', wallD: '#615540', roof: '#4a5a6b',
+    desc: '原版 School House 成本 50木+40石，1 名教师。孩子 10 岁入学、16 岁毕业，毕业工人干活快 30%。学校停办时孩子满 10 岁直接当工人；已入学的孩子会继续读到毕业。',
   },
   farm: {
     id: 'farm', name: '农田', icon: '🌾', w: 8, h: 8,
@@ -61,14 +67,13 @@ G.BDEF = {
 };
 
 /* 工具栏顺序 */
-G.TOOLBAR = ['house', 'storage', 'gatherer', 'forester', 'woodcutter', 'dock', 'farm', 'road', 'demolish'];
-G.TOOL_DEMOLISH = 'demolish';
+G.TOOLBAR = ['house', 'storage', 'gatherer', 'forester', 'woodcutter', 'dock', 'school', 'farm', 'road', 'fell', 'demolish'];
 
 /* 产出参数（workH: 每次工作小时数；目标对齐原版年产量） */
 G.PROD = {
   gatherer:  { workH: 5, yield: { type: 'food', qty: 5 },  radius: 6, needTrees: 6 },
-  forester:  { workH: 40, logsYield: 2, plantH: 3, radius: 8 },
-  woodcutter: { workH: 7, logsIn: 2, firewoodOut: 6 },
+  forester:  { workH: 22, logsYield: 2, plantH: 3, radius: 12 },
+  woodcutter: { workH: 7, logsIn: 2, firewoodOut: 6, eduFirewoodPerLog: 4 },
   dock:      { workH: 5, yield: { type: 'food', qty: 4 } },
   farm:      { perTile: 7, tileWorkH: 0.5, growDays: 24 },
   builderChunk: 4,      // 建筑工人每段工作时长
@@ -86,12 +91,17 @@ G.LIFE = {
   birthFoodDays: 4,       // 粮食储备需可支撑的天数，才允许生育
   pairEvery: 3,           // 每 N 天尝试为单身者组建家庭
   maxFamily: 10,          // 每个家庭人口上限
+  restFrom: 22,           // 休息开始时刻（小时）：市民回家睡觉
+  restTo: 6,              // 休息结束时刻：天亮起床
+  gradAge: 16,            // 学堂毕业年龄
+  schoolCap: 20,          // 每所学堂学生容量
+  eduWorkMul: 0.7,        // 受教育工人任务工时倍率（同产出更快，≈ 产出 +43%）
 };
 G.LIFE.eatPerDay = G.LIFE.eatPerYear / G.YEAR_DAYS; // ≈2.08 食物/人/天（生育门槛、饥饿警告用）
 
-/* 树木生长（天数阈值；原版一棵树约 4 年成材） */
-G.TREE_YOUNG = 90;
-G.TREE_MATURE = 190;
+/* 树木生长（天数阈值；原版一棵树数年成材，本作约 2.5 年——配合护林圈可持续产量） */
+G.TREE_YOUNG = 60;
+G.TREE_MATURE = 120;
 G.TREE_LOGS = 2;          // 1 棵树 = 2 原木（原版，未受教育）
 
 /* 岩石：清理每格岩石获得石头（原版地表岩石是初期石头来源） */

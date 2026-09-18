@@ -53,6 +53,7 @@ G.newGame = function (seed) {
   G.cam.x = window.innerWidth / 2 - sx * G.cam.z;
   G.cam.y = window.innerHeight / 2 - sy * G.cam.z;
   G.needGround = true;
+  G.groundDirty.clear();
 
   G.ui.toast('归园 · 放逐小镇复刻原型（原版数值）', 'good');
   G.ui.toast('中难度开局：4 个家庭无家可归。先盖木屋（16木+8石）安家，再修采集小屋、护林小屋保食物木材', 'warn');
@@ -62,34 +63,42 @@ G.newGame = function (seed) {
 };
 
 /* ---------- 存档 ---------- */
+/* 序列化当前对局（存档与反馈快照共用；不含 savedAt） */
+G.serializeGame = function () {
+  const w = G.world, g = G.game;
+  return {
+    v: 1, seed: w.seed,
+    game: {
+      h: g.h, day: g.day, season: g.season, year: g.year,
+      res: g.res, stats: g.stats, prevFood: g.prevFood, foodNet: g.foodNet, warned: g.warned,
+    },
+      trees: w.trees.map(t => [t.i, t.x, t.y, t.b]),
+      marked: [...w.marked],
+      rockCleared: w.rockCleared,
+    buildings: w.buildings.map(b => ({
+      id: b.id, type: b.type, x: b.x, y: b.y, state: b.state,
+      progress: b.progress, workLeft: b.workLeft, totalWork: b.totalWork,
+      workers: b.workers, family: b.family, noWork: b.noWork, warnText: b.warnText,
+      doCut: b.doCut, doPlant: b.doPlant,
+      farm: b.farm ? b.farm.map(f => [f.sown ? 1 : 0, f.harvested ? 1 : 0]) : undefined,
+      sownAll: b.sownAll, growth: b.growth, harvestDone: b.harvestDone,
+    })),
+    families: w.families.map(f => ({ id: f.id, members: f.members, houseId: f.houseId })),
+    citizens: w.citizens.map(c => ({
+      id: c.id, name: c.name, sex: c.sex, age: c.age, adult: c.adult,
+      x: c.x, y: c.y, familyId: c.familyId, job: c.job,
+      student: c.student ? 1 : 0, educated: c.educated ? 1 : 0, school: c.school != null ? c.school : null,
+      hunger: c.hunger, cold: c.cold, carry: c.carry,
+    })),
+    nextUid: G._peekUid(),
+  };
+};
+
 G.saveGame = function (key, silent) {
   key = key || G.SAVE_KEY;
   try {
-    const w = G.world, g = G.game;
-    const data = {
-      v: 1, seed: w.seed,
-      savedAt: Date.now(),
-      game: {
-        h: g.h, day: g.day, season: g.season, year: g.year,
-        res: g.res, stats: g.stats, prevFood: g.prevFood, foodNet: g.foodNet, warned: g.warned,
-      },
-      trees: w.trees.map(t => [t.i, t.x, t.y, t.b]),
-      rockCleared: w.rockCleared,
-      buildings: w.buildings.map(b => ({
-        id: b.id, type: b.type, x: b.x, y: b.y, state: b.state,
-        progress: b.progress, workLeft: b.workLeft, totalWork: b.totalWork,
-        workers: b.workers, family: b.family, noWork: b.noWork, warnText: b.warnText,
-        farm: b.farm ? b.farm.map(f => [f.sown ? 1 : 0, f.harvested ? 1 : 0]) : undefined,
-        sownAll: b.sownAll, growth: b.growth, harvestDone: b.harvestDone,
-      })),
-      families: w.families.map(f => ({ id: f.id, members: f.members, houseId: f.houseId })),
-      citizens: w.citizens.map(c => ({
-        id: c.id, name: c.name, sex: c.sex, age: c.age, adult: c.adult,
-        x: c.x, y: c.y, familyId: c.familyId, job: c.job,
-        hunger: c.hunger, cold: c.cold, carry: c.carry,
-      })),
-    };
-    data.nextUid = G._peekUid();
+    const data = G.serializeGame();
+    data.savedAt = Date.now();
     localStorage.setItem(key, JSON.stringify(data));
     if (!silent) G.ui.toast('💾 已保存', 'good');
   } catch (e) {
@@ -136,12 +145,15 @@ G.loadGame = function (key) {
       w.rock[i] = 0;
       w.rockCleared.push(i);
     }
+    // 「砍伐」标记
+    if (d.marked) for (const i of d.marked) w.marked.add(i);
     // 建筑
     for (const bd of d.buildings) {
       const b = {
         id: bd.id, type: bd.type, x: bd.x, y: bd.y, w: G.BDEF[bd.type].w, h: G.BDEF[bd.type].h,
         state: bd.state, progress: bd.progress, workLeft: bd.workLeft, totalWork: bd.totalWork,
         workers: bd.workers, family: bd.family, noWork: bd.noWork, warnText: bd.warnText || '',
+        doCut: bd.doCut !== false, doPlant: bd.doPlant !== false, // 旧档无此字段默认全开
       };
       if (bd.type === 'farm') {
         b.farm = [];
@@ -163,7 +175,8 @@ G.loadGame = function (key) {
       const c = {
         id: cd.id, name: cd.name, sex: cd.sex, age: cd.age, adult: cd.adult,
         x: cd.x, y: cd.y, familyId: cd.familyId, job: cd.job,
-        task: null, carry: cd.carry, state: 'idle', walkKind: '', path: null, pi: 0,
+        student: !!cd.student, educated: !!cd.educated, school: cd.school != null ? cd.school : null,
+        task: null, pausedTask: null, carry: cd.carry, state: 'idle', walkKind: '', path: null, pi: 0,
         wanderT: Math.random() * 3, hunger: cd.hunger, cold: cd.cold, animT: 0, dead: false,
       };
       w.citizens.push(c);
@@ -178,6 +191,7 @@ G.loadGame = function (key) {
     G.cam.x = window.innerWidth / 2 - sx * G.cam.z;
     G.cam.y = window.innerHeight / 2 - sy * G.cam.z;
     G.needGround = true;
+    G.groundDirty.clear();
     G.ui.toast(key === G.AUTOSAVE_KEY ? '📂 已自动恢复上次进度（🌱 可开新局）' : '📂 存档已载入', 'good');
     G.ui.refreshHUD();
   } catch (e) {
@@ -186,13 +200,39 @@ G.loadGame = function (key) {
   }
 };
 
+/* ---------- 相机 ---------- */
+/* 把相机限制在地图附近（各边留一点余量，不允许拖到纯黑区域） */
+G.clampCam = function () {
+  if (!G.world || !G.cv) return;
+  const z = G.cam.z, N = G.world.N, m = 60;
+  const half = N * 32 * z; // u/v 两个方向的地图半跨
+  G.cam.x = G.clamp(G.cam.x, m - half, G.cv.clientWidth - m + half);
+  G.cam.y = G.clamp(G.cam.y, m - half, G.cv.clientHeight - m);
+};
+
 /* ---------- 工具模式 ---------- */
 G.setTool = function (t) {
   if (t == null) { G.tool = null; }
   else if (t === 'demolish') G.tool = { kind: 'demolish' };
   else if (t === 'road') G.tool = { kind: 'road' };
+  else if (t === 'fell') G.tool = { kind: 'fell' };
   else G.tool = { kind: 'build', type: t };
   G.ui.setToolActive();
+};
+
+/* 「砍伐」工具：沿线把树木标记为待砍（原版 Harvest Trees 的拖拽框选） */
+G.paintFell = function (x0, y0, x1, y1) {
+  const w = G.world;
+  const dx = Math.abs(x1 - x0), dy = Math.abs(y1 - y0);
+  const sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
+  let err = dx - dy, x = x0, y = y0;
+  while (true) {
+    G.markFellAt(w, x, y);
+    if (x === x1 && y === y1) break;
+    const e2 = 2 * err;
+    if (e2 > -dy) { err -= dy; x += sx; }
+    if (e2 < dx) { err += dx; y += sy; }
+  }
 };
 
 /* ---------- 建造 ---------- */
@@ -209,20 +249,19 @@ G.paintRoad = function (x0, y0, x1, y1) {
   const w = G.world;
   const dx = Math.abs(x1 - x0), dy = Math.abs(y1 - y0);
   const sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
-  let err = dx - dy, x = x0, y = y0, painted = 0;
+  let err = dx - dy, x = x0, y = y0;
   while (true) {
     if (G.canPlaceRoad(w, x, y)) {
       if (w.treeIdx[y * w.N + x] >= 0) G.removeTree(w, x, y);
       G.clearRock(w, x, y);
       w.road[y * w.N + x] = 1;
-      painted++;
+      G.markGroundDirty(x, y);
     }
     if (x === x1 && y === y1) break;
     const e2 = 2 * err;
     if (e2 > -dy) { err -= dy; x += sx; }
     if (e2 < dx) { err += dx; y += sy; }
   }
-  if (painted) G.needGround = true;
 };
 
 /* ---------- 初始化 ---------- */
@@ -241,6 +280,7 @@ G.init = function () {
   resize();
 
   G.ui.init();
+  G.feedback.init();
   // 启动：有自动存档则恢复上次进度，否则开新局
   if (localStorage.getItem(G.AUTOSAVE_KEY)) G.loadGame(G.AUTOSAVE_KEY);
   else G.newGame();
@@ -257,6 +297,7 @@ G.init = function () {
   /* ----- 输入 ----- */
   let dragging = false, dragBtn = -1, dragMoved = 0, lastX = 0, lastY = 0;
   let roadLast = null;
+  let fellLast = null;
 
   const toLocal = (e) => {
     const r = G.cv.getBoundingClientRect();
@@ -276,6 +317,12 @@ G.init = function () {
       if (G.canPlaceRoad(G.world, tx, ty)) { G.paintRoad(tx, ty, tx, ty); roadLast = { x: tx, y: ty }; }
       else roadLast = { x: tx, y: ty };
     }
+    if (e.button === 0 && G.tool && G.tool.kind === 'fell') {
+      const t = G.screenToTile(p.x, p.y);
+      const tx = Math.floor(t.tx), ty = Math.floor(t.ty);
+      G.markFellAt(G.world, tx, ty);
+      fellLast = { x: tx, y: ty };
+    }
   });
 
   window.addEventListener('mousemove', e => {
@@ -293,6 +340,12 @@ G.init = function () {
       if (tx !== roadLast.x || ty !== roadLast.y) {
         G.paintRoad(roadLast.x, roadLast.y, tx, ty);
         roadLast = { x: tx, y: ty };
+      }
+    } else if (dragBtn === 0 && G.tool && G.tool.kind === 'fell' && fellLast) {
+      const tx = Math.floor(t.tx), ty = Math.floor(t.ty);
+      if (tx !== fellLast.x || ty !== fellLast.y) {
+        G.paintFell(fellLast.x, fellLast.y, tx, ty);
+        fellLast = { x: tx, y: ty };
       }
     }
   });
@@ -334,7 +387,9 @@ G.init = function () {
     else if (e.key === '2') { G.game.paused = false; G.game.speed = 3; G.ui.refreshHUD(); }
     else if (e.key === '3') { G.game.paused = false; G.game.speed = 8; G.ui.refreshHUD(); }
     else if (e.key === 'Escape') {
-      if (!document.getElementById('saves').classList.contains('hidden')) G.ui.closeSaves();
+      if (!document.getElementById('errs').classList.contains('hidden')) document.getElementById('errs').classList.add('hidden');
+      else if (!document.getElementById('fb').classList.contains('hidden')) G.feedback.close();
+      else if (!document.getElementById('saves').classList.contains('hidden')) G.ui.closeSaves();
       else if (G.tool) G.setTool(null);
       else if (G.sel) G.ui.hideInfo();
       else G.ui.toggleHelp(false);
@@ -353,6 +408,7 @@ G.init = function () {
     if (G.keys['s'] || G.keys['arrowdown']) G.cam.y -= pan;
     if (G.keys['a'] || G.keys['arrowleft']) G.cam.x += pan;
     if (G.keys['d'] || G.keys['arrowright']) G.cam.x -= pan;
+    if (G.world) G.clampCam();
 
     if (!G.game.paused && !G.game.over) {
       G.advanceSim(dtReal * G.HOURS_PER_SEC * G.game.speed);

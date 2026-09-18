@@ -16,9 +16,11 @@
     <div id="pop">👥 0</div>
     <div id="speed"></div>
     <div id="sys">
+      <button id="btn-err" title="脚本错误记录" class="hidden">⚠</button>
       <button id="btn-save" title="保存到手动档">💾</button>
       <button id="btn-load" title="存档管理：载入 / 删除">📂</button>
       <button id="btn-new" title="新游戏">🌱</button>
+      <button id="btn-fb" title="发送试玩反馈（无需注册）">📮</button>
       <button id="btn-help" title="帮助">❓</button>
     </div>
   </div>
@@ -39,15 +41,18 @@
         <li><b>滚轮</b>：缩放；<b>WASD / 方向键</b>：平移</li>
         <li><b>空格</b>：暂停；<b>1 / 2 / 3</b>：速度</li>
         <li><b>Esc</b>：取消工具 / 取消选择</li>
+        <li><b>🪚 砍伐</b>：点击或框选树木做标记（原版 Harvest Trees），无业散工前来砍倒，每次 2 原木入库</li>
       </ul>
-      <p>💾 换季、每 90 秒和离开页面时会自动写入「自动档」，刷新后自动恢复；📂 打开存档管理可载入/删除；💾 为手动存档，🌱 开新局。</p>
+      <p>💾 换季、每 90 秒和离开页面时会自动写入「自动档」，刷新后自动恢复；📂 打开存档管理可载入/删除；💾 为手动存档，🌱 开新局。遇到问题或想法，点右上角 📮 一句话反馈（无需注册）。</p>
       <h3>生存要点（数值对齐原版 Banished）</h3>
       <ul>
         <li>🍖 每人每年吃 100 食物。采集小屋（需森林，约 300-500/工人/年）、农田（约 7 食物/格/年，春种秋收）、渔码头（需临水）</li>
-        <li>🪵 1 棵树 = 2 原木（护林小屋砍树种树）；🔥 伐木屋把原木做成柴火（1 原木 = 3 柴火）</li>
+        <li>🪵 1 棵树 = 2 原木。护林小屋砍树 + 补种（面板可分别开关）；🔥 伐木屋把原木劈成柴火：1 原木 = 3 柴火（受教育 4），工人自己跑仓库背料——挨着仓库建更快</li>
         <li>🪨 石头靠清理地表岩石：在岩石上盖房、铺路、或用拆除工具清除</li>
         <li>🏠 每人都要有木屋（16木+8石），每屋每年约烧 30 柴火；入冬前没房没柴会冻死人</li>
-        <li>👶 有房有粮的夫妇约 2~3 年生一胎；孩子满 10 岁开始工作</li>
+        <li>🌙 市民 22:00–6:00 回家睡觉（无房者只能露宿，寒冬更危险）；白天劳作</li>
+        <li>🎓 学堂（50木+40石）：孩子 10 岁入学、16 岁毕业。毕业工人干活更快——伐木屋 1 原木出 4 柴火，其余工种提速 30%</li>
+        <li>👶 有房有粮的夫妇约 2~3 年生一胎；孩子满 10 岁开始工作（或入学）</li>
         <li>⚠️ 中难度开局：4 个家庭无家可归，只有一辆储物车（木80 石48 食200 柴24）</li>
       </ul>
       <button id="help-close">开始游戏</button>
@@ -63,6 +68,38 @@
         <button id="save-now">💾 保存到手动档</button>
         <button id="saves-clear" class="clear-all">🗑 清空全部存档</button>
         <button id="saves-close">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="errs" class="overlay hidden">
+    <div class="dialog">
+      <h2>⚠ 脚本错误记录</h2>
+      <pre class="err-pre" id="err-list"></pre>
+      <div class="save-actions">
+        <button id="errs-clear">清空</button>
+        <button id="errs-close">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="fb" class="overlay hidden">
+    <div class="dialog">
+      <h2>📮 反馈 <small>不用注册，一句话就行</small></h2>
+      <p class="fb-hint">太难 / 太简单、数值不对、Bug、想要的功能……都会直接发给开发者。附带的存档快照只含游戏数据，用来复现问题。</p>
+      <textarea id="fb-text" maxlength="2000" placeholder="比如：第一个冬天必死，柴火不够用……"></textarea>
+      <div class="fb-row">
+        <label>昵称（可选）<input id="fb-name" maxlength="20" placeholder="方便回访你"></label>
+        <label class="fb-ck"><input type="checkbox" id="fb-attach" checked>附带当前存档快照</label>
+      </div>
+      <p class="fb-status" id="fb-status"></p>
+      <div id="fb-fallback" class="hidden">
+        <p class="fb-hint">反馈内容如下，点击文本框全选，复制发给开发者（微信 / 邮箱均可）：</p>
+        <textarea id="fb-fallback-text" readonly></textarea>
+      </div>
+      <div class="save-actions">
+        <button id="fb-send">发送</button>
+        <button id="fb-close" class="plain">关闭</button>
       </div>
     </div>
   </div>
@@ -88,6 +125,7 @@ window.addEventListener('unhandledrejection', e => window.__errs.push('promise: 
 <script src="js/sim.js"></script>
 <script src="js/render.js"></script>
 <script src="js/ui.js"></script>
+<script src="js/feedback.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>

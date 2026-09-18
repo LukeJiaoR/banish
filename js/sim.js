@@ -20,6 +20,7 @@ G.game = G.newGameState();
 
 G.seasonOf = function (day) { return Math.floor((day % G.YEAR_DAYS) / G.SEASON_DAYS); };
 G.isWinter = function () { return G.game.season === 3; };
+G.isRestTime = function () { const h = G.game.h; return h >= G.LIFE.restFrom || h < G.LIFE.restTo; };
 
 /* ================= 时间推进 ================= */
 G.advanceSim = function (dtH) {
@@ -70,13 +71,28 @@ G.endDay = function () {
     }
   }
 
+  // 学堂学生数（每天重算，供入学容量判断）
+  const schoolCount = {};
+  for (const c of w.citizens) if (c.school != null) schoolCount[c.school] = (schoolCount[c.school] || 0) + 1;
+
   const dead = [];
   for (const c of w.citizens) {
     c.age += 1 / G.YEAR_DAYS;
-    // 长大成人
-    if (!c.adult && c.age >= G.ADULT_AGE) {
-      c.adult = true;
-      G.ui.toast(`${c.name} 长大成人，可以工作了`, 'good');
+    // 成长：有在办学堂就入学，否则直接当工人；学生毕业成为受教育工人
+    if (!c.adult && c.age >= G.ADULT_AGE && !c.student) {
+      const sc = G.pickSchool(schoolCount);
+      if (sc) {
+        c.student = true; c.school = sc.id;
+        schoolCount[sc.id] = (schoolCount[sc.id] || 0) + 1;
+        G.ui.toast(`🎓 ${c.name} 进入学堂读书`, 'good');
+      } else {
+        c.adult = true;
+        G.ui.toast(`${c.name} 长大成人，可以工作了`, 'good');
+      }
+    }
+    if (c.student && c.age >= G.LIFE.gradAge) {
+      c.student = false; c.adult = true; c.educated = true; c.school = null;
+      G.ui.toast(`🎓 ${c.name} 学成毕业`, 'good');
     }
     // 冻：取暖看自家的屋子——没分到柴火的房子挨冻，无房更冷
     if (winter) {
@@ -147,14 +163,15 @@ G.onSeasonChange = function (from, to) {
       }
     }
   }
-  G.needGround = true;
+  G.needGround = true;          // 换季调色板变化，整图重绘
+  if (G.groundDirty) G.groundDirty.clear();
   if (G.autosave) G.autosave();
 };
 
 /* ================= 家庭 ================= */
 G.formFamilies = function () {
   const w = G.world;
-  const singles = w.citizens.filter(c => !c.dead && c.age >= G.MOTHER_MIN && c.familyId == null);
+  const singles = w.citizens.filter(c => !c.dead && c.age >= G.MOTHER_MIN && c.familyId == null && !c.student);
   const men = singles.filter(c => c.sex === 'm'), women = singles.filter(c => c.sex === 'f');
   for (const m of men) {
     if (m.familyId != null) continue;
@@ -233,7 +250,8 @@ G.spawnCitizen = function (opt) {
     adult: opt.adult !== undefined ? opt.adult : (opt.age === undefined ? true : opt.age >= G.ADULT_AGE),
     x: opt.x, y: opt.y,
     familyId: opt.familyId != null ? opt.familyId : null,
-    job: null, task: null, carry: null,
+    job: null, task: null, carry: null, pausedTask: null,
+    student: false, educated: false, school: null,
     state: 'idle', walkKind: '', path: null, pi: 0,
     wanderT: G.rng() * 3,
     hunger: 0, cold: 0,
@@ -309,18 +327,67 @@ G.sendTo = function (c, tx, ty) {
   const p = G.findPath(G.world, Math.round(c.x), Math.round(c.y), tx, ty);
   if (!p) { c.state = 'idle'; c.task = null; return; }
   c.path = p; c.pi = 0;
-  if (p.length === 0) { c.state = 'work'; if (c.task) c.task.workLeft = c.task.work; }
+  if (p.length === 0) { c.state = 'work'; if (c.task && !(c.task.workLeft > 0)) c.task.workLeft = c.task.work; }
   else { c.state = 'walk'; c.walkKind = 'task'; }
+};
+
+/* 回家睡觉（无房者就地睡）。没干完的活先挂起，天亮接着干——
+ * 否则 40 小时的伐木任务永远无法在 16 小时的工作日内完成 */
+G.goHome = function (c) {
+  if (c.task) c.pausedTask = c.task;
+  c.task = null;
+  const h = G.homeOf(c);
+  if (!h) { c.path = null; c.state = 'rest'; return; }
+  const spot = G.workSpot(G.world, h, c.x, c.y);
+  const p = G.findPath(G.world, Math.round(c.x), Math.round(c.y), spot ? spot.x : h.x, spot ? spot.y : h.y);
+  if (p && p.length) { c.path = p; c.pi = 0; c.state = 'walk'; c.walkKind = 'home'; }
+  else { c.path = null; c.state = 'rest'; }
+};
+
+/* 天亮续接昨晚挂起的任务；目标已失效（树被砍/建筑拆了/换岗位）则放弃 */
+G.resumeTask = function (c) {
+  const t = c.pausedTask;
+  c.pausedTask = null;
+  if (!t) return false;
+  const w = G.world;
+  // 有建筑的任务要求仍在原岗位；无建筑任务 = 散工砍标记树，只看树还在不在
+  let ok = t.b ? (c.job != null && w.bmap[c.job] === t.b) : (t.kind === 'chop');
+  if (ok && t.kind === 'chop') {
+    const idx = w.treeIdx[t.ty * w.N + t.tx];
+    ok = idx >= 0 && w.trees[idx] === t.tree;   // 同一棵树还在（防止重种/互换后误续）
+  } else if (ok && t.kind === 'plant') {
+    const i = t.ty * w.N + t.tx;
+    ok = !w.water[i] && !w.rock[i] && !w.road[i] && w.treeIdx[i] < 0 && w.bgrid[i] < 0;
+  } else if (ok && t.kind === 'sow') {
+    ok = !!(t.b.farm && t.b.farm[t.ti] && !t.b.farm[t.ti].sown);
+  } else if (ok && t.kind === 'harvest') {
+    ok = !!(t.b.farm && t.b.farm[t.ti] && t.b.farm[t.ti].sown && !t.b.farm[t.ti].harvested);
+  } else if (ok && t.kind === 'firewood') {
+    ok = t.b.state === 'ok';
+  } else if (ok && t.kind === 'build') {
+    ok = t.b.state === 'site';
+  }
+  if (!ok) return false;
+  c.task = t;
+  c.state = 'idle';
+  G.sendTo(c, t.tx, t.ty); // sendTo/arrive 只在 workLeft 为 0 时才重置满工时
+  return true;
+};
+
+/* 最近的可用仓库 */
+G.nearestStorage = function (x, y) {
+  let best = null, bd = Infinity;
+  for (const s of G.world.buildings) {
+    if (s.type !== 'storage' || s.state !== 'ok') continue;
+    const d = G.d2(x, y, s.x + s.w / 2, s.y + s.h / 2);
+    if (d < bd) { bd = d; best = s; }
+  }
+  return best;
 };
 
 /* 开始搬运去仓库 */
 G.startHaul = function (c) {
-  const storages = G.world.buildings.filter(b => b.type === 'storage' && b.state === 'ok');
-  let best = null, bd = Infinity;
-  for (const s of storages) {
-    const d = G.d2(c.x, c.y, s.x + s.w / 2, s.y + s.h / 2);
-    if (d < bd) { bd = d; best = s; }
-  }
+  const best = G.nearestStorage(c.x, c.y);
   if (!best) { // 没有仓库：直接入库
     G.game.res[c.carry.type] += c.carry.qty;
     c.carry = null;
@@ -337,9 +404,35 @@ G.startHaul = function (c) {
   } else c.state = 'haul';
 };
 
+/* 背料到达仓库：转入回屋加工段。返回 false = 仓库没料（白跑） */
+G.firewoodFetchDone = function (c, t) {
+  if (G.game.res[t.consume.type] < t.consume.qty) return false;
+  const spot = G.workSpot(G.world, t.b, c.x, c.y);
+  if (!spot) return false;
+  t.phase = 'work';
+  t.tx = spot.x; t.ty = spot.y;
+  t.workLeft = t.work;
+  c.task = t;   // completeTask 入口会清空任务，续段要挂回去
+  c.state = 'idle';
+  G.sendTo(c, t.tx, t.ty);
+  return true;
+};
+
 /* 市民每帧步进 */
 G.stepCitizen = function (c, dtH) {
   if (c.dead) return;
+  if (c.state === 'rest') {
+    if (!G.isRestTime()) {
+      c.state = 'idle';
+      if (!G.resumeTask(c)) c.wanderT = 0.5 + G.rng() * 2; // 天亮起床：先接着干昨晚的活
+    }
+    return;
+  }
+  // 深夜：回家睡觉（正在搬货的先送完这趟）
+  if (G.isRestTime() && c.state !== 'haul' && !(c.state === 'walk' && c.walkKind === 'home')) {
+    G.goHome(c);
+    if (c.state === 'rest') return;
+  }
   switch (c.state) {
     case 'walk':
     case 'haul': {
@@ -368,7 +461,7 @@ G.stepCitizen = function (c, dtH) {
       c.wanderT -= dtH;
       if (c.wanderT <= 0) {
         c.wanderT = 2 + G.rng() * 5;
-        if (c.age >= G.ADULT_AGE && c.job) G.requestTask(c);
+        if (c.age >= G.ADULT_AGE) G.requestTask(c); // 有岗位的接活；无业散工顺路处理「砍伐」标记
         else G.wander(c);
       }
     }
@@ -385,8 +478,15 @@ G.arrive = function (c) {
     G.requestTask(c);
   } else if (c.state === 'walk') {
     if (c.walkKind === 'task' && c.task) {
+      if (c.task.kind === 'firewood' && c.task.phase === 'fetch') {
+        // 到仓库只是背料，不加工：直接转入回屋加工段
+        if (!G.firewoodFetchDone(c, c.task)) { c.task = null; c.state = 'idle'; c.wanderT = 2; }
+        return;
+      }
       c.state = 'work';
-      c.task.workLeft = c.task.work;
+      if (!(c.task.workLeft > 0)) c.task.workLeft = c.task.work; // 续接的任务保留剩余工时
+    } else if (c.walkKind === 'home') {
+      c.state = 'rest';
     } else {
       c.state = 'idle';
       c.wanderT = 2 + G.rng() * 5;
@@ -397,15 +497,31 @@ G.arrive = function (c) {
 /* ================= 任务系统 ================= */
 G.requestTask = function (c) {
   c.task = null;
+  if (G.isRestTime()) { G.goHome(c); return; } // 深夜不接受新任务
   const w = G.world;
   const b = c.job != null ? w.bmap[c.job] : null;
-  if (!b) { c.state = 'idle'; return; }
+  if (!b) {
+    // 无业散工：处理「砍伐」标记（原版 Harvest Trees 由劳动者执行）
+    // 同一棵标记树只派一人（标记数量有限，不允许多人工复重叠）
+    const claimed = new Set();
+    for (const c2 of w.citizens)
+      if (c2 !== c && c2.task && c2.task.kind === 'chop' && !c2.task.b) claimed.add(c2.task.ty * w.N + c2.task.tx);
+    const mt = G.pickMarkedTree(w, c.x, c.y, claimed);
+    if (mt) {
+      c.task = { kind: 'chop', b: null, tx: mt.x, ty: mt.y, tree: mt.tree, work: G.taskWork(c, G.PROD.forester.workH), workLeft: 0 };
+      G.sendTo(c, mt.x, mt.y);
+      return;
+    }
+    c.state = 'idle';
+    G.wander(c); // 没有标记树则照常闲逛
+    return;
+  }
   if (b.state === 'site') {
     if (b.workLeft <= 0) { G.finishBuilding(b); c.state = 'idle'; return; }
     const spot = G.workSpot(w, b, c.x, c.y) || { x: b.x, y: b.y };
     c.task = {
       kind: 'build', b, tx: spot.x, ty: spot.y,
-      work: Math.min(G.PROD.builderChunk, b.workLeft),
+      work: Math.min(G.taskWork(c, G.PROD.builderChunk), b.workLeft),
       workLeft: 0, total: b.totalWork,
     };
     G.sendTo(c, spot.x, spot.y);
@@ -422,6 +538,9 @@ G.requestTask = function (c) {
   }
 };
 
+/* 任务工时：受过教育的工人更快（原版教育产出加成，产出不变、耗时缩短） */
+G.taskWork = function (c, hours) { return c.educated ? hours * G.LIFE.eduWorkMul : hours; };
+
 /* 按建筑类型生成任务 */
 G.makeTask = function (b, c) {
   const P = G.PROD, g = G.game, w = G.world;
@@ -430,11 +549,15 @@ G.makeTask = function (b, c) {
       if (g.res.wood >= P.woodcutter.logsIn) {
         const spot = G.workSpot(w, b, c.x, c.y);
         if (!spot) return null;
+        // 两段式（原版）：先去仓库背原木，回伐木屋加工，产出再背回仓库；没仓库就就地加工
+        const st = G.nearestStorage(b.x, b.y);
+        const target = st ? (G.workSpot(w, st, b.x, b.y) || { x: st.x, y: st.y }) : spot;
         return {
-          kind: 'work', b, tx: spot.x, ty: spot.y,
+          kind: 'firewood', b, tx: target.x, ty: target.y, phase: st ? 'fetch' : 'work',
           work: P.woodcutter.workH, workLeft: 0,
-          consume: { type: 'wood', qty: P.woodcutter.logsIn },  // 完工时才扣料，任务中途取消不丢木材
-          yield: { type: 'firewood', qty: P.woodcutter.firewoodOut },
+          consume: { type: 'wood', qty: P.woodcutter.logsIn },
+          // 原版：受教育工人 1 原木出 4 柴火（配比加成，而非提速）
+          yield: { type: 'firewood', qty: c.educated ? P.woodcutter.logsIn * P.woodcutter.eduFirewoodPerLog : P.woodcutter.firewoodOut },
         };
       }
       b.noWork = true; b.warnText = '缺木材';
@@ -442,22 +565,26 @@ G.makeTask = function (b, c) {
     }
     case 'forester': {
       const R = P.forester.radius;
-      const trees = G.treesInRadius(w, b.x, b.y, R, true);
-      // 已被其他工人认领的树不再重复认领（全部被认领时允许重叠）
-      const claimed = new Set();
-      for (const c2 of w.citizens)
-        if (c2.task && c2.task.kind === 'chop' && c2 !== c) claimed.add(c2.task.ty * w.N + c2.task.tx);
-      let best = null, bd = Infinity;
-      for (const t of trees) {
-        if (claimed.has(t.i) && claimed.size < trees.length) continue;
-        const d = G.d2(b.x, b.y, t.x, t.y) + G.rng() * 8;
-        if (d < bd) { bd = d; best = t; }
+      if (b.doCut) { // 砍伐成熟树（面板可开关，原版 Forester 的 Cut 选项）
+        const trees = G.treesInRadius(w, b.x, b.y, R, true);
+        // 已被其他工人认领的树不再重复认领（全部被认领时允许重叠）
+        const claimed = new Set();
+        for (const c2 of w.citizens)
+          if (c2.task && c2.task.kind === 'chop' && c2 !== c) claimed.add(c2.task.ty * w.N + c2.task.tx);
+        let best = null, bd = Infinity;
+        for (const t of trees) {
+          if (claimed.has(t.i) && claimed.size < trees.length) continue;
+          const d = G.d2(b.x, b.y, t.x, t.y) + G.rng() * 8;
+          if (d < bd) { bd = d; best = t; }
+        }
+        if (best) return { kind: 'chop', b, tx: best.x, ty: best.y, tree: best, work: G.taskWork(c, P.forester.workH), workLeft: 0 };
       }
-      if (best) return { kind: 'chop', b, tx: best.x, ty: best.y, tree: best, work: P.forester.workH, workLeft: 0 };
-      // 补种：螺旋扫描找最近可种空地（确定性，原版一棵树约 4 年成材）
-      const spot = G.nearestPlantSpot(w, b.x, b.y, R);
-      if (spot) return { kind: 'plant', b, tx: spot.x, ty: spot.y, work: P.forester.plantH, workLeft: 0 };
-      b.noWork = true; b.warnText = '无成熟树木且无空地';
+      if (b.doPlant) { // 补种（原版 Plant 选项）
+        const spot = G.nearestPlantSpot(w, b.x, b.y, R);
+        if (spot) return { kind: 'plant', b, tx: spot.x, ty: spot.y, work: G.taskWork(c, P.forester.plantH), workLeft: 0 };
+      }
+      b.noWork = true;
+      b.warnText = !b.doCut && !b.doPlant ? '已停用（砍伐/补种均关）' : (b.doCut ? '附近无成熟树木且无处补种' : '无处可补种');
       return null;
     }
     case 'gatherer': {
@@ -470,7 +597,7 @@ G.makeTask = function (b, c) {
       const t = trees[G.ri(0, trees.length - 1)];
       return {
         kind: 'work', b, tx: t.x, ty: t.y,
-        work: P.gatherer.workH, workLeft: 0, yield: { type: P.gatherer.yield.type, qty: P.gatherer.yield.qty },
+        work: G.taskWork(c, P.gatherer.workH), workLeft: 0, yield: { type: P.gatherer.yield.type, qty: P.gatherer.yield.qty },
       };
     }
     case 'dock': {
@@ -478,7 +605,7 @@ G.makeTask = function (b, c) {
       if (!spot) return null;
       return {
         kind: 'work', b, tx: spot.x, ty: spot.y,
-        work: P.dock.workH, workLeft: 0, yield: { type: P.dock.yield.type, qty: P.dock.yield.qty },
+        work: G.taskWork(c, P.dock.workH), workLeft: 0, yield: { type: P.dock.yield.type, qty: P.dock.yield.qty },
       };
     }
     case 'farm': {
@@ -489,7 +616,7 @@ G.makeTask = function (b, c) {
         const ti = b.farm.findIndex(f => !f.sown);
         if (ti >= 0) {
           const f = b.farm[ti];
-          return { kind: 'sow', b, ti, tx: f.x, ty: f.y, work: P2.tileWorkH, workLeft: 0 };
+          return { kind: 'sow', b, ti, tx: f.x, ty: f.y, work: G.taskWork(c, P2.tileWorkH), workLeft: 0 };
         }
       }
       // 收获（秋，作物长成）
@@ -497,7 +624,7 @@ G.makeTask = function (b, c) {
         const ti = b.farm.findIndex(f => !f.harvested);
         if (ti >= 0) {
           const f = b.farm[ti];
-          return { kind: 'harvest', b, ti, tx: f.x, ty: f.y, work: P2.tileWorkH, workLeft: 0 };
+          return { kind: 'harvest', b, ti, tx: f.x, ty: f.y, work: G.taskWork(c, P2.tileWorkH), workLeft: 0 };
         }
       }
       return null;
@@ -521,7 +648,9 @@ G.completeTask = function (c) {
       break;
     }
     case 'chop': {
-      if (b && G.world.treeIdx[t.ty * G.world.N + t.tx] >= 0) {
+      const treeOk = G.world.treeIdx[t.ty * G.world.N + t.tx] >= 0;
+      const jobOk = !t.b || G.world.bmap[t.b.id] === t.b; // b 为空 = 散工砍标记树
+      if (treeOk && jobOk) {
         G.removeTree(G.world, t.tx, t.ty);
         c.carry = { type: 'wood', qty: G.TREE_LOGS };
       }
@@ -537,6 +666,17 @@ G.completeTask = function (c) {
         G.game.res[t.consume.type] -= t.consume.qty;
       }
       if (t.yield) c.carry = { type: t.yield.type, qty: t.yield.qty };
+      break;
+    }
+    case 'firewood': {
+      if (t.phase === 'fetch') {
+        // 到仓库背料：有料转入加工段（木料在完工时才扣）；没料则白跑一趟
+        if (!G.firewoodFetchDone(c, t)) break;
+        return;
+      }
+      if (G.game.res[t.consume.type] < t.consume.qty) break; // 加工期间料被挪用，这趟白干
+      G.game.res[t.consume.type] -= t.consume.qty;
+      c.carry = { type: 'firewood', qty: t.yield.qty };
       break;
     }
     case 'sow': {
@@ -571,7 +711,7 @@ G.releaseWorker = function (c) {
     const b = w.bmap[c.job];
     if (b) b.workers = b.workers.filter(id => id !== c.id);
   }
-  c.job = null; c.task = null;
+  c.job = null; c.task = null; c.pausedTask = null;
   c.state = 'idle'; c.wanderT = 0.5;
 };
 
@@ -592,10 +732,20 @@ G.pickNearest = function (cands, b) {
   return best;
 };
 
+/* 找一所还有空位的在办学堂（有教师才开学） */
+G.pickSchool = function (counts) {
+  const w = G.world;
+  for (const b of w.buildings)
+    if (b.type === 'school' && b.state === 'ok' && b.workers.length > 0 && (counts[b.id] || 0) < G.LIFE.schoolCap) return b;
+  return null;
+};
+
 G.scheduleJobs = function () {
   const w = G.world;
   for (const b of w.buildings) b.noWork = false;
   const jobless = () => w.citizens.filter(c => !c.dead && c.adult && c.job == null);
+  // 「砍伐」标记需要散工处理：预留 1-2 名无业成人（不够则稍后从闲余岗位抽调）
+  const wantLabor = w.marked && w.marked.size > 0 ? Math.min(2, Math.ceil(w.marked.size / 2)) : 0;
 
   // 第一优先：建筑工地（人手不足时抽调：先抽非粮食岗位；
   // 粮食岗位仅在有富余时抽调 —— 保留约 pop/4 的粮食劳动力。
@@ -611,7 +761,7 @@ G.scheduleJobs = function () {
         const busyAll = w.citizens.filter(ci => {
           if (ci.dead || !ci.adult || ci.job == null) return false;
           const jb = w.bmap[ci.job];
-          return jb && jb.state === 'ok' && G.BDEF[jb.type].jobs > 0;
+          return jb && jb.state === 'ok' && G.BDEF[jb.type].jobs > 0 && jb.type !== 'school'; // 教师不抽调
         });
         let pool = busyAll.filter(ci => !FOOD_JOBS.includes(w.bmap[ci.job].type));
         if (!pool.length) {
@@ -628,14 +778,17 @@ G.scheduleJobs = function () {
     }
   }
 
-  // 第二优先：普通工作岗位
+  // 第二优先：普通工作岗位（有标记待砍时，只派到不侵占最后几名空闲市民的程度；
+  // 绝不从岗位抽人——原版 Harvest Trees 由玩家保留的劳动者执行）
   for (const b of w.buildings) {
     if (b.state !== 'ok') continue;
     const def = G.BDEF[b.type];
     if (!def.jobs) continue;
     let guard = 0;
     while (b.workers.length < def.jobs && guard++ < 6) {
-      const c = G.pickNearest(jobless(), b);
+      const pool = jobless();
+      if (wantLabor && pool.length <= wantLabor) break;
+      const c = G.pickNearest(pool, b);
       if (!c) break;
       G.assignWorker(b, c);
     }
@@ -661,6 +814,7 @@ G.scheduleJobs = function () {
     }
     // 供体 2：全员闲置的岗位（粮食岗需 >1 人才能出借）
     const lazy = w.buildings.find(x => x !== b && x.state === 'ok' && G.BDEF[x.type].jobs > 0 && x.workers.length > 0
+      && x.type !== 'school' // 教师不外借，保证学堂开学
       && (!FOOD_SET.includes(x.type) || x.workers.length > 1)
       && x.workers.every(id => { const c = w.cmap[id]; return c && c.state === 'idle' && !c.task; }));
     if (lazy) { give(lazy); continue; }
@@ -718,6 +872,7 @@ G.addBuilding = function (type, x, y, opt) {
         b.farm.push({ x: i, y: j, sown: false, harvested: false });
     b.sownAll = false; b.growth = 0; b.harvestDone = false;
   }
+  if (type === 'forester') { b.doCut = true; b.doPlant = true; } // 原版 Forester 的 Cut / Plant 开关
   w.buildings.push(b);
   w.bmap[b.id] = b;
   for (let j = y; j < y + def.h; j++)
@@ -788,7 +943,7 @@ G.demolishAt = function (tx, ty) {
     if (b) { G.removeBuilding(b); G.ui.toast(`已拆除 ${G.BDEF[b.type].name}`, 'info'); }
     return;
   }
-  if (w.road[i]) { w.road[i] = 0; G.needGround = true; return; }
+  if (w.road[i]) { w.road[i] = 0; G.markGroundDirty(tx, ty); return; }
   if (w.treeIdx[i] >= 0) { G.removeTree(w, tx, ty); return; }
-  if (w.rock[i]) { G.clearRock(w, tx, ty); G.needGround = true; }
+  if (w.rock[i]) { G.clearRock(w, tx, ty); }
 };

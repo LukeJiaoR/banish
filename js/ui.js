@@ -50,12 +50,18 @@ G.ui = {
     this.el.toolbar.innerHTML = G.TOOLBAR.map(t => {
       if (t === 'demolish')
         return `<button class="tb" data-tool="demolish" title="${toolTip(t)}"><span class="ic">🚫</span><span class="lb">拆除</span></button>`;
+      if (t === 'fell')
+        return `<button class="tb" data-tool="fell" title="标记砍伐（原版 Harvest Trees）：点击或拖选树木做标记，无业散工前来砍倒，每次 2 原木入库"><span class="ic">🪚</span><span class="lb">砍伐</span><span class="cost">免费</span></button>`;
       const d = G.BDEF[t];
       const cost = Object.keys(d.cost).map(k => `${G.RES[k].icon}${d.cost[k]}`).join(' ') || '免费';
       return `<button class="tb" data-tool="${t}" title="${toolTip(t)}"><span class="ic">${d.icon}</span><span class="lb">${d.name}</span><span class="cost">${cost}</span></button>`;
     }).join('');
     this.el.toolbar.querySelectorAll('button').forEach(btn => {
-      btn.addEventListener('click', () => G.setTool(G.tool && G.tool.kind === (btn.dataset.tool === 'demolish' ? 'demolish' : 'build') && (btn.dataset.tool === 'demolish' || G.tool.type === btn.dataset.tool) ? null : btn.dataset.tool));
+      btn.addEventListener('click', () => {
+        const k = btn.dataset.tool;
+        const active = !!G.tool && (G.tool.kind === k || (G.tool.kind === 'build' && G.tool.type === k));
+        G.setTool(active ? null : k); // 再点一次取消
+      });
     });
 
     // 顶栏按钮
@@ -63,6 +69,12 @@ G.ui = {
     document.getElementById('btn-load').addEventListener('click', () => this.showSaves());
     document.getElementById('btn-new').addEventListener('click', () => { if (confirm('放弃当前进度，开创新家园？')) G.newGame(); });
     document.getElementById('btn-help').addEventListener('click', () => this.toggleHelp());
+    document.getElementById('btn-err').addEventListener('click', () => this.showErrs());
+    document.getElementById('errs-close').addEventListener('click', () => document.getElementById('errs').classList.add('hidden'));
+    document.getElementById('errs-clear').addEventListener('click', () => {
+      window.__errs.length = 0;
+      this.refreshHUD();
+    });
     document.getElementById('help-close').addEventListener('click', () => this.toggleHelp(false));
     document.getElementById('over-restart').addEventListener('click', () => { this.el.over.classList.add('hidden'); G.newGame(); });
     document.getElementById('saves-close').addEventListener('click', () => this.closeSaves());
@@ -104,13 +116,16 @@ G.ui = {
       netEl.textContent = net > 0 ? `+${net}` : (net < 0 ? `${net}` : '');
       netEl.className = net < 0 ? 'neg' : 'pos';
     }
-    this.el.date.textContent = `${G.SEASON_ICONS[g.season]} 第 ${g.year} 年 · ${G.SEASON_NAMES[g.season]} 第 ${(g.day % G.SEASON_DAYS) + 1} 天`;
+    const hh = Math.floor(g.h);
+    this.el.date.textContent = `${G.SEASON_ICONS[g.season]} 第 ${g.year} 年 · ${G.SEASON_NAMES[g.season]} 第 ${(g.day % G.SEASON_DAYS) + 1} 天 · ${G.isRestTime() ? '🌙' : '☀️'} ${String(hh).padStart(2, '0')}:00`;
     const w = G.world;
     const adults = w.citizens.filter(c => c.adult).length;
     const children = w.citizens.length - adults;
     const homeless = w.families.filter(f => f.houseId == null && f.members.length).length;
     this.el.pop.innerHTML = `👥 ${w.citizens.length} <small>(成人${adults}·儿童${children})</small>` +
       (homeless ? ` <span class="warn-txt">无房${homeless}家</span>` : '');
+    const errBtn = document.getElementById('btn-err');
+    if (errBtn) errBtn.classList.toggle('hidden', !window.__errs.length);
     this.el.speed.querySelectorAll('button').forEach(btn => {
       const v = btn.dataset.v;
       btn.classList.toggle('active', v === 'pause' ? g.paused : (!g.paused && g.speed === +v));
@@ -149,6 +164,16 @@ G.ui = {
         const fam = w.families.find(f => f.id === b.family);
         if (fam) extra = `<div class="row">住户：${fam.members.map(id => w.cmap[id]).filter(Boolean).map(c => `${c.name}(${Math.floor(c.age)}岁)`).join('、')}</div>`;
       }
+      if (b.type === 'school') {
+        const n = w.citizens.filter(cc => cc.school === b.id).length;
+        extra = `<div class="row">学生：${n} / ${G.LIFE.schoolCap}</div>`;
+      }
+      if (b.type === 'forester') {
+        extra = `<div class="row tog-row">
+          <button class="mini-tog${b.doCut ? '' : ' off'}" data-k="doCut">砍伐：${b.doCut ? '开' : '关'}</button>
+          <button class="mini-tog${b.doPlant ? '' : ' off'}" data-k="doPlant">补种：${b.doPlant ? '开' : '关'}</button>
+        </div>`;
+      }
       el.innerHTML = `
         <div class="info-head"><span>${def.icon} ${def.name}</span><button id="info-close">✕</button></div>
         <div class="row">${status}</div>
@@ -159,19 +184,28 @@ G.ui = {
       const c = w.cmap[G.sel.id];
       if (!c) { this.hideInfo(); return; }
       let status = '闲逛';
-      if (c.state === 'work') status = c.task ? (c.task.kind === 'build' ? '建造中' : c.task.kind === 'sow' ? '播种' : c.task.kind === 'harvest' ? '收获' : '工作中') : '工作中';
-      else if (c.state === 'walk' || c.state === 'haul') status = c.carry ? `搬运${G.RES[c.carry.type].name}` : '赶路';
+      if (c.state === 'rest') status = '睡觉';
+      else if (c.state === 'work') status = c.task ? (c.task.kind === 'build' ? '建造中' : c.task.kind === 'sow' ? '播种' : c.task.kind === 'harvest' ? '收获' : '工作中') : '工作中';
+      else if (c.state === 'walk' || c.state === 'haul') status = c.carry ? `搬运${G.RES[c.carry.type].name}` : (c.walkKind === 'home' ? '回家' : '赶路');
       const jobB = c.job != null ? w.bmap[c.job] : null;
-      const jobName = jobB ? G.BDEF[jobB.type].name : (c.adult ? '无业' : '儿童');
+      const jobName = jobB ? G.BDEF[jobB.type].name : (c.student ? '学堂学生' : (c.adult ? '无业' : '儿童'));
       const fam = G.familyOf(c);
       el.innerHTML = `
         <div class="info-head"><span>🧑 ${c.name}</span><button id="info-close">✕</button></div>
-        <div class="row">${c.sex === 'm' ? '男' : '女'} · ${Math.floor(c.age)} 岁 · ${c.adult ? '成人' : '儿童'}</div>
+        <div class="row">${c.sex === 'm' ? '男' : '女'} · ${Math.floor(c.age)} 岁 · ${c.student ? '学生' : c.adult ? '成人' : '儿童'}</div>
         <div class="row">职业：${jobName} · ${status}</div>
         <div class="row">家庭：${fam ? (fam.houseId != null ? '有房' : '无房') : '单身'}</div>
+        <div class="row">学识：${c.student ? '🎓 就读中' : c.educated ? '📖 受过教育' : '未受教育'}</div>
         <div class="row">饥饿 ${'▕'.repeat(Math.min(4, c.hunger)) || '无'} · 受冻 ${c.cold > 1 ? '是' : '无'}</div>`;
     }
     document.getElementById('info-close').addEventListener('click', () => this.hideInfo());
+    el.querySelectorAll('.mini-tog').forEach(btn => btn.addEventListener('click', () => {
+      const bb = w.bmap[G.sel.id];
+      if (!bb) return;
+      bb[btn.dataset.k] = !bb[btn.dataset.k];
+      bb.noWork = false;
+      this.renderInfo();
+    }));
     const dem = document.getElementById('info-demolish');
     if (dem) dem.addEventListener('click', () => {
       const b = w.bmap[G.sel.id];
@@ -190,6 +224,13 @@ G.ui = {
     const h = this.el.help;
     const show = force !== undefined ? force : h.classList.contains('hidden');
     h.classList.toggle('hidden', !show);
+  },
+
+  /* ---------- 错误记录面板（window.__errs，index.html 注入） ---------- */
+  showErrs: function () {
+    document.getElementById('err-list').textContent =
+      window.__errs.length ? window.__errs.join('\n') : '（当前没有记录到脚本错误）';
+    document.getElementById('errs').classList.remove('hidden');
   },
 
   /* ---------- 存档管理面板 ---------- */
