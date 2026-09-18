@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>归园 · 放逐小镇（Banished 复刻原型）</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="hud">
+  <div id="topbar">
+    <div id="res-row"></div>
+    <div id="date">第 1 年 · 春</div>
+    <div id="pop">👥 0</div>
+    <div id="speed"></div>
+    <div id="sys">
+      <button id="btn-save" title="保存到手动档">💾</button>
+      <button id="btn-load" title="存档管理：载入 / 删除">📂</button>
+      <button id="btn-new" title="新游戏">🌱</button>
+      <button id="btn-help" title="帮助">❓</button>
+    </div>
+  </div>
+
+  <div id="toolbar"></div>
+
+  <div id="info" class="panel hidden"></div>
+  <div id="toasts"></div>
+
+  <div id="help" class="overlay hidden">
+    <div class="dialog">
+      <h2>归园 · 放逐小镇 <small>Banished 复刻原型</small></h2>
+      <p>一群被放逐者来到荒野，你要帮他们在第一场寒冬来临前活下来，并把小镇延续下去。</p>
+      <h3>操作</h3>
+      <ul>
+        <li><b>左键</b>：建造 / 选择（拖动可平移视角）</li>
+        <li><b>右键拖动</b>：平移视角（右键点击 = 取消当前工具）</li>
+        <li><b>滚轮</b>：缩放；<b>WASD / 方向键</b>：平移</li>
+        <li><b>空格</b>：暂停；<b>1 / 2 / 3</b>：速度</li>
+        <li><b>Esc</b>：取消工具 / 取消选择</li>
+      </ul>
+      <p>💾 换季、每 90 秒和离开页面时会自动写入「自动档」，刷新后自动恢复；📂 打开存档管理可载入/删除；💾 为手动存档，🌱 开新局。</p>
+      <h3>生存要点（数值对齐原版 Banished）</h3>
+      <ul>
+        <li>🍖 每人每年吃 100 食物。采集小屋（需森林，约 300-500/工人/年）、农田（约 7 食物/格/年，春种秋收）、渔码头（需临水）</li>
+        <li>🪵 1 棵树 = 2 原木（护林小屋砍树种树）；🔥 伐木屋把原木做成柴火（1 原木 = 3 柴火）</li>
+        <li>🪨 石头靠清理地表岩石：在岩石上盖房、铺路、或用拆除工具清除</li>
+        <li>🏠 每人都要有木屋（16木+8石），每屋每年约烧 30 柴火；入冬前没房没柴会冻死人</li>
+        <li>👶 有房有粮的夫妇约 2~3 年生一胎；孩子满 10 岁开始工作</li>
+        <li>⚠️ 中难度开局：4 个家庭无家可归，只有一辆储物车（木80 石48 食200 柴24）</li>
+      </ul>
+      <button id="help-close">开始游戏</button>
+    </div>
+  </div>
+
+  <div id="saves" class="overlay hidden">
+    <div class="dialog">
+      <h2>🗂 存档管理</h2>
+      <p class="sav-hint" id="saves-hint"></p>
+      <div id="save-list"></div>
+      <div class="save-actions">
+        <button id="save-now">💾 保存到手动档</button>
+        <button id="saves-clear" class="clear-all">🗑 清空全部存档</button>
+        <button id="saves-close">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="over" class="overlay hidden">
+    <div class="dialog">
+      <h2>🕊 小镇消亡了</h2>
+      <p id="over-text"></p>
+      <button id="over-restart">重新开始</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* 全局错误收集（调试用） */
+window.__errs = [];
+window.addEventListener('error', e => window.__errs.push((e.message || '') + ' @ ' + (e.filename || '').split('/').pop() + ':' + e.lineno));
+window.addEventListener('unhandledrejection', e => window.__errs.push('promise: ' + e.reason));
+</script>
+<script src="js/core.js"></script>
+<script src="js/defs.js"></script>
+<script src="js/map.js"></script>
+<script src="js/sim.js"></script>
+<script src="js/render.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
