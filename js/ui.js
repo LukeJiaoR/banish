@@ -154,6 +154,8 @@ G.ui = {
       else if (b.type === 'boarding') status = `入住 ${G.boardingFamilies(w, b).length} / ${G.LIFE.boardingCap} 家`;
       else if (b.type === 'farm') {
         status = !b.sownAll ? '待播种（春）' : b.growth < 1 ? `生长中 ${Math.floor(b.growth * 100)}%` : (b.harvestDone ? '已收获' : '待收获（秋）');
+      } else if (b.type === 'woodcutter' && G.fuelLimited(b)) {
+        status = '停工：柴火已达上限';
       } else status = b.noWork ? `停工：${b.warnText || '无法工作'}` : '运作中';
       let workers = '';
       if (def.jobs > 0 || b.state === 'site') {
@@ -173,6 +175,13 @@ G.ui = {
         extra = `<div class="row tog-row">
           <button class="mini-tog${b.doCut ? '' : ' off'}" data-k="doCut">砍伐：${b.doCut ? '开' : '关'}</button>
           <button class="mini-tog${b.doPlant ? '' : ' off'}" data-k="doPlant">补种：${b.doPlant ? '开' : '关'}</button>
+        </div>`;
+      }
+      if (b.type === 'woodcutter') { // 燃料上限（原版 Fuel Limit）：柴火库存达到上限即停产
+        extra = `<div class="row tog-row">
+          <span>燃料上限：<b>${G.fuelLimitOf(b)}</b>（库存 ${Math.floor(G.game.res.firewood)}）</span>
+          <button class="mini-tog" data-fl="-50" title="降低上限 50">−</button>
+          <button class="mini-tog" data-fl="50" title="提高上限 50">＋</button>
         </div>`;
       }
       el.innerHTML = `
@@ -203,6 +212,13 @@ G.ui = {
     el.querySelectorAll('.mini-tog').forEach(btn => btn.addEventListener('click', () => {
       const bb = w.bmap[G.sel.id];
       if (!bb) return;
+      if (btn.dataset.fl) { // 伐木屋燃料上限 ±50
+        const P = G.PROD.woodcutter;
+        bb.fuelLimit = G.clamp(G.fuelLimitOf(bb) + Number(btn.dataset.fl), 0, P.fuelMax);
+        bb.noWork = false; // 清掉停工标记，下次派活时按新上限重新评估
+        this.renderInfo();
+        return;
+      }
       bb[btn.dataset.k] = !bb[btn.dataset.k];
       bb.noWork = false;
       this.renderInfo();

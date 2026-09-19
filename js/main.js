@@ -79,7 +79,7 @@ G.serializeGame = function () {
       id: b.id, type: b.type, x: b.x, y: b.y, state: b.state,
       progress: b.progress, workLeft: b.workLeft, totalWork: b.totalWork,
       workers: b.workers, family: b.family, noWork: b.noWork, warnText: b.warnText,
-      doCut: b.doCut, doPlant: b.doPlant,
+      doCut: b.doCut, doPlant: b.doPlant, fuelLimit: b.fuelLimit,
       farm: b.farm ? b.farm.map(f => [f.sown ? 1 : 0, f.harvested ? 1 : 0]) : undefined,
       sownAll: b.sownAll, growth: b.growth, harvestDone: b.harvestDone,
     })),
@@ -155,6 +155,7 @@ G.loadGame = function (key) {
         state: bd.state, progress: bd.progress, workLeft: bd.workLeft, totalWork: bd.totalWork,
         workers: bd.workers, family: bd.family, noWork: bd.noWork, warnText: bd.warnText || '',
         doCut: bd.doCut !== false, doPlant: bd.doPlant !== false, // 旧档无此字段默认全开
+        fuelLimit: bd.fuelLimit != null ? bd.fuelLimit : (bd.type === 'woodcutter' ? G.PROD.woodcutter.fuelLimit : undefined), // 旧档回退默认上限
       };
       if (bd.type === 'farm') {
         b.farm = [];

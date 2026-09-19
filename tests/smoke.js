@@ -605,5 +605,29 @@ G.markGroundDirty = G.markGroundDirty || (() => {}); // render.js 未加载时�
   check('开局默认速度 1（速度档为 1/2/5）', G.newGameState().speed === 1);
 }
 
+/* ================= 九、伐木屋燃料上限（原版 Fuel Limit） ================= */
+{
+  freshGame();
+  const w = G.world;
+  const b = addB(w, 'woodcutter', 2, 2, 2, 2);
+  const c = G.spawnCitizen({ x: 5, y: 5, sex: 'm', age: 25 });
+  c.job = b.id;
+  G.game.res.wood = 10;
+  check('燃料上限默认 200', G.fuelLimitOf(b) === 200);
+  G.game.res.firewood = 300; // 超过默认上限
+  const t1 = G.makeTask(b, c);
+  check('柴火达到上限 → 停工', t1 === null && b.noWork === true && b.warnText === '柴火已达上限');
+  G.game.res.firewood = 100;
+  b.noWork = false;
+  const t2 = G.makeTask(b, c);
+  check('低于上限 → 正常接活', !!t2 && t2.kind === 'firewood');
+  b.fuelLimit = 50; // 自定义上限
+  const t3 = G.makeTask(b, c);
+  check('自定义上限生效（50）', t3 === null && G.fuelLimited(b) === true);
+  b.fuelLimit = 0; // 上限 0 = 彻底停产
+  const t4 = G.makeTask(b, c);
+  check('上限 0 → 停产', t4 === null);
+}
+
 console.log(`\n${fail === 0 ? '全部通过' : '有失败'}: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
