@@ -6,11 +6,20 @@
 
 G.cam = { x: 0, y: 0, z: 1 };
 G.groundScale = 0.5;   // 地面缓存画布降采样
+G.CACHE_MAX_PX = 16000000; // 地面缓存画布像素上限（Safari 单画布约 1677 万像素，超出会静默空白）
 G.groundOX = 0; G.groundOY = 0;
 G.needGround = true;
 G.groundDirty = new Set();  // 只变了道路/岩石的瓦片：局部重绘，不整图重建
 G.smoke = [];
 G.flakes = null;
+
+/* 地面缓存允许的最大精度：地图越大，缓存画布越大，需要降低采样率以控制在画布上限内 */
+G.maxGroundScale = function () {
+  const w = G.world;
+  if (!w) return 1;
+  const full = (w.N * 64 + 80) * (w.N * 32 + 80);
+  return Math.min(1, Math.sqrt(G.CACHE_MAX_PX / full));
+};
 
 /* 夜色浓度（0-1）：20 点入夜 → 22 点全暗 → 4 点最暗 → 6 点天亮 */
 G.nightAlpha = function () {
@@ -560,12 +569,13 @@ G.frame = function (dtReal) {
     }
   }
 
-  // 地面缓存清晰度：缩放稳定后按当前倍率重建（上限 1 倍，控制内存）
-  const tgt = G.clamp(z, 0.55, 1);
+  // 地面缓存清晰度：缩放稳定后按当前倍率重建（受画布像素上限约束，控制内存）
+  const gcap = G.maxGroundScale();
+  const tgt = G.clamp(z, 0.55, gcap);
   if (Math.abs(tgt - G.groundScale) > 0.12 && !G._gsTimer) {
     G._gsTimer = setTimeout(() => {
       G._gsTimer = null;
-      G.groundScale = G.clamp(G.cam.z, 0.55, 1);
+      G.groundScale = G.clamp(G.cam.z, 0.55, G.maxGroundScale());
       G.needGround = true;
     }, 250);
   } else if (Math.abs(tgt - G.groundScale) <= 0.12 && G._gsTimer) {

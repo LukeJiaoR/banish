@@ -437,6 +437,10 @@ G.startHaul = function (c) {
   } else c.state = 'haul';
 };
 
+/* 燃料上限（原版 Wood Cutter 的 Fuel Limit）：柴火库存达到上限即停产；旧档/测试无该字段时用默认值 */
+G.fuelLimitOf = function (b) { return b.fuelLimit != null ? b.fuelLimit : G.PROD.woodcutter.fuelLimit; };
+G.fuelLimited = function (b) { return b.type === 'woodcutter' && G.game.res.firewood >= G.fuelLimitOf(b); };
+
 /* 背料到达仓库：转入回屋加工段。返回 false = 仓库没料（白跑） */
 G.firewoodFetchDone = function (c, t) {
   if (G.game.res[t.consume.type] < t.consume.qty) return false;
@@ -582,6 +586,10 @@ G.makeTask = function (b, c) {
   const P = G.PROD, g = G.game, w = G.world;
   switch (b.type) {
     case 'woodcutter': {
+      if (G.fuelLimited(b)) { // 燃料上限：库存够用时自动停工（原版 Fuel Limit）
+        b.noWork = true; b.warnText = '柴火已达上限';
+        return null;
+      }
       if (g.res.wood >= P.woodcutter.logsIn) {
         const spot = G.workSpot(w, b, c.x, c.y);
         if (!spot) return null;
@@ -820,6 +828,7 @@ G.scheduleJobs = function () {
     if (b.state !== 'ok') continue;
     const def = G.BDEF[b.type];
     if (!def.jobs) continue;
+    if (G.fuelLimited(b)) continue; // 柴火到上限的伐木屋不拉人，空闲者留给「砍伐」标记
     let guard = 0;
     while (b.workers.length < def.jobs && guard++ < 6) {
       const pool = jobless();
@@ -835,7 +844,7 @@ G.scheduleJobs = function () {
   //   非收获季农田 → 全员闲置岗位 → 木材富余时的护林屋 → 秋收季从林业抽人抢收
   const FOOD_SET = ['gatherer', 'dock', 'farm'];
   const targets = w.buildings
-    .filter(b => b.state === 'ok' && G.BDEF[b.type].jobs > 0 && b.workers.length < G.BDEF[b.type].jobs && !b.noWork)
+    .filter(b => b.state === 'ok' && G.BDEF[b.type].jobs > 0 && b.workers.length < G.BDEF[b.type].jobs && !b.noWork && !G.fuelLimited(b))
     .sort((a, b2) => (a.type === 'woodcutter' ? -1 : b2.type === 'woodcutter' ? 1 : 0));
   for (const b of targets) {
     if (jobless().length) break; // 有无业者时由第二优先处理
@@ -855,7 +864,7 @@ G.scheduleJobs = function () {
       && x.workers.every(id => { const c = w.cmap[id]; return c && c.state === 'idle' && !c.task; }));
     if (lazy) { give(lazy); continue; }
     // 供体 3：伐木屋缺人且木材有富余 → 护林屋（>1 人）抽一人锯柴
-    if (b.type === 'woodcutter' && G.game.res.wood > 10) {
+    if (b.type === 'woodcutter' && G.game.res.wood > 10 && !G.fuelLimited(b)) {
       const forester = w.buildings.find(x => x.type === 'forester' && x.state === 'ok' && x.workers.length > 1);
       if (forester) { give(forester); continue; }
     }
@@ -909,6 +918,7 @@ G.addBuilding = function (type, x, y, opt) {
     b.sownAll = false; b.growth = 0; b.harvestDone = false;
   }
   if (type === 'forester') { b.doCut = true; b.doPlant = true; } // 原版 Forester 的 Cut / Plant 开关
+  if (type === 'woodcutter') b.fuelLimit = G.PROD.woodcutter.fuelLimit; // 燃料上限（原版 Fuel Limit）
   w.buildings.push(b);
   w.bmap[b.id] = b;
   for (let j = y; j < y + def.h; j++)

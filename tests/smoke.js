@@ -597,6 +597,7 @@ G.markGroundDirty = G.markGroundDirty || (() => {}); // render.js 未加载时�
 /* ---- 8.8 原版规则常量 ---- */
 {
   freshGame();
+  check('地图 128 格（原版「小型」地图尺寸）', G.MAP === 128);
   check('家庭人口上限 8（原版每屋 8 人）', G.LIFE.maxFamily === 8);
   check('毕业年龄 17 岁（原版）', G.LIFE.gradAge === 17);
   check('学堂容量 20 学生（原版）', G.LIFE.schoolCap === 20);

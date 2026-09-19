@@ -55,7 +55,7 @@ G.BDEF = {
     id: 'woodcutter', name: '伐木屋', icon: '🪓', w: 2, h: 2,
     cost: { wood: 24, stone: 8 }, buildWork: 70, jobs: 1, passable: false,
     wall: '#75563c', wallD: '#5b4230', roof: '#7a5230',
-    desc: '原版成本 24木+8石，1 名工人。把原木劈成柴火：1 原木 = 3 柴火（受教育 4）。工人自己去仓库背原木——建在仓库旁边效率更高。入冬前务必多储备。',
+    desc: '原版成本 24木+8石，1 名工人。把原木劈成柴火：1 原木 = 3 柴火（受教育 4）。工人自己去仓库背原木——建在仓库旁边效率更高。面板可设「燃料上限」（原版 Fuel Limit），柴火够用时自动停工。',
   },
   dock: {
     id: 'dock', name: '渔码头', icon: '🎣', w: 2, h: 2,
@@ -90,7 +90,8 @@ G.TOOLBAR = ['house', 'stonehouse', 'boarding', 'storage', 'gatherer', 'forester
 G.PROD = {
   gatherer:  { workH: 5, yield: { type: 'food', qty: 5 },  radius: 6, needTrees: 6 },
   forester:  { workH: 22, logsYield: 2, eduLogsYield: 3, plantH: 3, radius: 12 },
-  woodcutter: { workH: 7, logsIn: 2, firewoodOut: 6, eduFirewoodPerLog: 4 },
+  woodcutter: { workH: 7, logsIn: 2, firewoodOut: 6, eduFirewoodPerLog: 4,
+    fuelLimit: 200, fuelStep: 50, fuelMax: 2000 }, // 燃料上限（原版 Fuel Limit）：柴火库存达到上限即停产；默认 200 ≈ 6~7 栋木屋一年取暖量
   dock:      { workH: 5, yield: { type: 'food', qty: 4 } },
   farm:      { perTile: 7, tileWorkH: 0.5, growDays: 24 },
   builderChunk: 4,      // 建筑工人每段工作时长

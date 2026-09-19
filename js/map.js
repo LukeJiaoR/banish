@@ -57,7 +57,7 @@ G.genWorld = function (seed) {
       const i = y * N + x;
       if (w.water[i]) continue;
       if (fbm(seed + 555, x, y) > 0.715) w.rock[i] = 1;
-      else if (fbm(seed + 888, x, y) > 0.725) w.rock[i] = 2;
+      else if (fbm(seed + 888, x, y) > 0.80) w.rock[i] = 2; // 铁矿明显稀于石头（约 1/4），成簇分布
     }
 
   // 森林：独立噪声场
