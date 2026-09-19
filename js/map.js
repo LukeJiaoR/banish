@@ -51,12 +51,13 @@ G.genWorld = function (seed) {
     else if (h < SAND_H) w.water[i] = 2; // 沙滩（视为陆地）
   }
 
-  // 岩石露头（噪声成簇，原版初期石头来源）
+  // 岩石露头（噪声成簇，原版初期石头来源；w.rock: 1=石头 2=铁矿）
   for (let y = 0; y < N; y++)
     for (let x = 0; x < N; x++) {
       const i = y * N + x;
       if (w.water[i]) continue;
       if (fbm(seed + 555, x, y) > 0.715) w.rock[i] = 1;
+      else if (fbm(seed + 888, x, y) > 0.725) w.rock[i] = 2;
     }
 
   // 森林：独立噪声场
@@ -101,15 +102,16 @@ G.addTree = function (w, x, y, born) {
   w.trees.push({ i, x, y, b: born !== undefined ? born : G.game ? G.game.day : 0 });
   w.treeIdx[i] = w.trees.length - 1;
 };
-/* 清理岩石 → 石头入库（原版：在岩石上盖房/铺路即采石） */
+/* 清理岩石 → 石头/铁入库（原版：在岩石上盖房/铺路即采石；铁矿清理得铁） */
 G.clearRock = function (w, x, y) {
   if (x < 0 || y < 0 || x >= w.N || y >= w.N) return false;
   const i = y * w.N + x;
   if (!w.rock[i]) return false;
+  const iron = w.rock[i] === 2;
   w.rock[i] = 0;
   w.rockCleared.push(i);
   G.markGroundDirty(x, y);
-  if (G.game) G.game.res.stone += G.ROCK_STONE;
+  if (G.game) G.game.res[iron ? 'iron' : 'stone'] += iron ? G.ROCK_IRON : G.ROCK_STONE;
   return true;
 };
 G.removeTree = function (w, x, y) {
@@ -350,6 +352,19 @@ G.canPlace = function (w, type, ox, oy) {
       if (w.water[t] === 1) return { ok: false, reason: '不能建在水上' };
       if (w.bgrid[t] >= 0) return { ok: false, reason: '与其他建筑重叠' };
     }
+  // 等距视觉间距：脚印不重叠还不够——新建筑的前墙脚线（南缘）若落在已有建筑的
+  // 屋顶投影内，画出来会像“盖在已有建筑上”；反向（新屋顶挡住旧前墙）同理。
+  // 屋顶高约 28px ≈ 0.875 格，恰好盖住紧贴北/西侧一格内的墙脚。农田是平的，不参与。
+  if (type !== 'farm') {
+    const foot = oy + def.h;
+    for (const b of w.buildings) {
+      if (b.type === 'farm') continue;
+      if (foot >= b.y && foot < b.y + b.h && ox < b.x + b.w && ox + def.w >= b.x)
+        return { ok: false, reason: '与其他建筑贴得太近：会叠在它后面' };
+      if (b.y + b.h >= oy && b.y + b.h < oy + def.h && b.x < ox + def.w && b.x + b.w >= ox)
+        return { ok: false, reason: '与其他建筑贴得太近：会挡住它' };
+    }
+  }
   if (type === 'dock') {
     for (let j = oy - 1; j <= oy + def.h; j++)
       for (let i = ox - 1; i <= ox + def.w; i++) {

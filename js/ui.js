@@ -21,12 +21,12 @@ G.ui = {
       `<span class="res" id="res-${k}" title="${G.RES[k].name}">${G.RES[k].icon}<b>0</b>${k === 'food' ? '<i id="net-food"></i>' : ''}</span>`
     ).join('');
 
-    // 速度按钮
+    // 速度按钮（原版：暂停 / 1x / 2x / 5x）
     this.el.speed.innerHTML = [
       ['⏸', 'pause', '暂停 (空格)'],
       ['▶', 1, '正常速度 (1)'],
-      ['⏩', 3, '三倍速 (2)'],
-      ['⏭', 8, '八倍速 (3)'],
+      ['⏩', 2, '二倍速 (2)'],
+      ['⏭', 5, '五倍速 (3)'],
     ].map(([ic, v, tip]) =>
       `<button class="sp" data-v="${v}" title="${tip}">${ic}</button>`
     ).join('');
@@ -51,7 +51,7 @@ G.ui = {
       if (t === 'demolish')
         return `<button class="tb" data-tool="demolish" title="${toolTip(t)}"><span class="ic">🚫</span><span class="lb">拆除</span></button>`;
       if (t === 'fell')
-        return `<button class="tb" data-tool="fell" title="标记砍伐（原版 Harvest Trees）：点击或拖选树木做标记，无业散工前来砍倒，每次 2 原木入库"><span class="ic">🪚</span><span class="lb">砍伐</span><span class="cost">免费</span></button>`;
+        return `<button class="tb" data-tool="fell" title="标记砍伐（原版 Cut Down Trees）：点击或拖选树木做标记，无业散工前来砍倒；未受教育 2 原木、受教育 3 原木入库"><span class="ic">🪚</span><span class="lb">砍伐</span><span class="cost">免费</span></button>`;
       const d = G.BDEF[t];
       const cost = Object.keys(d.cost).map(k => `${G.RES[k].icon}${d.cost[k]}`).join(' ') || '免费';
       return `<button class="tb" data-tool="${t}" title="${toolTip(t)}"><span class="ic">${d.icon}</span><span class="lb">${d.name}</span><span class="cost">${cost}</span></button>`;
@@ -150,7 +150,8 @@ G.ui = {
       const def = G.BDEF[b.type];
       let status;
       if (b.state === 'site') status = `建造中 ${Math.floor(b.progress * 100)}%`;
-      else if (b.type === 'house') status = b.family != null ? '有人居住' : '空置';
+      else if (b.type === 'house' || b.type === 'stonehouse') status = b.family != null ? '有人居住' : '空置';
+      else if (b.type === 'boarding') status = `入住 ${G.boardingFamilies(w, b).length} / ${G.LIFE.boardingCap} 家`;
       else if (b.type === 'farm') {
         status = !b.sownAll ? '待播种（春）' : b.growth < 1 ? `生长中 ${Math.floor(b.growth * 100)}%` : (b.harvestDone ? '已收获' : '待收获（秋）');
       } else status = b.noWork ? `停工：${b.warnText || '无法工作'}` : '运作中';
@@ -160,7 +161,7 @@ G.ui = {
         workers = `<div class="row">工人：<span>${names || (b.state === 'site' ? '等待建筑工人' : '无')}</span></div>`;
       }
       let extra = '';
-      if (b.type === 'house' && b.family != null) {
+      if ((b.type === 'house' || b.type === 'stonehouse') && b.family != null) {
         const fam = w.families.find(f => f.id === b.family);
         if (fam) extra = `<div class="row">住户：${fam.members.map(id => w.cmap[id]).filter(Boolean).map(c => `${c.name}(${Math.floor(c.age)}岁)`).join('、')}</div>`;
       }

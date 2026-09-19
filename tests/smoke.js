@@ -2,14 +2,14 @@
  * 直接加载 core/defs/map/sim（无 DOM、无渲染），覆盖：
  * 经济修复（生育门槛/按屋取暖/完工扣料/读档搬运）、昼夜作息、教育系统、存档新字段。
  * 命中 assert 即退出码非 0，可挂 CI。 */
-const fs = require('fs');
-const path = require('path');
 global.window = global;
 global.addEventListener = () => {}; // main.js 顶层注册 DOMContentLoaded 用
-const src = ['core', 'defs', 'map', 'sim', 'main']
-  .map(f => fs.readFileSync(path.join(__dirname, '..', 'js', f + '.js'), 'utf8'))
-  .join('\n;\n');
-eval(src);
+// 按浏览器加载顺序 require 游戏源码（仅本地仓库文件，无动态执行）
+require('../js/core.js');
+require('../js/defs.js');
+require('../js/map.js');
+require('../js/sim.js');
+require('../js/main.js');
 
 let pass = 0, fail = 0;
 const check = (name, cond, extra = '') => {
@@ -244,11 +244,11 @@ G.ui = { toast() {}, refreshHUD() {} };
   const teacher = G.spawnCitizen({ x: 3, y: 3, sex: 'f', age: 30 });
   const school = addB(G.world, 'school', 2, 2, 3, 3);
   school.workers.push(teacher.id); teacher.job = school.id;
-  const kid = G.spawnCitizen({ x: 6, y: 6, sex: 'm', age: 16, adult: false, student: false });
-  // 手动置为在读学生（模拟 6 年前入学）
+  const kid = G.spawnCitizen({ x: 6, y: 6, sex: 'm', age: 17, adult: false, student: false });
+  // 手动置为在读学生（模拟多年前面入学）
   kid.student = true; kid.school = school.id;
   G.endDay();
-  check('16 岁毕业：受教育、成为劳动力', kid.adult === true && kid.educated === true && kid.student === false && kid.school == null);
+  check('17 岁毕业：受教育、成为劳动力', kid.adult === true && kid.educated === true && kid.student === false && kid.school == null);
 }
 {
   freshGame();
@@ -430,6 +430,178 @@ G.ui = { toast() {}, refreshHUD() {} };
   w1.task = null; w1.state = 'idle';
   G.scheduleJobs();
   check('标记清空后空闲者正常回流岗位', w1.job != null && b.workers.length === 2);
+}
+
+/* ================= 七、建造视觉间距（不能叠在已有建筑“上/后”） ================= */
+/* 等距视角下，脚印不重叠也可能视觉叠放：新建筑的前墙脚线（南缘）落在已有建筑
+ * 屋顶投影内时，画出来像“盖在已有建筑上”。canPlace 必须把这些位置判为非法。 */
+{
+  freshGame();
+  const w = G.world;
+  addB(w, 'house', 5, 5, 2, 2);   // 占 (5..6, 5..6)，前墙脚在 y=7 行
+  check('脚印同位重叠拒绝', G.canPlace(w, 'house', 5, 5).ok === false);
+  check('脚印部分重叠拒绝', G.canPlace(w, 'house', 6, 6).ok === false);
+  check('正北 0 间距拒绝（会叠在已有建筑上）', G.canPlace(w, 'house', 5, 3).ok === false);
+  check('正南 0 间距拒绝（会挡住已有建筑）', G.canPlace(w, 'house', 5, 7).ok === false);
+  check('斜后方 0 间距拒绝（会叠在已有建筑上）', G.canPlace(w, 'house', 3, 3).ok === false);
+  check('正西错半行拒绝（墙脚被压住）', G.canPlace(w, 'house', 3, 4).ok === false);
+  check('正北留 1 格允许', G.canPlace(w, 'house', 5, 2).ok === true);
+  check('正南留 1 格允许', G.canPlace(w, 'house', 5, 8).ok === true);
+  check('正西 0 间距成排允许', G.canPlace(w, 'house', 3, 5).ok === true);
+  check('正东 0 间距成排允许', G.canPlace(w, 'house', 7, 5).ok === true);
+  check('远离已有建筑允许', G.canPlace(w, 'house', 3, 8).ok === true);
+  // addBuilding 端到端：叠放位置在扣除资源前就应被拒
+  const before = G.game.res.wood;
+  const r = G.addBuilding('house', 5, 3, { free: true });
+  check('addBuilding 拒绝叠放且不扣料', r.ok === false && G.game.res.wood === before && w.buildings.length === 1);
+  // 农田是平的，不产生视觉遮挡：紧贴农田北缘（0 间距）放屋应放行
+  addB(w, 'farm', 2, 2, 8, 8);    // 占 (2..9, 2..9)
+  check('农田不产生视觉遮挡', G.canPlace(w, 'house', 3, 0).ok === true);
+}
+
+/* ================= 八、原版数值对齐（对照 banished-wiki.com 复核） ================= */
+G.markGroundDirty = G.markGroundDirty || (() => {}); // render.js 未加载时清岩石/铺路需要
+
+/* ---- 8.1 建造成本与入口 ---- */
+{
+  freshGame();
+  const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  check('采集小屋 30木+12石（原版）', eq(G.BDEF.gatherer.cost, { wood: 30, stone: 12 }));
+  check('护林小屋 32木+12石（原版）', eq(G.BDEF.forester.cost, { wood: 32, stone: 12 }));
+  check('仓库 48木+16石（原版）', eq(G.BDEF.storage.cost, { wood: 48, stone: 16 }));
+  check('学堂 50木+16石+16铁（原版）', eq(G.BDEF.school.cost, { wood: 50, stone: 16, iron: 16 }));
+  check('石屋 24木+40石+10铁（原版）', !!G.BDEF.stonehouse && eq(G.BDEF.stonehouse.cost, { wood: 24, stone: 40, iron: 10 }));
+  check('宿舍 100木+45石（原版）', !!G.BDEF.boarding && eq(G.BDEF.boarding.cost, { wood: 100, stone: 45 }));
+  check('渔码头 30木+16石（原版）', eq(G.BDEF.dock.cost, { wood: 30, stone: 16 }));
+  check('伐木屋 24木+8石（原版）', eq(G.BDEF.woodcutter.cost, { wood: 24, stone: 8 }));
+  check('石屋/宿舍进工具栏', G.TOOLBAR.includes('stonehouse') && G.TOOLBAR.includes('boarding'));
+  check('铁是全局资源之一', G.RES_KEYS.includes('iron') && G.RES.iron.name === '铁');
+}
+
+/* ---- 8.2 石屋取暖省一半（原版木屋≈30/年、石屋 15/年） ---- */
+{
+  freshGame();
+  const g = G.game;
+  g.day = 35; g.res.food = 10000; g.res.firewood = 100; // 冬季
+  const m1 = G.spawnCitizen({ x: 6, y: 6, sex: 'm', age: 30 });
+  const { house: wh } = houseWith(G.world, m1);
+  const m2 = G.spawnCitizen({ x: 8, y: 6, sex: 'm', age: 30 });
+  const sh = addB(G.world, 'stonehouse', 8, 2, 2, 2);
+  const fam2 = { id: G.nextId(), members: [m2.id], houseId: sh.id };
+  m2.familyId = fam2.id; G.world.families.push(fam2); sh.family = fam2.id;
+  G.endDay();
+  check('木屋每天 2.5 + 石屋每天 1.25 柴火', Math.abs(g.res.firewood - (100 - 2.5 - 1.25)) < 1e-9);
+  check('两户都取暖正常', !wh.unheated && !sh.unheated);
+}
+
+/* ---- 8.3 宿舍：无房家庭临时入住，有空独栋搬出（原版 Boarding House） ---- */
+{
+  freshGame();
+  const w = G.world, g = G.game;
+  const b = addB(w, 'boarding', 1, 1, 4, 3);
+  const m = G.spawnCitizen({ x: 5, y: 5, sex: 'm', age: 30 });
+  const f = G.spawnCitizen({ x: 5, y: 6, sex: 'f', age: 28 });
+  const fam = { id: G.nextId(), members: [m.id, f.id], houseId: null };
+  m.familyId = fam.id; f.familyId = fam.id;
+  w.families.push(fam);
+  G.assignHousing();
+  check('无房家庭入住宿舍', fam.houseId === b.id);
+  const h = addB(w, 'house', 7, 1, 2, 2);
+  G.assignHousing();
+  check('有空独栋后搬出宿舍', fam.houseId === h.id && h.family === fam.id);
+  G.removeBuilding(h);
+  G.assignHousing();
+  check('独栋被拆 → 家庭回宿舍', fam.houseId === b.id);
+  check('宿舍容量 5 家', G.LIFE.boardingCap === 5);
+}
+
+/* ---- 8.4 学堂停办 → 学生辍学成为工人（原版规则，永久未受教育） ---- */
+{
+  const g = freshGame();
+  g.res.food = 10000;
+  const teacher = G.spawnCitizen({ x: 3, y: 3, sex: 'f', age: 30 });
+  const school = addB(G.world, 'school', 2, 2, 3, 3);
+  school.workers.push(teacher.id); teacher.job = school.id;
+  const kid = G.spawnCitizen({ x: 6, y: 6, sex: 'm', age: 10, adult: false });
+  G.endDay();
+  check('预备：孩子已入学', kid.student === true && kid.school === school.id);
+  school.workers = []; teacher.job = null; // 教师离职
+  G.endDay();
+  check('教师离开 → 学生立即辍学当工人', kid.adult === true && kid.student === false && kid.school == null && !kid.educated);
+}
+
+/* ---- 8.5 受教育砍树 3 原木（未受教育 2） ---- */
+{
+  freshGame();
+  const w = G.world;
+  const b = addB(w, 'forester', 2, 2, 2, 2);
+  b.doCut = true; b.doPlant = false;
+  G.addTree(w, 5, 5, -200);
+  const edu = G.spawnCitizen({ x: 4, y: 4, sex: 'm', age: 25 });
+  edu.educated = true; edu.job = b.id;
+  const t = G.makeTask(b, edu);
+  check('受教育护林工：一棵树 3 原木', t && t.kind === 'chop' && t.logs === 3);
+  const plain = G.spawnCitizen({ x: 4, y: 5, sex: 'f', age: 25 });
+  plain.job = b.id;
+  const t2 = G.makeTask(b, plain);
+  check('未受教育护林工：一棵树 2 原木', t2 && t2.kind === 'chop' && t2.logs === 2);
+  t.work = 1; t.workLeft = 0;
+  edu.task = t;
+  G.completeTask(edu); // 本局没有仓库 → 原木直接入库
+  check('砍倒后 3 原木入库', G.game.res.wood === 80 + 3 && !edu.carry);
+}
+{
+  freshGame();
+  const w = G.world;
+  G.addTree(w, 5, 5, -200);
+  const c = G.spawnCitizen({ x: 6, y: 5, sex: 'm', age: 25 });
+  c.educated = true;
+  w.marked.add(5 * w.N + 5);
+  G.requestTask(c);
+  check('受教育散工砍标记树也是 3 原木', c.task && c.task.kind === 'chop' && c.task.logs === 3);
+  c.task.workLeft = 0;
+  G.completeTask(c);
+  check('入库 3 原木', G.game.res.wood === 80 + 3);
+}
+
+/* ---- 8.6 拆除返还约一半材料（原版行为） ---- */
+{
+  freshGame();
+  const g = G.game;
+  const b = addB(G.world, 'house', 2, 2, 2, 2);
+  const w0 = g.res.wood, s0 = g.res.stone;
+  G.removeBuilding(b);
+  check('拆除木屋返还 8木+4石', g.res.wood === w0 + 8 && g.res.stone === s0 + 4);
+}
+
+/* ---- 8.7 铁矿清理得铁；岩石清理得石头 ---- */
+{
+  freshGame();
+  const w = G.world, g = G.game;
+  w.rock[5 * w.N + 5] = 2;
+  const iron0 = g.res.iron, stone0 = g.res.stone;
+  G.clearRock(w, 5, 5);
+  check('锈色铁矿清理得铁', g.res.iron === iron0 + G.ROCK_IRON && g.res.stone === stone0);
+  w.rock[6 * w.N + 6] = 1;
+  G.clearRock(w, 6, 6);
+  check('灰色岩石清理得石头', g.res.stone === stone0 + G.ROCK_STONE);
+}
+{
+  freshGame();
+  const w = G.genWorld(12345);
+  let stone = 0, iron = 0;
+  for (let i = 0; i < w.rock.length; i++) { if (w.rock[i] === 1) stone++; if (w.rock[i] === 2) iron++; }
+  check('真实地图同时含石头与铁矿', stone > 0 && iron > 0);
+}
+
+/* ---- 8.8 原版规则常量 ---- */
+{
+  freshGame();
+  check('家庭人口上限 8（原版每屋 8 人）', G.LIFE.maxFamily === 8);
+  check('毕业年龄 17 岁（原版）', G.LIFE.gradAge === 17);
+  check('学堂容量 20 学生（原版）', G.LIFE.schoolCap === 20);
+  check('自然死亡 70 岁起（原版多活到 70~85）', G.OLD_AGE === 70);
+  check('开局默认速度 1（速度档为 1/2/5）', G.newGameState().speed === 1);
 }
 
 console.log(`\n${fail === 0 ? '全部通过' : '有失败'}: ${pass} passed, ${fail} failed`);

@@ -40,7 +40,11 @@ def _month_file():
 
 def _salt():
     """IP 哈希盐：首次生成后固定，避免重启后同一 IP 出不同哈希。"""
-    p = os.path.join(FB_DIR, '.salt')
+    fb = os.path.realpath(FB_DIR)
+    os.makedirs(fb, exist_ok=True)
+    p = os.path.realpath(os.path.join(fb, '.salt'))
+    if os.path.dirname(p) != fb:
+        raise RuntimeError(f'FEEDBACK_DIR 非法：{FB_DIR}')  # 盐文件必须恰好落在反馈目录内
     try:
         with open(p, encoding='utf-8') as f:
             s = f.read().strip()
@@ -49,8 +53,16 @@ def _salt():
     except FileNotFoundError:
         pass
     s = os.urandom(16).hex()
-    with open(p, 'w', encoding='utf-8') as f:
-        f.write(s)
+    try:
+        # 原子创建（O_EXCL）：并发请求只会有一个写成功，且绝不覆盖已有盐
+        fd = os.open(p, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    except FileExistsError:
+        with open(p, encoding='utf-8') as f:
+            return f.read().strip()
+    try:
+        os.write(fd, s.encode('utf-8'))
+    finally:
+        os.close(fd)
     return s
 
 
@@ -62,6 +74,15 @@ class Handler(SimpleHTTPRequestHandler):
     def end_headers(self):
         self.send_header('Cache-Control', 'no-store, must-revalidate')
         super().end_headers()
+
+    def translate_path(self, path):
+        """静态文件一律限制在站点根目录内（防目录穿越，纵深防御）。"""
+        p = super().translate_path(path)
+        root = os.path.realpath(ROOT)
+        real = os.path.realpath(p)
+        if real != root and not real.startswith(root + os.sep):
+            return os.path.join(ROOT, '__outside__.notexist')
+        return p
 
     def list_directory(self, path):
         self.send_error(403)

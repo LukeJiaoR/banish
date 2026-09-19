@@ -16,19 +16,20 @@ G.YEAR_DAYS = 48;         // 一年天数（4 季）
 G.SEASON_NAMES = ['春', '夏', '秋', '冬'];
 G.SEASON_ICONS = ['🌸', '☀️', '🍂', '❄️'];
 
-G.ADULT_AGE = 10;         // 年满可工作（同 Banished：孩子 10 岁开始干活）
+G.ADULT_AGE = 10;         // 年满可工作（同 Banished：孩子 10 岁开始干活或入学）
 G.MOTHER_MIN = 15;
 G.MOTHER_MAX = 45;
-G.OLD_AGE = 62;           // 自然死亡概率开始上升
+G.OLD_AGE = 70;           // 自然死亡概率开始上升（原版多在 70~85 岁去世）
 
 /* 资源（数值对齐原版 Banished） */
 G.RES = {
   wood:     { name: '木材', color: '#b08850', icon: '🪵' },
   stone:    { name: '石头', color: '#b8b8b8', icon: '🪨' },
+  iron:     { name: '铁', color: '#c08a5a', icon: '🔩' },
   food:     { name: '食物', color: '#e0705a', icon: '🍖' },
   firewood: { name: '柴火', color: '#e8a33d', icon: '🔥' },
 };
-G.RES_KEYS = ['wood', 'stone', 'food', 'firewood'];
+G.RES_KEYS = ['wood', 'stone', 'iron', 'food', 'firewood'];
 
 /* ---------- 随机数 ---------- */
 // 可播种 RNG（地形生成用）

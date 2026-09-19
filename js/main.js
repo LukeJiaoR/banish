@@ -16,10 +16,10 @@ G.newGame = function (seed) {
   seed = seed || ((Math.random() * 0xffffffff) >>> 0);
   G.rng = G.makeRng(seed ^ 0x51f15e);
   G.world = G.genWorld(seed);
-  // 原版「中等」难度开局：4 个家庭（无房），一辆储物车（仓库）
-  // 资源：木 80 / 石 48 / 食物 200 / 柴火 24
+  // 原版「中等」难度开局：5 个家庭（无房），一辆储物车（仓库）
+  // 资源：木 80 / 石 48 / 食物 200 / 柴火 24（铁靠清理地表铁矿获得）
   G.game = G.newGameState();
-  G.game.res = { wood: 80, stone: 48, food: 200, firewood: 24 };
+  G.game.res = { wood: 80, stone: 48, iron: 0, food: 200, firewood: 24 };
   G.sel = null;
   G.tool = null;
   G.smoke = [];
@@ -32,10 +32,10 @@ G.newGame = function (seed) {
   const s = G.world.start;
   G.addBuilding('storage', s.x - 1, s.y - 1, { instant: true, free: true });
 
-  // 4 个家庭：2 名成人 + 若干孩子（原版开局全部无家可归，入冬前必须盖房）
-  let kidPlan = [2, 2, 1, 0];
-  for (let f = 0; f < 4; f++) {
-    const ang = (f / 4) * Math.PI * 2;
+  // 5 个家庭（原版中难度）：2 名成人 + 若干孩子，开局全部无家可归，入冬前必须盖房
+  let kidPlan = [2, 2, 1, 0, 0];
+  for (let f = 0; f < 5; f++) {
+    const ang = (f / 5) * Math.PI * 2;
     const hx = s.x + Math.round(Math.cos(ang) * 2), hy = s.y + Math.round(Math.sin(ang) * 2);
     const m = G.spawnCitizen({ x: hx, y: hy, sex: 'm', age: G.ri(19, 38) });
     const fm = G.spawnCitizen({ x: hx, y: hy, sex: 'f', age: G.ri(18, 36) });
@@ -56,8 +56,8 @@ G.newGame = function (seed) {
   G.groundDirty.clear();
 
   G.ui.toast('归园 · 放逐小镇复刻原型（原版数值）', 'good');
-  G.ui.toast('中难度开局：4 个家庭无家可归。先盖木屋（16木+8石）安家，再修采集小屋、护林小屋保食物木材', 'warn');
-  G.ui.toast('在岩石上盖房/铺路可获得石头 · 入冬前备好柴火（每屋每年约 30）', 'info');
+  G.ui.toast('中难度开局：5 个家庭无家可归。先盖木屋（16木+8石）安家，再修采集小屋、护林小屋保食物木材', 'warn');
+  G.ui.toast('岩石给石头、锈色铁矿给铁 · 入冬前备好柴火（木屋每年约 30，石屋省一半）', 'info');
   G.scheduleJobs();
   G.ui.refreshHUD();
 };
@@ -129,6 +129,7 @@ G.loadGame = function (key) {
     G.game = G.newGameState();
     const g = G.game, w = G.world;
     Object.assign(g, d.game);
+    g.res.iron = g.res.iron || 0; // 旧存档迁移：无铁字段时补 0
     G.sel = null; G.tool = null; G.smoke = []; G.flakes = null;
     G.ui.hideInfo(); G.ui.setToolActive();
     document.getElementById('over').classList.add('hidden');
@@ -384,8 +385,8 @@ G.init = function () {
     G.keys[e.key.toLowerCase()] = true;
     if (e.key === ' ') { G.game.paused = !G.game.paused; G.ui.refreshHUD(); e.preventDefault(); }
     else if (e.key === '1') { G.game.paused = false; G.game.speed = 1; G.ui.refreshHUD(); }
-    else if (e.key === '2') { G.game.paused = false; G.game.speed = 3; G.ui.refreshHUD(); }
-    else if (e.key === '3') { G.game.paused = false; G.game.speed = 8; G.ui.refreshHUD(); }
+    else if (e.key === '2') { G.game.paused = false; G.game.speed = 2; G.ui.refreshHUD(); }
+    else if (e.key === '3') { G.game.paused = false; G.game.speed = 5; G.ui.refreshHUD(); }
     else if (e.key === 'Escape') {
       if (!document.getElementById('errs').classList.contains('hidden')) document.getElementById('errs').classList.add('hidden');
       else if (!document.getElementById('fb').classList.contains('hidden')) G.feedback.close();

@@ -3,6 +3,7 @@
 启动 server.py 于随机端口（反馈目录指向临时目录），验证：
 静态托管、反馈落盘、空内容拒绝、限频、token 鉴权查看。
 全部命中即退出码 0，可挂 CI。"""
+import http.client
 import json
 import os
 import socket
@@ -10,8 +11,6 @@ import subprocess
 import sys
 import tempfile
 import time
-import urllib.error
-import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -37,14 +36,15 @@ def free_port():
 
 
 def req(port, path, method='GET', body=None, ctype='application/json'):
-    r = urllib.request.Request(
-        f'http://127.0.0.1:{port}{path}', data=body, method=method,
-        headers={'Content-Type': ctype} if body else {})
+    """请求本机临时测试服务：主机固定为 127.0.0.1 回环，仅端口与路径可变。"""
+    conn = http.client.HTTPConnection('127.0.0.1', port, timeout=5)
+    headers = {'Content-Type': ctype} if body else {}
     try:
-        with urllib.request.urlopen(r, timeout=5) as resp:
-            return resp.status, resp.read().decode('utf-8', 'replace')
-    except urllib.error.HTTPError as e:
-        return e.code, e.read().decode('utf-8', 'replace')
+        conn.request(method, path, body=body, headers=headers)
+        resp = conn.getresponse()
+        return resp.status, resp.read().decode('utf-8', 'replace')
+    finally:
+        conn.close()
 
 
 def post(port, payload):

@@ -85,14 +85,16 @@ G.drawGroundTile = function (c, w, pal, x, y) {
   c.strokeStyle = col;   // 同色描边消除瓦片接缝
   c.lineWidth = 1;
   c.stroke();
-  // 岩石露头
+  // 岩石露头（1=石头 2=铁矿，锈色）
   if (w.rock[i]) {
+    const iron = w.rock[i] === 2;
+    const rk = iron ? pal.iron : pal.rock, rkD = iron ? pal.ironD : pal.rockD;
     const cx = sx, cy = sy + 16;
-    c.fillStyle = pal.rockD;
+    c.fillStyle = rkD;
     c.beginPath(); c.ellipse(cx + 4, cy + 4, 9, 5, 0, 0, Math.PI * 2); c.fill();
-    c.fillStyle = pal.rock;
+    c.fillStyle = rk;
     c.beginPath(); c.ellipse(cx - 2, cy - 1, 10, 6, 0, 0, Math.PI * 2); c.fill();
-    c.fillStyle = pal.rockD;
+    c.fillStyle = rkD;
     c.beginPath(); c.ellipse(cx - 6, cy + 5, 5, 3, 0, 0, Math.PI * 2); c.fill();
     c.fillStyle = 'rgba(255,255,255,0.18)';
     c.beginPath(); c.ellipse(cx - 4, cy - 3, 5, 2.5, 0, 0, Math.PI * 2); c.fill();
@@ -230,8 +232,8 @@ G.drawBuilding = function (ctx, b, time) {
   // 门（左墙中部）
   const mx = (L[0] + B[0]) / 2, my = (L[1] + B[1]) / 2 - H;
   quadFill(ctx, mx - 3, my + 6, mx + 1, my + 8, mx + 1, my + 13, mx - 3, my + 11, '#3a2a1a');
-  // 窗（右墙，冬夜亮灯）
-  if (b.type === 'house') {
+  // 窗（住宅冬夜透光）
+  if (def.isHome) {
     const wx = (B[0] + R[0]) / 2, wy = (B[1] + R[1]) / 2 - H;
     ctx.fillStyle = (G.isWinter() || G.nightAlpha() > 0.15) ? '#ffd98a' : '#2e2013';
     ctx.fillRect(wx - 2.5, wy + 3, 5, 4);
@@ -240,7 +242,7 @@ G.drawBuilding = function (ctx, b, time) {
   const o = 0.22;
   const Tr = G.T2S(b.x - o, b.y - o), Rr = G.T2S(b.x + b.w + o, b.y - o),
         Br = G.T2S(b.x + b.w + o, b.y + b.h + o), Lr = G.T2S(b.x - o, b.y + b.h + o);
-  const roofH = H + (b.type === 'house' ? 8 : 4);
+  const roofH = H + (def.isHome ? 8 : 4);
   // 屋顶两坡
   quadFill(ctx, Tr[0], Tr[1] - roofH, Br[0], Br[1] - roofH, Lr[0], Lr[1] - roofH + 0.1, Lr[0], Lr[1] - roofH + 0.1, def.roof);
   ctx.beginPath();
@@ -258,8 +260,8 @@ G.drawBuilding = function (ctx, b, time) {
   ctx.moveTo(Tr[0], Tr[1] - roofH);
   ctx.lineTo(Br[0], Br[1] - roofH);
   ctx.stroke();
-  // 烟囱（木屋）
-  if (b.type === 'house') {
+  // 烟囱（住宅与宿舍）
+  if (def.chimney) {
     const cx = Tr[0] + (Br[0] - Tr[0]) * 0.25, cy = Tr[1] + (Br[1] - Tr[1]) * 0.25 - roofH;
     ctx.fillStyle = '#5a5148';
     ctx.fillRect(cx - 2.5, cy - 7, 5, 9);
@@ -382,7 +384,9 @@ G.updateParticles = function (dt) {
   // 炊烟
   if (G.isWinter() && !G.game.paused) {
     for (const b of G.world.buildings) {
-      if (b.type === 'house' && b.state === 'ok' && b.family != null && b._chimney && Math.random() < 0.06) {
+      const def = G.BDEF[b.type];
+      const lived = b.type === 'boarding' ? G.boardingFamilies(G.world, b).length > 0 : b.family != null;
+      if (def.chimney && b.state === 'ok' && lived && b._chimney && Math.random() < 0.06) {
         G.smoke.push({ x: b._chimney[0], y: b._chimney[1], age: 0, max: 2.5 + Math.random() * 2 });
       }
     }
@@ -426,6 +430,32 @@ G.frame = function (dtReal) {
   ctx.drawImage(G._gcv, -G.groundOX, -G.groundOY,
     G._gcv.width / G.groundScale, G._gcv.height / G.groundScale);
 
+  const w = G.world;
+
+  // 建造幽灵：贴着地面画、在建筑之前——后面的建筑/树会正确把它挡住，
+  // 不会出现“绿色预览浮在已有建筑上”的误导
+  if (G.tool && G.tool.kind === 'build' && G.hover.tx >= 0) {
+    const def = G.BDEF[G.tool.type];
+    const ox = G.hover.tx - ((def.w - 1) >> 1), oy = G.hover.ty - ((def.h - 1) >> 1);
+    const chk = G.canPlace(w, G.tool.type, ox, oy);
+    for (let j = 0; j < def.h; j++)
+      for (let i = 0; i < def.w; i++) {
+        const [sx, sy] = G.T2S(ox + i, oy + j);
+        G.diamondPath(ctx, sx, sy);
+        ctx.fillStyle = chk.ok ? 'rgba(120,230,140,0.4)' : 'rgba(230,90,80,0.4)';
+        ctx.fill();
+      }
+    G._ghost = { ox, oy };
+  } else G._ghost = null;
+
+  // 道路工具悬停（同样贴地）
+  if (G.tool && G.tool.kind === 'road' && G.hover.tx >= 0) {
+    const [sx, sy] = G.T2S(G.hover.tx, G.hover.ty);
+    G.diamondPath(ctx, sx, sy);
+    ctx.fillStyle = G.canPlaceRoad(w, G.hover.tx, G.hover.ty) ? 'rgba(120,230,140,0.4)' : 'rgba(230,90,80,0.4)';
+    ctx.fill();
+  }
+
   // 可视瓦片范围
   const W = cv.clientWidth, H = cv.clientHeight;
   const corners = [G.screenToTile(0, 0), G.screenToTile(W, 0), G.screenToTile(0, H), G.screenToTile(W, H)];
@@ -437,7 +467,6 @@ G.frame = function (dtReal) {
   tx0 = Math.max(0, Math.floor(tx0) - 2); ty0 = Math.max(0, Math.floor(ty0) - 2);
   tx1 = Math.min(G.world.N - 1, Math.ceil(tx1) + 2); ty1 = Math.min(G.world.N - 1, Math.ceil(ty1) + 4);
 
-  const w = G.world;
   const items = [];
   // 树
   for (let y = ty0; y <= ty1; y++)
@@ -489,29 +518,6 @@ G.frame = function (dtReal) {
     ctx.strokeStyle = 'rgba(255,255,255,0.35)';
     ctx.lineWidth = 1;
     ctx.stroke();
-  }
-
-  // 建造幽灵
-  if (G.tool && G.tool.kind === 'build' && G.hover.tx >= 0) {
-    const def = G.BDEF[G.tool.type];
-    const ox = G.hover.tx - ((def.w - 1) >> 1), oy = G.hover.ty - ((def.h - 1) >> 1);
-    const chk = G.canPlace(w, G.tool.type, ox, oy);
-    for (let j = 0; j < def.h; j++)
-      for (let i = 0; i < def.w; i++) {
-        const [sx, sy] = G.T2S(ox + i, oy + j);
-        G.diamondPath(ctx, sx, sy);
-        ctx.fillStyle = chk.ok ? 'rgba(120,230,140,0.4)' : 'rgba(230,90,80,0.4)';
-        ctx.fill();
-      }
-    G._ghost = { ox, oy };
-  } else G._ghost = null;
-
-  // 道路工具悬停
-  if (G.tool && G.tool.kind === 'road' && G.hover.tx >= 0) {
-    const [sx, sy] = G.T2S(G.hover.tx, G.hover.ty);
-    G.diamondPath(ctx, sx, sy);
-    ctx.fillStyle = G.canPlaceRoad(w, G.hover.tx, G.hover.ty) ? 'rgba(120,230,140,0.4)' : 'rgba(230,90,80,0.4)';
-    ctx.fill();
   }
 
   // 选中建筑高亮

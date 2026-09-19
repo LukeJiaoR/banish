@@ -7,7 +7,7 @@ G.newGameState = function () {
   return {
     h: 6, day: 0, season: 0, year: 1,
     speed: 1, paused: false,
-    res: { wood: 80, stone: 48, food: 200, firewood: 24 }, // 原版中难度开局
+    res: { wood: 80, stone: 48, iron: 0, food: 200, firewood: 24 }, // 原版中难度开局（无工具系统，铁仅用于建造）
     schedT: 1,
     over: false,
     stats: { born: 0, died: 0, deadReasons: {} },
@@ -60,12 +60,17 @@ G.endDay = function () {
   g.res.food = food;
 
   const winter = g.season === 3;
-  const houses = w.buildings.filter(b => b.type === 'house' && b.state === 'ok' && b.family != null);
-  // 原版：木屋每年约烧 30 柴火，集中在冬季消耗；柴火按屋支付，付不起的屋子挨冻
-  const perHouse = G.LIFE.houseWarmWoodPerYear / G.SEASON_DAYS;
+  // 有人住的房子才烧柴（含石屋/宿舍；取暖量按建筑类型，原版石屋省一半）
+  const houses = w.buildings.filter(b => {
+    const def = G.BDEF[b.type];
+    if (b.state !== 'ok' || def.warmWoodPerYear == null) return false;
+    return b.family != null || w.families.some(f => f.houseId === b.id);
+  });
+  // 原版：木屋每年约烧 30 柴火（石屋 15），集中在冬季消耗；柴火按屋支付，付不起的屋子挨冻
   for (const h of houses) h.unheated = false;
   if (winter && houses.length) {
     for (const h of houses) {
+      const perHouse = G.BDEF[h.type].warmWoodPerYear / G.SEASON_DAYS;
       if (g.res.firewood >= perHouse) g.res.firewood -= perHouse;
       else { h.unheated = true; g.res.firewood = 0; }
     }
@@ -78,6 +83,14 @@ G.endDay = function () {
   const dead = [];
   for (const c of w.citizens) {
     c.age += 1 / G.YEAR_DAYS;
+    // 学堂停办（教师离职/学堂拆除）：在读学生立即辍学当工人，永久失去受教育机会（原版规则）
+    if (c.student) {
+      const sb = w.bmap[c.school];
+      if (!sb || sb.state !== 'ok' || sb.workers.length === 0) {
+        c.student = false; c.adult = true; c.school = null;
+        G.ui.toast(`📚 ${c.name} 所在学堂停办，辍学当了工人`, 'warn');
+      }
+    }
     // 成长：有在办学堂就入学，否则直接当工人；学生毕业成为受教育工人
     if (!c.adult && c.age >= G.ADULT_AGE && !c.student) {
       const sc = G.pickSchool(schoolCount);
@@ -104,8 +117,8 @@ G.endDay = function () {
       else if (housed) c.cold += childMul;             // 有房但没柴火
       else c.cold += G.LIFE.homelessCold * childMul;   // 无家可归
     } else c.cold = 0;
-    // 自然老死
-    if (c.age > G.OLD_AGE && G.chance(Math.min(0.25, (c.age - G.OLD_AGE) * 0.005)))
+    // 自然老死（原版市民多活到 70~85 岁）
+    if (c.age > G.OLD_AGE && G.chance(Math.min(0.25, (c.age - G.OLD_AGE) * 0.004)))
       dead.push([c, '寿终正寝']);
     else if (c.hunger >= G.LIFE.starveDays) dead.push([c, '饿死']);
     else if (c.cold >= G.LIFE.coldDays) dead.push([c, '冻死']);
@@ -202,16 +215,36 @@ G.homeOf = function (c) {
   return null;
 };
 
+/* 宿舍当前入住的家庭数 */
+G.boardingFamilies = function (w, b) {
+  return w.families.filter(f => f.houseId === b.id);
+};
+
 G.assignHousing = function () {
   const w = G.world;
-  const free = w.buildings.filter(b => b.type === 'house' && b.state === 'ok' && b.family == null);
-  if (!free.length) return;
+  const free = w.buildings.filter(b => (b.type === 'house' || b.type === 'stonehouse') && b.state === 'ok' && b.family == null);
+  // 原版：市民不会主动住宿舍，但没房子的家庭会被安排进宿舍过冬；
+  // 一旦有空独栋木屋（含石屋），先安置无房家庭、再让宿舍里的家庭搬出
   const homeless = w.families.filter(f => f.houseId == null && f.members.length >= 2);
-  for (const fam of homeless) {
+  const inBoarding = w.families.filter(f => {
+    const h = f.houseId != null ? w.bmap[f.houseId] : null;
+    return h && h.type === 'boarding';
+  });
+  for (const fam of homeless.concat(inBoarding)) {
     const house = free.shift();
     if (!house) break;
     fam.houseId = house.id;
     house.family = fam.id;
+  }
+  // 没有空独栋：无房家庭入住宿舍（原版 Boarding House 最多 5 家）
+  const boardings = w.buildings.filter(b => b.type === 'boarding' && b.state === 'ok');
+  if (boardings.length) {
+    for (const fam of homeless) {
+      if (fam.houseId != null) continue;
+      const b = boardings.find(b2 => G.boardingFamilies(w, b2).length < G.LIFE.boardingCap);
+      if (!b) break;
+      fam.houseId = b.id;
+    }
   }
 };
 
@@ -508,7 +541,7 @@ G.requestTask = function (c) {
       if (c2 !== c && c2.task && c2.task.kind === 'chop' && !c2.task.b) claimed.add(c2.task.ty * w.N + c2.task.tx);
     const mt = G.pickMarkedTree(w, c.x, c.y, claimed);
     if (mt) {
-      c.task = { kind: 'chop', b: null, tx: mt.x, ty: mt.y, tree: mt.tree, work: G.taskWork(c, G.PROD.forester.workH), workLeft: 0 };
+      c.task = { kind: 'chop', b: null, tx: mt.x, ty: mt.y, tree: mt.tree, logs: G.taskLogYield(c), work: G.taskWork(c, G.PROD.forester.workH), workLeft: 0 };
       G.sendTo(c, mt.x, mt.y);
       return;
     }
@@ -540,6 +573,9 @@ G.requestTask = function (c) {
 
 /* 任务工时：受过教育的工人更快（原版教育产出加成，产出不变、耗时缩短） */
 G.taskWork = function (c, hours) { return c.educated ? hours * G.LIFE.eduWorkMul : hours; };
+
+/* 砍树原木数：未受教育 2、受教育 3（原版 Forester/散工的教育加成） */
+G.taskLogYield = function (c) { return c.educated ? G.PROD.forester.eduLogsYield : G.TREE_LOGS; };
 
 /* 按建筑类型生成任务 */
 G.makeTask = function (b, c) {
@@ -577,7 +613,7 @@ G.makeTask = function (b, c) {
           const d = G.d2(b.x, b.y, t.x, t.y) + G.rng() * 8;
           if (d < bd) { bd = d; best = t; }
         }
-        if (best) return { kind: 'chop', b, tx: best.x, ty: best.y, tree: best, work: G.taskWork(c, P.forester.workH), workLeft: 0 };
+        if (best) return { kind: 'chop', b, tx: best.x, ty: best.y, tree: best, logs: G.taskLogYield(c), work: G.taskWork(c, P.forester.workH), workLeft: 0 };
       }
       if (b.doPlant) { // 补种（原版 Plant 选项）
         const spot = G.nearestPlantSpot(w, b.x, b.y, R);
@@ -652,7 +688,7 @@ G.completeTask = function (c) {
       const jobOk = !t.b || G.world.bmap[t.b.id] === t.b; // b 为空 = 散工砍标记树
       if (treeOk && jobOk) {
         G.removeTree(G.world, t.tx, t.ty);
-        c.carry = { type: 'wood', qty: G.TREE_LOGS };
+        c.carry = { type: 'wood', qty: t.logs || G.TREE_LOGS };
       }
       break;
     }
@@ -921,16 +957,19 @@ G.removeBuilding = function (b) {
     const c = w.cmap[id];
     if (c) { c.job = null; c.task = null; c.state = 'idle'; }
   }
-  if (b.family != null) {
-    const fam = w.families.find(f => f.id === b.family);
-    if (fam) fam.houseId = null;
+  // 原版：拆除建筑返还约一半建材（本作建造材料在下令时一次扣除）
+  const def = G.BDEF[b.type];
+  const refund = [];
+  for (const k in def.cost) {
+    const n = Math.floor(def.cost[k] / 2);
+    if (n > 0) { G.game.res[k] += n; refund.push(`${G.RES[k].icon}×${n}`); }
   }
-  for (let j = b.y; j < b.y + b.h; j++)
-    for (let i = b.x; i < b.x + b.w; i++)
-      w.bgrid[j * w.N + i] = -1;
+  // 住户搬出（独栋住宅与宿舍都以 fam.houseId 指向本建筑）
+  for (const fam of w.families) if (fam.houseId === b.id) fam.houseId = null;
   w.buildings = w.buildings.filter(x => x !== b);
   delete w.bmap[b.id];
   if (G.sel && G.sel.kind === 'b' && G.sel.id === b.id) G.ui.hideInfo();
+  G.ui.toast(`🚧 已拆除 ${def.name}${refund.length ? `，返还 ${refund.join(' ')}` : ''}`, 'info');
   G.scheduleJobs();
 };
 
@@ -940,7 +979,7 @@ G.demolishAt = function (tx, ty) {
   const bid = w.bgrid[i];
   if (bid >= 0) {
     const b = w.bmap[bid];
-    if (b) { G.removeBuilding(b); G.ui.toast(`已拆除 ${G.BDEF[b.type].name}`, 'info'); }
+    if (b) G.removeBuilding(b); // 拆除提示（含返还材料）在 removeBuilding 内
     return;
   }
   if (w.road[i]) { w.road[i] = 0; G.markGroundDirty(tx, ty); return; }
