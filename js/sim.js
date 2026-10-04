@@ -167,6 +167,12 @@ G.endDay = function () {
 G.onSeasonChange = function (from, to) {
   const g = G.game;
   G.ui.toast(`${G.SEASON_ICONS[to]} ${G.SEASON_NAMES[to]}天来了`, to === 3 ? 'warn' : 'info');
+  if (to === 0) {
+    // 春回大地：农田全部复位（含上年已收获的），开始新一轮播种
+    for (const b of G.world.buildings) {
+      if (b.type === 'farm' && b.state === 'ok') G.resetFarm(b);
+    }
+  }
   if (to === 3) {
     // 未收获的作物冻死
     for (const b of G.world.buildings) {

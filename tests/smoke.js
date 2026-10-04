@@ -701,5 +701,30 @@ G.markGroundDirty = G.markGroundDirty || (() => {}); // render.js 未加载时�
   check('库存降回上限以下 → 恢复派工', b.workers.length === 1 && b.workers[0] === c.id);
 }
 
+/* ---- 8.11 农田跨年复种：收获完成后第二年春天能再次播种 ---- */
+{
+  freshGame();
+  const w = G.world, g = G.game;
+  g.res.food = 100000;
+  const b = addB(w, 'farm', 2, 2, 8, 8);
+  b.farm = [];
+  for (let j = 2; j < 10; j++) for (let i = 2; i < 10; i++) b.farm.push({ x: i, y: j, sown: false, harvested: false });
+  b.sownAll = false; b.growth = 0; b.harvestDone = false;
+  const c = G.spawnCitizen({ x: 5, y: 5, sex: 'm', age: 25 });
+  c.job = b.id;
+  let t;
+  while (!b.sownAll && (t = G.makeTask(b, c))) { t.workLeft = 0; G.completeTask(c); }
+  check('预备：第一年播种完成', b.sownAll === true);
+  for (let d = 0; d < 30 && b.growth < 1; d++) G.endDay();
+  check('预备：作物成熟', b.growth >= 1);
+  while (G.game.season !== 2) G.endDay();
+  while (!b.harvestDone && (t = G.makeTask(b, c))) { t.workLeft = 0; G.completeTask(c); }
+  check('预备：第一年收获完成', b.harvestDone === true);
+  // 走过冬天进入第二年春天（春季换季应复位农田）
+  for (let d = 0; d < 24 && !(G.game.season === 0 && !b.sownAll && b.growth === 0); d++) G.endDay();
+  const t2 = G.makeTask(b, c);
+  check('收获后第二年春天可再播种', !!t2 && t2.kind === 'sow');
+}
+
 console.log(`\n${fail === 0 ? '全部通过' : '有失败'}: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
