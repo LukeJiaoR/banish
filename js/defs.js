@@ -39,6 +39,12 @@ G.BDEF = {
     wall: '#7c7466', wallD: '#5e574c', roof: '#5c5648',
     desc: '原版 Storage Barn 成本 48木+16石。存放全镇资源，工人把收获搬到最近的仓库。',
   },
+  mine: {
+    id: 'mine', name: '矿井', icon: '⛏️', w: 3, h: 3,
+    cost: { wood: 80, stone: 40, iron: 10 }, buildWork: 140, jobs: 4, passable: false,
+    wall: '#6f6a62', wallD: '#524e47', roof: '#4a463f',
+    desc: '深井采矿，不受地表矿藏限制：4 名工人轮流下井，每 5 趟有 1 趟采铁。石:铁产出比约 4:1，让石头/铁不再完全依赖地表矿（地表矿清得快、仍是早期最快来源）。',
+  },
   gatherer: {
     id: 'gatherer', name: '采集小屋', icon: '🧺', w: 2, h: 2,
     cost: { wood: 30, stone: 12 }, buildWork: 70, jobs: 4, passable: false,
@@ -84,7 +90,7 @@ G.BDEF = {
 };
 
 /* 工具栏顺序 */
-G.TOOLBAR = ['house', 'stonehouse', 'boarding', 'storage', 'gatherer', 'forester', 'woodcutter', 'dock', 'school', 'farm', 'road', 'fell', 'demolish'];
+G.TOOLBAR = ['house', 'stonehouse', 'boarding', 'storage', 'mine', 'gatherer', 'forester', 'woodcutter', 'dock', 'school', 'farm', 'road', 'fell', 'demolish'];
 
 /* 产出参数（workH: 每次工作小时数；目标对齐原版年产量） */
 G.PROD = {
@@ -97,6 +103,7 @@ G.PROD = {
   woodcutter: { workH: 7, logsIn: 2, firewoodOut: 6, eduFirewoodPerLog: 4,
     fuelLimit: 200, fuelStep: 50, fuelMax: 2000 }, // 燃料上限（原版 Fuel Limit）：柴火库存达到上限即停产；默认 200 ≈ 6~7 栋木屋一年取暖量
   dock:      { workH: 5, yield: { type: 'food', qty: 4 }, waterR: 10, fullWater: 40 },
+  mine:      { workH: 9, yield: 3, ironEvery: 5 }, // 每 5 趟 1 趟铁，其余采石（深井矿脉不枯竭）
   // perTile 14/格：原版 7/格但田块可放大到 15×15，本作固定 8×8，翻倍对齐原版人均产出；
   // haulCap 28：收获攒满 4 格再送一趟仓，否则 64 趟搬运会把秋收窗口耗在走路 上
   farm:      { perTile: 14, tileWorkH: 0.5, growDays: 24, haulCap: 28 },

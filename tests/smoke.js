@@ -940,5 +940,25 @@ G.markGroundDirty = G.markGroundDirty || (() => {}); // render.js 未加载时�
   check('儿童与在读学生优先吃饭（成人先挨饿）', adult.hunger === 1 && student.hunger === 0 && kid.hunger === 0);
 }
 
+/* ---- 8.12 矿井：深井采矿（石为主、每 5 趟 1 趟铁），可持续石头/铁来源 ---- */
+{
+  freshGame();
+  const w = G.world, g = G.game;
+  g.res.wood = 1000; g.res.stone = 1000; g.res.iron = 100; // 备足建材
+  check('矿井成本 80木+40石+10铁', G.BDEF.mine && G.BDEF.mine.cost.wood === 80 && G.BDEF.mine.cost.stone === 40 && G.BDEF.mine.cost.iron === 10);
+  check('矿井进工具栏', G.TOOLBAR.includes('mine'));
+  const b = addB(w, 'mine', 4, 4, 3, 3);
+  const c = G.spawnCitizen({ x: 8, y: 8, sex: 'm', age: 25 });
+  c.job = b.id;
+  const t1 = G.makeTask(b, c);
+  check('矿井任务：采石 3', t1 && t1.kind === 'work' && t1.yield.type === 'stone' && t1.yield.qty === 3);
+  b.mineTick = 4; // 下一趟是第 5 趟
+  const t5 = G.makeTask(b, c);
+  check('每 5 趟 1 趟铁', t5 && t5.yield.type === 'iron' && t5.yield.qty === 3);
+  c.task = t1; c.state = 'work'; t1.workLeft = 0;
+  G.completeTask(c);
+  check('采石完工 3 石入库', g.res.stone === 1000 + 3);
+}
+
 console.log(`\n${fail === 0 ? '全部通过' : '有失败'}: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

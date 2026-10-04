@@ -745,6 +745,18 @@ G.makeTask = function (b, c) {
         work: G.taskWork(c, P.dock.workH), workLeft: 0, yield: { type: P.dock.yield.type, qty },
       };
     }
+    case 'mine': {
+      const spot = G.workSpot(w, b, c.x, c.y);
+      if (!spot) return null;
+      // 每 ironEvery 趟出 1 趟铁，其余采石
+      b.mineTick = (b.mineTick || 0) + 1;
+      const ironTurn = b.mineTick % P.mine.ironEvery === 0;
+      return {
+        kind: 'work', b, tx: spot.x, ty: spot.y,
+        work: G.taskWork(c, P.mine.workH), workLeft: 0,
+        yield: { type: ironTurn ? 'iron' : 'stone', qty: P.mine.yield },
+      };
+    }
     case 'farm': {
       if (b.state !== 'ok') return null;
       const P2 = P.farm;
