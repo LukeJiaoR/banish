@@ -120,8 +120,8 @@ G.endDay = function () {
       else if (housed) c.cold += G.LIFE.unheatedCold * childMul; // 冷屋挡风但没柴火，受冻慢于露宿
       else c.cold += G.LIFE.homelessCold * childMul;             // 无家可归
     } else c.cold = 0;
-    // 自然老死（原版市民多活到 70~85 岁）
-    if (c.age > G.OLD_AGE && G.chance(Math.min(0.25, (c.age - G.OLD_AGE) * 0.004)))
+    // 自然老死（原版市民多活到 70~85 岁；死亡率随年龄缓升，实测死亡多落在 71~85 区间）
+    if (c.age > G.OLD_AGE && G.chance(Math.min(0.25, (c.age - G.OLD_AGE) * 0.002)))
       dead.push([c, '寿终正寝']);
     else if (c.hunger >= G.LIFE.starveDays) dead.push([c, '饿死']);
     else if (c.cold >= G.LIFE.coldDays) dead.push([c, '冻死']);
