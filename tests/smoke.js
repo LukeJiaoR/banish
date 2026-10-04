@@ -855,5 +855,35 @@ G.markGroundDirty = G.markGroundDirty || (() => {}); // render.js 未加载时�
   check('生育节奏 ≈ 2~3 年一胎（年受孕率 40%±2%）', Math.abs(perYear - 0.4) < 0.02);
 }
 
+/* ---- 采集/渔获随资源状态浮动 ---- */
+{
+  freshGame();
+  const w = G.world;
+  const b = addB(w, 'gatherer', 2, 2, 2, 2);
+  const c = G.spawnCitizen({ x: 4, y: 4, sex: 'm', age: 25 });
+  c.job = b.id;
+  seedMatureTrees(w, 5, 5, 24); // 圈内成熟树达到满产基准
+  let t = G.makeTask(b, c);
+  check('密林采集满产 5', t && t.yield.qty === 5);
+  for (const t2 of w.trees.slice()) G.removeTree(w, t2.x, t2.y); // 清成幼林
+  for (let k = 0; k < 20; k++) G.addTree(w, 5 + (k % 5), 5 + ((k / 5) | 0), 0); // 树苗 born=今天
+  b.noWork = false;
+  t = G.makeTask(b, c);
+  check('幼林采集减产至 0.4 倍档（5→2）', t && t.yield.qty === 2);
+}
+{
+  freshGame();
+  const w = G.world;
+  const b = addB(w, 'dock', 2, 2, 2, 2);
+  const c = G.spawnCitizen({ x: 4, y: 4, sex: 'm', age: 25 });
+  c.job = b.id;
+  const t = G.makeTask(b, c);
+  check('周边无水渔获减半（4→2）', t && t.yield.qty === 2);
+  for (let y = 6; y < 12; y++) for (let x = 6; x < 12; x++) w.water[y * w.N + x] = 1; // 大片水域
+  b.noWork = false;
+  const t2 = G.makeTask(b, c);
+  check('大水域渔获满产 4', t2 && t2.yield.qty === 4);
+}
+
 console.log(`\n${fail === 0 ? '全部通过' : '有失败'}: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

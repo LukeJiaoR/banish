@@ -684,18 +684,24 @@ G.makeTask = function (b, c) {
         b.noWork = true; b.warnText = '附近没有森林';
         return null;
       }
+      // 产出随森林成熟度浮动：成熟树越多采集越丰（护林砍穿森林会砸了采集小屋的饭碗）
+      const mature = trees.reduce((s, t2) => s + (G.treeStage(t2) >= 2 ? 1 : 0), 0);
+      const qty = Math.max(1, Math.round(P.gatherer.yield.qty * (0.4 + 0.6 * Math.min(1, mature / P.gatherer.fullForest))));
       const t = trees[G.ri(0, trees.length - 1)];
       return {
         kind: 'work', b, tx: t.x, ty: t.y,
-        work: G.taskWork(c, P.gatherer.workH), workLeft: 0, yield: { type: P.gatherer.yield.type, qty: P.gatherer.yield.qty },
+        work: G.taskWork(c, P.gatherer.workH), workLeft: 0, yield: { type: P.gatherer.yield.type, qty },
       };
     }
     case 'dock': {
       const spot = G.workSpot(w, b, c.x, c.y);
       if (!spot) return null;
+      // 渔获随水域大小浮动：一片小水洼撑不起满产
+      const waterN = G.countWaterInRadius(w, b.x, b.y, P.dock.waterR);
+      const qty = Math.max(1, Math.round(P.dock.yield.qty * (0.5 + 0.5 * Math.min(1, waterN / P.dock.fullWater))));
       return {
         kind: 'work', b, tx: spot.x, ty: spot.y,
-        work: G.taskWork(c, P.dock.workH), workLeft: 0, yield: { type: P.dock.yield.type, qty: P.dock.yield.qty },
+        work: G.taskWork(c, P.dock.workH), workLeft: 0, yield: { type: P.dock.yield.type, qty },
       };
     }
     case 'farm': {

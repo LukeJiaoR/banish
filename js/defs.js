@@ -43,7 +43,7 @@ G.BDEF = {
     id: 'gatherer', name: '采集小屋', icon: '🧺', w: 2, h: 2,
     cost: { wood: 30, stone: 12 }, buildWork: 70, jobs: 4, passable: false,
     wall: '#7d6a48', wallD: '#615238', roof: '#5d7040',
-    desc: '原版成本 30木+12石，4 名工人。在附近森林采集，约 300-500 食物/工人/年。必须靠近森林。',
+    desc: '原版成本 30木+12石，4 名工人。在附近森林采集，约 250-400 食物/工人/年，随圈内成熟林密度浮动——护林小屋把森林砍穿会砸了这里的饭碗。必须靠近森林。',
   },
   forester: {
     id: 'forester', name: '护林小屋', icon: '🌲', w: 2, h: 2,
@@ -61,7 +61,7 @@ G.BDEF = {
     id: 'dock', name: '渔码头', icon: '🎣', w: 2, h: 2,
     cost: { wood: 30, stone: 16 }, buildWork: 90, jobs: 4, passable: false,
     wall: '#6f5b40', wallD: '#574732', roof: '#8a5a3a',
-    desc: '原版成本 30木+16石，4 名工人，全年产约 350-500 食物/工人/年。必须紧邻水面。',
+    desc: '原版成本 30木+16石，4 名工人，全年产约 200-350 食物/工人/年，随周边水域大小浮动。必须紧邻水面。',
   },
   school: {
     id: 'school', name: '学堂', icon: '🏫', w: 3, h: 3,
@@ -88,14 +88,15 @@ G.TOOLBAR = ['house', 'stonehouse', 'boarding', 'storage', 'gatherer', 'forester
 
 /* 产出参数（workH: 每次工作小时数；目标对齐原版年产量） */
 G.PROD = {
-  gatherer:  { workH: 5, yield: { type: 'food', qty: 5 },  radius: 6, needTrees: 6 },
+  // gatherer/dock 产出随资源状态浮动：满产基准 qty，圈内成熟树/水域不足时按比例打折
+  gatherer:  { workH: 5, yield: { type: 'food', qty: 5 }, radius: 6, needTrees: 6, fullForest: 24 },
   // workH 8h + 原地补种 3h = 11h/棵：赶路+砍+种+送仓刚好排进 16h 工作日，
   // 砍一棵在原坑种一棵（可持续轮伐），采伐区锁定在护林屋周围成熟林带；
   // minMature：圈内成熟树低于下限即停砍育林（防清穿森林、拖垮同址采集小屋）
   forester:  { workH: 8, logsYield: 2, eduLogsYield: 3, plantH: 3, radius: 16, minMature: 15 },
   woodcutter: { workH: 7, logsIn: 2, firewoodOut: 6, eduFirewoodPerLog: 4,
     fuelLimit: 200, fuelStep: 50, fuelMax: 2000 }, // 燃料上限（原版 Fuel Limit）：柴火库存达到上限即停产；默认 200 ≈ 6~7 栋木屋一年取暖量
-  dock:      { workH: 5, yield: { type: 'food', qty: 4 } },
+  dock:      { workH: 5, yield: { type: 'food', qty: 4 }, waterR: 10, fullWater: 40 },
   // perTile 14/格：原版 7/格但田块可放大到 15×15，本作固定 8×8，翻倍对齐原版人均产出；
   // haulCap 28：收获攒满 4 格再送一趟仓，否则 64 趟搬运会把秋收窗口耗在走路 上
   farm:      { perTile: 14, tileWorkH: 0.5, growDays: 24, haulCap: 28 },
