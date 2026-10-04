@@ -7,7 +7,7 @@ G.newGameState = function () {
   return {
     h: 6, day: 0, season: 0, year: 1,
     speed: 1, paused: false,
-    res: { wood: 80, stone: 48, iron: 0, food: 200, firewood: 24 }, // 原版中难度开局（无工具系统，铁仅用于建造）
+    res: { wood: 80, stone: 48, iron: 0, food: 500, firewood: 50 }, // 开局（原版中难度 5 家庭）；存粮较原版加厚：15 人 6 天食物跑道撑不到第一座采集屋建成
     schedT: 1,
     over: false,
     stats: { born: 0, died: 0, deadReasons: {} },

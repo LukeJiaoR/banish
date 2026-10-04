@@ -114,7 +114,7 @@ G.ui = { toast() {}, refreshHUD() {} };
   const t2 = G.makeTask(b, c);
   c.task = t2; t2.workLeft = 0;
   G.completeTask(c);
-  check('完工扣 2 木产 6 柴入仓', G.game.res.wood === 0 && G.game.res.firewood === 24 + 6);
+  check('完工扣 2 木产 6 柴入仓', G.game.res.wood === 0 && G.game.res.firewood === 50 + 6);
 }
 {
   freshGame();
@@ -133,7 +133,7 @@ G.ui = { toast() {}, refreshHUD() {} };
   G.completeTask(c); // 加工完成
   check('加工完扣 2 木、6 柴背着去仓库', G.game.res.wood === 8 && c.carry && c.carry.type === 'firewood' && c.carry.qty === 6);
   for (let k = 0; k < 100 && c.carry; k++) G.stepCitizen(c, 0.5);
-  check('柴火送达仓库', G.game.res.firewood === 24 + 6 && !c.carry);
+  check('柴火送达仓库', G.game.res.firewood === 50 + 6 && !c.carry);
 }
 
 /* ---- 读档后随身货物重新入仓 ---- */

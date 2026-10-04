@@ -17,9 +17,9 @@ G.newGame = function (seed) {
   G.rng = G.makeRng(seed ^ 0x51f15e);
   G.world = G.genWorld(seed);
   // 原版「中等」难度开局：5 个家庭（无房），一辆储物车（仓库）
-  // 资源：木 80 / 石 48 / 食物 200 / 柴火 24（铁靠清理地表铁矿获得）
+  // 资源：木 80 / 石 48 / 食 500 / 柴 50（存粮较原版加厚，见 README「有意差异」；铁靠清理地表铁矿获得）
   G.game = G.newGameState();
-  G.game.res = { wood: 80, stone: 48, iron: 0, food: 200, firewood: 24 };
+  G.game.res = { wood: 80, stone: 48, iron: 0, food: 500, firewood: 50 };
   G.sel = null;
   G.tool = null;
   G.smoke = [];
