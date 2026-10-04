@@ -185,6 +185,35 @@ body {
 }
 .save-actions button.plain:hover { background: rgba(90,70,40,0.6); }
 
+/* ---- 服务器存档区 + 存档文件导出/导入 ---- */
+#server-saves { margin-top: 12px; border-top: 1px dashed rgba(216,178,90,0.25); padding-top: 10px; }
+.server-saves-hint { color: #b8a888; font-size: 11.5px; line-height: 1.6; }
+.server-saves-hint code { color: #ffd98a; background: rgba(60,48,30,0.6); border-radius: 4px; padding: 1px 5px; }
+.server-saves-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  margin-bottom: 8px; color: #ffd98a; font-weight: bold; font-size: 13px;
+}
+.server-saves-head small { color: #b8a888; font-weight: normal; }
+.server-save-new { display: flex; gap: 6px; }
+.server-save-new input {
+  width: 150px; background: rgba(30,24,14,0.8); border: 1px solid rgba(216,178,90,0.35);
+  color: #ffe9b0; border-radius: 6px; padding: 4px 8px; font-size: 12px;
+}
+.server-save-new input:focus { outline: none; border-color: #d8b25a; }
+.server-save-new button {
+  background: #6b5426; border: 1px solid #d8b25a; color: #ffe9b0;
+  border-radius: 6px; padding: 4px 10px; cursor: pointer; font-size: 12px; white-space: nowrap;
+}
+.server-save-new button:hover { background: #7d622c; }
+.save-row.server { border-color: rgba(120,170,220,0.3); }
+.save-row.server .sav-name { color: #a8d0f0; }
+.file-io-row { display: flex; gap: 10px; margin-top: 10px; }
+.file-io-row button {
+  background: rgba(60,48,30,0.6); border: 1px solid rgba(216,178,90,0.35); color: #ddd0b0;
+  border-radius: 8px; padding: 6px 14px; cursor: pointer; font-size: 12.5px;
+}
+.file-io-row button:hover { background: rgba(90,70,40,0.6); color: #ffe9b0; }
+
 /* ---- 反馈 ---- */
 #fb-text, #fb-fallback-text {
   width: 100%; display: block;

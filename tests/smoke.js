@@ -298,12 +298,23 @@ G.ui = { toast() {}, refreshHUD() {} };
   edu.educated = true;
   const forester = addB(G.world, 'forester', 6, 2, 2, 2);
   forester.doCut = false; forester.doPlant = true;
+  const wc = addB(G.world, 'woodcutter', 9, 2, 2, 2);
+  wc.fuelLimit = 350;
   G.saveGame('test_key', true);
   G.loadGame('test_key');
   const kid2 = G.world.cmap[kid.id], edu2 = G.world.cmap[edu.id];
   check('存读档保留 学生/受教育/学校 字段', kid2 && kid2.student === true && kid2.school === 999 && edu2 && edu2.educated === true);
   const f2 = G.world.buildings.find(x => x.type === 'forester');
   check('存读档保留 护林小屋砍伐/补种开关', f2 && f2.doCut === false && f2.doPlant === true);
+  const wc2 = G.world.buildings.find(x => x.type === 'woodcutter');
+  check('存读档保留 伐木屋燃料上限', wc2 && wc2.fuelLimit === 350);
+  // 旧档迁移：无 fuelLimit 字段的伐木屋回退默认上限
+  const raw = JSON.parse(localStorage.getItem('test_key'));
+  delete raw.buildings.find(x => x.type === 'woodcutter').fuelLimit;
+  localStorage.setItem('test_key', JSON.stringify(raw));
+  G.loadGame('test_key');
+  const wc3 = G.world.buildings.find(x => x.type === 'woodcutter');
+  check('旧档无 fuelLimit → 回退默认上限 200', wc3 && wc3.fuelLimit === 200);
   delete global.localStorage;
   delete global.document;
 }
@@ -564,6 +575,38 @@ G.markGroundDirty = G.markGroundDirty || (() => {}); // render.js 未加载时�
   check('入库 3 原木', G.game.res.wood === 80 + 3);
 }
 
+/* ---- 8.9 砍倒即原地补种（护林可持续轮伐；砍+种合并为一个任务） ---- */
+{
+  freshGame();
+  const w = G.world;
+  const b = addB(w, 'forester', 2, 2, 2, 2);
+  b.doCut = true; b.doPlant = true;
+  G.addTree(w, 5, 5, -200); // 成熟树
+  const c = G.spawnCitizen({ x: 4, y: 4, sex: 'm', age: 25 });
+  c.job = b.id;
+  const t = G.makeTask(b, c);
+  check('砍伐任务合并原地补种（8h+3h=11h）', t && t.kind === 'chop' && t.replant === true && t.work === 11);
+  c.task = t; t.workLeft = 0;
+  G.completeTask(c);
+  const i = 5 * w.N + 5;
+  check('砍倒后原坑立即长出树苗、2 原木入库',
+    w.treeIdx[i] >= 0 && w.trees[w.treeIdx[i]].b === G.game.day && G.game.res.wood === 80 + 2);
+}
+{
+  freshGame();
+  const w = G.world;
+  const b = addB(w, 'forester', 2, 2, 2, 2);
+  b.doCut = true; b.doPlant = false; // 只砍不种
+  G.addTree(w, 5, 5, -200);
+  const c = G.spawnCitizen({ x: 4, y: 4, sex: 'm', age: 25 });
+  c.job = b.id;
+  const t = G.makeTask(b, c);
+  check('关补种 → 只砍不种（8h）', t && t.kind === 'chop' && !t.replant && t.work === 8);
+  c.task = t; t.workLeft = 0;
+  G.completeTask(c);
+  check('砍倒后树坑空置、2 原木入库', w.treeIdx[5 * w.N + 5] < 0 && G.game.res.wood === 80 + 2);
+}
+
 /* ---- 8.6 拆除返还约一半材料（原版行为） ---- */
 {
   freshGame();
@@ -572,6 +615,21 @@ G.markGroundDirty = G.markGroundDirty || (() => {}); // render.js 未加载时�
   const w0 = g.res.wood, s0 = g.res.stone;
   G.removeBuilding(b);
   check('拆除木屋返还 8木+4石', g.res.wood === w0 + 8 && g.res.stone === s0 + 4);
+}
+
+/* ---- 8.10 拆除清除占地占位（否则残留幽灵格：点击无详情、原地无法重建） ---- */
+{
+  freshGame();
+  const w = G.world;
+  const b = addB(w, 'woodcutter', 4, 4, 2, 2);
+  G.removeBuilding(b);
+  let residual = 0;
+  for (let j = 4; j < 6; j++) for (let i = 4; i < 6; i++) if (w.bgrid[j * w.N + i] >= 0) residual++;
+  check('拆除后占地占位全部清除', residual === 0 && w.buildings.length === 0 && !w.bmap[b.id]);
+  check('拆除后原地可重建', G.canPlace(w, 'woodcutter', 4, 4).ok === true);
+  G.ui.hideInfo = () => {};
+  G.selectAt(4, 4, { x: -999, y: -999 });
+  check('拆除后点击原地不再有幽灵详情', G.sel == null);
 }
 
 /* ---- 8.7 铁矿清理得铁；岩石清理得石头 ---- */
@@ -627,6 +685,20 @@ G.markGroundDirty = G.markGroundDirty || (() => {}); // render.js 未加载时�
   b.fuelLimit = 0; // 上限 0 = 彻底停产
   const t4 = G.makeTask(b, c);
   check('上限 0 → 停产', t4 === null);
+}
+{
+  // 上限联动调度：到上限的伐木屋不拉人，库存降回后恢复派工
+  freshGame();
+  const w = G.world;
+  const b = addB(w, 'woodcutter', 2, 2, 2, 2);
+  const c = G.spawnCitizen({ x: 5, y: 5, sex: 'm', age: 25 });
+  G.game.res.wood = 10;
+  G.game.res.firewood = 200;
+  G.scheduleJobs();
+  check('到上限的伐木屋不派工', b.workers.length === 0 && c.job == null);
+  G.game.res.firewood = 100;
+  G.scheduleJobs();
+  check('库存降回上限以下 → 恢复派工', b.workers.length === 1 && b.workers[0] === c.id);
 }
 
 console.log(`\n${fail === 0 ? '全部通过' : '有失败'}: ${pass} passed, ${fail} failed`);

@@ -4,7 +4,7 @@
  * 所有经济数值对齐原版 Banished（未受教育工人基准）：
  *   每人每年吃 100 食物；1 棵树 = 2 原木；1 原木 = 3 柴火；
  *   木屋每年约烧 30 柴火；农田约 7 食物/格/年；
- *   采集约 300-500 食物/工人/年；护林约 30-50 原木/工人/年。
+ *   采集约 300-500 食物/工人/年；护林约 55-65 原木/工人/年（受教育约 90-110，砍倒即原地补种）。
  * ============================================================ */
 
 /* 建筑（w/h 为占地格数；cost 为建造消耗；buildWork 为建造所需工时（游戏小时））
@@ -49,7 +49,7 @@ G.BDEF = {
     id: 'forester', name: '护林小屋', icon: '🌲', w: 2, h: 2,
     cost: { wood: 32, stone: 12 }, buildWork: 70, jobs: 4, passable: false,
     wall: '#6b5a3e', wallD: '#54462f', roof: '#4a6b3a',
-    desc: '原版成本 32木+12石，4 名工人。砍树取原木（未受教育 1 树=2 原木，受教育 3）并补种，约 30-50 原木/工人/年。面板可分别开关「砍伐」与「补种」：只种不砍可育林，只砍不种会清光森林。',
+    desc: '原版成本 32木+12石，4 名工人。砍树取原木（未受教育 1 树=2 原木，受教育 3），砍倒即原地补种、可持续轮伐，约 55-65 原木/工人/年（受教育近翻倍）。面板可分别开关「砍伐」与「补种」：只种不砍可育林，只砍不种会清光森林。',
   },
   woodcutter: {
     id: 'woodcutter', name: '伐木屋', icon: '🪓', w: 2, h: 2,
@@ -89,7 +89,9 @@ G.TOOLBAR = ['house', 'stonehouse', 'boarding', 'storage', 'gatherer', 'forester
 /* 产出参数（workH: 每次工作小时数；目标对齐原版年产量） */
 G.PROD = {
   gatherer:  { workH: 5, yield: { type: 'food', qty: 5 },  radius: 6, needTrees: 6 },
-  forester:  { workH: 22, logsYield: 2, eduLogsYield: 3, plantH: 3, radius: 12 },
+  // workH 8h + 原地补种 3h = 11h/棵：赶路+砍+种+送仓刚好排进 16h 工作日，
+  // 砍一棵在原坑种一棵（可持续轮伐），采伐区锁定在护林屋周围成熟林带
+  forester:  { workH: 8, logsYield: 2, eduLogsYield: 3, plantH: 3, radius: 16 },
   woodcutter: { workH: 7, logsIn: 2, firewoodOut: 6, eduFirewoodPerLog: 4,
     fuelLimit: 200, fuelStep: 50, fuelMax: 2000 }, // 燃料上限（原版 Fuel Limit）：柴火库存达到上限即停产；默认 200 ≈ 6~7 栋木屋一年取暖量
   dock:      { workH: 5, yield: { type: 'food', qty: 4 } },
@@ -111,6 +113,7 @@ G.LIFE = {
   maxFamily: 8,           // 每个家庭人口上限（原版每栋住宅至多住 8 人）
   restFrom: 22,           // 休息开始时刻（小时）：市民回家睡觉
   restTo: 6,              // 休息结束时刻：天亮起床
+  campDist: 10,           // 深夜离家超过该格数就地在工地露宿（护林人常驻林中的真实做法，避免长途回家又折返）
   gradAge: 17,            // 学堂毕业年龄（原版 17 岁）
   schoolCap: 20,          // 每所学堂学生容量（原版 20）
   boardingCap: 5,         // 每栋宿舍可入住的家庭数（原版 5）
@@ -118,9 +121,9 @@ G.LIFE = {
 };
 G.LIFE.eatPerDay = G.LIFE.eatPerYear / G.YEAR_DAYS; // ≈2.08 食物/人/天（生育门槛、饥饿警告用）
 
-/* 树木生长（天数阈值；原版一棵树数年成材，本作约 2.5 年——配合护林圈可持续产量） */
+/* 树木生长（天数阈值；原版一棵树 4-5 年成材，本作约 2 年——配合小地图快节奏与护林可持续产量） */
 G.TREE_YOUNG = 60;
-G.TREE_MATURE = 120;
+G.TREE_MATURE = 100;
 G.TREE_LOGS = 2;          // 1 棵树 = 2 原木（原版未受教育；受教育护林/散工砍出 3 原木）
 
 /* 岩石：清理每格岩石获得石头/铁（原版地表岩石与铁矿是初期石头、铁的来源） */

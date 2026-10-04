@@ -310,8 +310,8 @@ G.nearestWalkable = function (w, x, y, r) {
       }
   return null;
 };
-/* 最近的可种树空地（螺旋扫描，确定性） */
-G.nearestPlantSpot = function (w, cx, cy, r) {
+/* 最近的可种树空地（螺旋扫描，确定性；claimed 中的格子跳过：一人一坑） */
+G.nearestPlantSpot = function (w, cx, cy, r, claimed) {
   for (let rad = 1; rad <= r; rad++)
     for (let dy = -rad; dy <= rad; dy++)
       for (let dx = -rad; dx <= rad; dx++) {
@@ -321,6 +321,7 @@ G.nearestPlantSpot = function (w, cx, cy, r) {
         if (x < 0 || y < 0 || x >= w.N || y >= w.N) continue;
         const i = y * w.N + x;
         if (w.water[i] || w.rock[i] || w.road[i] || w.treeIdx[i] >= 0 || w.bgrid[i] >= 0) continue;
+        if (claimed && claimed.has(i)) continue;
         return { x, y };
       }
   return null;

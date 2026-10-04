@@ -25,6 +25,7 @@ G.newGame = function (seed) {
   G.smoke = [];
   G.flakes = null;
   localStorage.removeItem(G.AUTOSAVE_KEY); // 主动重开时清掉旧自动存档
+  G.deleteServerSaveQuiet('autosave');     // 服务器自动档同步清理（不可用时静默跳过）
   G.ui.hideInfo();
   G.ui.setToolActive();
   document.getElementById('over').classList.add('hidden');
@@ -67,7 +68,7 @@ G.newGame = function (seed) {
 G.serializeGame = function () {
   const w = G.world, g = G.game;
   return {
-    v: 1, seed: w.seed,
+    v: 1, seed: w.seed, N: w.N, // N：地图尺寸（旧档跨尺寸迁移裸索引用）
     game: {
       h: g.h, day: g.day, season: g.season, year: g.year,
       res: g.res, stats: g.stats, prevFood: g.prevFood, foodNet: g.foodNet, warned: g.warned,
@@ -108,7 +109,10 @@ G.saveGame = function (key, silent) {
 
 /* 自动存档（换季 / 离开页面时调用，启动时自动恢复） */
 G.autosave = function () {
-  if (G.world && !G.game.over) G.saveGame(G.AUTOSAVE_KEY, true);
+  if (G.world && !G.game.over) {
+    G.saveGame(G.AUTOSAVE_KEY, true);
+    G.saveToServer('autosave', true).catch(() => {}); // 自动档镜像到服务器；不可用时静默跳过
+  }
 };
 
 G._peekUid = function () {
@@ -123,31 +127,47 @@ G.loadGame = function (key) {
   const raw = localStorage.getItem(key);
   if (!raw) { G.ui.toast('没有找到存档', 'warn'); return; }
   try {
-    const d = JSON.parse(raw);
-    G.rng = G.makeRng((d.seed ^ 0x51f15e) >>> 0);
-    G.world = G.genWorld(d.seed);
-    G.game = G.newGameState();
-    const g = G.game, w = G.world;
-    Object.assign(g, d.game);
-    g.res.iron = g.res.iron || 0; // 旧存档迁移：无铁字段时补 0
-    G.sel = null; G.tool = null; G.smoke = []; G.flakes = null;
-    G.ui.hideInfo(); G.ui.setToolActive();
-    document.getElementById('over').classList.add('hidden');
+    G.applySaveData(JSON.parse(raw));
+    G.ui.toast(key === G.AUTOSAVE_KEY ? '📂 已自动恢复上次进度（🌱 可开新局）' : '📂 存档已载入', 'good');
+  } catch (e) {
+    console.error(e);
+    G.ui.toast('读档失败：' + e.message, 'bad');
+  }
+};
 
-    G.setUid(d.nextUid || 10000);
-    // 树：清空重建
-    w.trees = []; w.treeIdx.fill(-1);
-    for (const [i, x, y, b] of d.trees) {
-      w.trees.push({ i, x, y, b });
-      w.treeIdx[i] = w.trees.length - 1;
-    }
-    // 已清理的岩石
-    for (const i of d.rockCleared || []) {
-      w.rock[i] = 0;
-      w.rockCleared.push(i);
-    }
-    // 「砍伐」标记
-    if (d.marked) for (const i of d.marked) w.marked.add(i);
+/* 把存档 JSON 应用为当前局面（本机档 / 服务器档 / 导入文件共用） */
+G.applySaveData = function (d) {
+  G.rng = G.makeRng((d.seed ^ 0x51f15e) >>> 0);
+  G.world = G.genWorld(d.seed);
+  G.game = G.newGameState();
+  const g = G.game, w = G.world;
+  Object.assign(g, d.game);
+  g.res.iron = g.res.iron || 0; // 旧存档迁移：无铁字段时补 0
+  G.sel = null; G.tool = null; G.smoke = []; G.flakes = null;
+  G.ui.hideInfo(); G.ui.setToolActive();
+  document.getElementById('over').classList.add('hidden');
+
+  // 旧版地图尺寸迁移：76×76 存档里的裸索引（岩石清理/砍伐标记）按旧 N 重映射
+  const oldN = d.N || w.N;
+  const remap = i => (i >= 0 && i < oldN * oldN && oldN !== w.N)
+    ? ((i / oldN) | 0) * w.N + (i % oldN) : i;
+
+  G.setUid(d.nextUid || 10000);
+  // 树：清空重建（索引一律按 x,y 现算，天然兼容旧尺寸存档）
+  w.trees = []; w.treeIdx.fill(-1);
+  for (const [, x, y, b] of d.trees) {
+    const i = y * w.N + x;
+    w.trees.push({ i, x, y, b });
+    w.treeIdx[i] = w.trees.length - 1;
+  }
+  // 已清理的岩石
+  for (const i of d.rockCleared || []) {
+    const t = remap(i);
+    w.rock[t] = 0;
+    w.rockCleared.push(t);
+  }
+  // 「砍伐」标记
+  if (d.marked) for (const i of d.marked) w.marked.add(remap(i));
     // 建筑
     for (const bd of d.buildings) {
       const b = {
@@ -194,12 +214,88 @@ G.loadGame = function (key) {
     G.cam.y = window.innerHeight / 2 - sy * G.cam.z;
     G.needGround = true;
     G.groundDirty.clear();
-    G.ui.toast(key === G.AUTOSAVE_KEY ? '📂 已自动恢复上次进度（🌱 可开新局）' : '📂 存档已载入', 'good');
     G.ui.refreshHUD();
-  } catch (e) {
-    console.error(e);
-    G.ui.toast('读档失败：' + e.message, 'bad');
-  }
+};
+
+/* ---------- 服务器存档（server.py /api/saves；静态/dev 服务器上不可用） ---------- */
+G.serverSaves = { available: null };   // null=探测中 true=可用 false=不可用
+
+G.probeServerSaves = function () {
+  if (location.protocol === 'file:') { G.serverSaves.available = false; return; }
+  fetch('/api/saves').then(r => (r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))))
+    .then(j => {
+      G.serverSaves.available = !!(j && j.ok);
+      G.ui.refreshSavesIfOpen();
+    })
+    .catch(() => { G.serverSaves.available = false; G.ui.refreshSavesIfOpen(); });
+};
+
+G.saveToServer = function (name, silent) {
+  if (!G.world || !G.game) return Promise.reject(new Error('当前没有对局'));
+  name = String(name || '').trim();
+  if (!name) return Promise.reject(new Error('请先填写存档名'));
+  const body = JSON.stringify({ name, data: G.serializeGame() });
+  return fetch('/api/saves', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body,
+    keepalive: body.length < 60000, // 离开页面时小包仍可送达（keepalive 上限 64KB）
+  }).then(r => r.json().then(j => ({ ok: r.ok, j }))).then(({ ok, j }) => {
+    if (!ok || !j.ok) throw new Error(j.error || '保存失败');
+    if (!silent) G.ui.toast('💾 已保存到服务器：' + name, 'good');
+    G.ui.refreshSavesIfOpen();
+  });
+};
+
+G.loadFromServer = function (name) {
+  return fetch('/api/saves/' + encodeURIComponent(name))
+    .then(r => (r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))))
+    .then(d => { G.applySaveData(d); G.ui.toast('📂 已从服务器载入：' + name, 'good'); });
+};
+
+G.deleteServerSave = function (name) {
+  return fetch('/api/saves/' + encodeURIComponent(name), { method: 'DELETE' })
+    .then(r => r.json())
+    .then(j => { if (!j.ok) throw new Error(j.error || '删除失败'); G.ui.refreshSavesIfOpen(); });
+};
+
+/* 静默删除服务器自动档（新开局/死档时镜像清理，与本机自动档同步） */
+G.deleteServerSaveQuiet = function (name) {
+  if (G.serverSaves.available !== true) return;
+  fetch('/api/saves/' + encodeURIComponent(name), { method: 'DELETE' }).catch(() => {});
+};
+
+/* ---------- 存档文件导出/导入（无服务器时的兜底持久化） ---------- */
+G.exportSaveFile = function () {
+  if (!G.world || !G.game) { G.ui.toast('当前没有对局', 'warn'); return; }
+  const data = G.serializeGame();
+  data.savedAt = Date.now();
+  const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const t = new Date(), p = n => (n < 10 ? '0' : '') + n;
+  a.href = url;
+  a.download = `放逐小镇存档-${t.getFullYear()}${p(t.getMonth() + 1)}${p(t.getDate())}-${p(t.getHours())}${p(t.getMinutes())}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+  G.ui.toast('⬇️ 存档文件已导出', 'good');
+};
+
+G.importSaveFile = function (file) {
+  if (!file) return;
+  const rd = new FileReader();
+  rd.onload = () => {
+    try {
+      G.applySaveData(JSON.parse(rd.result));
+      G.ui.toast('📂 存档文件已导入', 'good');
+    } catch (e) {
+      G.ui.toast('导入失败：' + e.message, 'bad');
+    }
+  };
+  rd.onerror = () => G.ui.toast('文件读取失败', 'bad');
+  rd.readAsText(file);
 };
 
 /* ---------- 相机 ---------- */
@@ -286,6 +382,7 @@ G.init = function () {
   // 启动：有自动存档则恢复上次进度，否则开新局
   if (localStorage.getItem(G.AUTOSAVE_KEY)) G.loadGame(G.AUTOSAVE_KEY);
   else G.newGame();
+  G.probeServerSaves(); // 探测服务器存档接口（server.py 托管时可用）
 
   // 自动存档：换季（sim.js onSeasonChange）、定时、页面隐藏、刷新/关闭时写入
   window.addEventListener('beforeunload', () => G.autosave());
@@ -447,11 +544,12 @@ G.selectAt = function (tx, ty, p) {
   const w = G.world;
   if (tx < 0 || ty < 0 || tx >= w.N || ty >= w.N) { G.ui.hideInfo(); return; }
   const bid = w.bgrid[ty * w.N + tx];
-  if (bid >= 0) {
+  if (bid >= 0 && w.bmap[bid]) {
     G.sel = { kind: 'b', id: bid };
     G.ui.showInfo(G.sel);
     return;
   }
+  // bgrid 指向已不存在的建筑（异常残留）时按空地处理
   // 找附近的市民（屏幕距离）
   let best = null, bd = 18 * 18;
   for (const c of w.citizens) {

@@ -371,6 +371,10 @@ G.goHome = function (c) {
   c.task = null;
   const h = G.homeOf(c);
   if (!h) { c.path = null; c.state = 'rest'; return; }
+  // 离家太远（如护林人深入林中）：就地露宿，天亮原地续接——
+  // 深夜长途回家再折返会把整个工作日耗在路上
+  const d = Math.sqrt(G.d2(c.x, c.y, h.x + h.w / 2, h.y + h.h / 2));
+  if (d > G.LIFE.campDist) { c.path = null; c.state = 'rest'; return; }
   const spot = G.workSpot(G.world, h, c.x, c.y);
   const p = G.findPath(G.world, Math.round(c.x), Math.round(c.y), spot ? spot.x : h.x, spot ? spot.y : h.y);
   if (p && p.length) { c.path = p; c.pi = 0; c.state = 'walk'; c.walkKind = 'home'; }
@@ -609,6 +613,16 @@ G.makeTask = function (b, c) {
     }
     case 'forester': {
       const R = P.forester.radius;
+      // 砍倒即原地补种（原版护林人的可持续轮伐）：砍+种合并为一个任务，
+      // 采伐区稳定在屋旁成熟林带；圈 内无成熟树时才单独补种育林
+      const plantTask = () => {
+        // 同屋工人在种的坑不再重复认领（防止多人挤同一个点白跑）
+        const claimed = new Set();
+        for (const c2 of w.citizens)
+          if (c2 !== c && c2.task && c2.task.kind === 'plant' && c2.task.b === b) claimed.add(c2.task.ty * w.N + c2.task.tx);
+        const spot = G.nearestPlantSpot(w, b.x, b.y, R, claimed);
+        return spot ? { kind: 'plant', b, tx: spot.x, ty: spot.y, work: G.taskWork(c, P.forester.plantH), workLeft: 0 } : null;
+      };
       if (b.doCut) { // 砍伐成熟树（面板可开关，原版 Forester 的 Cut 选项）
         const trees = G.treesInRadius(w, b.x, b.y, R, true);
         // 已被其他工人认领的树不再重复认领（全部被认领时允许重叠）
@@ -621,14 +635,20 @@ G.makeTask = function (b, c) {
           const d = G.d2(b.x, b.y, t.x, t.y) + G.rng() * 8;
           if (d < bd) { bd = d; best = t; }
         }
-        if (best) return { kind: 'chop', b, tx: best.x, ty: best.y, tree: best, logs: G.taskLogYield(c), work: G.taskWork(c, P.forester.workH), workLeft: 0 };
+        if (best) return {
+          kind: 'chop', b, tx: best.x, ty: best.y, tree: best, logs: G.taskLogYield(c),
+          // 砍+原地补种合并（补种耗时会加进工时；关补种则只砍不种，森林会被清光）
+          replant: b.doPlant,
+          work: G.taskWork(c, P.forester.workH + (b.doPlant ? P.forester.plantH : 0)), workLeft: 0,
+        };
       }
-      if (b.doPlant) { // 补种（原版 Plant 选项）
-        const spot = G.nearestPlantSpot(w, b.x, b.y, R);
-        if (spot) return { kind: 'plant', b, tx: spot.x, ty: spot.y, work: G.taskWork(c, P.forester.plantH), workLeft: 0 };
+      if (b.doPlant) { // 补种（原版 Plant 选项；无成熟树可砍时育林）
+        const t = plantTask();
+        if (t) return t;
       }
       b.noWork = true;
-      b.warnText = !b.doCut && !b.doPlant ? '已停用（砍伐/补种均关）' : (b.doCut ? '附近无成熟树木且无处补种' : '无处可补种');
+      b.warnText = !b.doCut && !b.doPlant ? '已停用（砍伐/补种均关）'
+        : (b.doCut ? '附近无成熟树木' : '无处可补种');
       return null;
     }
     case 'gatherer': {
@@ -697,6 +717,7 @@ G.completeTask = function (c) {
       if (treeOk && jobOk) {
         G.removeTree(G.world, t.tx, t.ty);
         c.carry = { type: 'wood', qty: t.logs || G.TREE_LOGS };
+        if (t.replant && t.b && t.b.doPlant) G.addTree(G.world, t.tx, t.ty); // 砍倒即原地补种
       }
       break;
     }
@@ -978,6 +999,10 @@ G.removeBuilding = function (b) {
   for (const fam of w.families) if (fam.houseId === b.id) fam.houseId = null;
   w.buildings = w.buildings.filter(x => x !== b);
   delete w.bmap[b.id];
+  // 清除占地占位：残留会让该地块成为"幽灵建筑"——点击无详情、原地也无法重建
+  for (let j = b.y; j < b.y + b.h; j++)
+    for (let i = b.x; i < b.x + b.w; i++)
+      w.bgrid[j * w.N + i] = -1;
   if (G.sel && G.sel.kind === 'b' && G.sel.id === b.id) G.ui.hideInfo();
   G.ui.toast(`🚧 已拆除 ${def.name}${refund.length ? `，返还 ${refund.join(' ')}` : ''}`, 'info');
   G.scheduleJobs();

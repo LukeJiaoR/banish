@@ -332,11 +332,88 @@ G.ui = {
       G.saveGame(G.SAVE_KEY);
       this.renderSaves();
     };
+    // 服务器存档区 + 存档文件导出/导入
+    this.renderServerSaves();
+    document.getElementById('save-export').onclick = () => G.exportSaveFile();
+    const imp = document.getElementById('save-import-file');
+    document.getElementById('save-import').onclick = () => imp.click();
+    imp.onchange = () => {
+      const f = imp.files && imp.files[0];
+      imp.value = '';
+      G.importSaveFile(f);
+    };
+  },
+
+  /* ---------- 服务器存档区（server.py /api/saves；探测不可用时给出提示） ---------- */
+  escHtml: function (s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, ch => (
+      { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+  },
+  refreshSavesIfOpen: function () {
+    const dlg = document.getElementById('saves');
+    if (dlg && !dlg.classList.contains('hidden')) this.renderSaves();
+  },
+  renderServerSaves: function () {
+    const box = document.getElementById('server-saves');
+    if (!box) return;
+    if (G.serverSaves.available === false) {
+      box.innerHTML = `<div class="server-saves-hint">🖥 服务器存档不可用（用 <code>python3 server.py</code> 启动即启用，
+        跨浏览器/跨设备共享）。本机存档与 ⬇️⬆️ 存档文件导出导入不受影响。</div>`;
+      return;
+    }
+    fetch('/api/saves').then(r => (r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))))
+      .then(j => {
+        if (!j || !j.ok) throw new Error('bad');
+        const saves = j.saves || [];
+        let html = `<div class="server-saves-head">
+          <span>🖥 服务器存档 <small>跨浏览器 · 跨设备</small></span>
+          <span class="server-save-new">
+            <input id="server-save-name" maxlength="40" placeholder="存档名，如：第二个冬天">
+            <button id="server-save-now">💾 存到服务器</button>
+          </span></div>`;
+        html += saves.map(s => {
+          const sum = s.summary && s.summary.savedAt
+            ? this.saveGameStr({ game: s.summary, citizens: { length: s.summary.pop || 0 } }) : '';
+          const name = this.escHtml(s.name);
+          return `<div class="save-row server">
+            <span class="sav-name">${name}</span>
+            <span class="sav-info">${sum ? this.saveTimeStr(s.summary) + `<small>${sum}</small>` : '摘要不可读'}<small>${Math.max(1, Math.round(s.size / 1024))} KB</small></span>
+            <button data-srv="load" data-name="${name}">载入</button>
+            <button class="del" data-srv="del" data-name="${name}">删除</button>
+          </div>`;
+        }).join('') || '<div class="save-row"><span class="sav-info save-empty">服务器暂无存档</span></div>';
+        box.innerHTML = html;
+        const input = document.getElementById('server-save-name');
+        document.getElementById('server-save-now').onclick = () => {
+          const name = (input.value || '').trim();
+          if (!name) { G.ui.toast('请先填写存档名', 'warn'); input.focus(); return; }
+          G.saveToServer(name)
+            .then(() => this.renderServerSaves())
+            .catch(() => {});
+        };
+        box.querySelectorAll('button[data-srv]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const name = btn.dataset.name;
+            if (btn.dataset.srv === 'load') {
+              G.loadFromServer(name).catch(e => G.ui.toast('载入失败：' + e.message, 'bad'));
+            } else if (confirm(`确定删除服务器存档「${name}」？`)) {
+              G.deleteServerSave(name)
+                .then(() => this.renderServerSaves())
+                .catch(e => G.ui.toast('删除失败：' + e.message, 'bad'));
+            }
+          });
+        });
+      })
+      .catch(() => {
+        G.serverSaves.available = false;
+        this.renderServerSaves();
+      });
   },
 
   gameOver: function () {
     const g = G.game;
     localStorage.removeItem(G.AUTOSAVE_KEY); // 死档不自动恢复，下次启动开新局
+    G.deleteServerSaveQuiet('autosave');     // 服务器自动档同步清理
     this.el.overText.innerHTML =
       `你的小镇在<strong>第 ${g.year} 年</strong>消亡了。<br><br>` +
       `存续 ${Math.floor(g.day / G.SEASON_DAYS)} 个季度 · 出生 ${g.stats.born} 人 · 死亡 ${g.stats.died} 人<br>` +
