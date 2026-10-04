@@ -56,10 +56,10 @@ G.endDay = function () {
   }
 
   // ---- 进食 / 受冻 / 年龄 / 死亡 ----
-  // 原版：每人每年吃 100 食物（儿童相同），粮食不足时儿童优先
+  // 原版：每人每年吃 100 食物（儿童相同），粮食不足时儿童与在读学生优先
   const eat = G.LIFE.eatPerYear / G.YEAR_DAYS;
   let food = g.res.food;
-  const sorted = w.citizens.slice().sort((a, b) => (a.age >= G.ADULT_AGE ? 1 : 0) - (b.age >= G.ADULT_AGE ? 1 : 0));
+  const sorted = w.citizens.slice().sort((a, b) => (a.age >= G.ADULT_AGE && !a.student ? 1 : 0) - (b.age >= G.ADULT_AGE && !b.student ? 1 : 0));
   for (const c of sorted) {
     if (food >= eat) { food -= eat; c.hunger = 0; }
     else c.hunger++;

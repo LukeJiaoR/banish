@@ -927,5 +927,18 @@ G.markGroundDirty = G.markGroundDirty || (() => {}); // render.js 未加载时�
   check('单人家庭可获分房', !!fam && fam.houseId === h2.id && h2.family === fam.id);
 }
 
+/* ---- 断粮时学生与儿童同优先级 ---- */
+{
+  freshGame();
+  const g = G.game;
+  const adult = G.spawnCitizen({ x: 6, y: 6, sex: 'm', age: 30 });
+  const student = G.spawnCitizen({ x: 7, y: 6, sex: 'f', age: 12, adult: false });
+  student.student = true; student.school = 999;
+  const kid = G.spawnCitizen({ x: 8, y: 6, sex: 'm', age: 6, adult: false });
+  g.res.food = 4.5; // 只够两人吃
+  G.endDay();
+  check('儿童与在读学生优先吃饭（成人先挨饿）', adult.hunger === 1 && student.hunger === 0 && kid.hunger === 0);
+}
+
 console.log(`\n${fail === 0 ? '全部通过' : '有失败'}: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
