@@ -107,7 +107,8 @@ G.LIFE = {
   houseWarmWoodPerYear: 30, // 每栋有人住的木屋每年烧约 30 柴火（原版），冬季集中消耗；石屋 15、宿舍 45
   starveDays: 4,          // 连续挨饿几天死亡
   coldDays: 5,            // 受冻累积几天死亡
-  homelessCold: 0.6,      // 无房者每天受冻增速
+  homelessCold: 0.6,      // 无房者每天受冻增速（露宿最冷）
+  unheatedCold: 0.4,      // 有房但没柴火（冷屋）每天受冻增速——屋子仍能挡风，应低于露宿
   coldChildMul: 1.5,      // 儿童受冻倍率
   birthChance: 0.014,     // 有房夫妇每天生育概率；非冬季 36 生育日 → 年受孕率 ≈ 40%（约 2.5 年一胎，原版节奏）
   birthFoodDays: 4,       // 粮食储备需可支撑的天数，才允许生育

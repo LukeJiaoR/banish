@@ -117,8 +117,8 @@ G.endDay = function () {
       const housed = !!(home && home.state === 'ok');
       const childMul = c.age < G.ADULT_AGE ? G.LIFE.coldChildMul : 1;
       if (housed && !home.unheated) c.cold = 0;
-      else if (housed) c.cold += childMul;             // 有房但没柴火
-      else c.cold += G.LIFE.homelessCold * childMul;   // 无家可归
+      else if (housed) c.cold += G.LIFE.unheatedCold * childMul; // 冷屋挡风但没柴火，受冻慢于露宿
+      else c.cold += G.LIFE.homelessCold * childMul;             // 无家可归
     } else c.cold = 0;
     // 自然老死（原版市民多活到 70~85 岁）
     if (c.age > G.OLD_AGE && G.chance(Math.min(0.25, (c.age - G.OLD_AGE) * 0.004)))
