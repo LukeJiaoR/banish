@@ -814,5 +814,12 @@ G.markGroundDirty = G.markGroundDirty || (() => {}); // render.js 未加载时�
   check('一趟送达 28 食物', g.res.food === 28 && !c.carry);
 }
 
+/* ---- 生育节奏：0.014/天 × 36 生育日 → 年受孕率 ≈ 40%（约 2.5 年一胎） ---- */
+{
+  freshGame();
+  const perYear = 1 - Math.pow(1 - G.LIFE.birthChance, G.SEASON_DAYS * 3); // 春夏秋 36 个生育日
+  check('生育节奏 ≈ 2~3 年一胎（年受孕率 40%±2%）', Math.abs(perYear - 0.4) < 0.02);
+}
+
 console.log(`\n${fail === 0 ? '全部通过' : '有失败'}: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
