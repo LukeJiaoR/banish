@@ -785,8 +785,13 @@ G.completeTask = function (c) {
     case 'harvest': {
       if (b && b.farm && b.farm[t.ti] && !b.farm[t.ti].harvested) {
         b.farm[t.ti].harvested = true;
-        c.carry = { type: 'food', qty: G.PROD.farm.perTile };
+        // 攒批搬运：收获累计到 haulCap 才送一趟仓库
+        const P = G.PROD.farm;
+        if (c.carry && c.carry.type === 'food') c.carry.qty = Math.min(P.haulCap, c.carry.qty + P.perTile);
+        else c.carry = { type: 'food', qty: P.perTile };
         if (b.farm.every(f => f.harvested)) b.harvestDone = true;
+        // 还没背满且田里没收完：继续收下一格
+        if (c.carry.qty < P.haulCap && !b.harvestDone) { G.requestTask(c); return; }
       }
       break;
     }
@@ -808,6 +813,7 @@ G.releaseWorker = function (c) {
     if (b) b.workers = b.workers.filter(id => id !== c.id);
   }
   c.job = null; c.task = null; c.pausedTask = null;
+  if (c.carry) { G.startHaul(c); return; } // 手上的货先送仓，不烂在身上
   c.state = 'idle'; c.wanderT = 0.5;
 };
 

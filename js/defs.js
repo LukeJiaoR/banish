@@ -73,7 +73,7 @@ G.BDEF = {
     id: 'farm', name: '农田', icon: '🌾', w: 8, h: 8,
     cost: {}, buildWork: 12, jobs: 4, passable: true,
     wall: '#6b4f33', wallD: '#573f29', roof: '#6b4f33',
-    desc: '原版免费。约 7 食物/格/年：春播秋收，8×8 满收约 448 食物。秋收不完会被冬天冻死。',
+    desc: '免费。约 14 食物/格/年：春播秋收，8×8 满收约 896 食物，收获攒满一筐（28）才送仓——挨着仓库建更省工。秋收不完会被冬天冻死。',
   },
   road: {
     id: 'road', name: '土路', icon: '🛣️', w: 1, h: 1,
@@ -95,7 +95,9 @@ G.PROD = {
   woodcutter: { workH: 7, logsIn: 2, firewoodOut: 6, eduFirewoodPerLog: 4,
     fuelLimit: 200, fuelStep: 50, fuelMax: 2000 }, // 燃料上限（原版 Fuel Limit）：柴火库存达到上限即停产；默认 200 ≈ 6~7 栋木屋一年取暖量
   dock:      { workH: 5, yield: { type: 'food', qty: 4 } },
-  farm:      { perTile: 7, tileWorkH: 0.5, growDays: 24 },
+  // perTile 14/格：原版 7/格但田块可放大到 15×15，本作固定 8×8，翻倍对齐原版人均产出；
+  // haulCap 28：收获攒满 4 格再送一趟仓，否则 64 趟搬运会把秋收窗口耗在走路 上
+  farm:      { perTile: 14, tileWorkH: 0.5, growDays: 24, haulCap: 28 },
   builderChunk: 4,      // 建筑工人每段工作时长
 };
 

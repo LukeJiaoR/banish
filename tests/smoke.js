@@ -790,5 +790,29 @@ G.markGroundDirty = G.markGroundDirty || (() => {}); // render.js 未加载时�
   check('回到 8 天存量以上 → 警告复位', !g.warned.foodLow);
 }
 
+/* ---- 农田收获攒批：背满 haulCap（2 格 × 14）才送一趟仓 ---- */
+{
+  freshGame();
+  const w = G.world, g = G.game;
+  g.res.food = 0;
+  const b = addB(w, 'farm', 2, 2, 8, 8);
+  b.farm = [];
+  for (let j = 2; j < 10; j++) for (let i = 2; i < 10; i++) b.farm.push({ x: i, y: j, sown: true, harvested: false });
+  b.sownAll = true; b.growth = 1; b.harvestDone = false;
+  addB(w, 'storage', 11, 2, 3, 3); // 离田几格，验证攒批
+  const c = G.spawnCitizen({ x: 5, y: 5, sex: 'm', age: 25 });
+  c.job = b.id;
+  g.season = 2;
+  const t = G.makeTask(b, c);
+  check('预备：领到收获任务', !!t && t.kind === 'harvest');
+  c.task = t; c.state = 'work'; t.workLeft = 0;
+  G.completeTask(c);
+  check('收第 1 格 → 背 14 食物继续收（不立即送仓）', c.carry && c.carry.type === 'food' && c.carry.qty === 14 && g.res.food === 0 && !!c.task);
+  G.completeTask(c); // c.task 已由 requestTask 指到下一格
+  check('背满 28 → 起程送仓', c.carry && c.carry.qty === 28 && c.state === 'haul' && g.res.food === 0);
+  G.arrive(c);
+  check('一趟送达 28 食物', g.res.food === 28 && !c.carry);
+}
+
 console.log(`\n${fail === 0 ? '全部通过' : '有失败'}: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
