@@ -648,22 +648,25 @@ G.makeTask = function (b, c) {
       };
       if (b.doCut) { // 砍伐成熟树（面板可开关，原版 Forester 的 Cut 选项）
         const trees = G.treesInRadius(w, b.x, b.y, R, true);
-        // 已被其他工人认领的树不再重复认领（全部被认领时允许重叠）
-        const claimed = new Set();
-        for (const c2 of w.citizens)
-          if (c2.task && c2.task.kind === 'chop' && c2 !== c) claimed.add(c2.task.ty * w.N + c2.task.tx);
-        let best = null, bd = Infinity;
-        for (const t of trees) {
-          if (claimed.has(t.i) && claimed.size < trees.length) continue;
-          const d = G.d2(b.x, b.y, t.x, t.y) + G.rng() * 8;
-          if (d < bd) { bd = d; best = t; }
+        // 成熟树存量低于下限就停砍育林：防止清穿森林（也会拖垮同址采集小屋），等补种长回来
+        if (trees.length > P.forester.minMature) {
+          // 已被其他工人认领的树不再重复认领（全部被认领时允许重叠）
+          const claimed = new Set();
+          for (const c2 of w.citizens)
+            if (c2.task && c2.task.kind === 'chop' && c2 !== c) claimed.add(c2.task.ty * w.N + c2.task.tx);
+          let best = null, bd = Infinity;
+          for (const t of trees) {
+            if (claimed.has(t.i) && claimed.size < trees.length) continue;
+            const d = G.d2(b.x, b.y, t.x, t.y) + G.rng() * 8;
+            if (d < bd) { bd = d; best = t; }
+          }
+          if (best) return {
+            kind: 'chop', b, tx: best.x, ty: best.y, tree: best, logs: G.taskLogYield(c),
+            // 砍+原地补种合并（补种耗时会加进工时；关补种则只砍不种，森林会被清光）
+            replant: b.doPlant,
+            work: G.taskWork(c, P.forester.workH + (b.doPlant ? P.forester.plantH : 0)), workLeft: 0,
+          };
         }
-        if (best) return {
-          kind: 'chop', b, tx: best.x, ty: best.y, tree: best, logs: G.taskLogYield(c),
-          // 砍+原地补种合并（补种耗时会加进工时；关补种则只砍不种，森林会被清光）
-          replant: b.doPlant,
-          work: G.taskWork(c, P.forester.workH + (b.doPlant ? P.forester.plantH : 0)), workLeft: 0,
-        };
       }
       if (b.doPlant) { // 补种（原版 Plant 选项；无成熟树可砍时育林）
         const t = plantTask();
@@ -671,7 +674,7 @@ G.makeTask = function (b, c) {
       }
       b.noWork = true;
       b.warnText = !b.doCut && !b.doPlant ? '已停用（砍伐/补种均关）'
-        : (b.doCut ? '附近无成熟树木' : '无处可补种');
+        : (b.doCut ? '附近成熟树不足' : '无处可补种');
       return null;
     }
     case 'gatherer': {

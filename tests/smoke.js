@@ -46,6 +46,20 @@ function houseWith(w, owner) {
   h.family = fam.id;
   return { house: h, fam };
 }
+/* 在 (cx,cy) 周围螺旋种 n 棵成熟树（born=-200，跨过 TREE_MATURE=100） */
+function seedMatureTrees(w, cx, cy, n) {
+  let k = 0;
+  for (let rad = 0; k < n && rad < 12; rad++)
+    for (let dy = -rad; dy <= rad && k < n; dy++)
+      for (let dx = -rad; dx <= rad && k < n; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== rad) continue;
+        const x = cx + dx, y = cy + dy;
+        if (x < 0 || y < 0 || x >= w.N || y >= w.N) continue;
+        if (w.treeIdx[y * w.N + x] >= 0 || w.water[y * w.N + x] || w.rock[y * w.N + x]) continue;
+        G.addTree(w, x, y, -200); k++;
+      }
+  return k;
+}
 
 /* ================= 一、经济修复 ================= */
 G.ui = { toast() {}, refreshHUD() {} };
@@ -377,6 +391,7 @@ G.ui = { toast() {}, refreshHUD() {} };
   const w = G.world;
   const b = addB(w, 'forester', 2, 2, 2, 2);
   G.addTree(w, 5, 5, -200);
+  seedMatureTrees(w, 8, 8, 18); // 离护林屋更远的成熟树群，凑够砍伐存量下限
   const c = G.spawnCitizen({ x: 4, y: 4, sex: 'm', age: 25 });
   c.job = b.id;
   b.doCut = false; b.doPlant = true;
@@ -384,10 +399,26 @@ G.ui = { toast() {}, refreshHUD() {} };
   check('关砍伐 → 只补种', t && t.kind === 'plant');
   b.doCut = true; b.doPlant = false;
   t = G.makeTask(b, c);
-  check('关补种 → 只砍成熟树', t && t.kind === 'chop');
+  check('关补种 → 只砍成熟树', t && t.kind === 'chop' && t.tx === 5 && t.ty === 5); // (5,5) 离屋最近
   b.doCut = false; b.doPlant = false;
   t = G.makeTask(b, c);
   check('全关 → 停工并标记 noWork', t === null && b.noWork === true && !!b.warnText);
+}
+{
+  // 成熟树存量 ≤ 下限 → 停砍育林（防止清穿森林）
+  freshGame();
+  const w = G.world;
+  const b = addB(w, 'forester', 2, 2, 2, 2);
+  G.addTree(w, 5, 5, -200); // 仅 1 棵成熟树 < minMature(15)
+  const c = G.spawnCitizen({ x: 4, y: 4, sex: 'm', age: 25 });
+  c.job = b.id;
+  b.doCut = true; b.doPlant = false;
+  const t = G.makeTask(b, c);
+  check('成熟树存量低于下限 → 停砍', t === null && b.noWork === true && b.warnText === '附近成熟树不足');
+  b.doPlant = true;
+  b.noWork = false;
+  const t2 = G.makeTask(b, c);
+  check('存量不足时转补种育林', t2 && t2.kind === 'plant');
 }
 
 /* ================= 六、「砍伐」标记工具（原版 Harvest Trees） ================= */
@@ -548,6 +579,7 @@ G.markGroundDirty = G.markGroundDirty || (() => {}); // render.js 未加载时�
   const b = addB(w, 'forester', 2, 2, 2, 2);
   b.doCut = true; b.doPlant = false;
   G.addTree(w, 5, 5, -200);
+  seedMatureTrees(w, 8, 8, 18); // 凑够砍伐存量下限；(5,5) 仍是离屋最近
   const edu = G.spawnCitizen({ x: 4, y: 4, sex: 'm', age: 25 });
   edu.educated = true; edu.job = b.id;
   const t = G.makeTask(b, edu);
@@ -581,11 +613,12 @@ G.markGroundDirty = G.markGroundDirty || (() => {}); // render.js 未加载时�
   const w = G.world;
   const b = addB(w, 'forester', 2, 2, 2, 2);
   b.doCut = true; b.doPlant = true;
-  G.addTree(w, 5, 5, -200); // 成熟树
+  G.addTree(w, 5, 5, -200); // 成熟树（离屋最近）
+  seedMatureTrees(w, 8, 8, 18);
   const c = G.spawnCitizen({ x: 4, y: 4, sex: 'm', age: 25 });
   c.job = b.id;
   const t = G.makeTask(b, c);
-  check('砍伐任务合并原地补种（8h+3h=11h）', t && t.kind === 'chop' && t.replant === true && t.work === 11);
+  check('砍伐任务合并原地补种（8h+3h=11h）', t && t.kind === 'chop' && t.replant === true && t.work === 11 && t.tx === 5);
   c.task = t; t.workLeft = 0;
   G.completeTask(c);
   const i = 5 * w.N + 5;
@@ -598,6 +631,7 @@ G.markGroundDirty = G.markGroundDirty || (() => {}); // render.js 未加载时�
   const b = addB(w, 'forester', 2, 2, 2, 2);
   b.doCut = true; b.doPlant = false; // 只砍不种
   G.addTree(w, 5, 5, -200);
+  seedMatureTrees(w, 8, 8, 18);
   const c = G.spawnCitizen({ x: 4, y: 4, sex: 'm', age: 25 });
   c.job = b.id;
   const t = G.makeTask(b, c);

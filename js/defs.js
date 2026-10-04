@@ -49,7 +49,7 @@ G.BDEF = {
     id: 'forester', name: '护林小屋', icon: '🌲', w: 2, h: 2,
     cost: { wood: 32, stone: 12 }, buildWork: 70, jobs: 4, passable: false,
     wall: '#6b5a3e', wallD: '#54462f', roof: '#4a6b3a',
-    desc: '原版成本 32木+12石，4 名工人。砍树取原木（未受教育 1 树=2 原木，受教育 3），砍倒即原地补种、可持续轮伐，约 55-65 原木/工人/年（受教育近翻倍）。面板可分别开关「砍伐」与「补种」：只种不砍可育林，只砍不种会清光森林。',
+    desc: '原版成本 32木+12石，4 名工人。砍树取原木（未受教育 1 树=2 原木，受教育 3），砍倒即原地补种、可持续轮伐，约 55-65 原木/工人/年（受教育近翻倍）。面板可分别开关「砍伐」与「补种」：只种不砍可育林，只砍不种会清光森林。圈内成熟树存量过低时会自动停砍育林。',
   },
   woodcutter: {
     id: 'woodcutter', name: '伐木屋', icon: '🪓', w: 2, h: 2,
@@ -90,8 +90,9 @@ G.TOOLBAR = ['house', 'stonehouse', 'boarding', 'storage', 'gatherer', 'forester
 G.PROD = {
   gatherer:  { workH: 5, yield: { type: 'food', qty: 5 },  radius: 6, needTrees: 6 },
   // workH 8h + 原地补种 3h = 11h/棵：赶路+砍+种+送仓刚好排进 16h 工作日，
-  // 砍一棵在原坑种一棵（可持续轮伐），采伐区锁定在护林屋周围成熟林带
-  forester:  { workH: 8, logsYield: 2, eduLogsYield: 3, plantH: 3, radius: 16 },
+  // 砍一棵在原坑种一棵（可持续轮伐），采伐区锁定在护林屋周围成熟林带；
+  // minMature：圈内成熟树低于下限即停砍育林（防清穿森林、拖垮同址采集小屋）
+  forester:  { workH: 8, logsYield: 2, eduLogsYield: 3, plantH: 3, radius: 16, minMature: 15 },
   woodcutter: { workH: 7, logsIn: 2, firewoodOut: 6, eduFirewoodPerLog: 4,
     fuelLimit: 200, fuelStep: 50, fuelMax: 2000 }, // 燃料上限（原版 Fuel Limit）：柴火库存达到上限即停产；默认 200 ≈ 6~7 栋木屋一年取暖量
   dock:      { workH: 5, yield: { type: 'food', qty: 4 } },
