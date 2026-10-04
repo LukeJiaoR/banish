@@ -53,12 +53,12 @@ G.genWorld = function (seed) {
   }
 
   // 岩石露头（噪声成簇，原版初期石头来源；w.rock: 1=石头 2=铁矿）
+  // 铁是石矿带里的富集核心：同一噪声场用更高阈值判定，石:铁 ≈ 4:1（实测标定），锈色矿嵌在灰色岩带里成簇分布
   for (let y = 0; y < N; y++)
     for (let x = 0; x < N; x++) {
       const i = y * N + x;
       if (w.water[i]) continue;
-      if (fbm(seed + 555, x, y) > 0.715) w.rock[i] = 1;
-      else if (fbm(seed + 888, x, y) > 0.80) w.rock[i] = 2; // 铁矿明显稀于石头（约 1/4），成簇分布
+      if (fbm(seed + 555, x, y) > 0.715) w.rock[i] = fbm(seed + 888, x, y) > 0.65 ? 2 : 1;
     }
 
   // 森林：独立噪声场
@@ -303,7 +303,7 @@ G.findPath = function (w, sx, sy, tx, ty) {
       }
       const ni = ny * N + nx;
       if (pf.closed[ni] === gen) continue;
-      const ng = pf.g[cur] + base * (w.road[ni] ? 0.55 : 1);
+      const ng = pf.g[cur] + base * (w.road[ni] ? 0.615 : 1); // 0.615 = 野地/路面实际速度比（1.6/2.6），与 sim 的 moveSpeed 保持一致
       if (pf.gen[ni] !== gen || ng < pf.g[ni]) {
         pf.gen[ni] = gen;
         pf.g[ni] = ng;
