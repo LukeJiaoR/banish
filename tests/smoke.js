@@ -755,5 +755,25 @@ G.markGroundDirty = G.markGroundDirty || (() => {}); // render.js 未加载时�
   check('收获后第二年春天可再播种', !!t2 && t2.kind === 'sow');
 }
 
+/* ---- 冬季柴火警告按实际取暖需求（有人住的房屋 × 柴火/年）触发 ---- */
+{
+  const g = freshGame();
+  g.day = 30; g.res.food = 10000; g.res.firewood = 10; // 秋季
+  const m = G.spawnCitizen({ x: 6, y: 6, sex: 'm', age: 30 });
+  const { house } = houseWith(G.world, m);
+  G.endDay();
+  check('秋天柴火不足一屋取暖 → 警告', g.warned.firewood === true);
+  g.res.firewood = G.BDEF[house.type].warmWoodPerYear + 10;
+  G.endDay();
+  check('柴火足够全部房屋取暖 → 警告复位', g.warned.firewood === false);
+}
+{
+  const g = freshGame();
+  g.day = 30; g.res.food = 10000; g.res.firewood = 0;
+  G.spawnCitizen({ x: 6, y: 6, sex: 'm', age: 30 }); // 无房，无取暖需求
+  G.endDay();
+  check('没有房屋需求时柴火不警告', g.warned.firewood === false);
+}
+
 console.log(`\n${fail === 0 ? '全部通过' : '有失败'}: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

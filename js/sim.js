@@ -34,6 +34,13 @@ G.advanceSim = function (dtH) {
   for (const c of G.world.citizens) G.stepCitizen(c, dtH);
 };
 
+/* 有人居住的取暖建筑（独栋住宅看 family 字段，宿舍看 family.houseId 反向引用） */
+G.isOccupiedHome = function (w, b) {
+  const def = G.BDEF[b.type];
+  if (b.state !== 'ok' || def.warmWoodPerYear == null) return false;
+  return b.family != null || w.families.some(f => f.houseId === b.id);
+};
+
 G.endDay = function () {
   const g = G.game, w = G.world;
   g.day++;
@@ -61,11 +68,7 @@ G.endDay = function () {
 
   const winter = g.season === 3;
   // 有人住的房子才烧柴（含石屋/宿舍；取暖量按建筑类型，原版石屋省一半）
-  const houses = w.buildings.filter(b => {
-    const def = G.BDEF[b.type];
-    if (b.state !== 'ok' || def.warmWoodPerYear == null) return false;
-    return b.family != null || w.families.some(f => f.houseId === b.id);
-  });
+  const houses = w.buildings.filter(b => G.isOccupiedHome(w, b));
   // 原版：木屋每年约烧 30 柴火（石屋 15），集中在冬季消耗；柴火按屋支付，付不起的屋子挨冻
   for (const h of houses) h.unheated = false;
   if (winter && houses.length) {
@@ -148,11 +151,15 @@ G.endDay = function () {
     G.ui.toast('⚠ 食物耗尽！镇民正在挨饿', 'bad');
   }
   if (pop > 0 && g.res.food > pop * G.LIFE.eatPerDay * 8) g.warned.hunger = false;
-  if (pop > 0 && !g.warned.firewood && g.season === 2 && g.res.firewood < pop * 0.6) {
-    g.warned.firewood = true;
-    G.ui.toast('⚠ 冬天将至，柴火可能不足', 'warn');
-  }
-  if (g.season !== 2) g.warned.firewood = false;
+  if (pop > 0 && g.season === 2) {
+    // 按实际取暖需求警告：需求 ≈ Σ 有人住的房屋年取暖量（冬季集中烧完）
+    const warmNeed = w.buildings.reduce((s, b) => s + (G.isOccupiedHome(w, b) ? G.BDEF[b.type].warmWoodPerYear : 0), 0);
+    if (g.res.firewood >= warmNeed) g.warned.firewood = false;
+    else if (!g.warned.firewood) {
+      g.warned.firewood = true;
+      G.ui.toast(`⚠ 冬天将至，柴火不足（现有 ${Math.floor(g.res.firewood)}，需求约 ${warmNeed}）`, 'warn');
+    }
+  } else g.warned.firewood = false;
   if (pop > 0 && !g.warned.foodLow && g.res.food < pop * 3) {
     g.warned.foodLow = true;
     G.ui.toast('⚠ 食物储备不足 3 天', 'warn');
