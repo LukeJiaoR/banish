@@ -195,24 +195,64 @@ G.onSeasonChange = function (from, to) {
 };
 
 /* ================= 家庭 ================= */
+/* 单身判定：从未成家，或丧偶/单亲（家里已无其他成人，可带孩子重组家庭） */
+G.isSingle = function (c) {
+  if (c.dead || c.student || c.age < G.MOTHER_MIN) return false;
+  if (c.familyId == null) return true;
+  const f = G.familyOf(c);
+  if (!f) { c.familyId = null; return true; } // 脏数据自愈
+  return f.members.every(id => { const o = G.world.cmap[id]; return !o || o === c || o.age < G.ADULT_AGE; });
+};
+
+/* 结为夫妇：双方家庭合并（各自的孩子随迁），有房一方保留住房 */
+G.joinFamilies = function (a, b) {
+  const w = G.world;
+  const fa = a.familyId != null ? G.familyOf(a) : null;
+  const fb = b.familyId != null ? G.familyOf(b) : null;
+  const size = (f) => (f ? f.members.length : 0);
+  if (size(fa) + size(fb) >= G.LIFE.maxFamily) return false; // 合并后超过家庭人口上限，不结
+  let fam;
+  if (!fa && !fb) {
+    fam = { id: G.nextId(), members: [a.id, b.id], houseId: null };
+    w.families.push(fam);
+  } else {
+    fam = fa || fb;
+    const joiner = fam === fa ? b : a;
+    const other = fa && fb ? (fam === fa ? fb : fa) : null;
+    if (other) {
+      for (const id of other.members) {
+        const o = w.cmap[id];
+        if (o) { o.familyId = fam.id; fam.members.push(id); }
+      }
+      if (other.houseId != null) { // 腾空原住房
+        const h = w.bmap[other.houseId];
+        if (h && h.family === other.id) h.family = null;
+      }
+      w.families = w.families.filter(f => f !== other);
+    } else {
+      fam.members.push(joiner.id);
+      joiner.familyId = fam.id;
+    }
+  }
+  G.ui.toast(`${a.name} 与 ${b.name} 结为夫妇`, 'good');
+  return true;
+};
+
 G.formFamilies = function () {
   const w = G.world;
-  const singles = w.citizens.filter(c => !c.dead && c.age >= G.MOTHER_MIN && c.familyId == null && !c.student);
-  const men = singles.filter(c => c.sex === 'm'), women = singles.filter(c => c.sex === 'f');
+  const men = w.citizens.filter(c => c.sex === 'm' && G.isSingle(c));
+  const women = w.citizens.filter(c => c.sex === 'f' && G.isSingle(c));
   for (const m of men) {
-    if (m.familyId != null) continue;
+    if (!G.isSingle(m)) continue;
     // 找最近的单身女性
     let best = null, bd = Infinity;
     for (const f of women) {
-      if (f.familyId != null) continue;
+      if (!G.isSingle(f)) continue;
       const d = G.d2(m.x, m.y, f.x, f.y);
       if (d < bd) { bd = d; best = f; }
     }
     if (!best) return;
-    const fam = { id: G.nextId(), members: [m.id, best.id], houseId: null };
-    w.families.push(fam);
-    m.familyId = fam.id; best.familyId = fam.id;
-    G.ui.toast(`${m.name} 与 ${best.name} 结为夫妇`, 'good');
+    G.joinFamilies(m, best);
   }
 };
 
@@ -237,13 +277,14 @@ G.assignHousing = function () {
   const w = G.world;
   const free = w.buildings.filter(b => (b.type === 'house' || b.type === 'stonehouse') && b.state === 'ok' && b.family == null);
   // 原版：市民不会主动住宿舍，但没房子的家庭会被安排进宿舍过冬；
-  // 一旦有空独栋木屋（含石屋），先安置无房家庭、再让宿舍里的家庭搬出
+  // 一旦有空独栋木屋（含石屋），先安置无房家庭（含丧偶独居者）、再让宿舍里的家庭搬出
   const homeless = w.families.filter(f => f.houseId == null && f.members.length >= 2);
+  const homelessSolo = w.families.filter(f => f.houseId == null && f.members.length === 1);
   const inBoarding = w.families.filter(f => {
     const h = f.houseId != null ? w.bmap[f.houseId] : null;
     return h && h.type === 'boarding';
   });
-  for (const fam of homeless.concat(inBoarding)) {
+  for (const fam of homeless.concat(homelessSolo, inBoarding)) {
     const house = free.shift();
     if (!house) break;
     fam.houseId = house.id;

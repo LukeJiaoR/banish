@@ -885,5 +885,47 @@ G.markGroundDirty = G.markGroundDirty || (() => {}); // render.js 未加载时�
   check('大水域渔获满产 4', t2 && t2.yield.qty === 4);
 }
 
+/* ---- 丧偶市民可再婚、单人家庭可分房 ---- */
+{
+  freshGame();
+  const w = G.world;
+  // 丧偶妻子（独居，有房）+ 单身汉 → 结婚并入住她的家庭与住房
+  const widow = G.spawnCitizen({ x: 5, y: 5, sex: 'f', age: 30 });
+  const { house } = houseWith(G.world, widow);
+  const man = G.spawnCitizen({ x: 6, y: 5, sex: 'm', age: 32 });
+  G.formFamilies();
+  const fam = G.familyOf(widow);
+  check('丧偶者可再婚（旧规则 familyId 永不重组）', !!fam && fam.members.includes(man.id) && man.familyId === fam.id);
+  check('再婚保留原住房', fam.houseId === house.id && house.family === fam.id);
+}
+{
+  freshGame();
+  const w = G.world;
+  // 单亲家庭（父+女）与单亲家庭（母+子）合并重组
+  const m1 = G.spawnCitizen({ x: 5, y: 5, sex: 'm', age: 30 });
+  const d1 = G.spawnCitizen({ x: 6, y: 5, sex: 'f', age: 8, adult: false });
+  const fam1 = { id: G.nextId(), members: [m1.id, d1.id], houseId: null };
+  m1.familyId = fam1.id; d1.familyId = fam1.id; w.families.push(fam1);
+  const m2 = G.spawnCitizen({ x: 8, y: 5, sex: 'f', age: 28 });
+  const s2 = G.spawnCitizen({ x: 9, y: 5, sex: 'm', age: 6, adult: false });
+  const fam2 = { id: G.nextId(), members: [m2.id, s2.id], houseId: null };
+  m2.familyId = fam2.id; s2.familyId = fam2.id; w.families.push(fam2);
+  G.formFamilies();
+  check('两个单亲家庭合并重组（孩子随迁）',
+    w.families.length === 1 && fam1.members.length === 4 && m2.familyId === fam1.id && s2.familyId === fam1.id);
+}
+{
+  freshGame();
+  const w = G.world;
+  // 丧偶独居者失去住房后，单人家庭也能分到房（旧规则 members>=2 永久无房 → 冬季必死）
+  const widower = G.spawnCitizen({ x: 5, y: 5, sex: 'm', age: 40 });
+  const { house } = houseWith(G.world, widower);
+  G.removeBuilding(house);
+  const h2 = addB(G.world, 'house', 7, 7, 2, 2);
+  G.assignHousing();
+  const fam = G.familyOf(widower);
+  check('单人家庭可获分房', !!fam && fam.houseId === h2.id && h2.family === fam.id);
+}
+
 console.log(`\n${fail === 0 ? '全部通过' : '有失败'}: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
