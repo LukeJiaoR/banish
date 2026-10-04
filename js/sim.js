@@ -160,11 +160,11 @@ G.endDay = function () {
       G.ui.toast(`⚠ 冬天将至，柴火不足（现有 ${Math.floor(g.res.firewood)}，需求约 ${warmNeed}）`, 'warn');
     }
   } else g.warned.firewood = false;
-  if (pop > 0 && !g.warned.foodLow && g.res.food < pop * 3) {
+  if (pop > 0 && !g.warned.foodLow && g.res.food < pop * G.LIFE.eatPerDay * 3) {
     g.warned.foodLow = true;
     G.ui.toast('⚠ 食物储备不足 3 天', 'warn');
   }
-  if (g.res.food > pop * 8) g.warned.foodLow = false;
+  if (g.res.food > pop * G.LIFE.eatPerDay * 8) g.warned.foodLow = false;
 
   g.foodNet = g.res.food - g.prevFood;
   g.prevFood = g.res.food;

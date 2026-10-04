@@ -775,5 +775,20 @@ G.markGroundDirty = G.markGroundDirty || (() => {}); // render.js 未加载时�
   check('没有房屋需求时柴火不警告', g.warned.firewood === false);
 }
 
+/* ---- 食物低量警告：阈值真正对齐「3 天」口径（旧 pop×3 实际只有 1.44 天） ---- */
+{
+  const g = freshGame();
+  g.res.food = 100;
+  G.spawnCitizen({ x: 6, y: 6, sex: 'm', age: 30 });
+  G.endDay();
+  check('存粮充足 → 无低量警告', !g.warned.foodLow);
+  g.res.food = 8; // 吃掉 2.08 后剩 5.9 < 6.25（3 天存量）；旧阈值 pop×3=3 不会触发
+  G.endDay();
+  check('吃后存量不足 3 天 → 警告', g.warned.foodLow === true);
+  g.res.food = 100;
+  G.endDay();
+  check('回到 8 天存量以上 → 警告复位', !g.warned.foodLow);
+}
+
 console.log(`\n${fail === 0 ? '全部通过' : '有失败'}: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
