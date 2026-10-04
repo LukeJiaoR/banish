@@ -21,7 +21,7 @@ function mkWorld(N = 12) {
     seed: 1, N,
     water: new Uint8Array(N * N), rock: new Uint8Array(N * N), road: new Uint8Array(N * N),
     bgrid: new Int32Array(N * N).fill(-1), treeIdx: new Int32Array(N * N).fill(-1),
-    trees: [], rockCleared: [], marked: new Set(),
+    trees: [], rockCleared: [], marked: new Set(), markedRocks: new Set(),
     buildings: [], bmap: {}, citizens: [], cmap: {}, families: [],
     start: { x: 6, y: 6 },
   };
@@ -632,17 +632,46 @@ G.markGroundDirty = G.markGroundDirty || (() => {}); // render.js 未加载时�
   check('拆除后点击原地不再有幽灵详情', G.sel == null);
 }
 
-/* ---- 8.7 铁矿清理得铁；岩石清理得石头 ---- */
+/* ---- 8.7 岩石/铁矿：拆除工具标记 → 散工劳动清除 → 石头/铁入库（不再零成本白给） ---- */
 {
   freshGame();
   const w = G.world, g = G.game;
   w.rock[5 * w.N + 5] = 2;
   const iron0 = g.res.iron, stone0 = g.res.stone;
-  G.clearRock(w, 5, 5);
-  check('锈色铁矿清理得铁', g.res.iron === iron0 + G.ROCK_IRON && g.res.stone === stone0);
+  G.markRockAt(w, 5, 5);
+  const c = G.spawnCitizen({ x: 6, y: 5, sex: 'm', age: 25 });
+  G.requestTask(c);
+  check('标记铁矿 → 散工领取清除任务', c.task && c.task.kind === 'clearrock' && c.task.rock === 2);
+  c.task.workLeft = 0;
+  G.completeTask(c);
+  check('清除铁矿 → 10 铁入库、岩石消失', g.res.iron === iron0 + G.ROCK_IRON && !w.rock[5 * w.N + 5]);
+  check('清除产生的资源经搬运入库（非原地白给）', c.carry == null);
   w.rock[6 * w.N + 6] = 1;
-  G.clearRock(w, 6, 6);
-  check('灰色岩石清理得石头', g.res.stone === stone0 + G.ROCK_STONE);
+  G.markRockAt(w, 6, 6);
+  const c2 = G.spawnCitizen({ x: 7, y: 6, sex: 'f', age: 25 });
+  G.requestTask(c2);
+  check('标记岩石 → 另一名散工领取', c2.task && c2.task.kind === 'clearrock' && c2.task.rock === 1);
+  c2.task.workLeft = 0;
+  G.completeTask(c2);
+  check('清除岩石 → 10 石入库', g.res.stone === stone0 + G.ROCK_STONE);
+}
+{
+  freshGame();
+  const w = G.world, g = G.game;
+  w.rock[5 * w.N + 5] = 1;
+  check('岩石上不能盖房', G.canPlace(w, 'house', 5, 5).ok === false);
+  check('岩石上不能铺路', G.canPlaceRoad(w, 5, 5) === false);
+  G.clearRock(w, 5, 5);
+  check('清除后可正常盖房/铺路', G.canPlace(w, 'house', 5, 5).ok === true && G.canPlaceRoad(w, 5, 5) === true);
+  check('clearRock 本身不产生资源', g.res.stone === 48 && g.res.iron === 0);
+}
+{
+  // 拆除工具点岩石 = 标记而非立即清除
+  freshGame();
+  const w = G.world;
+  w.rock[5 * w.N + 5] = 1;
+  G.demolishAt(5, 5);
+  check('拆除工具点岩石 → 标记待清除（岩石仍在）', w.markedRocks.has(5 * w.N + 5) && w.rock[5 * w.N + 5] === 1);
 }
 {
   freshGame();

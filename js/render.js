@@ -482,6 +482,8 @@ G.frame = function (dtReal) {
     for (let x = tx0; x <= tx1; x++) {
       const idx = w.treeIdx[y * w.N + x];
       if (idx >= 0) items.push({ d: x + y, k: 0, x, y, t: w.trees[idx], marked: w.marked.has(y * w.N + x) });
+      if (w.rock[y * w.N + x] && w.markedRocks && w.markedRocks.has(y * w.N + x))
+        items.push({ d: x + y + 0.02, k: 3, x, y });
     }
   // 建筑
   for (const b of w.buildings) {
@@ -506,6 +508,13 @@ G.frame = function (dtReal) {
         ctx.lineWidth = 1.5;
         ctx.stroke();
       }
+    }
+    else if (it.k === 3) { // 待清除岩石标记
+      const [msx, msy] = G.T2S(it.x, it.y);
+      G.diamondPath(ctx, msx, msy);
+      ctx.strokeStyle = 'rgba(255,170,60,0.85)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
     }
     else if (it.k === 1) {
       G.drawBuilding(ctx, it.b, now);

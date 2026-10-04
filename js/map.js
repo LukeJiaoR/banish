@@ -36,6 +36,7 @@ G.genWorld = function (seed) {
     cmap: {},
     families: [],
     marked: new Set(),  // 「砍伐」工具标记的树（散工来砍）
+    markedRocks: new Set(), // 「拆除」工具标记的岩石/铁矿（散工来清除入库）
     start: { x: N >> 1, y: N >> 1 },
   };
 
@@ -102,16 +103,15 @@ G.addTree = function (w, x, y, born) {
   w.trees.push({ i, x, y, b: born !== undefined ? born : G.game ? G.game.day : 0 });
   w.treeIdx[i] = w.trees.length - 1;
 };
-/* 清理岩石 → 石头/铁入库（原版：在岩石上盖房/铺路即采石；铁矿清理得铁） */
+/* 清理岩石：只从网格移除并记录（资源由散工的清除任务完工时入库，不再原地白给） */
 G.clearRock = function (w, x, y) {
   if (x < 0 || y < 0 || x >= w.N || y >= w.N) return false;
   const i = y * w.N + x;
   if (!w.rock[i]) return false;
-  const iron = w.rock[i] === 2;
   w.rock[i] = 0;
   w.rockCleared.push(i);
+  if (w.markedRocks) w.markedRocks.delete(i);
   G.markGroundDirty(x, y);
-  if (G.game) G.game.res[iron ? 'iron' : 'stone'] += iron ? G.ROCK_IRON : G.ROCK_STONE;
   return true;
 };
 G.removeTree = function (w, x, y) {
@@ -146,6 +146,28 @@ G.pickMarkedTree = function (w, x, y, claimed) {
     const tx = i % w.N, ty = (i / w.N) | 0;
     const d = G.d2(x, y, tx, ty);
     if (d < bd) { bd = d; best = { x: tx, y: ty, tree: w.trees[idx] }; }
+  }
+  return best;
+};
+/* 「拆除」工具：标记一块岩石/铁矿，空闲散工前来清除（石头/铁入库） */
+G.markRockAt = function (w, x, y) {
+  if (x < 0 || y < 0 || x >= w.N || y >= w.N) return;
+  const i = y * w.N + x;
+  if (!w.rock[i]) return;
+  if (w.markedRocks.size >= 300) return; // 队列上限，防误拖全图
+  const first = w.markedRocks.size === 0;
+  w.markedRocks.add(i);
+  if (first && G.ui && G.ui.toast) G.ui.toast('⛏ 已标记清除岩石：空闲的市民会前来采集（石头/铁入库）', 'info');
+};
+/* 取离散工最近的标记岩石（claimed 中的坐标跳过：一人一坑） */
+G.pickMarkedRock = function (w, x, y, claimed) {
+  let best = null, bd = Infinity;
+  for (const i of w.markedRocks) {
+    if (claimed && claimed.has(i)) continue;
+    if (!w.rock[i]) continue;
+    const tx = i % w.N, ty = (i / w.N) | 0;
+    const d = G.d2(x, y, tx, ty);
+    if (d < bd) { bd = d; best = { x: tx, y: ty, rock: w.rock[i] }; }
   }
   return best;
 };
@@ -351,6 +373,7 @@ G.canPlace = function (w, type, ox, oy) {
     for (let i = ox; i < ox + def.w; i++) {
       const t = j * N + i;
       if (w.water[t] === 1) return { ok: false, reason: '不能建在水上' };
+      if (w.rock[t]) return { ok: false, reason: '地面有岩石，需先用拆除工具标记清除' };
       if (w.bgrid[t] >= 0) return { ok: false, reason: '与其他建筑重叠' };
     }
   // 等距视觉间距：脚印不重叠还不够——新建筑的前墙脚线（南缘）若落在已有建筑的
@@ -380,6 +403,6 @@ G.canPlace = function (w, type, ox, oy) {
 G.canPlaceRoad = function (w, x, y) {
   if (x < 0 || y < 0 || x >= w.N || y >= w.N) return false;
   const i = y * w.N + x;
-  if (w.water[i] === 1 || w.bgrid[i] >= 0 || w.road[i]) return false;
+  if (w.water[i] === 1 || w.rock[i] || w.bgrid[i] >= 0 || w.road[i]) return false;
   return true;
 };

@@ -41,7 +41,7 @@ G.ui = {
 
     // 建造菜单
     const toolTip = (t) => {
-      if (t === 'demolish') return '拆除：点击建筑 / 树木 / 道路将其移除';
+      if (t === 'demolish') return '拆除：点击建筑 / 树木 / 道路移除；点击岩石/铁矿做清除标记，空闲市民会前来采集入库';
       const d = G.BDEF[t];
       const cost = Object.keys(d.cost).map(k => `${G.RES[k].icon}×${d.cost[k]}`).join(' ') || '免费';
       const jobs = d.jobs ? ` · 岗位×${d.jobs}` : '';

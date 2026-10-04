@@ -75,6 +75,7 @@ G.serializeGame = function () {
     },
       trees: w.trees.map(t => [t.i, t.x, t.y, t.b]),
       marked: [...w.marked],
+      markedRocks: [...(w.markedRocks || [])],
       rockCleared: w.rockCleared,
     buildings: w.buildings.map(b => ({
       id: b.id, type: b.type, x: b.x, y: b.y, state: b.state,
@@ -168,6 +169,8 @@ G.applySaveData = function (d) {
   }
   // 「砍伐」标记
   if (d.marked) for (const i of d.marked) w.marked.add(remap(i));
+  // 「清除岩石」标记（只保留仍存在岩石的格子）
+  if (d.markedRocks) for (const i of d.markedRocks) { const t = remap(i); if (w.rock[t]) w.markedRocks.add(t); }
     // 建筑
     for (const bd of d.buildings) {
       const b = {
@@ -351,7 +354,6 @@ G.paintRoad = function (x0, y0, x1, y1) {
   while (true) {
     if (G.canPlaceRoad(w, x, y)) {
       if (w.treeIdx[y * w.N + x] >= 0) G.removeTree(w, x, y);
-      G.clearRock(w, x, y);
       w.road[y * w.N + x] = 1;
       G.markGroundDirty(x, y);
     }

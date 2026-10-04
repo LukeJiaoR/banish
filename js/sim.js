@@ -548,7 +548,7 @@ G.requestTask = function (c) {
   const w = G.world;
   const b = c.job != null ? w.bmap[c.job] : null;
   if (!b) {
-    // 无业散工：处理「砍伐」标记（原版 Harvest Trees 由劳动者执行）
+    // 无业散工：处理「砍伐」与「清除岩石」标记（原版 Harvest Trees 由劳动者执行）
     // 同一棵标记树只派一人（标记数量有限，不允许多人工复重叠）
     const claimed = new Set();
     for (const c2 of w.citizens)
@@ -557,6 +557,16 @@ G.requestTask = function (c) {
     if (mt) {
       c.task = { kind: 'chop', b: null, tx: mt.x, ty: mt.y, tree: mt.tree, logs: G.taskLogYield(c), work: G.taskWork(c, G.PROD.forester.workH), workLeft: 0 };
       G.sendTo(c, mt.x, mt.y);
+      return;
+    }
+    // 再看「清除岩石」标记：石头/铁的来源，需劳动清除后入库
+    const claimedR = new Set();
+    for (const c2 of w.citizens)
+      if (c2 !== c && c2.task && c2.task.kind === 'clearrock') claimedR.add(c2.task.ty * w.N + c2.task.tx);
+    const mr = G.pickMarkedRock(w, c.x, c.y, claimedR);
+    if (mr) {
+      c.task = { kind: 'clearrock', b: null, tx: mr.x, ty: mr.y, rock: mr.rock, work: G.taskWork(c, G.ROCK_WORK), workLeft: 0 };
+      G.sendTo(c, mr.x, mr.y);
       return;
     }
     c.state = 'idle';
@@ -731,6 +741,14 @@ G.completeTask = function (c) {
       G.addTree(G.world, t.tx, t.ty);
       break;
     }
+    case 'clearrock': {
+      const i = t.ty * G.world.N + t.tx;
+      if (G.world.rock[i] === t.rock) {
+        G.clearRock(G.world, t.tx, t.ty);
+        c.carry = { type: t.rock === 2 ? 'iron' : 'stone', qty: t.rock === 2 ? G.ROCK_IRON : G.ROCK_STONE };
+      }
+      break;
+    }
     case 'work': {
       if (t.consume) {
         if (G.game.res[t.consume.type] < t.consume.qty) break; // 材料在干活的这几个小时里被同行用掉，本次白干
@@ -815,8 +833,9 @@ G.scheduleJobs = function () {
   const w = G.world;
   for (const b of w.buildings) b.noWork = false;
   const jobless = () => w.citizens.filter(c => !c.dead && c.adult && c.job == null);
-  // 「砍伐」标记需要散工处理：预留 1-2 名无业成人（不够则稍后从闲余岗位抽调）
-  const wantLabor = w.marked && w.marked.size > 0 ? Math.min(2, Math.ceil(w.marked.size / 2)) : 0;
+  // 「砍伐」/「清除岩石」标记需要散工处理：预留 1-2 名无业成人（不够则稍后从闲余岗位抽调）
+  const markCount = (w.marked ? w.marked.size : 0) + (w.markedRocks ? w.markedRocks.size : 0);
+  const wantLabor = markCount > 0 ? Math.min(2, Math.ceil(markCount / 2)) : 0;
 
   // 第一优先：建筑工地（人手不足时抽调：先抽非粮食岗位；
   // 粮食岗位仅在有富余时抽调 —— 保留约 pop/4 的粮食劳动力。
@@ -917,7 +936,7 @@ G.addBuilding = function (type, x, y, opt) {
   if (!chk.ok) return chk;
   if (!opt.free) for (const k in def.cost) G.game.res[k] -= def.cost[k];
 
-  // 清理占地上的树与岩石（原版：盖在树上得木材、盖在岩石上得石头）
+  // 清理占地上的树（得木材）；岩石已被 canPlace 拦截，这里仅兜底清理占位（不再直接给资源）
   let bonusWood = 0;
   for (let j = y; j < y + def.h; j++)
     for (let i = x; i < x + def.w; i++) {
@@ -1025,5 +1044,5 @@ G.demolishAt = function (tx, ty) {
   }
   if (w.road[i]) { w.road[i] = 0; G.markGroundDirty(tx, ty); return; }
   if (w.treeIdx[i] >= 0) { G.removeTree(w, tx, ty); return; }
-  if (w.rock[i]) { G.clearRock(w, tx, ty); }
+  if (w.rock[i]) { G.markRockAt(w, tx, ty); return; } // 岩石改为标记后由散工清除（资源入库需劳动）
 };
