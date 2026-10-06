@@ -26,7 +26,16 @@ nohup python3 server.py 8613 > server.log 2>&1 &   # 或用 systemd 常驻
 
 **反馈入口**：游戏右上角 📮。玩家**无需注册**，一句话反馈 + 可选昵称，勾选后自动附带当前存档快照（仅游戏数据），提交后即可在服务器上查看：
 
-- 反馈存储：`feedback/feedback-YYYYMM.jsonl`，每行一个 JSON（正文、昵称、进度摘要、存档快照、脚本错误、匿名玩家 ID、IP 盐值哈希）。
+- 反馈存储：`feedback/feedback-YYYYMM.jsonl`，每行一个 JSON（正文、昵称、**游戏版本号**、进度摘要、**最近 60 天每日摘要曲线**、**最近 30 次建造/拆除记录**、存档快照、脚本错误、匿名玩家 ID、IP 盐值哈希）。
+
+**反馈复盘与分析**（可复盘 · 可追踪 · 可分析）：
+
+```bash
+python3 tools/fb_stats.py                    # 聚合报告：版本分布/进度直方图/死因合计/饥荒深度/关键词/脚本错误
+python3 tools/fb_extract.py --id p-xxxx      # 按玩家抽快照 → feedback/replays/*.json
+```
+
+`fb_extract.py` 导出的 json 就是标准存档：游戏内「📂 存档管理 → ⬆️ 导入存档文件」即可回到该玩家反馈时的**精确局面**（含 60 天资源曲线定位问题发生的时点）。每条反馈可归因到版本号，数值补丁发布时递增 `js/core.js` 的 `G.VERSION`。
 - 在线查看：`FEEDBACK_TOKEN=私密token python3 server.py 8613` 启动，访问 `http://主机:8613/api/feedback?token=私密token`；不设 token 则该接口关闭，直接 ssh cat 文件。
 - 防滥用：每 IP 每 10 分钟最多 6 条；单条 ≤1.5MB；月文件超 50MB 拒收；目录列表禁用。
 - 反代（可选）：nginx `location / { proxy_pass http://127.0.0.1:8613; }`。
@@ -120,6 +129,7 @@ js/main.js      游戏循环 / 输入 / 存档
 dev-server.py   开发用禁缓存静态服务器
 server.py       部署服务器：静态托管 + /api/feedback 反馈落盘
 tests/          冒烟测试（node tests/smoke.js · python3 tests/server_smoke.py）、产能基准（node tests/bench.js）、开局重测（node tests/opening.js）
+tools/          反馈工具：fb_extract.py 快照提取（→ 可导入存档）、fb_stats.py 聚合分析报告
 ```
 
 零依赖纯 Canvas 2D，`file://` 双击即玩。
@@ -130,7 +140,8 @@ tests/          冒烟测试（node tests/smoke.js · python3 tests/server_smoke
 - **标准开局重测 tests/opening.js**（脚本化玩家：采集屋→伐木屋→清岩石→宿舍过冬→护林/农田/住房，种子 1 三年）：**15 人 0 死亡穿过三个冬天**，第一冬全员住进宿舍（最低储备食物 440/柴火 185），第 2 年建成 5 独栋，第 3 年出生 3 人、人口 15→18。
 - 「砍伐」标记工具：框选后散工自动前往砍倒，一人一树、跨夜续接；未受教育 2 原木、受教育 3 原木入库。
 - 存档/读档完整还原（含树木、岩石清理记录；旧档自动补铁字段）。
-- `node tests/smoke.js`：经济/作息/教育/存档/**原版数值对齐** 157 项断言；`python3 tests/server_smoke.py`：静态托管、反馈落盘、限频、token 鉴权、**存档接口（写入/列表/读取/删除 + 非法名消毒 + 超限拒绝）** 21 项断言。
+- `node tests/smoke.js`：经济/作息/教育/存档/**原版数值对齐** 161 项断言；`python3 tests/server_smoke.py`：静态托管、反馈落盘（**版本号/滚动日志/建造记录**）、限频、token 鉴权、**存档接口（写入/列表/读取/删除 + 非法名消毒 + 超限拒绝）** 22 项断言。
+- **反馈工具链端到端**：合成反馈 JSONL → `fb_extract.py` 导出的快照可直接被 `applySaveData` 加载（精确复现玩家局面）；`fb_stats.py` 输出版本/进度/死因/饥荒深度聚合报告。
 
 ## 路线图（可继续做的）
 
