@@ -1051,6 +1051,35 @@ G.markGroundDirty = G.markGroundDirty || (() => {}); // render.js 未加载时�
   check('工具按寿命磨损（120 天/把）', g.res.tools === 1 && g.toolWear < 1);
 }
 
+/* ---- 猎人小屋：狩猎依赖成熟林（新采集动作，猎物随森林再生） ---- */
+{
+  freshGame();
+  const g = G.game, w = G.world;
+  check('猎人小屋成本 44木+10石（原版）', G.BDEF.hunting && G.BDEF.hunting.cost.wood === 44 && G.BDEF.hunting.cost.stone === 10);
+  check('猎人小屋进工具栏', G.TOOLBAR.includes('hunting'));
+  const b = addB(w, 'hunting', 2, 2, 2, 2);
+  const c = G.spawnCitizen({ x: 4, y: 4, sex: 'm', age: 25 });
+  c.job = b.id;
+  let t = G.makeTask(b, c);
+  check('附近没有成熟林 → 停工', t === null && b.noWork === true && b.warnText === '附近成熟林太少，猎物绝迹');
+  seedMatureTrees(w, 5, 5, 20); // 圈内成熟树达满产基准
+  b.noWork = false;
+  t = G.makeTask(b, c);
+  check('密林狩猎满产 4 食物', t && t.kind === 'work' && t.yield.type === 'food' && t.yield.qty === 4);
+  g.res.tools = 0;
+  b.noWork = false;
+  t = G.makeTask(b, c);
+  check('无工具狩猎减半（4→2）', t && t.yield.qty === 2);
+}
+/* ---- 森林自然播种：护林屋之外森林也能再生 ---- */
+{
+  freshGame();
+  const w = G.world;
+  G.addTree(w, 6, 6, -200); // 仅 1 棵树
+  for (let d = 0; d < 200 && G.game.season !== 3; d++) G.endDay();
+  check('自然播种：森林从 1 棵缓慢扩张', w.trees.length > 5);
+}
+
 console.log(`\n${fail === 0 ? '全部通过' : '有失败'}: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
 })();

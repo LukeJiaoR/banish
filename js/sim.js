@@ -59,6 +59,12 @@ G.endDay = function () {
       b.growth = Math.min(1, b.growth + 1 / G.PROD.farm.growDays);
   }
 
+  // ---- 森林自然轮转：非冬季偶发自播（护林屋之外，森林也能缓慢恢复/扩张） ----
+  if (g.season !== 3 && w.trees.length > 0 && G.chance(G.TREE_SPREAD_CHANCE)) {
+    const t0 = w.trees[(G.rng() * w.trees.length) | 0];
+    G.addTree(w, t0.x + G.ri(-2, 2), t0.y + G.ri(-2, 2), g.day); // addTree 自带越界/占位检查
+  }
+
   // ---- 进食 / 受冻 / 年龄 / 死亡 ----
   // 原版：每人每年吃 100 食物（儿童相同），粮食不足时儿童与在读学生优先
   const eat = G.LIFE.eatPerYear / G.YEAR_DAYS;
@@ -801,6 +807,22 @@ G.makeTask = function (b, c) {
         work: G.taskWork(c, P.blacksmith.workH), workLeft: 0,
         consume: cons,
         yield: { type: 'tools', qty: c.educated ? P.blacksmith.eduToolsOut : P.blacksmith.toolsOut },
+      };
+    }
+    case 'hunting': {
+      const R = P.hunting.radius;
+      // 狩猎依赖成熟林（鹿群栖息地）：成熟树不足不开工，产出随林况浮动——与采集互补的食物来源
+      const trees = G.treesInRadius(w, b.x, b.y, R, true);
+      if (trees.length < P.hunting.needTrees) {
+        b.noWork = true; b.warnText = '附近成熟林太少，猎物绝迹';
+        return null;
+      }
+      const mature = trees.reduce((s, t2) => s + (G.treeStage(t2) >= 2 ? 1 : 0), 0);
+      const qty = G.taskYield(Math.max(1, Math.round(P.hunting.yield * (0.4 + 0.6 * Math.min(1, mature / P.hunting.fullForest)))));
+      const t = trees[G.ri(0, trees.length - 1)];
+      return {
+        kind: 'work', b, tx: t.x, ty: t.y,
+        work: G.taskWork(c, P.hunting.workH), workLeft: 0, yield: { type: 'food', qty },
       };
     }
     case 'farm': {
