@@ -105,8 +105,8 @@ G.ui = { toast() {}, refreshHUD() {} };
   const hs = G.world.buildings.filter(b => b.type === 'house');
   check('柴火按屋消耗至 0', g.res.firewood === 0);
   check('前两栋暖、第三栋 unheated', !hs[0].unheated && !hs[1].unheated && hs[2].unheated === true);
-  check('冷屋居民 cold=0.4（低于露宿），无房者 0.6，暖屋 0',
-    G.world.cmap[fams[2].members[0]].cold === G.LIFE.unheatedCold && homeless.cold === 0.6 &&
+  check('冷屋居民 cold=0.3（低于露宿），无房者 0.4，暖屋 0',
+    G.world.cmap[fams[2].members[0]].cold === G.LIFE.unheatedCold && homeless.cold === G.LIFE.homelessCold &&
     G.world.cmap[fams[0].members[0]].cold === 0);
 }
 

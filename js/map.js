@@ -72,7 +72,7 @@ G.genWorld = function (seed) {
       }
     }
 
-  // 寻找镇址：平坦陆地 + 附近有森林 + 不太远有水
+  // 寻找镇址：平坦陆地 + 附近有森林 + 不太远有水 + 附近有岩石（第一冬安家的石头来源）
   let best = null, bestScore = -1;
   const cx = N >> 1, cy = N >> 1;
   for (let r = 0; r < N; r += 2) {
@@ -83,8 +83,9 @@ G.genWorld = function (seed) {
       if (!G.areaLand(w, sx - 2, sy - 2, 6, 6)) continue;
       const forest = G.countTreesInRadius(w, sx, sy, 8);
       const waterN = G.countWaterInRadius(w, sx, sy, 12);
-      if (forest < 25 || waterN < 6) continue;
-      const score = forest + waterN - r * 0.6;
+      const rockN = G.countRocksInRadius(w, sx, sy, 12);
+      if (forest < 25 || waterN < 6 || rockN < 3) continue; // 没有近处岩石，开局石头撑不起第一冬的住房
+      const score = forest + waterN + rockN * 2 - r * 0.6;
       if (score > bestScore) { bestScore = score; best = { x: sx, y: sy }; }
     }
     if (best && r > 10) break;
@@ -198,6 +199,15 @@ G.countWaterInRadius = function (w, cx, cy, r) {
   for (let y = y0; y <= y1; y++)
     for (let x = x0; x <= x1; x++)
       if (w.water[y * w.N + x] === 1) n++;
+  return n;
+};
+G.countRocksInRadius = function (w, cx, cy, r) {
+  let n = 0;
+  const x0 = Math.max(0, cx - r), x1 = Math.min(w.N - 1, cx + r);
+  const y0 = Math.max(0, cy - r), y1 = Math.min(w.N - 1, cy + r);
+  for (let y = y0; y <= y1; y++)
+    for (let x = x0; x <= x1; x++)
+      if (w.rock[y * w.N + x]) n++;
   return n;
 };
 G.clearTreesInRadius = function (w, cx, cy, r) {
