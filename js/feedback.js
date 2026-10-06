@@ -72,9 +72,12 @@ G.feedback = {
     const p = {
       pid: this.pid(), name, text: document.getElementById('fb-text').value.trim().slice(0, 2000),
       t: Date.now(),
+      v: G.VERSION,
       ua: navigator.userAgent, lang: navigator.language,
       screen: window.innerWidth + 'x' + window.innerHeight,
       progress: this.progress(),
+      hist: (G.game && G.game.hist ? G.game.hist.slice(-60) : []),
+      buildLog: (G.game && G.game.buildLog ? G.game.buildLog.slice(-30) : []),
       save: null, errs: (window.__errs || []).slice(-20),
     };
     if (document.getElementById('fb-attach').checked && G.world) {

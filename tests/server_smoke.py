@@ -76,7 +76,8 @@ try:
     st, body = req(port, '/js/')
     check('目录列表被禁止', st == 403)
 
-    st, body = post(port, {'pid': 'p-test0001', 'text': '第一个冬天必死，柴火不够', 'name': '测试员'})
+    st, body = post(port, {'pid': 'p-test0001', 'text': '第一个冬天必死，柴火不够', 'name': '测试员',
+                           'v': '0.3.0', 'hist': [{'d': 1, 'pop': 15, 'food': 500}], 'buildLog': [{'d': 1, 't': 'house'}]})
     check('有效反馈 200 ok', st == 200 and json.loads(body).get('ok') is True)
 
     files = sorted(Path(tmp).glob('feedback-*.jsonl'))
@@ -87,6 +88,10 @@ try:
     check('反馈落盘 JSONL（含正文/昵称/进度字段）',
           entry is not None and entry['text'] == '第一个冬天必死，柴火不够'
           and entry['name'] == '测试员' and 'progress' in entry and 'ip' in entry and len(entry['ip']) == 16)
+    check('反馈落盘保留 版本号/滚动日志/建造记录（可归因可复盘）',
+          entry is not None and entry.get('v') == '0.3.0'
+          and isinstance(entry.get('hist'), list) and entry['hist'][0]['d'] == 1
+          and isinstance(entry.get('buildLog'), list) and entry['buildLog'][0]['t'] == 'house')
 
     st, body = post(port, {'text': '   '})
     check('空反馈 400', st == 400)

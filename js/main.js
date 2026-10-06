@@ -70,8 +70,10 @@ G.serializeGame = function () {
   return {
     v: 1, seed: w.seed, N: w.N, // N：地图尺寸（旧档跨尺寸迁移裸索引用）
     game: {
+      v: G.VERSION,
       h: g.h, day: g.day, season: g.season, year: g.year,
       res: g.res, stats: g.stats, prevFood: g.prevFood, foodNet: g.foodNet, warned: g.warned,
+      hist: g.hist, buildLog: g.buildLog,
     },
       trees: w.trees.map(t => [t.i, t.x, t.y, t.b]),
       marked: [...w.marked],

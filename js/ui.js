@@ -417,7 +417,8 @@ G.ui = {
     this.el.overText.innerHTML =
       `你的小镇在<strong>第 ${g.year} 年</strong>消亡了。<br><br>` +
       `存续 ${Math.floor(g.day / G.SEASON_DAYS)} 个季度 · 出生 ${g.stats.born} 人 · 死亡 ${g.stats.died} 人<br>` +
-      (Object.keys(g.stats.deadReasons).map(k => `${k} ×${g.stats.deadReasons[k]}`).join(' · '));
+      (Object.keys(g.stats.deadReasons).map(k => `${k} ×${g.stats.deadReasons[k]}`).join(' · ')) +
+      `<br><small style="opacity:.6">版本 ${G.VERSION} · 反馈时提到它可帮我对号入座</small>`;
     this.el.over.classList.remove('hidden');
   },
 };

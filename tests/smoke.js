@@ -314,10 +314,13 @@ G.ui = { toast() {}, refreshHUD() {} };
   forester.doCut = false; forester.doPlant = true;
   const wc = addB(G.world, 'woodcutter', 9, 2, 2, 2);
   wc.fuelLimit = 350;
+  G.game.hist.push({ d: 7, season: 2, pop: 3, food: 100, firewood: 10, wood: 10, stone: 5, iron: 0, born: 0, died: 0, warn: 'w' }); // 验证滚动日志随档保存
+  G.game.buildLog.push({ d: 6, t: 'house' });
   G.saveGame('test_key', true);
   G.loadGame('test_key');
   const kid2 = G.world.cmap[kid.id], edu2 = G.world.cmap[edu.id];
   check('存读档保留 学生/受教育/学校 字段', kid2 && kid2.student === true && kid2.school === 999 && edu2 && edu2.educated === true);
+  check('存读档保留 滚动日志与建造记录', G.game.hist.length === 1 && G.game.hist[0].d === 7 && G.game.buildLog.length === 1 && G.game.buildLog[0].t === 'house');
   const f2 = G.world.buildings.find(x => x.type === 'forester');
   check('存读档保留 护林小屋砍伐/补种开关', f2 && f2.doCut === false && f2.doPlant === true);
   const wc2 = G.world.buildings.find(x => x.type === 'woodcutter');
@@ -958,6 +961,19 @@ G.markGroundDirty = G.markGroundDirty || (() => {}); // render.js 未加载时�
   c.task = t1; c.state = 'work'; t1.workLeft = 0;
   G.completeTask(c);
   check('采石完工 3 石入库', g.res.stone === 1000 + 3);
+}
+
+/* ---- 滚动日志：每日摘要环形缓冲（60 条封顶）+ 建造/拆除记录 ---- */
+{
+  const g = freshGame();
+  g.res.food = 10000;
+  G.spawnCitizen({ x: 6, y: 6, sex: 'm', age: 25 });
+  G.addBuilding('house', 3, 3, { free: true, instant: true });
+  for (let d = 0; d < 70; d++) G.endDay();
+  check('每日摘要入环形缓冲且封顶 60 条', g.hist.length === 60 && g.hist[59].d === g.day && g.hist[59].pop === G.world.citizens.length);
+  G.removeBuilding(G.world.buildings.find(b => b.type === 'house'));
+  check('建造/拆除进 buildLog（-前缀=拆除）', g.buildLog.some(e => e.t === 'house') && g.buildLog.some(e => e.t === '-house'));
+  check('版本号就绪（反馈归因用）', typeof G.VERSION === 'string' && /^\d+\.\d+\.\d+/.test(G.VERSION));
 }
 
 console.log(`\n${fail === 0 ? '全部通过' : '有失败'}: ${pass} passed, ${fail} failed`);

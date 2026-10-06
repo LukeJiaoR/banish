@@ -212,6 +212,9 @@ class Handler(SimpleHTTPRequestHandler):
             't': t if isinstance(t, (int, float)) else time.time() * 1000,
             'ip': hashlib.sha256((_salt() + ip).encode('utf-8')).hexdigest()[:16],
             'pid': _s(data.get('pid'), 32),
+            'v': _s(data.get('v'), 24),  # 游戏版本号：反馈可归因到具体数值补丁
+            'hist': data.get('hist') if isinstance(data.get('hist'), list) else [],
+            'buildLog': data.get('buildLog') if isinstance(data.get('buildLog'), list) else [],
             'name': _s(data.get('name'), 40),
             'text': text,
             'ua': _s(data.get('ua'), 300),

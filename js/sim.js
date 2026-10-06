@@ -14,6 +14,8 @@ G.newGameState = function () {
     prevFood: 200,
     foodNet: 0,
     warned: {},
+    hist: [],       // 每日摘要环形缓冲（末 60 条）：反馈快照的时间维度，复盘/分析用
+    buildLog: [],   // 最近 30 次建造/拆除（负号前缀 = 拆除）
   };
 };
 G.game = G.newGameState();
@@ -44,6 +46,7 @@ G.isOccupiedHome = function (w, b) {
 G.endDay = function () {
   const g = G.game, w = G.world;
   g.day++;
+  const born0 = g.stats.born, died0 = g.stats.died; // 当日生死增量（进滚动日志）
   const oldSeason = g.season;
   g.season = G.seasonOf(g.day);
   g.year = Math.floor(g.day / G.YEAR_DAYS) + 1;
@@ -168,6 +171,15 @@ G.endDay = function () {
 
   g.foodNet = g.res.food - g.prevFood;
   g.prevFood = g.res.food;
+  // 每日摘要（末 60 条）：反馈快照自带时间曲线，饥荒/寒冬可复盘
+  g.hist.push({
+    d: g.day, season: g.season, pop: w.citizens.length,
+    food: Math.round(g.res.food), firewood: Math.round(g.res.firewood),
+    wood: Math.round(g.res.wood), stone: Math.round(g.res.stone), iron: Math.round(g.res.iron),
+    born: g.stats.born - born0, died: g.stats.died - died0,
+    warn: (g.warned.hunger ? 'h' : '') + (g.warned.firewood ? 'w' : '') + (g.warned.foodLow ? 'l' : ''),
+  });
+  if (g.hist.length > 60) g.hist.shift();
   G.ui.refreshHUD();
 };
 
@@ -1040,6 +1052,10 @@ G.addBuilding = function (type, x, y, opt) {
   }
   if (type === 'forester') { b.doCut = true; b.doPlant = true; } // 原版 Forester 的 Cut / Plant 开关
   if (type === 'woodcutter') b.fuelLimit = G.PROD.woodcutter.fuelLimit; // 燃料上限（原版 Fuel Limit）
+  if (G.game && G.game.buildLog) { // 建造/拆除记录（反馈分析用；负号前缀 = 拆除）
+    G.game.buildLog.push({ d: G.game.day, t: type });
+    if (G.game.buildLog.length > 30) G.game.buildLog.shift();
+  }
   w.buildings.push(b);
   w.bmap[b.id] = b;
   for (let j = y; j < y + def.h; j++)
@@ -1099,6 +1115,10 @@ G.removeBuilding = function (b) {
   for (const fam of w.families) if (fam.houseId === b.id) fam.houseId = null;
   w.buildings = w.buildings.filter(x => x !== b);
   delete w.bmap[b.id];
+  if (G.game && G.game.buildLog) {
+    G.game.buildLog.push({ d: G.game.day, t: '-' + b.type });
+    if (G.game.buildLog.length > 30) G.game.buildLog.shift();
+  }
   // 清除占地占位：残留会让该地块成为"幽灵建筑"——点击无详情、原地也无法重建
   for (let j = b.y; j < b.y + b.h; j++)
     for (let i = b.x; i < b.x + b.w; i++)
