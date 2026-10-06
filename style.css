@@ -69,7 +69,8 @@ body {
 }
 .tb:hover { border-color: #d8b25a; background: rgba(90,70,40,0.55); }
 .tb.active { background: #6b5426; border-color: #ffd98a; color: #fff; }
-.tb .ic { font-size: 18px; }
+.tb .ic { font-size: 18px; position: relative; display: inline-block; min-width: 22px; height: 22px; line-height: 22px; }
+.tb .ic .icimg { position: absolute; left: 0; top: 0; width: 100%; height: 100%; object-fit: contain; }
 .tb .cost { font-size: 10px; color: #b8a888; }
 .tb.active .cost { color: #ffe9b0; }
 
@@ -226,13 +227,15 @@ body {
 }
 #fb-text:focus, #fb-name:focus { outline: none; border-color: #d8b25a; }
 #fb .fb-hint { font-size: 12px; color: #b8a888; margin: 2px 0 10px; }
-#fb-name {
-  width: 140px; padding: 5px 8px;
+#fb-name, #fb-tag {
+  padding: 5px 8px;
   background: rgba(10,8,5,0.5);
   border: 1px solid rgba(216,178,90,0.3);
   border-radius: 6px;
   color: #e8dcc0; font: inherit; font-size: 12.5px;
 }
+#fb-name { width: 140px; }
+#fb-tag option { background: #241f16; color: #e8dcc0; }
 .fb-row {
   display: flex; flex-wrap: wrap; align-items: center;
   gap: 8px 16px; margin-top: 8px;

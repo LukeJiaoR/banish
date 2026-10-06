@@ -65,6 +65,22 @@ def bucket(v, edges, labels):
     return labels[-1]
 
 
+def load_fixed_ids(paths):
+    """闭环清单：传入目录下的 FIXED.md → feedback/FIXED.md（服务器）→ tools/FIXED.md（仓库模板）。"""
+    import re
+    ids = set()
+    cands = [(p.parent / 'FIXED.md') if p.suffix == '.jsonl' else (p / 'FIXED.md') for p in paths]
+    cands += [DEFAULT_FB / 'FIXED.md', ROOT / 'tools' / 'FIXED.md']
+    for cand in cands:
+        try:
+            if cand.is_file():
+                ids.update(re.findall(r'f[0-9a-f]{10}', cand.read_text(encoding='utf-8')))
+                break
+        except OSError:
+            continue
+    return ids
+
+
 def main():
     ap = argparse.ArgumentParser(description='反馈聚合分析 → markdown 报告')
     ap.add_argument('paths', nargs='*', default=[str(DEFAULT_FB)], help='feedback JSONL 文件或目录')
@@ -93,6 +109,17 @@ def main():
     lines = ['# 反馈分析报告', '']
     lines.append(f'- 反馈 **{len(entries)}** 条 · 玩家 **{len(pids)}** 人 · 时间跨度 {span}')
     lines.append(f'- 版本分布：' + '，'.join(f'{k} ×{v}' for k, v in versions.most_common()))
+
+    # 分类标签与闭环率
+    tags = Counter(e.get('tag') or '未分类' for e in entries)
+    lines.append(f'- 分类：' + '，'.join(f'{k} ×{v}' for k, v in tags.most_common()))
+    fixed_ids = load_fixed_ids(paths)
+    with_id = [e for e in entries if e.get('id')]
+    done = sum(1 for e in with_id if e['id'] in fixed_ids)
+    lines.append(f'- 闭环：{done}/{len(with_id)} 已处理（清单 feedback/FIXED.md）；待处理 {len(with_id) - done} 条')
+    pending = [e for e in sorted(with_id, key=lambda x: x.get('t') or 0) if e['id'] not in fixed_ids]
+    for e in pending[-8:]:
+        lines.append(f"  - 待处理 `{e['id']}` ({(e.get('pid') or '?')}, v{e.get('v') or '?'}, {(e.get('tag') or '未分类')}) {(e.get('text') or '')[:40]}")
 
     # 进度直方图（全部反馈的 progress）
     day_edges, day_labels = [12, 24, 36, 48, 96, 10 ** 9], ['第1季', '第2季', '第3季', '第1年内', '1-2年', '2年+']

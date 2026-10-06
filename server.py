@@ -206,13 +206,17 @@ class Handler(SimpleHTTPRequestHandler):
             self._json(400, {'ok': False, 'error': '反馈内容为空'})
             return
         t = data.get('t')
+        t = t if isinstance(t, (int, float)) else time.time() * 1000
         ip = self.client_address[0]  # 限频在 _rate_hit 内，这里取一次做哈希
         entry = {
+            # 稳定 id：pid|时间|正文 的哈希——供 GET /api/feedback/<id>/save 定位与闭环清单登记
+            'id': 'f' + hashlib.sha256(f"{data.get('pid')}|{t}|{text}".encode('utf-8')).hexdigest()[:10],
             'recv': time.time(),
-            't': t if isinstance(t, (int, float)) else time.time() * 1000,
+            't': t,
             'ip': hashlib.sha256((_salt() + ip).encode('utf-8')).hexdigest()[:16],
             'pid': _s(data.get('pid'), 32),
             'v': _s(data.get('v'), 24),  # 游戏版本号：反馈可归因到具体数值补丁
+            'tag': _s(data.get('tag'), 12),  # 可选分类：bug/数值/卡关/建议
             'hist': data.get('hist') if isinstance(data.get('hist'), list) else [],
             'buildLog': data.get('buildLog') if isinstance(data.get('buildLog'), list) else [],
             'name': _s(data.get('name'), 40),
@@ -351,8 +355,74 @@ class Handler(SimpleHTTPRequestHandler):
             self.send_header('Content-Length', str(len(body)))
             self.end_headers()
             self.wfile.write(body)
+        elif path.startswith('/api/feedback/') and (path.endswith('/save') or path.endswith('/replay')):
+            if not TOKEN:
+                self.send_error(404)
+                return
+            qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            if qs.get('token', [''])[0] != TOKEN:
+                self.send_error(403)
+                return
+            fid = urllib.parse.unquote(path[len('/api/feedback/'):-len('/save') if path.endswith('/save') else -len('/replay')])
+            if path.endswith('/save'):
+                self._feedback_save(fid)
+            else:
+                self._feedback_replay(fid)
         else:
             super().do_GET()
+
+    def _find_feedback(self, fid):
+        """按 id 在各月 JSONL 里定位反馈条目。"""
+        if not fid or len(fid) > 40 or not os.path.isdir(FB_DIR):
+            return None
+        with _lock:
+            for fn in sorted(os.listdir(FB_DIR)):
+                if not fn.endswith('.jsonl'):
+                    continue
+                with open(os.path.join(FB_DIR, fn), encoding='utf-8') as f:
+                    for line in f:
+                        if fid not in line:
+                            continue
+                        try:
+                            e = json.loads(line)
+                        except json.JSONDecodeError:
+                            continue
+                        if e.get('id') == fid:
+                            return e
+        return None
+
+    def _feedback_save(self, fid):
+        """GET /api/feedback/<id>/save?token=…：返回该反馈的存档快照（复盘一键导入）。"""
+        found = self._find_feedback(fid)
+        if not found or not isinstance(found.get('save'), dict):
+            self._json(404, {'ok': False, 'error': '该反馈不存在或未附带存档快照'})
+            return
+        save = dict(found['save'])
+        save.setdefault('savedAt', found.get('t') or time.time() * 1000)
+        self._json(200, save)
+
+    def _feedback_replay(self, fid):
+        """GET /api/feedback/<id>/replay?token=…：注入快照的游戏页——点开即复盘。"""
+        found = self._find_feedback(fid)
+        if not found or not isinstance(found.get('save'), dict):
+            self._json(404, {'ok': False, 'error': '该反馈不存在或未附带存档快照'})
+            return
+        try:
+            html = open(os.path.join(ROOT, 'index.html'), encoding='utf-8').read()
+        except OSError:
+            self._json(500, {'ok': False, 'error': '读取游戏页面失败'})
+            return
+        save = dict(found['save'])
+        save.setdefault('savedAt', found.get('t') or time.time() * 1000)
+        payload = json.dumps(save, ensure_ascii=False).replace('</', '<\\/')
+        inject = '<script>window.__REPLAY_SAVE=' + payload + ';</script>\n<script>'
+        html = html.replace('<script>', inject, 1)
+        body = html.encode('utf-8')
+        self.send_response(200)
+        self.send_header('Content-Type', 'text/html; charset=utf-8')
+        self.send_header('Content-Length', str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
 
     def do_DELETE(self):
         path = urllib.parse.urlparse(self.path).path

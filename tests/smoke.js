@@ -976,5 +976,27 @@ G.markGroundDirty = G.markGroundDirty || (() => {}); // render.js 未加载时�
   check('版本号就绪（反馈归因用）', typeof G.VERSION === 'string' && /^\d+\.\d+\.\d+/.test(G.VERSION));
 }
 
-console.log(`\n${fail === 0 ? '全部通过' : '有失败'}: ${pass} passed, ${fail} failed`);
-process.exit(fail ? 1 : 0);
+/* ---- ?load= 一键复盘：G.loadFromUrl 桩 fetch 载入快照（异步收尾） ---- */
+(async () => {
+  global.localStorage = { _d: {}, getItem(k) { return this._d[k] || null; }, setItem(k, v) { this._d[k] = String(v); }, removeItem(k) { delete this._d[k]; } };
+  global.document = { getElementById: () => ({ classList: { add() {}, remove() {}, contains: () => true }, addEventListener() {}, querySelectorAll: () => [] }) };
+  G.T2S = G.T2S || ((x, y) => [0, 0]);
+  G.cam = G.cam || { x: 0, y: 0, z: 1 };
+  G.groundDirty = G.groundDirty || { clear() {} };
+  freshGame();
+  G.ui.hideInfo = () => {};
+  G.ui.setToolActive = () => {};
+  G.spawnCitizen({ x: 6, y: 6, sex: 'm', age: 25 });
+  G.saveGame('replay_key', true);
+  const data = JSON.parse(localStorage.getItem('replay_key'));
+  // 一键复盘：服务器注入 window.__REPLAY_SAVE 后，tryReplayLoad 无网络还原局面
+  global.window.__REPLAY_SAVE = data;
+  const okLoad = G.tryReplayLoad();
+  check('一键复盘：注入快照直接还原局面', okLoad && G.world.citizens.length > 0 && G.game.day === data.game.day);
+  check('一键复盘：无注入时返回 false（正常走开局流程）', G.tryReplayLoad() === false);
+  delete global.localStorage;
+  delete global.document;
+
+  console.log(`\n${fail === 0 ? '全部通过' : '有失败'}: ${pass} passed, ${fail} failed`);
+  process.exit(fail ? 1 : 0);
+})();

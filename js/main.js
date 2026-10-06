@@ -125,6 +125,22 @@ G._peekUid = function () {
   return v;
 };
 
+/* 一键复盘：服务器在 /api/feedback/<id>/replay 页面里注入 window.__REPLAY_SAVE，
+ * 打开链接即已带上快照——这里只做无网络的本地还原。 */
+G.tryReplayLoad = function () {
+  const d = window.__REPLAY_SAVE;
+  if (!d) return false;
+  delete window.__REPLAY_SAVE;
+  try {
+    G.applySaveData(d);
+    G.ui.toast('📂 已加载复盘存档（反馈快照）', 'good');
+    return true;
+  } catch (e) {
+    G.ui.toast('复盘存档加载失败：' + e.message, 'bad');
+    return false;
+  }
+};
+
 G.loadGame = function (key) {
   key = key || G.SAVE_KEY;
   const raw = localStorage.getItem(key);
@@ -383,9 +399,11 @@ G.init = function () {
 
   G.ui.init();
   G.feedback.init();
-  // 启动：有自动存档则恢复上次进度，否则开新局
-  if (localStorage.getItem(G.AUTOSAVE_KEY)) G.loadGame(G.AUTOSAVE_KEY);
-  else G.newGame();
+  // 启动：一键复盘页（已注入快照）→ 有自动存档则恢复上次进度 → 否则开新局
+  if (!G.tryReplayLoad()) {
+    if (localStorage.getItem(G.AUTOSAVE_KEY)) G.loadGame(G.AUTOSAVE_KEY);
+    else G.newGame();
+  }
   G.probeServerSaves(); // 探测服务器存档接口（server.py 托管时可用）
 
   // 自动存档：换季（sim.js onSeasonChange）、定时、页面隐藏、刷新/关闭时写入

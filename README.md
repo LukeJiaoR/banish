@@ -31,11 +31,15 @@ nohup python3 server.py 8613 > server.log 2>&1 &   # 或用 systemd 常驻
 **反馈复盘与分析**（可复盘 · 可追踪 · 可分析）：
 
 ```bash
-python3 tools/fb_stats.py                    # 聚合报告：版本分布/进度直方图/死因合计/饥荒深度/关键词/脚本错误
+python3 tools/fb_stats.py                    # 聚合报告：版本分布/分类/闭环率/进度直方图/死因合计/饥荒深度/关键词
 python3 tools/fb_extract.py --id p-xxxx      # 按玩家抽快照 → feedback/replays/*.json
+python3 tools/fb_extract.py --server http://IP:8613 --token 秘密token
+                                             # 额外打印「点开即复盘」链接（游戏 ?load= 参数直接载入快照）
 ```
 
-`fb_extract.py` 导出的 json 就是标准存档：游戏内「📂 存档管理 → ⬆️ 导入存档文件」即可回到该玩家反馈时的**精确局面**（含 60 天资源曲线定位问题发生的时点）。每条反馈可归因到版本号，数值补丁发布时递增 `js/core.js` 的 `G.VERSION`。
+- `fb_extract.py` 导出的 json 就是标准存档：游戏内「📂 存档管理 → ⬆️ 导入存档文件」即可回到该玩家反馈时的**精确局面**（含 60 天资源曲线定位问题发生的时点）；`--server/--token` 打印的链接打开游戏即自动载入。
+- 反馈表单带可选分类（bug/数值/卡关/建议）；每条反馈有稳定 id，处理完在 `feedback/FIXED.md`（格式见 `tools/FIXED.md`）登记一行，报告即统计闭环率并标注待处理项。
+- 数值补丁发布时递增 `js/core.js` 的 `G.VERSION`，反馈自动归因到版本。
 - 在线查看：`FEEDBACK_TOKEN=私密token python3 server.py 8613` 启动，访问 `http://主机:8613/api/feedback?token=私密token`；不设 token 则该接口关闭，直接 ssh cat 文件。
 - 防滥用：每 IP 每 10 分钟最多 6 条；单条 ≤1.5MB；月文件超 50MB 拒收；目录列表禁用。
 - 反代（可选）：nginx `location / { proxy_pass http://127.0.0.1:8613; }`。
@@ -124,15 +128,18 @@ js/map.js       地形与岩石生成 / 树木 / A* 寻路 / 放置判定
 js/sim.js       时间 / 市民 AI / 劳动力调度 / 经济与生死
 js/render.js    等距渲染（地面缓存 / 建筑 / 市民 / 粒子）
 js/ui.js        HUD / 建造菜单 / 信息面板 / 通知
+js/sprites.js   精灵图加载（assets/ 任意一张缺失自动回退程序化绘制）
 js/feedback.js  匿名试玩反馈（📮，无需注册）
 js/main.js      游戏循环 / 输入 / 存档
 dev-server.py   开发用禁缓存静态服务器
 server.py       部署服务器：静态托管 + /api/feedback 反馈落盘
 tests/          冒烟测试（node tests/smoke.js · python3 tests/server_smoke.py）、产能基准（node tests/bench.js）、开局重测（node tests/opening.js）
-tools/          反馈工具：fb_extract.py 快照提取（→ 可导入存档）、fb_stats.py 聚合分析报告
+tools/          反馈工具 fb_extract.py / fb_stats.py；切图脚本 slice_assets.py（art/ 整图 → assets/ 单件）
+art/            AI 生成的精灵整图（切图源文件，见 docs/art-assets.md）
+assets/         切出的精灵单件 PNG（地表纹理 / 树木岩石 / 建筑 / 人物帧 / 图标）
 ```
 
-零依赖纯 Canvas 2D，`file://` 双击即玩。
+零依赖纯 Canvas 2D，`file://` 双击即玩。美术为 AI 生成的手绘风精灵图（四季地表纹理、建筑、人物行走/劳作帧等 82 张），由 `tools/slice_assets.py` 从 `art/` 整图切出；替换美术只需重新生成整图并重跑切图脚本，规格与风格提示词见 `docs/art-assets.md`。
 
 ## 已验证
 
@@ -140,8 +147,8 @@ tools/          反馈工具：fb_extract.py 快照提取（→ 可导入存档�
 - **标准开局重测 tests/opening.js**（脚本化玩家：采集屋→伐木屋→清岩石→宿舍过冬→护林/农田/住房，种子 1 三年）：**15 人 0 死亡穿过三个冬天**，第一冬全员住进宿舍（最低储备食物 440/柴火 185），第 2 年建成 5 独栋，第 3 年出生 3 人、人口 15→18。
 - 「砍伐」标记工具：框选后散工自动前往砍倒，一人一树、跨夜续接；未受教育 2 原木、受教育 3 原木入库。
 - 存档/读档完整还原（含树木、岩石清理记录；旧档自动补铁字段）。
-- `node tests/smoke.js`：经济/作息/教育/存档/**原版数值对齐** 161 项断言；`python3 tests/server_smoke.py`：静态托管、反馈落盘（**版本号/滚动日志/建造记录**）、限频、token 鉴权、**存档接口（写入/列表/读取/删除 + 非法名消毒 + 超限拒绝）** 22 项断言。
-- **反馈工具链端到端**：合成反馈 JSONL → `fb_extract.py` 导出的快照可直接被 `applySaveData` 加载（精确复现玩家局面）；`fb_stats.py` 输出版本/进度/死因/饥荒深度聚合报告。
+- `node tests/smoke.js`：经济/作息/教育/存档/**原版数值对齐** 162 项断言；`python3 tests/server_smoke.py`：静态托管、反馈落盘（**版本号/分类/滚动日志/建造记录/稳定 id**）、**快照下载接口**、限频、token 鉴权、**存档接口** 26 项断言。
+- **反馈工具链端到端**：合成反馈 JSONL → `fb_extract.py` 导出的快照可直接被 `applySaveData` 加载（精确复现玩家局面）、`?load=` 链接与闭环标记生效；`fb_stats.py` 输出版本/分类/闭环/进度/死因/饥荒深度聚合报告。
 
 ## 路线图（可继续做的）
 

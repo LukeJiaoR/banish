@@ -77,7 +77,8 @@ try:
     check('目录列表被禁止', st == 403)
 
     st, body = post(port, {'pid': 'p-test0001', 'text': '第一个冬天必死，柴火不够', 'name': '测试员',
-                           'v': '0.3.0', 'hist': [{'d': 1, 'pop': 15, 'food': 500}], 'buildLog': [{'d': 1, 't': 'house'}]})
+                           'v': '0.3.0', 'tag': '数值', 'hist': [{'d': 1, 'pop': 15, 'food': 500}], 'buildLog': [{'d': 1, 't': 'house'}],
+                           'save': {'game': {'day': 12, 'food': 500}, 'trees': []}})
     check('有效反馈 200 ok', st == 200 and json.loads(body).get('ok') is True)
 
     files = sorted(Path(tmp).glob('feedback-*.jsonl'))
@@ -88,8 +89,8 @@ try:
     check('反馈落盘 JSONL（含正文/昵称/进度字段）',
           entry is not None and entry['text'] == '第一个冬天必死，柴火不够'
           and entry['name'] == '测试员' and 'progress' in entry and 'ip' in entry and len(entry['ip']) == 16)
-    check('反馈落盘保留 版本号/滚动日志/建造记录（可归因可复盘）',
-          entry is not None and entry.get('v') == '0.3.0'
+    check('反馈落盘保留 版本号/分类/滚动日志/建造记录（可归因可复盘）',
+          entry is not None and entry.get('v') == '0.3.0' and entry.get('tag') == '数值'
           and isinstance(entry.get('hist'), list) and entry['hist'][0]['d'] == 1
           and isinstance(entry.get('buildLog'), list) and entry['buildLog'][0]['t'] == 'house')
 
@@ -102,6 +103,17 @@ try:
     check('错误 token 403', st == 403)
     st, body = req(port, '/api/feedback?token=test-token')
     check('正确 token 可查看全部反馈', st == 200 and '柴火不够' in body)
+
+    fid = (entry or {}).get('id')
+    check('反馈分配稳定 id（定位/闭环用）', bool(fid) and fid.startswith('f') and len(fid) == 11)
+    st, body = req(port, f'/api/feedback/{fid}/save?token=test-token')
+    check('快照下载接口 200 且内容一致', st == 200 and json.loads(body).get('game', {}).get('day') == 12)
+    st, body = req(port, f'/api/feedback/{fid}/replay?token=test-token')
+    check('复盘页注入快照（点开即复盘）', st == 200 and '__REPLAY_SAVE' in body and '"day": 12' in body)
+    st, body = req(port, f'/api/feedback/{fid}/save')
+    check('快照下载无 token 403', st == 403)
+    st, body = req(port, '/api/feedback/f0000000000/save?token=test-token')
+    check('未知反馈 id 404', st == 404)
 
     for i in range(5):  # 已发 2 条，再发 5 条到限频阈值 6
         post(port, {'pid': 'p-test0001', 'text': f'第 {i} 条'})

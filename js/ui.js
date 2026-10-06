@@ -39,7 +39,13 @@ G.ui = {
       });
     });
 
-    // 建造菜单
+    // 建造菜单（有切图图标的工具把精灵图叠在 emoji 上，图加载失败自动回退 emoji）
+    const TOOL_ICONS = {
+      house: 'tool_house', storage: 'tool_storage', gatherer: 'tool_gatherer',
+      forester: 'tool_forester', woodcutter: 'tool_woodcutter', dock: 'tool_dock',
+      school: 'tool_school', farm: 'tool_farm', road: 'tool_road', demolish: 'tool_demolish',
+    };
+    const icImg = (n) => n ? `<img class="icimg" src="assets/icons/${n}.png" alt="" onerror="this.remove()">` : '';
     const toolTip = (t) => {
       if (t === 'demolish') return '拆除：点击建筑 / 树木 / 道路移除；点击岩石/铁矿做清除标记，空闲市民会前来采集入库';
       const d = G.BDEF[t];
@@ -49,12 +55,12 @@ G.ui = {
     };
     this.el.toolbar.innerHTML = G.TOOLBAR.map(t => {
       if (t === 'demolish')
-        return `<button class="tb" data-tool="demolish" title="${toolTip(t)}"><span class="ic">🚫</span><span class="lb">拆除</span></button>`;
+        return `<button class="tb" data-tool="demolish" title="${toolTip(t)}"><span class="ic">🚫${icImg(TOOL_ICONS.demolish)}</span><span class="lb">拆除</span></button>`;
       if (t === 'fell')
         return `<button class="tb" data-tool="fell" title="标记砍伐（原版 Cut Down Trees）：点击或拖选树木做标记，无业散工前来砍倒；未受教育 2 原木、受教育 3 原木入库"><span class="ic">🪚</span><span class="lb">砍伐</span><span class="cost">免费</span></button>`;
       const d = G.BDEF[t];
       const cost = Object.keys(d.cost).map(k => `${G.RES[k].icon}${d.cost[k]}`).join(' ') || '免费';
-      return `<button class="tb" data-tool="${t}" title="${toolTip(t)}"><span class="ic">${d.icon}</span><span class="lb">${d.name}</span><span class="cost">${cost}</span></button>`;
+      return `<button class="tb" data-tool="${t}" title="${toolTip(t)}"><span class="ic">${d.icon}${icImg(TOOL_ICONS[t])}</span><span class="lb">${d.name}</span><span class="cost">${cost}</span></button>`;
     }).join('');
     this.el.toolbar.querySelectorAll('button').forEach(btn => {
       btn.addEventListener('click', () => {

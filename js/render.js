@@ -51,6 +51,59 @@ G.diamondPath = function (ctx, sx, sy) {
   ctx.closePath();
 };
 
+/* ---------- 精灵辅助（assets/ 图片；任一缺失时调用方回退程序化绘制） ---------- */
+/* 以「脚点」(cx, by=底边中心) 画一张精灵，按 G.SPRITE_SIZES 或 opts.w 定尺寸。
+ * 命中返回 [dw, dh]，缺失返回 null。opts.flip = 水平镜像。 */
+G.sprDraw = function (ctx, name, cx, by, opts) {
+  const im = G.SPR && G.SPR.get(name);
+  if (!im || !im.width) return null;
+  const sz = (opts && opts.w) ? { w: opts.w } : (G.SPRITE_SIZES[name] || {});
+  let dw, dh;
+  if (sz.w) { dw = sz.w; dh = dw * im.height / im.width; }
+  else if (sz.h) { dh = sz.h; dw = dh * im.width / im.height; }
+  else { dw = im.width; dh = im.height; }
+  if (opts && opts.flip) {
+    ctx.save();
+    ctx.translate(cx, by);
+    ctx.scale(-1, 1);
+    ctx.drawImage(im, -dw / 2, -dh, dw, dh);
+    ctx.restore();
+  } else {
+    ctx.drawImage(im, cx - dw / 2, by - dh, dw, dh);
+  }
+  return [dw, dh];
+};
+
+/* 地表纹理：季节后缀映射（G.PAL 下标 → 切图文件名后缀） */
+G.TEX_SEASON = ['spring', 'summer', 'autumn', 'winter'];
+/* 在地面缓存里以菱形裁切铺一张可平铺纹理（轻微外溢 1px 消除瓦片接缝），
+ * tint/tintA 可选：叠加一层同色系平色制造瓦片变化 */
+G.fillTexDiamond = function (c, name, sx, sy, tint, tintA) {
+  const im = G.SPR.get(name);
+  if (!im || !im.width) return false;
+  G.diamondPath(c, sx, sy);
+  c.save();
+  c.clip();
+  c.drawImage(im, sx - 32.5, sy - 0.5, 65, 33);
+  if (tint) {
+    c.globalAlpha = tintA;
+    c.fillStyle = tint;
+    c.fillRect(sx - 33, sy - 1, 66, 34);
+    c.globalAlpha = 1;
+  }
+  c.restore();
+  return true;
+};
+
+/* 建筑精灵按占地菱形的宽度比例缩放（图里自带栅栏/台阶等出格装饰） */
+G.BUILD_SPR_W = {
+  house: 1.16, stonehouse: 1.12, boarding: 1.04, storage: 1.03, mine: 1.12,
+  gatherer: 1.10, forester: 1.06, woodcutter: 1.12, dock: 1.0,
+  school: 1.06, site_2x2: 1.0, site_3x3: 1.0,
+};
+/* 精灵内烟囱的横向位置（相对精灵宽度，负=偏左），用于挂炊烟粒子 */
+G.BUILD_CHIMNEY_X = { house: -0.30, stonehouse: 0.02, boarding: -0.32 };
+
 /* ---------- 地面缓存（半分辨率整图；道路/岩石改动只局部重绘脏瓦片） ---------- */
 G.markGroundDirty = function (x, y) {
   if (!G.world || x < 0 || y < 0 || x >= G.world.N || y >= G.world.N) return;
@@ -62,13 +115,19 @@ G.drawGroundTile = function (c, w, pal, x, y) {
   const N = w.N;
   const i = y * N + x;
   const [sx, sy] = G.T2S(x, y);
+  const tex = G.TEX_SEASON[G.game.season];
   if (w.water[i] === 1) {
-    G.diamondPath(c, sx, sy);
-    c.fillStyle = pal.water;
-    c.fill();
-    c.strokeStyle = pal.water;
-    c.lineWidth = 1;
-    c.stroke();
+    if (G.fillTexDiamond(c, 'water_' + tex, sx, sy)) {
+      // 第二变体打破平铺感（仅夏季，避免冬天混入未结冰水面）
+      if (G.game.season === 1 && (x + y) % 4 === 1) G.fillTexDiamond(c, 'water_summer_b', sx, sy);
+    } else {
+      G.diamondPath(c, sx, sy);
+      c.fillStyle = pal.water;
+      c.fill();
+      c.strokeStyle = pal.water;
+      c.lineWidth = 1;
+      c.stroke();
+    }
     c.strokeStyle = pal.shore;
     c.lineWidth = 1.5;
     const corner = [[sx, sy, sx + 32, sy + 16], [sx + 32, sy + 16, sx, sy + 32], [sx, sy + 32, sx - 32, sy + 16], [sx - 32, sy + 16, sx, sy]];
@@ -85,28 +144,49 @@ G.drawGroundTile = function (c, w, pal, x, y) {
   }
   const h = G.h2(w.seed + 5, x, y);
   let col = pal.grass;
-  if (w.water[i] === 2) col = pal.sand;
+  let texName = 'grass_' + tex;
+  if (w.water[i] === 2) { col = pal.sand; texName = 'sand_' + tex; }
   else col = h < 0.33 ? pal.grassAlt : (h > 0.8 ? pal.grassDark : pal.grass);
-  if (w.road[i]) col = h < 0.5 ? pal.road : pal.roadAlt;
-  G.diamondPath(c, sx, sy);
-  c.fillStyle = col;
-  c.fill();
-  c.strokeStyle = col;   // 同色描边消除瓦片接缝
-  c.lineWidth = 1;
-  c.stroke();
-  // 岩石露头（1=石头 2=铁矿，锈色）
+  if (w.road[i]) { col = h < 0.5 ? pal.road : pal.roadAlt; texName = 'road_' + tex; }
+  // 纹理优先；平色只作为变体淡染与纹理缺失时的回退
+  if (G.fillTexDiamond(c, texName, sx, sy, col, w.road[i] || w.water[i] === 2 ? 0 : 0.14)) {
+    c.strokeStyle = 'rgba(0,0,0,0.05)';
+    c.lineWidth = 1;
+    G.diamondPath(c, sx, sy);
+    c.stroke();
+  } else {
+    G.diamondPath(c, sx, sy);
+    c.fillStyle = col;
+    c.fill();
+    c.strokeStyle = col;   // 同色描边消除瓦片接缝
+    c.lineWidth = 1;
+    c.stroke();
+  }
+  // 岩石露头（1=石头 2=铁矿，锈色标记）
   if (w.rock[i]) {
     const iron = w.rock[i] === 2;
     const rk = iron ? pal.iron : pal.rock, rkD = iron ? pal.ironD : pal.rockD;
     const cx = sx, cy = sy + 16;
-    c.fillStyle = rkD;
-    c.beginPath(); c.ellipse(cx + 4, cy + 4, 9, 5, 0, 0, Math.PI * 2); c.fill();
-    c.fillStyle = rk;
-    c.beginPath(); c.ellipse(cx - 2, cy - 1, 10, 6, 0, 0, Math.PI * 2); c.fill();
-    c.fillStyle = rkD;
-    c.beginPath(); c.ellipse(cx - 6, cy + 5, 5, 3, 0, 0, Math.PI * 2); c.fill();
-    c.fillStyle = 'rgba(255,255,255,0.18)';
-    c.beginPath(); c.ellipse(cx - 4, cy - 3, 5, 2.5, 0, 0, Math.PI * 2); c.fill();
+    const rn = 'rock_' + (((x * 7 + y * 13) % 2) ? 'b' : 'a') + (G.isWinter() ? '_snow' : '');
+    const spr = G.sprDraw(c, rn, cx, cy + 10, { w: 26 });
+    if (spr) {
+      if (iron) { // 铁矿：在岩石上叠锈色矿粒示区分
+        c.fillStyle = pal.iron;
+        c.beginPath(); c.ellipse(cx - 4, cy + 1, 3, 1.8, 0, 0, Math.PI * 2); c.fill();
+        c.beginPath(); c.ellipse(cx + 3, cy + 4, 2.4, 1.5, 0, 0, Math.PI * 2); c.fill();
+        c.fillStyle = pal.ironD;
+        c.beginPath(); c.ellipse(cx + 1, cy + 7, 2, 1.2, 0, 0, Math.PI * 2); c.fill();
+      }
+    } else {
+      c.fillStyle = rkD;
+      c.beginPath(); c.ellipse(cx + 4, cy + 4, 9, 5, 0, 0, Math.PI * 2); c.fill();
+      c.fillStyle = rk;
+      c.beginPath(); c.ellipse(cx - 2, cy - 1, 10, 6, 0, 0, Math.PI * 2); c.fill();
+      c.fillStyle = rkD;
+      c.beginPath(); c.ellipse(cx - 6, cy + 5, 5, 3, 0, 0, Math.PI * 2); c.fill();
+      c.fillStyle = 'rgba(255,255,255,0.18)';
+      c.beginPath(); c.ellipse(cx - 4, cy - 3, 5, 2.5, 0, 0, Math.PI * 2); c.fill();
+    }
   }
 };
 
@@ -156,9 +236,11 @@ G.drawTree = function (ctx, t) {
   const [sx, sy] = G.T2S(t.x, t.y);
   const by = sy + 16;
   const stage = G.treeStage(t);
+  const winter = G.isWinter();
+  const sprName = 'tree_' + ['sapling', 'young', 'mature'][stage] + (winter ? '_snow' : '');
+  if (G.sprDraw(ctx, sprName, sx, by)) return;
   const col = G.TREE_COLORS.canopy[(t.x * 7 + t.y * 13) % G.TREE_COLORS.canopy.length];
   const trunk = G.TREE_COLORS.trunk;
-  const winter = G.isWinter();
   if (stage === 0) {
     ctx.fillStyle = trunk; ctx.fillRect(sx - 0.7, by - 5, 1.4, 5);
     tri(ctx, sx, by - 5, 4.5, 7, col);
@@ -209,6 +291,16 @@ G.drawBuilding = function (ctx, b, time) {
   if (b.type === 'dock') { G.drawDock(ctx, b); return; }
 
   if (b.state === 'site') {
+    // 工地：脚手架精灵 + 引擎画进度条
+    const siteSpr = (b.w >= 3 || b.h >= 3) ? 'site_3x3' : 'site_2x2';
+    if (G.sprDraw(ctx, siteSpr, B[0], B[1], { w: (b.w + b.h) * 32 * (G.BUILD_SPR_W[siteSpr] || 1) })) {
+      const px = (T[0] + B[0]) / 2, py = T[1] - 10;
+      ctx.fillStyle = 'rgba(0,0,0,0.5)';
+      ctx.fillRect(px - 16, py, 32, 4);
+      ctx.fillStyle = '#d8b25a';
+      ctx.fillRect(px - 16, py, 32 * b.progress, 4);
+      return;
+    }
     // 工地：地基 + 木架
     G.diamondPath(ctx, T[0], T[1]);
     ctx.fillStyle = 'rgba(120,90,55,0.35)';
@@ -230,6 +322,16 @@ G.drawBuilding = function (ctx, b, time) {
     ctx.fillRect(px - 16, py, 32, 4);
     ctx.fillStyle = '#d8b25a';
     ctx.fillRect(px - 16, py, 32 * b.progress, 4);
+    return;
+  }
+
+  // 建筑精灵：脚点 = 占地菱形最下角，宽度 = 占地菱形宽 × 出格系数
+  const sprW = (b.w + b.h) * 32 * (G.BUILD_SPR_W[b.type] || 1.08);
+  const spr = G.sprDraw(ctx, b.type, B[0], B[1], { w: sprW });
+  if (spr) {
+    if (def.chimney) { // 挂烟囱粒子锚点（精灵内烟囱横向位置见 BUILD_CHIMNEY_X）
+      b._chimney = [B[0] + spr[0] * (G.BUILD_CHIMNEY_X[b.type] || -0.30), B[1] - spr[1] * 0.58];
+    }
     return;
   }
 
@@ -280,16 +382,21 @@ G.drawBuilding = function (ctx, b, time) {
 
 G.drawFarm = function (ctx, b) {
   const pal = G.PAL[G.game.season];
+  const soilTex = pal.snow ? 'farm_soil_snow' : 'farm_soil';
   for (const f of b.farm) {
     const [sx, sy] = G.T2S(f.x, f.y);
-    G.diamondPath(ctx, sx, sy);
-    ctx.fillStyle = f.harvested ? (pal.snow ? '#aeb6bd' : '#7a5c39') : pal.soil;
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(0,0,0,0.15)';
-    ctx.lineWidth = 0.5;
-    ctx.stroke();
+    if (!G.fillTexDiamond(ctx, soilTex, sx, sy, f.harvested ? '#5c452c' : null, f.harvested ? 0.25 : 0)) {
+      G.diamondPath(ctx, sx, sy);
+      ctx.fillStyle = f.harvested ? (pal.snow ? '#aeb6bd' : '#7a5c39') : pal.soil;
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+      ctx.lineWidth = 0.5;
+      ctx.stroke();
+    }
     if (f.sown && !f.harvested) {
       const g = b.growth;
+      const stage = g >= 1 ? 'crop_ripe' : g >= 0.66 ? 'crop_stage2' : g >= 0.33 ? 'crop_stage1' : 'crop_stage0';
+      if (G.sprDraw(ctx, stage, sx, sy + 26)) continue;
       const cropCol = g >= 1 ? (G.game.season === 2 ? '#d8b23a' : '#c8a83a') : G.lerpColor('#5d8a3a', '#c2a13a', g);
       const rr = 1 + g * 1.6;
       ctx.fillStyle = cropCol;
@@ -308,6 +415,8 @@ G.drawDock = function (ctx, b) {
   const R = G.T2S(b.x + b.w, b.y);
   const B = G.T2S(b.x + b.w, b.y + b.h);
   const L = G.T2S(b.x, b.y + b.h);
+  // 码头精灵（木平台+小板屋一体）；缺失回退程序化平台
+  if (G.sprDraw(ctx, 'dock', B[0], B[1] + 6, { w: (b.w + b.h) * 32 })) return;
   // 平台
   ctx.beginPath();
   ctx.moveTo(T[0], T[1]); ctx.lineTo(R[0], R[1]); ctx.lineTo(B[0], B[1]); ctx.lineTo(L[0], L[1]);
@@ -358,24 +467,42 @@ G.drawCitizen = function (ctx, c, time) {
   const walking = c.state === 'walk' || c.state === 'haul';
   const bob = walking ? Math.abs(Math.sin(c.animT)) * 1.2 : (c.state === 'work' ? Math.abs(Math.sin(c.animT)) * 0.8 : 0);
   const resting = c.state === 'rest';
+  // 朝向：按屏幕位移翻转（素材默认朝左）
+  if (c._psx != null) {
+    const dxs = sx - c._psx;
+    if (dxs > 0.03) c._fx = 1;
+    else if (dxs < -0.03) c._fx = -1;
+  }
+  c._psx = sx;
   if (resting) ctx.globalAlpha = 0.55; // 睡觉中的市民淡显
   // 阴影
   ctx.fillStyle = 'rgba(0,0,0,0.25)';
   ctx.beginPath();
   ctx.ellipse(sx, sy, 3.4 * s, 1.7 * s, 0, 0, Math.PI * 2);
   ctx.fill();
-  // 身体
-  ctx.fillStyle = child ? '#a3703f' : '#6e4a33';
-  ctx.fillRect(sx - 1.7 * s, sy - 7.5 * s - bob, 3.4 * s, 5.2 * s);
-  // 头
-  ctx.fillStyle = '#d8a37a';
-  ctx.beginPath();
-  ctx.arc(sx, sy - 8.6 * s - bob, 1.8 * s, 0, Math.PI * 2);
-  ctx.fill();
+  // 身体：精灵帧优先（行走 4 帧 / 劳作 2 帧 / 站立），缺失回退程序化小人
+  const f = Math.floor(c.animT / 1.5);
+  let frame;
+  if (child) frame = walking ? 'child_walk_' + (f % 4) : 'child_idle';
+  else if (walking) frame = 'adult_walk_' + (f % 4);
+  else if (c.state === 'work') frame = 'adult_work_' + (f % 2);
+  else frame = 'adult_idle';
+  if (!G.sprDraw(ctx, frame, sx, sy, { flip: c._fx === 1 })) {
+    // 身体
+    ctx.fillStyle = child ? '#a3703f' : '#6e4a33';
+    ctx.fillRect(sx - 1.7 * s, sy - 7.5 * s - bob, 3.4 * s, 5.2 * s);
+    // 头
+    ctx.fillStyle = '#d8a37a';
+    ctx.beginPath();
+    ctx.arc(sx, sy - 8.6 * s - bob, 1.8 * s, 0, Math.PI * 2);
+    ctx.fill();
+  }
   // 携带物
   if (c.carry) {
-    ctx.fillStyle = G.RES[c.carry.type].color;
-    ctx.fillRect(sx + 1.6 * s, sy - 5.4 * s - bob, 2.6, 2.6);
+    if (!G.sprDraw(ctx, 'carry_' + c.carry.type, sx + 3.2 * s, sy - 4 * s, { w: 10 * s })) {
+      ctx.fillStyle = G.RES[c.carry.type].color;
+      ctx.fillRect(sx + 1.6 * s, sy - 5.4 * s - bob, 2.6, 2.6);
+    }
   }
   // 选中圈
   if (G.sel && G.sel.kind === 'c' && G.sel.id === c.id) {
@@ -521,10 +648,12 @@ G.frame = function (dtReal) {
       // 警告标记
       if (it.b.noWork && it.b.state === 'ok') {
         const T = G.T2S(it.b.x + it.b.w / 2, it.b.y);
-        ctx.font = '13px system-ui';
-        ctx.textAlign = 'center';
-        ctx.fillStyle = '#ffcf4d';
-        ctx.fillText('⚠', T[0], T[1] - 30);
+        if (!G.sprDraw(ctx, 'alert', T[0], T[1] - 16, {})) {
+          ctx.font = '13px system-ui';
+          ctx.textAlign = 'center';
+          ctx.fillStyle = '#ffcf4d';
+          ctx.fillText('⚠', T[0], T[1] - 30);
+        }
       }
     } else G.drawCitizen(ctx, it.c, now);
   }

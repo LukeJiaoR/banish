@@ -71,6 +71,7 @@ G.feedback = {
     try { localStorage.setItem(this.NAME_KEY, name); } catch (e) {}
     const p = {
       pid: this.pid(), name, text: document.getElementById('fb-text').value.trim().slice(0, 2000),
+      tag: (document.getElementById('fb-tag') || {}).value || '',
       t: Date.now(),
       v: G.VERSION,
       ua: navigator.userAgent, lang: navigator.language,
