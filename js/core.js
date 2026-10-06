@@ -29,10 +29,11 @@ G.RES = {
   wood:     { name: '木材', color: '#b08850', icon: '🪵' },
   stone:    { name: '石头', color: '#b8b8b8', icon: '🪨' },
   iron:     { name: '铁', color: '#c08a5a', icon: '🔩' },
+  tools:    { name: '工具', color: '#cfcfcf', icon: '🛠' },
   food:     { name: '食物', color: '#e0705a', icon: '🍖' },
   firewood: { name: '柴火', color: '#e8a33d', icon: '🔥' },
 };
-G.RES_KEYS = ['wood', 'stone', 'iron', 'food', 'firewood'];
+G.RES_KEYS = ['wood', 'stone', 'iron', 'tools', 'food', 'firewood'];
 
 /* ---------- 随机数 ---------- */
 // 可播种 RNG（地形生成用）

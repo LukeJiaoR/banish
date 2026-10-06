@@ -7,7 +7,7 @@ G.newGameState = function () {
   return {
     h: 6, day: 0, season: 0, year: 1,
     speed: 1, paused: false,
-    res: { wood: 80, stone: 48, iron: 0, food: 500, firewood: 50 }, // 开局（原版中难度 5 家庭）；存粮较原版加厚：15 人 6 天食物跑道撑不到第一座采集屋建成
+    res: { wood: 80, stone: 48, iron: 0, tools: 15, food: 500, firewood: 50 }, // 开局（原版中难度 5 家庭，工具 15 件≈第一轮磨损周期）；存粮较原版加厚：15 人 6 天食物跑道撑不到第一座采集屋建成
     schedT: 1,
     over: false,
     stats: { born: 0, died: 0, deadReasons: {} },
@@ -16,6 +16,7 @@ G.newGameState = function () {
     warned: {},
     hist: [],       // 每日摘要环形缓冲（末 60 条）：反馈快照的时间维度，复盘/分析用
     buildLog: [],   // 最近 30 次建造/拆除（负号前缀 = 拆除）
+    toolWear: 0,    // 工具磨损累积器（满 1 磨掉 1 把）
   };
 };
 G.game = G.newGameState();
@@ -70,6 +71,12 @@ G.endDay = function () {
   g.res.food = food;
 
   const winter = g.season === 3;
+  // ---- 工具磨损：每个成人每天磨损 1/toolLifeDays 把；用尽则全员生产减半 ----
+  const adultsNow = w.citizens.filter(c => !c.dead && c.adult).length;
+  if (g.res.tools > 0) {
+    g.toolWear = (g.toolWear || 0) + adultsNow / G.LIFE.toolLifeDays;
+    while (g.toolWear >= 1 && g.res.tools > 0) { g.toolWear -= 1; g.res.tools -= 1; }
+  } else g.toolWear = 0;
   // 有人住的房子才烧柴（含石屋/宿舍；取暖量按建筑类型，原版石屋省一半）
   const houses = w.buildings.filter(b => G.isOccupiedHome(w, b));
   // 原版：木屋每年约烧 30 柴火（石屋 15），集中在冬季消耗；柴火按屋支付，付不起的屋子挨冻
@@ -168,6 +175,11 @@ G.endDay = function () {
     G.ui.toast('⚠ 食物储备不足 3 天', 'warn');
   }
   if (g.res.food > pop * G.LIFE.eatPerDay * 8) g.warned.foodLow = false;
+  if (pop > 0 && !g.warned.noTools && g.res.tools <= 0) {
+    g.warned.noTools = true;
+    G.ui.toast('⚠ 工具用尽，生产减半——尽快建铁匠铺打工具（1铁+2木→2件）', 'bad');
+  }
+  if (g.res.tools > 0) g.warned.noTools = false;
 
   g.foodNet = g.res.food - g.prevFood;
   g.prevFood = g.res.food;
@@ -615,7 +627,7 @@ G.requestTask = function (c) {
       if (c2 !== c && c2.task && c2.task.kind === 'chop' && !c2.task.b) claimed.add(c2.task.ty * w.N + c2.task.tx);
     const mt = G.pickMarkedTree(w, c.x, c.y, claimed);
     if (mt) {
-      c.task = { kind: 'chop', b: null, tx: mt.x, ty: mt.y, tree: mt.tree, logs: G.taskLogYield(c), work: G.taskWork(c, G.PROD.forester.workH), workLeft: 0 };
+      c.task = { kind: 'chop', b: null, tx: mt.x, ty: mt.y, tree: mt.tree, logs: G.taskYield(G.taskLogYield(c)), work: G.taskWork(c, G.PROD.forester.workH), workLeft: 0 };
       G.sendTo(c, mt.x, mt.y);
       return;
     }
@@ -658,6 +670,12 @@ G.requestTask = function (c) {
 /* 任务工时：受过教育的工人更快（原版教育产出加成，产出不变、耗时缩短） */
 G.taskWork = function (c, hours) { return c.educated ? hours * G.LIFE.eduWorkMul : hours; };
 
+/* 任务产出按工具状态折算：工具用尽时减产（原版工具是效率核心，约 2.5 年磨坏一件） */
+G.taskYield = function (base) {
+  const m = G.game.res.tools > 0 ? 1 : G.NO_TOOL_MULT;
+  return Math.max(1, Math.round(base * m));
+};
+
 /* 砍树原木数：未受教育 2、受教育 3（原版 Forester/散工的教育加成） */
 G.taskLogYield = function (c) { return c.educated ? G.PROD.forester.eduLogsYield : G.TREE_LOGS; };
 
@@ -681,7 +699,7 @@ G.makeTask = function (b, c) {
           work: P.woodcutter.workH, workLeft: 0,
           consume: { type: 'wood', qty: P.woodcutter.logsIn },
           // 原版：受教育工人 1 原木出 4 柴火（配比加成，而非提速）
-          yield: { type: 'firewood', qty: c.educated ? P.woodcutter.logsIn * P.woodcutter.eduFirewoodPerLog : P.woodcutter.firewoodOut },
+          yield: { type: 'firewood', qty: G.taskYield(c.educated ? P.woodcutter.logsIn * P.woodcutter.eduFirewoodPerLog : P.woodcutter.firewoodOut) },
         };
       }
       b.noWork = true; b.warnText = '缺木材';
@@ -714,7 +732,7 @@ G.makeTask = function (b, c) {
             if (d < bd) { bd = d; best = t; }
           }
           if (best) return {
-            kind: 'chop', b, tx: best.x, ty: best.y, tree: best, logs: G.taskLogYield(c),
+            kind: 'chop', b, tx: best.x, ty: best.y, tree: best, logs: G.taskYield(G.taskLogYield(c)),
             // 砍+原地补种合并（补种耗时会加进工时；关补种则只砍不种，森林会被清光）
             replant: b.doPlant,
             work: G.taskWork(c, P.forester.workH + (b.doPlant ? P.forester.plantH : 0)), workLeft: 0,
@@ -739,7 +757,7 @@ G.makeTask = function (b, c) {
       }
       // 产出随森林成熟度浮动：成熟树越多采集越丰（护林砍穿森林会砸了采集小屋的饭碗）
       const mature = trees.reduce((s, t2) => s + (G.treeStage(t2) >= 2 ? 1 : 0), 0);
-      const qty = Math.max(1, Math.round(P.gatherer.yield.qty * (0.4 + 0.6 * Math.min(1, mature / P.gatherer.fullForest))));
+      const qty = G.taskYield(Math.max(1, Math.round(P.gatherer.yield.qty * (0.4 + 0.6 * Math.min(1, mature / P.gatherer.fullForest)))));
       const t = trees[G.ri(0, trees.length - 1)];
       return {
         kind: 'work', b, tx: t.x, ty: t.y,
@@ -751,7 +769,7 @@ G.makeTask = function (b, c) {
       if (!spot) return null;
       // 渔获随水域大小浮动：一片小水洼撑不起满产
       const waterN = G.countWaterInRadius(w, b.x, b.y, P.dock.waterR);
-      const qty = Math.max(1, Math.round(P.dock.yield.qty * (0.5 + 0.5 * Math.min(1, waterN / P.dock.fullWater))));
+      const qty = G.taskYield(Math.max(1, Math.round(P.dock.yield.qty * (0.5 + 0.5 * Math.min(1, waterN / P.dock.fullWater)))));
       return {
         kind: 'work', b, tx: spot.x, ty: spot.y,
         work: G.taskWork(c, P.dock.workH), workLeft: 0, yield: { type: P.dock.yield.type, qty },
@@ -766,7 +784,23 @@ G.makeTask = function (b, c) {
       return {
         kind: 'work', b, tx: spot.x, ty: spot.y,
         work: G.taskWork(c, P.mine.workH), workLeft: 0,
-        yield: { type: ironTurn ? 'iron' : 'stone', qty: P.mine.yield },
+        yield: { type: ironTurn ? 'iron' : 'stone', qty: G.taskYield(P.mine.yield) },
+      };
+    }
+    case 'blacksmith': {
+      const spot = G.workSpot(w, b, c.x, c.y);
+      if (!spot) return null;
+      const cons = P.blacksmith.consume;
+      if (cons.some(c2 => g.res[c2.type] < c2.qty)) {
+        b.noWork = true; b.warnText = '缺铁或木材';
+        return null;
+      }
+      // 1铁+2木 → 2 件工具（受教育 3）；铁匠抡锤不用工具，不吃减产
+      return {
+        kind: 'work', b, tx: spot.x, ty: spot.y,
+        work: G.taskWork(c, P.blacksmith.workH), workLeft: 0,
+        consume: cons,
+        yield: { type: 'tools', qty: c.educated ? P.blacksmith.eduToolsOut : P.blacksmith.toolsOut },
       };
     }
     case 'farm': {
@@ -826,14 +860,15 @@ G.completeTask = function (c) {
       const i = t.ty * G.world.N + t.tx;
       if (G.world.rock[i] === t.rock) {
         G.clearRock(G.world, t.tx, t.ty);
-        c.carry = { type: t.rock === 2 ? 'iron' : 'stone', qty: t.rock === 2 ? G.ROCK_IRON : G.ROCK_STONE };
+        c.carry = { type: t.rock === 2 ? 'iron' : 'stone', qty: G.taskYield(t.rock === 2 ? G.ROCK_IRON : G.ROCK_STONE) };
       }
       break;
     }
     case 'work': {
       if (t.consume) {
-        if (G.game.res[t.consume.type] < t.consume.qty) break; // 材料在干活的这几个小时里被同行用掉，本次白干
-        G.game.res[t.consume.type] -= t.consume.qty;
+        const cons = Array.isArray(t.consume) ? t.consume : [t.consume];
+        if (cons.some(c2 => G.game.res[c2.type] < c2.qty)) break; // 材料在干活的这几个小时里被同行用掉，本次白干
+        for (const c2 of cons) G.game.res[c2.type] -= c2.qty;
       }
       if (t.yield) c.carry = { type: t.yield.type, qty: t.yield.qty };
       break;
@@ -857,12 +892,12 @@ G.completeTask = function (c) {
       break;
     }
     case 'harvest': {
-      if (b && b.farm && b.farm[t.ti] && !b.farm[t.ti].harvested) {
-        b.farm[t.ti].harvested = true;
+      if (t.b && t.b.farm && t.b.farm[t.ti] && !t.b.farm[t.ti].harvested) {
+        t.b.farm[t.ti].harvested = true;
         // 攒批搬运：收获累计到 haulCap 才送一趟仓库
         const P = G.PROD.farm;
-        if (c.carry && c.carry.type === 'food') c.carry.qty = Math.min(P.haulCap, c.carry.qty + P.perTile);
-        else c.carry = { type: 'food', qty: P.perTile };
+        if (c.carry && c.carry.type === 'food') c.carry.qty = Math.min(P.haulCap, c.carry.qty + G.taskYield(P.perTile));
+        else c.carry = { type: 'food', qty: G.taskYield(P.perTile) };
         if (b.farm.every(f => f.harvested)) b.harvestDone = true;
         // 还没背满且田里没收完：继续收下一格
         if (c.carry.qty < P.haulCap && !b.harvestDone) { G.requestTask(c); return; }

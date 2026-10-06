@@ -325,6 +325,12 @@ G.ui = { toast() {}, refreshHUD() {} };
   check('存读档保留 护林小屋砍伐/补种开关', f2 && f2.doCut === false && f2.doPlant === true);
   const wc2 = G.world.buildings.find(x => x.type === 'woodcutter');
   check('存读档保留 伐木屋燃料上限', wc2 && wc2.fuelLimit === 350);
+  // 旧档迁移：无工具字段补 10 把
+  const raw3 = JSON.parse(localStorage.getItem('test_key'));
+  delete raw3.game.res.tools;
+  localStorage.setItem('migr_key', JSON.stringify(raw3));
+  G.loadGame('migr_key');
+  check('旧档无工具字段 → 补 10 把应急', G.game.res.tools === 10);
   // 旧档迁移：无 fuelLimit 字段的伐木屋回退默认上限
   const raw = JSON.parse(localStorage.getItem('test_key'));
   delete raw.buildings.find(x => x.type === 'woodcutter').fuelLimit;
@@ -997,6 +1003,54 @@ G.markGroundDirty = G.markGroundDirty || (() => {}); // render.js 未加载时�
   delete global.localStorage;
   delete global.document;
 
-  console.log(`\n${fail === 0 ? '全部通过' : '有失败'}: ${pass} passed, ${fail} failed`);
-  process.exit(fail ? 1 : 0);
+/* ---- 工具循环：铁匠铺打工具、按寿命磨损、无工具减产（资源轮转核心） ---- */
+{
+  const g = freshGame();
+  check('工具是全局资源之一', G.RES_KEYS.includes('tools'));
+  check('铁匠铺成本 42木+24石（原版）', G.BDEF.blacksmith && G.BDEF.blacksmith.cost.wood === 42 && G.BDEF.blacksmith.cost.stone === 24);
+  check('铁匠铺进工具栏', G.TOOLBAR.includes('blacksmith'));
+  const b = addB(G.world, 'blacksmith', 4, 4, 3, 3);
+  const c = G.spawnCitizen({ x: 8, y: 8, sex: 'm', age: 25 });
+  c.job = b.id;
+  g.res.iron = 5; g.res.wood = 50; g.res.tools = 0;
+  const t = G.makeTask(b, c);
+  check('铁匠任务：1铁+2木 → 2 工具', t && t.kind === 'work' && Array.isArray(t.consume) && t.yield.type === 'tools' && t.yield.qty === 2);
+  c.task = t; c.state = 'work'; t.workLeft = 0;
+  G.completeTask(c);
+  check('完工扣料入库（铁-1 木-2 工具+2）', g.res.iron === 4 && g.res.wood === 48 && g.res.tools === 2);
+  g.res.iron = 0;
+  b.noWork = false;
+  const t2 = G.makeTask(b, c);
+  check('缺铁或木材 → 停工', t2 === null && b.noWork === true && b.warnText === '缺铁或木材');
+  g.res.iron = 5; b.noWork = false;
+  const edu = G.spawnCitizen({ x: 8, y: 9, sex: 'f', age: 25 });
+  edu.educated = true; edu.job = b.id;
+  const t3 = G.makeTask(b, edu);
+  check('受教育铁匠 1铁+2木 → 3 工具', t3 && t3.yield.qty === 3);
+}
+{
+  const g = freshGame();
+  const w = G.world;
+  g.res.tools = 5;
+  check('有工具满产', G.taskYield(10) === 10);
+  g.res.tools = 0;
+  check('无工具减半', G.taskYield(10) === 5);
+  check('减产后至少 1', G.taskYield(1) === 1);
+  // 端到端：无工具砍标记树 2→1 原木
+  G.addTree(w, 5, 5, -200);
+  w.marked.add(5 * w.N + 5);
+  const c = G.spawnCitizen({ x: 6, y: 5, sex: 'm', age: 25 });
+  G.requestTask(c);
+  check('无工具砍标记树 2→1 原木', c.task && c.task.logs === 1);
+}
+{
+  const g = freshGame();
+  G.spawnCitizen({ x: 6, y: 6, sex: 'm', age: 25 }); // 1 成人
+  g.res.tools = 2; g.res.food = 100000;
+  for (let d = 0; d < 130; d++) G.endDay();
+  check('工具按寿命磨损（120 天/把）', g.res.tools === 1 && g.toolWear < 1);
+}
+
+console.log(`\n${fail === 0 ? '全部通过' : '有失败'}: ${pass} passed, ${fail} failed`);
+process.exit(fail ? 1 : 0);
 })();

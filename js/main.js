@@ -17,9 +17,9 @@ G.newGame = function (seed) {
   G.rng = G.makeRng(seed ^ 0x51f15e);
   G.world = G.genWorld(seed);
   // 原版「中等」难度开局：5 个家庭（无房），一辆储物车（仓库）
-  // 资源：木 80 / 石 48 / 食 500 / 柴 50（存粮较原版加厚，见 README「有意差异」；铁靠清理地表铁矿获得）
+  // 资源：木 80 / 石 48 / 食 500 / 柴 50 / 工具 15（≈第一轮磨损周期，之后靠铁匠铺）
   G.game = G.newGameState();
-  G.game.res = { wood: 80, stone: 48, iron: 0, food: 500, firewood: 50 };
+  G.game.res = { wood: 80, stone: 48, iron: 0, tools: 15, food: 500, firewood: 50 };
   G.sel = null;
   G.tool = null;
   G.smoke = [];
@@ -162,6 +162,9 @@ G.applySaveData = function (d) {
   const g = G.game, w = G.world;
   Object.assign(g, d.game);
   g.res.iron = g.res.iron || 0; // 旧存档迁移：无铁字段时补 0
+  g.res.tools = g.res.tools != null ? g.res.tools : 10; // 旧存档迁移：无工具字段补 10 把应急
+  g.hist = Array.isArray(g.hist) ? g.hist : [];
+  g.buildLog = Array.isArray(g.buildLog) ? g.buildLog : [];
   G.sel = null; G.tool = null; G.smoke = []; G.flakes = null;
   G.ui.hideInfo(); G.ui.setToolActive();
   document.getElementById('over').classList.add('hidden');

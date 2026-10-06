@@ -46,6 +46,12 @@ G.BDEF = {
     wall: '#6f6a62', wallD: '#524e47', roof: '#4a463f',
     desc: '深井采矿，不受地表矿藏限制：4 名工人轮流下井，每 5 趟有 1 趟采铁。石:铁产出比约 4:1，让石头/铁不再完全依赖地表矿（地表矿清得快、仍是早期最快来源）。',
   },
+  blacksmith: {
+    id: 'blacksmith', name: '铁匠铺', icon: '⚒️', w: 3, h: 3,
+    cost: { wood: 42, stone: 24 }, buildWork: 120, jobs: 1, passable: false,
+    wall: '#7a5a45', wallD: '#5c4334', roof: '#6b4a3a',
+    desc: '原版 Blacksmith 成本 42木+24石，1 名工人。1 铁+2 木打 2 件工具（受教育 3 件）。工具是市民干活的饭碗：每人每天磨损一点，约 2.5 年用坏一件；工具用尽时生产减半。',
+  },
   gatherer: {
     id: 'gatherer', name: '采集小屋', icon: '🧺', w: 2, h: 2,
     cost: { wood: 30, stone: 12 }, buildWork: 70, jobs: 4, passable: false,
@@ -91,7 +97,7 @@ G.BDEF = {
 };
 
 /* 工具栏顺序 */
-G.TOOLBAR = ['house', 'stonehouse', 'boarding', 'storage', 'mine', 'gatherer', 'forester', 'woodcutter', 'dock', 'school', 'farm', 'road', 'fell', 'demolish'];
+G.TOOLBAR = ['house', 'stonehouse', 'boarding', 'storage', 'mine', 'blacksmith', 'gatherer', 'forester', 'woodcutter', 'dock', 'hunting', 'school', 'farm', 'road', 'fell', 'demolish'];
 
 /* 产出参数（workH: 每次工作小时数；目标对齐原版年产量） */
 G.PROD = {
@@ -105,6 +111,8 @@ G.PROD = {
     fuelLimit: 200, fuelStep: 50, fuelMax: 2000 }, // 燃料上限（原版 Fuel Limit）：柴火库存达到上限即停产；默认 200 ≈ 6~7 栋木屋一年取暖量
   dock:      { workH: 5, yield: { type: 'food', qty: 4 }, waterR: 10, fullWater: 40 },
   mine:      { workH: 9, yield: 3, ironEvery: 5 }, // 每 5 趟 1 趟铁，其余采石（深井矿脉不枯竭）
+  blacksmith: { workH: 8, consume: [{ type: 'iron', qty: 1 }, { type: 'wood', qty: 2 }], toolsOut: 2, eduToolsOut: 3 }, // 1铁+2木→2工具（受教育 3）
+  hunting:   { workH: 5, yield: 4, radius: 12, needTrees: 10, fullForest: 20 }, // 狩猎依赖成熟林（鹿群栖息地），猎物随森林再生
   // perTile 14/格：原版 7/格但田块可放大到 15×15，本作固定 8×8，翻倍对齐原版人均产出；
   // haulCap 28：收获攒满 4 格再送一趟仓，否则 64 趟搬运会把秋收窗口耗在走路 上
   farm:      { perTile: 14, tileWorkH: 0.5, growDays: 24, haulCap: 28 },
@@ -131,7 +139,9 @@ G.LIFE = {
   schoolCap: 20,          // 每所学堂学生容量（原版 20）
   boardingCap: 5,         // 每栋宿舍可入住的家庭数（原版 5）
   eduWorkMul: 0.7,        // 受教育工人任务工时倍率（同产出更快，≈ 产出 +43%）
+  toolLifeDays: 120,      // 工具寿命（约 2.5 年，原版 2~3 年）：每个成人每天磨损 1/寿命
 };
+G.NO_TOOL_MULT = 0.5;     // 工具用尽时生产任务产出倍率（原版无工具减产）
 G.LIFE.eatPerDay = G.LIFE.eatPerYear / G.YEAR_DAYS; // ≈2.08 食物/人/天（生育门槛、饥饿警告用）
 
 /* 树木生长（天数阈值；原版一棵树 4-5 年成材，本作约 2 年——配合小地图快节奏与护林可持续产量） */
