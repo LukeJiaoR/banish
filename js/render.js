@@ -572,6 +572,19 @@ G.updateParticles = function (dt) {
   } else G.flakes = null;
 };
 
+/* Ground-level food forest warning while marking resources; no path queries. */
+G.drawFoodForestBounds = function (ctx) {
+  for (const [x0, y0, x1, y1] of G.foodForestBounds(G.world)) {
+    ctx.save(); ctx.beginPath();
+    [[x0,y0],[x1,y0],[x1,y1],[x0,y1]].forEach(([x,y], i) => {
+      const [sx,sy] = G.T2S(x,y); if (i) ctx.lineTo(sx,sy); else ctx.moveTo(sx,sy);
+    });
+    ctx.closePath(); ctx.fillStyle = 'rgba(143,200,102,0.07)'; ctx.fill();
+    ctx.strokeStyle = '#8fc866'; ctx.lineWidth = 1.5 / G.cam.z;
+    ctx.setLineDash([6 / G.cam.z, 4 / G.cam.z]); ctx.stroke(); ctx.restore();
+  }
+};
+
 /* ---------- 主绘制 ---------- */
 G.frame = function (dtReal) {
   const cv = G.cv, ctx = G.ctx;
@@ -590,6 +603,8 @@ G.frame = function (dtReal) {
     G._gcv.width / G.groundScale, G._gcv.height / G.groundScale);
 
   const w = G.world;
+  const harvesting = G.tool && (G.tool.kind === 'fell' || G.tool.kind === 'demolish');
+  if (harvesting) G.drawFoodForestBounds(ctx);
 
   // 建造幽灵：贴着地面画、在建筑之前——后面的建筑/树会正确把它挡住，
   // 不会出现“绿色预览浮在已有建筑上”的误导
@@ -615,7 +630,11 @@ G.frame = function (dtReal) {
         ctx.fill();
       }
     G._ghost = { ox, oy };
-  } else { G._ghost = null; G.ui.refreshPlacement(null); }
+  } else {
+    G._ghost = null;
+    if (harvesting) G.ui.refreshHarvest();
+    else G.ui.refreshPlacement(null);
+  }
 
   // 道路工具悬停（同样贴地）
   if (G.tool && G.tool.kind === 'road' && G.hover.tx >= 0) {

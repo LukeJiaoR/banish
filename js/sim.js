@@ -1288,7 +1288,9 @@ G.scheduleJobs = function () {
   }
   const jobless = () => w.citizens.filter(c => !c.dead && c.adult && c.job == null);
   // 「砍伐」/「清除岩石」标记需要散工处理：预留 1-2 名无业成人（不够则稍后从闲余岗位抽调）
-  const markCount = (w.marked ? w.marked.size : 0) + (w.markedRocks ? w.markedRocks.size : 0);
+  w.markReachability = Object.assign(G.reachableMarks(w), { day: G.game.day, h: G.game.h,
+    total: (w.marked ? w.marked.size : 0) + (w.markedRocks ? w.markedRocks.size : 0) });
+  const markCount = w.markReachability.count;
   const wantLabor = markCount > 0 ? Math.min(2, Math.ceil(markCount / 2)) : 0;
 
   const harvestSeason = G.game.season === 2;

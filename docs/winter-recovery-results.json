@@ -1,0 +1,800 @@
+{
+  "root": "/tmp/banish-a6700f6",
+  "years": 30,
+  "strategyHash": "d6ded4bcf9490e5dd971f756db4cb77478382c997042d84592064c9110c3e197",
+  "testSourceHash": "39654a1b83be608d894fb24ea9dab6ea7e90560385ca1765ef83c72b6fe3fb64",
+  "purpose": "Seed41 day192 causal intervention. Does not establish a universal strategy, a balanced scheduler, zero cold homes, or browser/visual acceptance.",
+  "actions": "Unchanged frozen long policy, plus temporary fuel target 0 from day192 until a second warehouse is ordered using real resources, ordinary construction and reachable placement; restore ordinary fuel target next half-day. No resource, age, worker-assignment, time or economic-constant overrides.",
+  "rationale": "At the intervention, compare current food/storage capacity and logs committed to fuel. General lesson: budget logs and warehouse capacity before food-day requirements exceed capacity. Day192 and this temporary production pause were tested on seed41 only; do not copy the pause blindly into an unprepared winter.",
+  "results": [
+    {
+      "scenario": "baseline",
+      "seed": 41,
+      "requestedEndDay": 1440,
+      "sourceHash": "dcfd1219440ab41ba9a71f537a11e4216341bee5a0ac70d3c8c0139363cf5c88",
+      "final": {
+        "day": 1440,
+        "hour": 6,
+        "population": 25,
+        "adults": 25,
+        "resources": {
+          "wood": 110,
+          "stone": 689,
+          "iron": 183,
+          "tools": 31,
+          "food": 1365,
+          "firewood": 72
+        },
+        "foodCapacity": 1500,
+        "foodDays": 26.208,
+        "completedHomes": 5,
+        "emptyHomes": 0,
+        "homelessFamilies": 0
+      },
+      "births": 17,
+      "secondGenerationBorn": 0,
+      "deaths": 7,
+      "causes": {
+        "冻死": 7
+      },
+      "shortages": {
+        "hungryCitizenDays": 0,
+        "toolDays": 3,
+        "unheatedHomeDays": 70
+      },
+      "minima": {
+        "food": 77.50000000004853,
+        "firewood": 0,
+        "wood": 0,
+        "tools": 0
+      },
+      "actions": [],
+      "completed": [
+        {
+          "day": 1,
+          "type": "gatherer",
+          "id": 22,
+          "x": 68,
+          "y": 70
+        },
+        {
+          "day": 3,
+          "type": "woodcutter",
+          "id": 23,
+          "x": 63,
+          "y": 70
+        },
+        {
+          "day": 5,
+          "type": "gatherer",
+          "id": 24,
+          "x": 64,
+          "y": 73
+        },
+        {
+          "day": 16,
+          "type": "house",
+          "id": 25,
+          "x": 68,
+          "y": 67
+        },
+        {
+          "day": 25,
+          "type": "house",
+          "id": 26,
+          "x": 63,
+          "y": 66
+        },
+        {
+          "day": 31,
+          "type": "house",
+          "id": 27,
+          "x": 66,
+          "y": 64
+        },
+        {
+          "day": 48,
+          "type": "farm",
+          "id": 28,
+          "x": 69,
+          "y": 80
+        },
+        {
+          "day": 74,
+          "type": "blacksmith",
+          "id": 29,
+          "x": 60,
+          "y": 65
+        },
+        {
+          "day": 170,
+          "type": "house",
+          "id": 33,
+          "x": 70,
+          "y": 70
+        },
+        {
+          "day": 191,
+          "type": "gatherer",
+          "id": 34,
+          "x": 60,
+          "y": 71
+        },
+        {
+          "day": 419,
+          "type": "gatherer",
+          "id": 44,
+          "x": 57,
+          "y": 71
+        },
+        {
+          "day": 1229,
+          "type": "storage",
+          "id": 50,
+          "x": 57,
+          "y": 65
+        },
+        {
+          "day": 1287,
+          "type": "forester",
+          "id": 51,
+          "x": 55,
+          "y": 91
+        },
+        {
+          "day": 1320,
+          "type": "storage",
+          "id": 52,
+          "x": 57,
+          "y": 77
+        },
+        {
+          "day": 1336,
+          "type": "mine",
+          "id": 53,
+          "x": 70,
+          "y": 77
+        },
+        {
+          "day": 1377,
+          "type": "house",
+          "id": 54,
+          "x": 70,
+          "y": 67
+        },
+        {
+          "day": 1412,
+          "type": "school",
+          "id": 55,
+          "x": 73,
+          "y": 75
+        }
+      ],
+      "descendantBirthDays": [],
+      "deathEvents": [
+        {
+          "day": 574,
+          "reason": "冻死",
+          "count": 7
+        }
+      ]
+    },
+    {
+      "scenario": "early-warehouse",
+      "seed": 41,
+      "requestedEndDay": 1440,
+      "sourceHash": "dcfd1219440ab41ba9a71f537a11e4216341bee5a0ac70d3c8c0139363cf5c88",
+      "final": {
+        "day": 1440,
+        "hour": 6,
+        "population": 36,
+        "adults": 33,
+        "resources": {
+          "wood": 238,
+          "stone": 1500,
+          "iron": 1500,
+          "tools": 41,
+          "food": 1330,
+          "firewood": 84
+        },
+        "foodCapacity": 1500,
+        "foodDays": 17.733,
+        "completedHomes": 8,
+        "emptyHomes": 0,
+        "homelessFamilies": 0
+      },
+      "births": 21,
+      "secondGenerationBorn": 3,
+      "deaths": 0,
+      "causes": {},
+      "shortages": {
+        "hungryCitizenDays": 0,
+        "toolDays": 0,
+        "unheatedHomeDays": 24
+      },
+      "minima": {
+        "food": 237.5000000000039,
+        "firewood": 0,
+        "wood": 0,
+        "tools": 9
+      },
+      "actions": [
+        {
+          "action": "set fuel target to 0",
+          "previousTarget": 150,
+          "state": {
+            "day": 192,
+            "hour": 6.5,
+            "population": 18,
+            "adults": 13,
+            "resources": {
+              "wood": 20,
+              "stone": 28,
+              "iron": 24,
+              "tools": 30,
+              "food": 240,
+              "firewood": 104
+            },
+            "foodCapacity": 500,
+            "foodDays": 6.4,
+            "completedHomes": 4,
+            "emptyHomes": 0,
+            "homelessFamilies": 1
+          }
+        },
+        {
+          "action": "order warehouse",
+          "x": 70,
+          "y": 77,
+          "cost": {
+            "wood": 48,
+            "stone": 16
+          },
+          "before": {
+            "day": 231,
+            "hour": 18.5,
+            "population": 20,
+            "adults": 13,
+            "resources": {
+              "wood": 48,
+              "stone": 68,
+              "iron": 42,
+              "tools": 30,
+              "food": 470,
+              "firewood": 70
+            },
+            "foodCapacity": 500,
+            "foodDays": 11.28,
+            "completedHomes": 4,
+            "emptyHomes": 0,
+            "homelessFamilies": 1
+          },
+          "after": {
+            "day": 231,
+            "hour": 18.5,
+            "population": 20,
+            "adults": 13,
+            "resources": {
+              "wood": 0,
+              "stone": 52,
+              "iron": 42,
+              "tools": 30,
+              "food": 470,
+              "firewood": 70
+            },
+            "foodCapacity": 500,
+            "foodDays": 11.28,
+            "completedHomes": 4,
+            "emptyHomes": 0,
+            "homelessFamilies": 1
+          }
+        },
+        {
+          "action": "restore ordinary fuel target",
+          "targets": [
+            150
+          ],
+          "state": {
+            "day": 232,
+            "hour": 6.5,
+            "population": 20,
+            "adults": 13,
+            "resources": {
+              "wood": 0,
+              "stone": 52,
+              "iron": 42,
+              "tools": 30,
+              "food": 438.333,
+              "firewood": 60
+            },
+            "foodCapacity": 500,
+            "foodDays": 10.52,
+            "completedHomes": 4,
+            "emptyHomes": 0,
+            "homelessFamilies": 1
+          }
+        }
+      ],
+      "completed": [
+        {
+          "day": 1,
+          "type": "gatherer",
+          "id": 22,
+          "x": 68,
+          "y": 70
+        },
+        {
+          "day": 3,
+          "type": "woodcutter",
+          "id": 23,
+          "x": 63,
+          "y": 70
+        },
+        {
+          "day": 5,
+          "type": "gatherer",
+          "id": 24,
+          "x": 64,
+          "y": 73
+        },
+        {
+          "day": 16,
+          "type": "house",
+          "id": 25,
+          "x": 68,
+          "y": 67
+        },
+        {
+          "day": 25,
+          "type": "house",
+          "id": 26,
+          "x": 63,
+          "y": 66
+        },
+        {
+          "day": 31,
+          "type": "house",
+          "id": 27,
+          "x": 66,
+          "y": 64
+        },
+        {
+          "day": 48,
+          "type": "farm",
+          "id": 28,
+          "x": 69,
+          "y": 80
+        },
+        {
+          "day": 74,
+          "type": "blacksmith",
+          "id": 29,
+          "x": 60,
+          "y": 65
+        },
+        {
+          "day": 170,
+          "type": "house",
+          "id": 33,
+          "x": 70,
+          "y": 70
+        },
+        {
+          "day": 191,
+          "type": "gatherer",
+          "id": 34,
+          "x": 60,
+          "y": 71
+        },
+        {
+          "day": 235,
+          "type": "storage",
+          "id": 37,
+          "x": 70,
+          "y": 77
+        },
+        {
+          "day": 460,
+          "type": "gatherer",
+          "id": 47,
+          "x": 67,
+          "y": 78
+        },
+        {
+          "day": 902,
+          "type": "gatherer",
+          "id": 52,
+          "x": 65,
+          "y": 80
+        },
+        {
+          "day": 1138,
+          "type": "forester",
+          "id": 53,
+          "x": 55,
+          "y": 48
+        },
+        {
+          "day": 1172,
+          "type": "storage",
+          "id": 54,
+          "x": 62,
+          "y": 80
+        },
+        {
+          "day": 1190,
+          "type": "mine",
+          "id": 55,
+          "x": 73,
+          "y": 75
+        },
+        {
+          "day": 1249,
+          "type": "house",
+          "id": 56,
+          "x": 70,
+          "y": 67
+        },
+        {
+          "day": 1267,
+          "type": "school",
+          "id": 57,
+          "x": 62,
+          "y": 61
+        },
+        {
+          "day": 1314,
+          "type": "house",
+          "id": 58,
+          "x": 68,
+          "y": 63
+        },
+        {
+          "day": 1361,
+          "type": "house",
+          "id": 61,
+          "x": 58,
+          "y": 66
+        },
+        {
+          "day": 1409,
+          "type": "house",
+          "id": 64,
+          "x": 57,
+          "y": 71
+        }
+      ],
+      "descendantBirthDays": [
+        1321,
+        1379,
+        1419
+      ],
+      "deathEvents": []
+    },
+    {
+      "scenario": "warehouse-without-pause",
+      "seed": 41,
+      "requestedEndDay": 600,
+      "sourceHash": "dcfd1219440ab41ba9a71f537a11e4216341bee5a0ac70d3c8c0139363cf5c88",
+      "final": {
+        "day": 600,
+        "hour": 6,
+        "population": 23,
+        "adults": 16,
+        "resources": {
+          "wood": 2,
+          "stone": 56,
+          "iron": 20,
+          "tools": 30,
+          "food": 457.083,
+          "firewood": 54
+        },
+        "foodCapacity": 500,
+        "foodDays": 9.539,
+        "completedHomes": 4,
+        "emptyHomes": 0,
+        "homelessFamilies": 1
+      },
+      "births": 15,
+      "secondGenerationBorn": 0,
+      "deaths": 7,
+      "causes": {
+        "冻死": 7
+      },
+      "shortages": {
+        "hungryCitizenDays": 0,
+        "toolDays": 0,
+        "unheatedHomeDays": 45
+      },
+      "minima": {
+        "food": 77.50000000004853,
+        "firewood": 0,
+        "wood": 0,
+        "tools": 9
+      },
+      "actions": [],
+      "completed": [
+        {
+          "day": 1,
+          "type": "gatherer",
+          "id": 22,
+          "x": 68,
+          "y": 70
+        },
+        {
+          "day": 3,
+          "type": "woodcutter",
+          "id": 23,
+          "x": 63,
+          "y": 70
+        },
+        {
+          "day": 5,
+          "type": "gatherer",
+          "id": 24,
+          "x": 64,
+          "y": 73
+        },
+        {
+          "day": 16,
+          "type": "house",
+          "id": 25,
+          "x": 68,
+          "y": 67
+        },
+        {
+          "day": 25,
+          "type": "house",
+          "id": 26,
+          "x": 63,
+          "y": 66
+        },
+        {
+          "day": 31,
+          "type": "house",
+          "id": 27,
+          "x": 66,
+          "y": 64
+        },
+        {
+          "day": 48,
+          "type": "farm",
+          "id": 28,
+          "x": 69,
+          "y": 80
+        },
+        {
+          "day": 74,
+          "type": "blacksmith",
+          "id": 29,
+          "x": 60,
+          "y": 65
+        },
+        {
+          "day": 170,
+          "type": "house",
+          "id": 33,
+          "x": 70,
+          "y": 70
+        },
+        {
+          "day": 191,
+          "type": "gatherer",
+          "id": 34,
+          "x": 60,
+          "y": 71
+        },
+        {
+          "day": 419,
+          "type": "gatherer",
+          "id": 44,
+          "x": 57,
+          "y": 71
+        }
+      ],
+      "descendantBirthDays": [],
+      "deathEvents": [
+        {
+          "day": 574,
+          "reason": "冻死",
+          "count": 7
+        }
+      ]
+    },
+    {
+      "scenario": "wrong-food-demolition",
+      "seed": 41,
+      "requestedEndDay": 600,
+      "sourceHash": "dcfd1219440ab41ba9a71f537a11e4216341bee5a0ac70d3c8c0139363cf5c88",
+      "final": {
+        "day": 530,
+        "hour": 0,
+        "population": 0,
+        "adults": 0,
+        "resources": {
+          "wood": 13,
+          "stone": 62,
+          "iron": 25,
+          "tools": 30,
+          "food": 0.75,
+          "firewood": 73
+        },
+        "foodCapacity": 500,
+        "foodDays": 0.75,
+        "completedHomes": 4,
+        "emptyHomes": 4,
+        "homelessFamilies": 0
+      },
+      "births": 13,
+      "secondGenerationBorn": 0,
+      "deaths": 28,
+      "causes": {
+        "饿死": 28
+      },
+      "shortages": {
+        "hungryCitizenDays": 106,
+        "toolDays": 0,
+        "unheatedHomeDays": 0
+      },
+      "minima": {
+        "food": 0.7500000000253921,
+        "firewood": 20,
+        "wood": 0,
+        "tools": 9
+      },
+      "actions": [
+        {
+          "action": "demolish latest gatherer (negative control)",
+          "id": 44,
+          "x": 57,
+          "y": 71,
+          "before": {
+            "day": 480,
+            "hour": 6.5,
+            "population": 28,
+            "adults": 15,
+            "resources": {
+              "wood": 2,
+              "stone": 56,
+              "iron": 28,
+              "tools": 29,
+              "food": 232.917,
+              "firewood": 20
+            },
+            "foodCapacity": 500,
+            "foodDays": 3.993,
+            "completedHomes": 4,
+            "emptyHomes": 0,
+            "homelessFamilies": 1
+          },
+          "after": {
+            "day": 480,
+            "hour": 6.5,
+            "population": 28,
+            "adults": 15,
+            "resources": {
+              "wood": 17,
+              "stone": 62,
+              "iron": 28,
+              "tools": 29,
+              "food": 232.917,
+              "firewood": 20
+            },
+            "foodCapacity": 500,
+            "foodDays": 3.993,
+            "completedHomes": 4,
+            "emptyHomes": 0,
+            "homelessFamilies": 1
+          }
+        }
+      ],
+      "completed": [
+        {
+          "day": 1,
+          "type": "gatherer",
+          "id": 22,
+          "x": 68,
+          "y": 70
+        },
+        {
+          "day": 3,
+          "type": "woodcutter",
+          "id": 23,
+          "x": 63,
+          "y": 70
+        },
+        {
+          "day": 5,
+          "type": "gatherer",
+          "id": 24,
+          "x": 64,
+          "y": 73
+        },
+        {
+          "day": 16,
+          "type": "house",
+          "id": 25,
+          "x": 68,
+          "y": 67
+        },
+        {
+          "day": 25,
+          "type": "house",
+          "id": 26,
+          "x": 63,
+          "y": 66
+        },
+        {
+          "day": 31,
+          "type": "house",
+          "id": 27,
+          "x": 66,
+          "y": 64
+        },
+        {
+          "day": 48,
+          "type": "farm",
+          "id": 28,
+          "x": 69,
+          "y": 80
+        },
+        {
+          "day": 74,
+          "type": "blacksmith",
+          "id": 29,
+          "x": 60,
+          "y": 65
+        },
+        {
+          "day": 170,
+          "type": "house",
+          "id": 33,
+          "x": 70,
+          "y": 70
+        },
+        {
+          "day": 191,
+          "type": "gatherer",
+          "id": 34,
+          "x": 60,
+          "y": 71
+        },
+        {
+          "day": 419,
+          "type": "gatherer",
+          "id": 44,
+          "x": 57,
+          "y": 71
+        }
+      ],
+      "descendantBirthDays": [],
+      "deathEvents": [
+        {
+          "day": 522,
+          "reason": "饿死",
+          "count": 12
+        },
+        {
+          "day": 526,
+          "reason": "饿死",
+          "count": 13
+        },
+        {
+          "day": 530,
+          "reason": "饿死",
+          "count": 3
+        }
+      ]
+    }
+  ],
+  "checks": [
+    {
+      "name": "seed41 intervention reaches 30 years with descendant births and school/mine",
+      "pass": true
+    },
+    {
+      "name": "seed41 intervention has no preventable deaths, hunger or tool exhaustion",
+      "pass": true
+    }
+  ]
+}

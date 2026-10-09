@@ -1,0 +1,562 @@
+{
+  "years": 5,
+  "seeds": [
+    49,
+    50,
+    51,
+    52,
+    53,
+    54,
+    55,
+    56
+  ],
+  "strategies": [
+    "adaptive-mining"
+  ],
+  "tuning": {},
+  "strategyHash": "b878b0328bc7a70c8f8aafebd04143c926ee21f764ef04ba3afbfc6c2121d206",
+  "sourceHash": "c8a976a8673400f98e0eea70a20353fcabeaf0d49d3d1362e67b77738328dca9",
+  "checks": [
+    {
+      "name": "adaptive-mining seed49: survives requested horizon",
+      "pass": true
+    },
+    {
+      "name": "adaptive-mining seed49: no first-winter deaths",
+      "pass": false
+    },
+    {
+      "name": "adaptive-mining seed49: no starvation",
+      "pass": true
+    },
+    {
+      "name": "adaptive-mining seed49: at most two cold deaths over five years",
+      "pass": true
+    },
+    {
+      "name": "adaptive-mining seed49: three food days at finish",
+      "pass": true
+    },
+    {
+      "name": "adaptive-mining seed49: tools maintained",
+      "pass": true
+    },
+    {
+      "name": "adaptive-mining seed50: survives requested horizon",
+      "pass": true
+    },
+    {
+      "name": "adaptive-mining seed50: no first-winter deaths",
+      "pass": true
+    },
+    {
+      "name": "adaptive-mining seed50: no starvation",
+      "pass": true
+    },
+    {
+      "name": "adaptive-mining seed50: at most two cold deaths over five years",
+      "pass": true
+    },
+    {
+      "name": "adaptive-mining seed50: three food days at finish",
+      "pass": true
+    },
+    {
+      "name": "adaptive-mining seed50: tools maintained",
+      "pass": true
+    },
+    {
+      "name": "adaptive-mining seed51: survives requested horizon",
+      "pass": true
+    },
+    {
+      "name": "adaptive-mining seed51: no first-winter deaths",
+      "pass": true
+    },
+    {
+      "name": "adaptive-mining seed51: no starvation",
+      "pass": true
+    },
+    {
+      "name": "adaptive-mining seed51: at most two cold deaths over five years",
+      "pass": true
+    },
+    {
+      "name": "adaptive-mining seed51: three food days at finish",
+      "pass": true
+    },
+    {
+      "name": "adaptive-mining seed51: tools maintained",
+      "pass": true
+    },
+    {
+      "name": "adaptive-mining seed52: survives requested horizon",
+      "pass": true
+    },
+    {
+      "name": "adaptive-mining seed52: no first-winter deaths",
+      "pass": true
+    },
+    {
+      "name": "adaptive-mining seed52: no starvation",
+      "pass": true
+    },
+    {
+      "name": "adaptive-mining seed52: at most two cold deaths over five years",
+      "pass": true
+    },
+    {
+      "name": "adaptive-mining seed52: three food days at finish",
+      "pass": true
+    },
+    {
+      "name": "adaptive-mining seed52: tools maintained",
+      "pass": true
+    },
+    {
+      "name": "adaptive-mining seed53: survives requested horizon",
+      "pass": true
+    },
+    {
+      "name": "adaptive-mining seed53: no first-winter deaths",
+      "pass": true
+    },
+    {
+      "name": "adaptive-mining seed53: no starvation",
+      "pass": true
+    },
+    {
+      "name": "adaptive-mining seed53: at most two cold deaths over five years",
+      "pass": true
+    },
+    {
+      "name": "adaptive-mining seed53: three food days at finish",
+      "pass": true
+    },
+    {
+      "name": "adaptive-mining seed53: tools maintained",
+      "pass": true
+    },
+    {
+      "name": "adaptive-mining seed54: survives requested horizon",
+      "pass": true
+    },
+    {
+      "name": "adaptive-mining seed54: no first-winter deaths",
+      "pass": false
+    },
+    {
+      "name": "adaptive-mining seed54: no starvation",
+      "pass": true
+    },
+    {
+      "name": "adaptive-mining seed54: at most two cold deaths over five years",
+      "pass": true
+    },
+    {
+      "name": "adaptive-mining seed54: three food days at finish",
+      "pass": true
+    },
+    {
+      "name": "adaptive-mining seed54: tools maintained",
+      "pass": true
+    },
+    {
+      "name": "adaptive-mining seed55: survives requested horizon",
+      "pass": true
+    },
+    {
+      "name": "adaptive-mining seed55: no first-winter deaths",
+      "pass": false
+    },
+    {
+      "name": "adaptive-mining seed55: no starvation",
+      "pass": true
+    },
+    {
+      "name": "adaptive-mining seed55: at most two cold deaths over five years",
+      "pass": true
+    },
+    {
+      "name": "adaptive-mining seed55: three food days at finish",
+      "pass": true
+    },
+    {
+      "name": "adaptive-mining seed55: tools maintained",
+      "pass": true
+    },
+    {
+      "name": "adaptive-mining seed56: survives requested horizon",
+      "pass": true
+    },
+    {
+      "name": "adaptive-mining seed56: no first-winter deaths",
+      "pass": true
+    },
+    {
+      "name": "adaptive-mining seed56: no starvation",
+      "pass": true
+    },
+    {
+      "name": "adaptive-mining seed56: at most two cold deaths over five years",
+      "pass": true
+    },
+    {
+      "name": "adaptive-mining seed56: three food days at finish",
+      "pass": true
+    },
+    {
+      "name": "adaptive-mining seed56: tools maintained",
+      "pass": true
+    }
+  ],
+  "evidence": "Report-only independent holdout; 45/48, three first-winter homeless child deaths retained.",
+  "results": [
+    {
+      "seed": 49,
+      "population": 20,
+      "born": 6,
+      "died": 1,
+      "causes": {
+        "冻死": 1
+      },
+      "resources": {
+        "wood": 24,
+        "stone": 36,
+        "iron": 2,
+        "tools": 30,
+        "food": 480,
+        "firewood": 86
+      },
+      "shortages": {
+        "hungryCitizenDays": 0,
+        "toolDays": 0,
+        "unheatedHomeDays": 0
+      },
+      "deaths": [
+        {
+          "day": 45,
+          "age": 9.9,
+          "reason": "冻死",
+          "hunger": 0,
+          "cold": 5.4,
+          "home": null,
+          "food": 468.8,
+          "fuel": 90,
+          "wood": 22
+        }
+      ],
+      "buildLog": [
+        "d0:gatherer@58,68",
+        "d2:woodcutter@56,64",
+        "d4:gatherer@64,64",
+        "d17:house@54,67",
+        "d26:house@56,61",
+        "d54:house@51,64",
+        "d56:farm@58,55",
+        "d76:blacksmith@52,59",
+        "d211:gatherer@59,65"
+      ]
+    },
+    {
+      "seed": 50,
+      "population": 23,
+      "born": 8,
+      "died": 0,
+      "causes": {},
+      "resources": {
+        "wood": 48,
+        "stone": 36,
+        "iron": 2,
+        "tools": 31,
+        "food": 285.1,
+        "firewood": 80
+      },
+      "shortages": {
+        "hungryCitizenDays": 0,
+        "toolDays": 0,
+        "unheatedHomeDays": 0
+      },
+      "deaths": [],
+      "buildLog": [
+        "d0:gatherer@56,64",
+        "d1:woodcutter@51,64",
+        "d3:gatherer@56,61",
+        "d16:house@54,67",
+        "d22:house@52,67",
+        "d28:house@56,67",
+        "d48:farm@44,56",
+        "d72:blacksmith@52,59",
+        "d191:gatherer@61,65"
+      ]
+    },
+    {
+      "seed": 51,
+      "population": 23,
+      "born": 8,
+      "died": 0,
+      "causes": {},
+      "resources": {
+        "wood": 28,
+        "stone": 48,
+        "iron": 1,
+        "tools": 30,
+        "food": 446.1,
+        "firewood": 104
+      },
+      "shortages": {
+        "hungryCitizenDays": 0,
+        "toolDays": 0,
+        "unheatedHomeDays": 0
+      },
+      "deaths": [],
+      "buildLog": [
+        "d0:gatherer@61,42",
+        "d1:woodcutter@66,42",
+        "d3:gatherer@61,38",
+        "d16:house@64,45",
+        "d22:house@66,39",
+        "d29:house@66,45",
+        "d48:farm@68,38",
+        "d74:blacksmith@69,46",
+        "d197:house@64,48",
+        "d212:gatherer@62,48"
+      ]
+    },
+    {
+      "seed": 52,
+      "population": 21,
+      "born": 6,
+      "died": 0,
+      "causes": {},
+      "resources": {
+        "wood": 42,
+        "stone": 36,
+        "iron": 2,
+        "tools": 31,
+        "food": 361.3,
+        "firewood": 86
+      },
+      "shortages": {
+        "hungryCitizenDays": 0,
+        "toolDays": 0,
+        "unheatedHomeDays": 0
+      },
+      "deaths": [],
+      "buildLog": [
+        "d0:gatherer@54,57",
+        "d1:woodcutter@59,57",
+        "d3:gatherer@57,60",
+        "d16:house@59,54",
+        "d23:house@59,60",
+        "d29:house@61,57",
+        "d48:farm@58,46",
+        "d74:blacksmith@62,60",
+        "d200:gatherer@57,63"
+      ]
+    },
+    {
+      "seed": 53,
+      "population": 22,
+      "born": 7,
+      "died": 0,
+      "causes": {},
+      "resources": {
+        "wood": 40,
+        "stone": 36,
+        "iron": 1,
+        "tools": 31,
+        "food": 448.2,
+        "firewood": 86
+      },
+      "shortages": {
+        "hungryCitizenDays": 0,
+        "toolDays": 0,
+        "unheatedHomeDays": 0
+      },
+      "deaths": [],
+      "buildLog": [
+        "d0:gatherer@54,67",
+        "d2:woodcutter@52,64",
+        "d4:gatherer@53,70",
+        "d6:house@47,64",
+        "d21:house@50,67",
+        "d27:house@48,67",
+        "d48:farm@40,66",
+        "d72:blacksmith@54,61",
+        "d166:gatherer@50,70"
+      ]
+    },
+    {
+      "seed": 54,
+      "population": 17,
+      "born": 3,
+      "died": 1,
+      "causes": {
+        "冻死": 1
+      },
+      "resources": {
+        "wood": 50,
+        "stone": 40,
+        "iron": 2,
+        "tools": 30,
+        "food": 396.3,
+        "firewood": 98
+      },
+      "shortages": {
+        "hungryCitizenDays": 0,
+        "toolDays": 0,
+        "unheatedHomeDays": 0
+      },
+      "deaths": [
+        {
+          "day": 45,
+          "age": 2.9,
+          "reason": "冻死",
+          "hunger": 0,
+          "cold": 5.4,
+          "home": null,
+          "food": 467.5,
+          "fuel": 90,
+          "wood": 14
+        }
+      ],
+      "buildLog": [
+        "d0:gatherer@68,51",
+        "d1:woodcutter@74,56",
+        "d3:gatherer@66,52",
+        "d19:house@69,56",
+        "d28:house@72,59",
+        "d54:house@74,53",
+        "d55:farm@61,54",
+        "d78:blacksmith@69,59",
+        "d211:house@74,59"
+      ]
+    },
+    {
+      "seed": 55,
+      "population": 18,
+      "born": 4,
+      "died": 1,
+      "causes": {
+        "冻死": 1
+      },
+      "resources": {
+        "wood": 0,
+        "stone": 36,
+        "iron": 1,
+        "tools": 30,
+        "food": 382,
+        "firewood": 50
+      },
+      "shortages": {
+        "hungryCitizenDays": 0,
+        "toolDays": 0,
+        "unheatedHomeDays": 0
+      },
+      "deaths": [
+        {
+          "day": 45,
+          "age": 7.9,
+          "reason": "冻死",
+          "hunger": 0,
+          "cold": 5.4,
+          "home": null,
+          "food": 419.3,
+          "fuel": 90,
+          "wood": 10
+        }
+      ],
+      "buildLog": [
+        "d0:gatherer@64,61",
+        "d1:woodcutter@66,58",
+        "d3:gatherer@62,61",
+        "d21:house@61,58",
+        "d31:house@66,55",
+        "d55:house@63,54",
+        "d58:farm@53,56",
+        "d84:blacksmith@69,56",
+        "d213:gatherer@67,62"
+      ]
+    },
+    {
+      "seed": 56,
+      "population": 22,
+      "born": 7,
+      "died": 0,
+      "causes": {},
+      "resources": {
+        "wood": 42,
+        "stone": 48,
+        "iron": 22,
+        "tools": 30,
+        "food": 365,
+        "firewood": 104
+      },
+      "shortages": {
+        "hungryCitizenDays": 0,
+        "toolDays": 0,
+        "unheatedHomeDays": 0
+      },
+      "deaths": [],
+      "buildLog": [
+        "d0:gatherer@67,66",
+        "d1:woodcutter@62,66",
+        "d3:gatherer@65,69",
+        "d17:house@64,62",
+        "d24:house@60,67",
+        "d31:house@60,63",
+        "d48:farm@56,55",
+        "d75:blacksmith@70,71",
+        "d196:gatherer@58,70",
+        "d211:house@68,60"
+      ]
+    }
+  ],
+  "candidateRecovery": {
+    "strategyHash": "d6ded4bcf9490e5dd971f756db4cb77478382c997042d84592064c9110c3e197",
+    "testSourceHash": "39654a1b83be608d894fb24ea9dab6ea7e90560385ca1765ef83c72b6fe3fb64",
+    "checks": [
+      {
+        "name": "seed41 intervention reaches 30 years with descendant births and school/mine",
+        "pass": true
+      },
+      {
+        "name": "seed41 intervention has no preventable deaths, hunger or tool exhaustion",
+        "pass": true
+      }
+    ],
+    "result": {
+      "sourceHash": "c8a976a8673400f98e0eea70a20353fcabeaf0d49d3d1362e67b77738328dca9",
+      "scenario": "early-warehouse",
+      "final": {
+        "day": 1440,
+        "hour": 6,
+        "population": 36,
+        "adults": 33,
+        "resources": {
+          "wood": 238,
+          "stone": 1500,
+          "iron": 1500,
+          "tools": 41,
+          "food": 1330,
+          "firewood": 84
+        },
+        "foodCapacity": 1500,
+        "foodDays": 17.733,
+        "completedHomes": 8,
+        "emptyHomes": 0,
+        "homelessFamilies": 0
+      },
+      "births": 21,
+      "secondGenerationBorn": 3,
+      "deaths": 0,
+      "causes": {},
+      "shortages": {
+        "hungryCitizenDays": 0,
+        "toolDays": 0,
+        "unheatedHomeDays": 24
+      }
+    }
+  }
+}
