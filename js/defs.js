@@ -50,7 +50,7 @@ G.BDEF = {
     id: 'blacksmith', name: '铁匠铺', icon: '⚒️', w: 3, h: 3,
     cost: { wood: 42, stone: 24 }, buildWork: 120, jobs: 1, passable: false,
     wall: '#7a5a45', wallD: '#5c4334', roof: '#6b4a3a',
-    desc: '原版 Blacksmith 成本 42木+24石，1 名工人。1 铁+2 木打 2 件工具（受教育 3 件）。工具是市民干活的饭碗：每人每天磨损一点，约 2.5 年用坏一件；工具用尽时生产减半。',
+    desc: '原版 Blacksmith 成本 42木+24石，1 名工人。1 铁+2 木打 2 件工具（受教育 3 件）。工具是市民干活的饭碗：每人每天磨损一点，约 2.5 年用坏一件；工具用尽时生产减半。默认备30件，达到工具上限即停工，避免把过冬木材全打成工具。',
   },
   gatherer: {
     id: 'gatherer', name: '采集小屋', icon: '🧺', w: 2, h: 2,
@@ -114,10 +114,10 @@ G.PROD = {
   // minMature：圈内成熟树低于下限即停砍育林（防清穿森林、拖垮同址采集小屋）
   forester:  { workH: 8, logsYield: 2, eduLogsYield: 3, plantH: 3, radius: 16, minMature: 15 },
   woodcutter: { workH: 7, logsIn: 2, firewoodOut: 6, eduFirewoodPerLog: 4,
-    fuelLimit: 200, fuelStep: 50, fuelMax: 2000 }, // 燃料上限（原版 Fuel Limit）：柴火库存达到上限即停产；默认 200 ≈ 6~7 栋木屋一年取暖量
+    fuelLimit: 100, fuelStep: 50, fuelMax: 2000 }, // 燃料上限（原版 Fuel Limit）：柴火库存达到上限即停产；默认 100 ≈ 3 栋木屋一年取暖量，扩张后按面板需求提高，避免开局过量劈柴挤掉住房木材
   dock:      { workH: 5, yield: { type: 'food', qty: 4 }, waterR: 10, fullWater: 40 },
   mine:      { workH: 9, yield: 3, ironEvery: 5 }, // 每 5 趟 1 趟铁，其余采石（深井矿脉不枯竭）
-  blacksmith: { workH: 8, consume: [{ type: 'iron', qty: 1 }, { type: 'wood', qty: 2 }], toolsOut: 2, eduToolsOut: 3 }, // 1铁+2木→2工具（受教育 3）
+  blacksmith: { toolLimit: 30, toolMax: 500, workH: 8, consume: [{ type: 'iron', qty: 1 }, { type: 'wood', qty: 2 }], toolsOut: 2, eduToolsOut: 3 }, // 1铁+2木→2工具（受教育 3）
   hunting:   { workH: 5, yield: 5, radius: 12, needTrees: 10, fullForest: 20 }, // 狩猎依赖成熟林（鹿群栖息地），猎物随森林再生
   // perTile 14/格：原版 7/格但田块可放大到 15×15，本作固定 8×8，翻倍对齐原版人均产出；
   // haulCap 28：收获攒满 4 格再送一趟仓，否则 64 趟搬运会把秋收窗口耗在走路 上
