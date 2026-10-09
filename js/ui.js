@@ -7,6 +7,62 @@ G.ui = {
   el: {},
   infoT: 0,
 
+  // Read-only estimate at the current occupancy. endDay has already charged the
+  // current winter day, so only later daily deductions belong in futureWinter.
+  // Keep demand unrounded for stock comparisons; only displayed totals round up.
+  heatDemand: function () {
+    const g = G.game, w = G.world;
+    const fullWinter = w.buildings.reduce((n, b) =>
+      n + (G.isOccupiedHome(w, b) ? G.BDEF[b.type].warmWoodPerYear : 0), 0);
+    const winter = g.season === 3;
+    const futureDays = winter ? Math.max(0, G.SEASON_DAYS - 1 - g.day % G.SEASON_DAYS) : G.SEASON_DAYS;
+    return { fullWinter, winter, futureDays, futureWinter: fullWinter * futureDays / G.SEASON_DAYS };
+  },
+
+  heatDemandText: function (heat) {
+    return `当前已入住住房：整冬约需 ${heat.fullWinter} 柴火` +
+      (heat.winter ? `；本冬此后约需 ${Math.ceil(heat.futureWinter)}（还剩 ${heat.futureDays} 次扣除）` : '');
+  },
+
+  fuelInfoData: function (b) {
+    const heat = this.heatDemand(), stock = G.game.res.firewood;
+    const need = heat.winter ? heat.futureWinter : heat.fullWinter;
+    let status;
+    if (b.state === 'site') {
+      const trees = G.siteTrees ? G.siteTrees(b).length : 0;
+      status = trees ? `清理工地：还需砍 ${trees} 棵树（工人搬运入仓）` : `建造中 ${Math.floor(b.progress * 100)}%`;
+    } else if (G.fuelLimited(b)) status = '本屋暂停新批次：柴火库存已达本屋目标';
+    else if (!G.jobCanProduce(b)) status = '本屋暂无新批次：缺原木';
+    // A previous limit warning can outlive its cutoff after fuel is used up.
+    else if (b.warnText !== '柴火已达上限' && (b.noWork || (b.warnText && !b.workers.length)))
+      status = `停工：${b.warnText || '无法工作'}`;
+    else status = b.workers.length ? '运作中' : '等待可用工人';
+    return {
+      target: `本屋燃料目标：${G.fuelLimitOf(b)}`,
+      stock: `全镇库存：柴火 ${Math.floor(stock)} · 原木 ${Math.floor(G.game.res.wood)}`,
+      heat: this.heatDemandText(heat),
+      gap: stock < need ? `柴火库存比${heat.winter ? '本冬后续' : '整冬'}取暖估算少约 ${Math.ceil(need - stock)}。` : '取暖估算会随住房入住情况变化。',
+      status,
+      workers: b.workers.map(id => G.world.cmap[id]).filter(Boolean).map(c => c.name).join('、') ||
+        (b.state === 'site' ? '等待建筑工人' : '无'),
+      refund: b.state === 'site' && !b.constructionStarted && b.progress === 0 && b.workLeft >= b.totalWork
+        ? '未开工：取消退还全部已付建材，保留树木' : '已开工：拆除退还一半已付建材，已砍树不恢复',
+    };
+  },
+
+  refreshFuelInfo: function (b) {
+    const el = this.el.info;
+    if (!el.querySelector) return false; // Existing minimal DOM fixtures.
+    const data = this.fuelInfoData(b), nodes = {};
+    for (const key of Object.keys(data)) {
+      nodes[key] = el.querySelector(`[data-fuel="${key}"]`);
+      if (!nodes[key]) return false;
+    }
+    for (const key of Object.keys(data))
+      if (nodes[key].textContent !== data[key]) nodes[key].textContent = data[key];
+    return true;
+  },
+
   init: function () {
     const $ = (id) => document.getElementById(id);
     this.el = {
@@ -192,8 +248,7 @@ G.ui = {
           if (adults) el.title += ` · 当前成人约可用 ${Math.floor(g.res.tools * G.LIFE.toolLifeDays / adults)} 天；铁匠需木材与铁矿`;
         }
         if (k === 'firewood') {
-          const need = G.world.buildings.reduce((n, b) => n + (G.isOccupiedHome(G.world, b) ? G.BDEF[b.type].warmWoodPerYear : 0), 0);
-          el.title += ` · 已入住住房整冬需 ${need}`;
+          el.title += ` · ${this.heatDemandText(this.heatDemand())}`;
         }
       }
     }
@@ -228,8 +283,8 @@ G.ui = {
     const food = w.buildings.some(b => ['gatherer', 'dock'].includes(b.type) && b.state === 'ok');
     const fuel = w.buildings.some(b => b.type === 'woodcutter' && b.state === 'ok');
     const homeless = w.families.filter(f => f.members.length && f.houseId == null).length;
-    const warmNeed = w.buildings.reduce((n,b) => n + (G.isOccupiedHome(w,b) ? G.BDEF[b.type].warmWoodPerYear : 0), 0);
-    const remainingHeat = g.season === 3 ? Math.ceil(warmNeed * Math.max(0, G.SEASON_DAYS - 1 - g.day % G.SEASON_DAYS) / G.SEASON_DAYS) : warmNeed;
+    const heat = this.heatDemand();
+    const remainingHeat = heat.winter ? heat.futureWinter : heat.fullWinter;
     const risks = [];
     const harvest = G.harvestFeedback();
     if (g.res.wood < 2) {
@@ -237,7 +292,7 @@ G.ui = {
       else if (harvest.trees) risks.push(`木材库存耗尽：${harvest.trees} 棵已标记，查看采运进度；砍倒后仍需送仓。`);
       else risks.push('木材耗尽：向更远可达森林标记砍伐，后续护林补种；避开食物林。');
     }
-    if (g.season >= 2 && g.res.firewood < remainingHeat) risks.push(`柴火不足：现有 ${Math.floor(g.res.firewood)} / 本冬剩余约 ${remainingHeat}，伐木屋需原木。`);
+    if (g.season >= 2 && g.res.firewood < remainingHeat) risks.push(`柴火不足：现有 ${Math.floor(g.res.firewood)} / ${heat.winter ? '本冬此后' : '整冬'}约需 ${Math.ceil(remainingHeat)}，伐木屋需原木。`);
     const stage = !food ? '① 先保持续食物：在近仓森林建采集小屋；不要先连盖五屋耗尽木石。'
       : !fuel ? '② 近仓建伐木屋备柴；在食物林外标记砍伐和矿石，保留散工。'
       : homeless ? `③ 入冬前安家：还有 ${homeless} 家无房；逐步补住房和取暖柴。`
@@ -305,14 +360,24 @@ G.ui = {
     // Keep a keyboard user's active control stable across timed refreshes.
     const active = document.activeElement;
     const hadFocus = active && el.contains && el.contains(active);
-    if (hadFocus && !force) return;
+    const selected = G.sel.kind === 'b' ? w.bmap[G.sel.id] : w.cmap[G.sel.id];
+    if (!selected) { this.hideInfo(); return; }
+    const sameSelection = this._infoWorld === w && this._infoSelection === selected;
+    // Update only fuel text, never replace this panel's focused buttons. A new
+    // selection or a site finishing construction still gets its own full panel.
+    if (sameSelection && selected.type === 'woodcutter' && this._fuelInfoState === selected.state && this.refreshFuelInfo(selected)) return;
+    if (hadFocus && !force && sameSelection && selected.type !== 'woodcutter') return;
     const focusSelector = hadFocus ? (active.id ? '#' + active.id : active.dataset.tl ? '[data-tl="' + active.dataset.tl + '"]' : active.dataset.fl ? '[data-fl="' + active.dataset.fl + '"]' : active.dataset.k ? '[data-k="' + active.dataset.k + '"]' : null) : null;
+    this._infoWorld = w;
+    this._infoSelection = selected;
     if (G.sel.kind === 'b') {
       const b = w.bmap[G.sel.id];
       if (!b) { this.hideInfo(); return; }
       const def = G.BDEF[b.type];
+      const fuelData = b.type === 'woodcutter' ? this.fuelInfoData(b) : null;
       let status;
-      if (b.state === 'site') {
+      if (fuelData) status = fuelData.status;
+      else if (b.state === 'site') {
         const trees = G.siteTrees ? G.siteTrees(b).length : 0;
         status = trees ? `清理工地：还需砍 ${trees} 棵树（工人搬运入仓）` : `建造中 ${Math.floor(b.progress * 100)}%`;
       }
@@ -320,8 +385,6 @@ G.ui = {
       else if (b.type === 'boarding') status = `入住 ${G.boardingFamilies(w, b).length} / ${G.LIFE.boardingCap} 家`;
       else if (b.type === 'farm') {
         status = !b.sownAll ? '待播种（春）' : b.growth < 1 ? `生长中 ${Math.floor(b.growth * 100)}%` : (b.harvestDone ? '已收获' : '待收获（秋）');
-      } else if (b.type === 'woodcutter' && G.fuelLimited(b)) {
-        status = '停工：柴火已达上限';
       } else if (G.toolLimited(b)) {
         status = '工具已达上限，暂停生产';
       } else if (def.jobs > 0 && !G.jobCanProduce(b)) {
@@ -330,7 +393,7 @@ G.ui = {
       let workers = '';
       if (def.jobs > 0 || b.state === 'site') {
         const names = b.workers.map(id => w.cmap[id]).filter(Boolean).map(c => this.escHtml(c.name)).join('、');
-        workers = `<div class="row">工人：<span>${names || (b.state === 'site' ? '等待建筑工人' : '无')}</span></div>`;
+        workers = `<div class="row">工人：<span${fuelData ? ' data-fuel="workers"' : ''}>${names || (b.state === 'site' ? '等待建筑工人' : '无')}</span></div>`;
       }
       let extra = '';
       if ((b.type === 'house' || b.type === 'stonehouse') && b.family != null) {
@@ -347,12 +410,17 @@ G.ui = {
           <button class="mini-tog${b.doPlant ? '' : ' off'}" data-k="doPlant">补种：${b.doPlant ? '开' : '关'}</button>
         </div>`;
       }
-      if (b.type === 'woodcutter') { // 燃料上限（原版 Fuel Limit）：柴火库存达到上限即停产
+      if (fuelData) { // Per-building stock cutoff, independent of heating demand.
+        const step = G.PROD.woodcutter.fuelStep;
         extra = `<div class="row tog-row">
-          <span>燃料上限：<b>${G.fuelLimitOf(b)}</b>（库存 ${Math.floor(G.game.res.firewood)}）</span>
-          <button class="mini-tog" data-fl="-50" title="降低上限 50">−</button>
-          <button class="mini-tog" data-fl="50" title="提高上限 50">＋</button>
-        </div>`;
+          <span data-fuel="target">${fuelData.target}</span>
+          <button class="mini-tog" data-fl="${-step}" title="降低本屋目标 ${step}" aria-label="降低本屋燃料目标 ${step}">−</button>
+          <button class="mini-tog" data-fl="${step}" title="提高本屋目标 ${step}" aria-label="提高本屋燃料目标 ${step}">＋</button>
+        </div>
+        <div class="row" data-fuel="stock">${fuelData.stock}</div>
+        <div class="row" data-fuel="heat">${fuelData.heat}</div>
+        <div class="row" data-fuel="gap">${fuelData.gap}</div>
+        <div class="row desc">目标不是取暖需求。库存达到目标只阻止本屋接新批次；调低可给建设留木，但不会预留建材。已接批次仍可能耗木，其他伐木屋按各自目标继续。住房变化和户外受冻仍须留意。</div>`;
       }
       if (b.type === 'blacksmith') {
         extra = `<div class="row tog-row">
@@ -371,11 +439,12 @@ G.ui = {
       }
       el.innerHTML = `
         <div class="info-head"><span>${def.icon} ${def.name}</span><button id="info-close">✕</button></div>
-        <div class="row">${this.escHtml(status)}</div>
+        <div class="row"${fuelData ? ' data-fuel="status"' : ''}>${this.escHtml(status)}</div>
         ${workers}${extra}
         <div class="row desc">${def.desc}</div>
-        <div class="row desc">${b.state === 'site' && !b.constructionStarted && b.progress === 0 && b.workLeft >= b.totalWork ? '未开工：取消退还全部已付建材，保留树木' : '已开工：拆除退还一半已付建材，已砍树不恢复'}</div>
+        <div class="row desc"${fuelData ? ' data-fuel="refund"' : ''}>${fuelData ? fuelData.refund : b.state === 'site' && !b.constructionStarted && b.progress === 0 && b.workLeft >= b.totalWork ? '未开工：取消退还全部已付建材，保留树木' : '已开工：拆除退还一半已付建材，已砍树不恢复'}</div>
         <button id="info-demolish" class="danger">${b.state === 'site' ? '取消工地' : '拆除'}</button>`;
+      if (fuelData) this._fuelInfoState = b.state;
     } else {
       const c = w.cmap[G.sel.id];
       if (!c) { this.hideInfo(); return; }
@@ -398,6 +467,7 @@ G.ui = {
     }
     document.getElementById('info-close').addEventListener('click', () => this.hideInfo());
     el.querySelectorAll('.mini-tog').forEach(btn => btn.addEventListener('click', () => {
+      if (!G.sel || G.sel.kind !== 'b' || G.world !== w || w.bmap[G.sel.id] !== selected) return;
       const bb = w.bmap[G.sel.id];
       if (!bb) return;
       if (btn.dataset.tl) {

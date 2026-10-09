@@ -1,0 +1,358 @@
+{
+  "title": "First-winter ordinary-action counterfactuals; results grouped by requested years, then scenario",
+  "testedMain": "742da7a",
+  "localEquivalentCommit": "fddbea1",
+  "tree": "e3d171e80ca1b823d17c55e14ccb825ae861f272",
+  "simulationSourceHash": "98f1d0e13200388daf3a0566794ba957f0fa00d951738af2a74f96f42295303d",
+  "historicalFrozenProbeHash": "1fc89b461cccca3e476f6531e76edc28d93f4a4a6dd2998cb5f1f6eda9553433",
+  "ordinaryPolicySourceHash": "6c45afb95cfcdbc6b7ca07a80884b29d8c596b8b89e8e6b758f79667b5f15c1d",
+  "portableDeliveryHash": "1dc0b3bfd180160fc8ec7b10066bf29aba63111439468e45291ded25ca96db66",
+  "provenance": "63 historical runs use historicalFrozenProbeHash. Portable delivery is a distinct file, replayed separately on seed49 for all five first-year scenarios with identical states/actions/daily snapshots. No other historical run is attributed to portableDeliveryHash.",
+  "policyHashes": {
+    "baseline": "da1e08551d35d6eb33c53e17b5413a998d1b6e5cc2a19d82ff4ffc9506ffa111",
+    "house16": "41f2f1bad3c9b253f22287cb08401ef4caab9afcdf85bb73ea77170297a9210a",
+    "fuel50-until-housed": "7349494bda59b6602d34e4fa2e0c9b36aa8c6f0cb0bb32419b0839728920d62d",
+    "fuel0-first-year": "80e4f9a4b1768d8b558483129bf5c056651fe22385a7bc643ac815ef43559083",
+    "cancel-for-stone": "da1e08551d35d6eb33c53e17b5413a998d1b6e5cc2a19d82ff4ffc9506ffa111"
+  },
+  "interventions": {
+    "baseline": "Unmodified sustainable strategy with adaptive-mining variant, same half-day decisions and half-hour simulation.",
+    "house16": "Only the first-three-houses order threshold changes from 22 logs to the actual 16-log cost; all actual costs/work/transport remain.",
+    "fuel50-until-housed": "Target 50 before day36 while fewer than three houses are ordered; restore ordinary target once three are ordered or day36 begins. Construction is still ordinary.",
+    "fuel0-first-year": "Negative control: fuel target0 from the opening through day47, including the entire first winter; restore ordinary target from day48. Initial 50 firewood is unchanged.",
+    "cancel-for-stone": "Once only, d12–35, if an unhoused child exists, wood>=16, stone<8, and tree marks exist: cancel all tree marks and mark the nearest two path-verified stone deposits. All other ordinary rules remain."
+  },
+  "constraints": "No tracked-file edits, resource gifts, yield/cold/hunger/timing changes, manual worker assignments, instant buildings, or script replacement in the repository. Browser interaction and visual enjoyment are untested.",
+  "interpretation": [
+    "First-winter recovery is not a long-term safe strategy. Five-year failures and unchanged failure controls are deliberately retained.",
+    "Earlier housing changes later births, random draws and construction routes, so do not assume equal action dates or attribute every later failure to one target value.",
+    "Seeds49/54/55 baseline deaths are homeless-child exposure with positive firewood and zero unheated-home-days. They do not establish a missing housing control or universal housing-assignment defect.",
+    "The cancellation result proves a conditional material reallocation, not a blanket cancel-all-orders cure.",
+    "Historical playability/long_economy policies and their existing reports are unchanged."
+  ],
+  "keyEvidence": {
+    "cancellationSeed49": [
+      {
+        "before": {
+          "day": 33,
+          "hour": 6.5,
+          "population": 15,
+          "resources": {
+            "wood": 18,
+            "stone": 0,
+            "iron": 0,
+            "tools": 13,
+            "food": 458.8,
+            "firewood": 104
+          },
+          "foodDays": 14.68,
+          "unhousedChildren": 1,
+          "occupiedAnnualHeat": 60,
+          "marks": {
+            "trees": 4,
+            "rocks": 0
+          }
+        },
+        "action": "Cancel all tree marks; mark two reachable stone deposits",
+        "result": {
+          "marks": 4,
+          "active": 2,
+          "paused": 0
+        },
+        "chosen": [
+          {
+            "x": 52,
+            "y": 66,
+            "d": 8
+          },
+          {
+            "x": 51,
+            "y": 65,
+            "d": 10
+          }
+        ],
+        "afterMarks": {
+          "trees": 0,
+          "rocks": 2
+        }
+      }
+    ],
+    "fuelTargetSeed49": [
+      {
+        "from": 100,
+        "to": 50,
+        "before": {
+          "day": 3,
+          "hour": 6.5,
+          "population": 15,
+          "resources": {
+            "wood": 42,
+            "stone": 28,
+            "iron": 0,
+            "tools": 15,
+            "food": 426.3,
+            "firewood": 50
+          },
+          "foodDays": 13.64,
+          "unhousedChildren": 5,
+          "occupiedAnnualHeat": 0,
+          "marks": {
+            "trees": 4,
+            "rocks": 0
+          }
+        }
+      },
+      {
+        "from": 50,
+        "to": 100,
+        "before": {
+          "day": 27,
+          "hour": 6.5,
+          "population": 15,
+          "resources": {
+            "wood": 12,
+            "stone": 12,
+            "iron": 0,
+            "tools": 13,
+            "food": 446.3,
+            "firewood": 50
+          },
+          "foodDays": 14.28,
+          "unhousedChildren": 1,
+          "occupiedAnnualHeat": 60,
+          "marks": {
+            "trees": 0,
+            "rocks": 2
+          }
+        }
+      }
+    ]
+  },
+  "unchangedFailureControls": [
+    {
+      "seed": 5,
+      "strategy": "neglect",
+      "day": 20,
+      "population": 0,
+      "died": 15,
+      "causes": {
+        "饿死": 15
+      },
+      "resources": {
+        "wood": 80,
+        "stone": 48,
+        "iron": 0,
+        "tools": 14,
+        "food": 0,
+        "firewood": 50
+      },
+      "shortages": {
+        "hungryCitizenDays": 45,
+        "toolDays": 0,
+        "unheatedHomeDays": 0
+      }
+    },
+    {
+      "seed": 49,
+      "strategy": "neglect",
+      "day": 20,
+      "population": 0,
+      "died": 15,
+      "causes": {
+        "饿死": 15
+      },
+      "resources": {
+        "wood": 80,
+        "stone": 48,
+        "iron": 0,
+        "tools": 14,
+        "food": 0,
+        "firewood": 50
+      },
+      "shortages": {
+        "hungryCitizenDays": 45,
+        "toolDays": 0,
+        "unheatedHomeDays": 0
+      }
+    },
+    {
+      "seed": 55,
+      "strategy": "neglect",
+      "day": 20,
+      "population": 0,
+      "died": 15,
+      "causes": {
+        "饿死": 15
+      },
+      "resources": {
+        "wood": 80,
+        "stone": 48,
+        "iron": 0,
+        "tools": 14,
+        "food": 0,
+        "firewood": 50
+      },
+      "shortages": {
+        "hungryCitizenDays": 45,
+        "toolDays": 0,
+        "unheatedHomeDays": 0
+      }
+    },
+    {
+      "seed": 5,
+      "strategy": "no-fuel",
+      "day": 96,
+      "population": 10,
+      "died": 8,
+      "causes": {
+        "冻死": 8
+      },
+      "resources": {
+        "wood": 26,
+        "stone": 40,
+        "iron": 9,
+        "tools": 29,
+        "food": 347.3,
+        "firewood": 0
+      },
+      "shortages": {
+        "hungryCitizenDays": 0,
+        "toolDays": 0,
+        "unheatedHomeDays": 76
+      }
+    },
+    {
+      "seed": 49,
+      "strategy": "no-fuel",
+      "day": 96,
+      "population": 11,
+      "died": 7,
+      "causes": {
+        "冻死": 7
+      },
+      "resources": {
+        "wood": 34,
+        "stone": 44,
+        "iron": 8,
+        "tools": 31,
+        "food": 415.4,
+        "firewood": 0
+      },
+      "shortages": {
+        "hungryCitizenDays": 0,
+        "toolDays": 0,
+        "unheatedHomeDays": 52
+      }
+    },
+    {
+      "seed": 55,
+      "strategy": "no-fuel",
+      "day": 96,
+      "population": 11,
+      "died": 5,
+      "causes": {
+        "冻死": 5
+      },
+      "resources": {
+        "wood": 26,
+        "stone": 28,
+        "iron": 8,
+        "tools": 31,
+        "food": 427.3,
+        "firewood": 0
+      },
+      "shortages": {
+        "hungryCitizenDays": 0,
+        "toolDays": 0,
+        "unheatedHomeDays": 64
+      }
+    }
+  ],
+  "resultsByYearsAndScenario": {
+    "1": {
+      "baseline": [
+        {"seed":5,"endDay":48,"population":15,"resources":{"wood":2,"stone":12,"iron":0,"tools":11,"food":466.3,"firewood":68},"deaths":{},"shortages":{"hungryCitizenDays":0,"toolDays":0,"coldHouseDays":0},"houseCompletionDays":[19,25,33]},
+        {"seed":21,"endDay":48,"population":15,"resources":{"wood":2,"stone":12,"iron":0,"tools":11,"food":473.8,"firewood":79},"deaths":{},"shortages":{"hungryCitizenDays":0,"toolDays":0,"coldHouseDays":0},"houseCompletionDays":[19,27,37]},
+        {"seed":40,"endDay":48,"population":15,"resources":{"wood":2,"stone":12,"iron":0,"tools":11,"food":421.3,"firewood":77},"deaths":{},"shortages":{"hungryCitizenDays":0,"toolDays":0,"coldHouseDays":0},"houseCompletionDays":[21,29,41]},
+        {"seed":41,"endDay":48,"population":15,"resources":{"wood":14,"stone":32,"iron":0,"tools":11,"food":471.3,"firewood":68},"deaths":{},"shortages":{"hungryCitizenDays":0,"toolDays":0,"coldHouseDays":0},"houseCompletionDays":[16,25,31]},
+        {"seed":49,"endDay":48,"population":14,"resources":{"wood":22,"stone":0,"iron":0,"tools":11,"food":486.3,"firewood":98},"deaths":{"冻死":1},"deathDayRange":[45,45],"shortages":{"hungryCitizenDays":0,"toolDays":0,"coldHouseDays":0},"houseCompletionDays":[19,27]},
+        {"seed":54,"endDay":48,"population":14,"resources":{"wood":14,"stone":20,"iron":0,"tools":11,"food":485.8,"firewood":98},"deaths":{"冻死":1},"deathDayRange":[45,45],"shortages":{"hungryCitizenDays":0,"toolDays":0,"coldHouseDays":0},"houseCompletionDays":[21,30]},
+        {"seed":55,"endDay":48,"population":14,"resources":{"wood":8,"stone":20,"iron":0,"tools":11,"food":427.8,"firewood":98},"deaths":{"冻死":1},"deathDayRange":[45,45],"shortages":{"hungryCitizenDays":0,"toolDays":0,"coldHouseDays":0},"houseCompletionDays":[22,32]}
+      ],
+      "house16": [
+        {"seed":5,"endDay":48,"population":16,"resources":{"wood":2,"stone":12,"iron":0,"tools":11,"food":450,"firewood":80},"deaths":{},"shortages":{"hungryCitizenDays":0,"toolDays":0,"coldHouseDays":0},"houseCompletionDays":[17,22,31]},
+        {"seed":21,"endDay":48,"population":15,"resources":{"wood":2,"stone":12,"iron":0,"tools":11,"food":468.8,"firewood":68},"deaths":{},"shortages":{"hungryCitizenDays":0,"toolDays":0,"coldHouseDays":0},"houseCompletionDays":[17,24,34]},
+        {"seed":40,"endDay":48,"population":15,"resources":{"wood":2,"stone":12,"iron":0,"tools":11,"food":442.5,"firewood":52.5},"deaths":{},"shortages":{"hungryCitizenDays":0,"toolDays":0,"coldHouseDays":0},"houseCompletionDays":[18,26,36]},
+        {"seed":41,"endDay":48,"population":15,"resources":{"wood":16,"stone":52,"iron":0,"tools":11,"food":457.5,"firewood":80},"deaths":{},"shortages":{"hungryCitizenDays":0,"toolDays":0,"coldHouseDays":0},"houseCompletionDays":[14,20,25]},
+        {"seed":49,"endDay":48,"population":15,"resources":{"wood":4,"stone":12,"iron":0,"tools":11,"food":415,"firewood":89},"deaths":{},"shortages":{"hungryCitizenDays":0,"toolDays":0,"coldHouseDays":0},"houseCompletionDays":[16,24,41]},
+        {"seed":54,"endDay":48,"population":16,"resources":{"wood":2,"stone":12,"iron":0,"tools":11,"food":443.3,"firewood":74},"deaths":{},"shortages":{"hungryCitizenDays":0,"toolDays":0,"coldHouseDays":0},"houseCompletionDays":[19,26,34]},
+        {"seed":55,"endDay":48,"population":16,"resources":{"wood":0,"stone":12,"iron":0,"tools":11,"food":325.3,"firewood":61},"deaths":{},"shortages":{"hungryCitizenDays":0,"toolDays":0,"coldHouseDays":0},"houseCompletionDays":[20,29,37]}
+      ],
+      "fuel50-until-housed": [
+        {"seed":5,"endDay":48,"population":15,"resources":{"wood":2,"stone":12,"iron":0,"tools":11,"food":468.8,"firewood":62},"deaths":{},"shortages":{"hungryCitizenDays":0,"toolDays":0,"coldHouseDays":0},"houseCompletionDays":[12,19,24]},
+        {"seed":21,"endDay":48,"population":16,"resources":{"wood":2,"stone":12,"iron":0,"tools":11,"food":377.1,"firewood":80},"deaths":{},"shortages":{"hungryCitizenDays":0,"toolDays":0,"coldHouseDays":0},"houseCompletionDays":[10,17,23]},
+        {"seed":40,"endDay":48,"population":15,"resources":{"wood":0,"stone":12,"iron":0,"tools":11,"food":455,"firewood":56},"deaths":{},"shortages":{"hungryCitizenDays":0,"toolDays":0,"coldHouseDays":0},"houseCompletionDays":[10,17,26]},
+        {"seed":41,"endDay":48,"population":15,"resources":{"wood":12,"stone":12,"iron":0,"tools":11,"food":395,"firewood":86},"deaths":{},"shortages":{"hungryCitizenDays":0,"toolDays":0,"coldHouseDays":0},"houseCompletionDays":[8,14,20]},
+        {"seed":49,"endDay":48,"population":16,"resources":{"wood":2,"stone":32,"iron":0,"tools":11,"food":385.8,"firewood":62},"deaths":{},"shortages":{"hungryCitizenDays":0,"toolDays":0,"coldHouseDays":0},"houseCompletionDays":[9,17,28]},
+        {"seed":54,"endDay":48,"population":15,"resources":{"wood":2,"stone":12,"iron":0,"tools":11,"food":461.3,"firewood":38},"deaths":{},"shortages":{"hungryCitizenDays":0,"toolDays":0,"coldHouseDays":0},"houseCompletionDays":[11,20,30]},
+        {"seed":55,"endDay":48,"population":16,"resources":{"wood":0,"stone":12,"iron":0,"tools":11,"food":313.8,"firewood":38},"deaths":{},"shortages":{"hungryCitizenDays":0,"toolDays":0,"coldHouseDays":0},"houseCompletionDays":[11,21,31]}
+      ],
+      "fuel0-first-year": [
+        {"seed":5,"endDay":48,"population":15,"resources":{"wood":42,"stone":52,"iron":0,"tools":11,"food":472.5,"firewood":0},"deaths":{},"shortages":{"hungryCitizenDays":0,"toolDays":0,"coldHouseDays":16},"houseCompletionDays":[12,19,24]},
+        {"seed":21,"endDay":48,"population":15,"resources":{"wood":54,"stone":32,"iron":0,"tools":11,"food":430,"firewood":0},"deaths":{},"shortages":{"hungryCitizenDays":0,"toolDays":0,"coldHouseDays":16},"houseCompletionDays":[10,17,23]},
+        {"seed":40,"endDay":48,"population":15,"resources":{"wood":42,"stone":32,"iron":0,"tools":11,"food":420,"firewood":0},"deaths":{},"shortages":{"hungryCitizenDays":0,"toolDays":0,"coldHouseDays":16},"houseCompletionDays":[10,17,26]},
+        {"seed":41,"endDay":48,"population":16,"resources":{"wood":70,"stone":32,"iron":0,"tools":11,"food":301.7,"firewood":0},"deaths":{},"shortages":{"hungryCitizenDays":0,"toolDays":0,"coldHouseDays":16},"houseCompletionDays":[8,14,20]},
+        {"seed":49,"endDay":48,"population":15,"resources":{"wood":48,"stone":32,"iron":0,"tools":11,"food":420,"firewood":0},"deaths":{},"shortages":{"hungryCitizenDays":0,"toolDays":0,"coldHouseDays":16},"houseCompletionDays":[9,17,28]},
+        {"seed":54,"endDay":48,"population":15,"resources":{"wood":40,"stone":32,"iron":0,"tools":11,"food":478.8,"firewood":0},"deaths":{},"shortages":{"hungryCitizenDays":0,"toolDays":0,"coldHouseDays":16},"houseCompletionDays":[11,20,30]},
+        {"seed":55,"endDay":48,"population":16,"resources":{"wood":32,"stone":32,"iron":0,"tools":11,"food":317.8,"firewood":0},"deaths":{},"shortages":{"hungryCitizenDays":0,"toolDays":0,"coldHouseDays":16},"houseCompletionDays":[11,21,31]}
+      ],
+      "cancel-for-stone": [
+        {"seed":5,"endDay":48,"population":15,"resources":{"wood":2,"stone":12,"iron":0,"tools":11,"food":466.3,"firewood":68},"deaths":{},"shortages":{"hungryCitizenDays":0,"toolDays":0,"coldHouseDays":0},"houseCompletionDays":[19,25,33]},
+        {"seed":21,"endDay":48,"population":15,"resources":{"wood":2,"stone":12,"iron":0,"tools":11,"food":473.8,"firewood":79},"deaths":{},"shortages":{"hungryCitizenDays":0,"toolDays":0,"coldHouseDays":0},"houseCompletionDays":[19,27,37]},
+        {"seed":40,"endDay":48,"population":15,"resources":{"wood":2,"stone":12,"iron":0,"tools":11,"food":421.3,"firewood":77},"deaths":{},"shortages":{"hungryCitizenDays":0,"toolDays":0,"coldHouseDays":0},"houseCompletionDays":[21,29,41]},
+        {"seed":41,"endDay":48,"population":15,"resources":{"wood":14,"stone":32,"iron":0,"tools":11,"food":471.3,"firewood":68},"deaths":{},"shortages":{"hungryCitizenDays":0,"toolDays":0,"coldHouseDays":0},"houseCompletionDays":[16,25,31]},
+        {"seed":49,"endDay":48,"population":15,"resources":{"wood":2,"stone":12,"iron":0,"tools":11,"food":442.5,"firewood":73},"deaths":{},"shortages":{"hungryCitizenDays":0,"toolDays":0,"coldHouseDays":0},"houseCompletionDays":[19,27,37]},
+        {"seed":54,"endDay":48,"population":14,"resources":{"wood":14,"stone":20,"iron":0,"tools":11,"food":485.8,"firewood":98},"deaths":{"冻死":1},"deathDayRange":[45,45],"shortages":{"hungryCitizenDays":0,"toolDays":0,"coldHouseDays":0},"houseCompletionDays":[21,30]},
+        {"seed":55,"endDay":48,"population":14,"resources":{"wood":8,"stone":20,"iron":0,"tools":11,"food":427.8,"firewood":98},"deaths":{"冻死":1},"deathDayRange":[45,45],"shortages":{"hungryCitizenDays":0,"toolDays":0,"coldHouseDays":0},"houseCompletionDays":[22,32]}
+      ]
+    },
+    "5": {
+      "baseline": [
+        {"seed":5,"endDay":240,"population":20,"resources":{"wood":0,"stone":36,"iron":2,"tools":31,"food":338.3,"firewood":0},"deaths":{},"shortages":{"hungryCitizenDays":0,"toolDays":0,"coldHouseDays":10},"houseCompletionDays":[19,25,33]},
+        {"seed":21,"endDay":240,"population":19,"resources":{"wood":26,"stone":36,"iron":1,"tools":29,"food":485.4,"firewood":85},"deaths":{},"shortages":{"hungryCitizenDays":0,"toolDays":0,"coldHouseDays":0},"houseCompletionDays":[19,27,37]},
+        {"seed":40,"endDay":240,"population":19,"resources":{"wood":32,"stone":36,"iron":2,"tools":30,"food":385.4,"firewood":23},"deaths":{},"shortages":{"hungryCitizenDays":0,"toolDays":0,"coldHouseDays":0},"houseCompletionDays":[21,29,41]},
+        {"seed":41,"endDay":240,"population":21,"resources":{"wood":22,"stone":48,"iron":21,"tools":31,"food":290,"firewood":98},"deaths":{},"shortages":{"hungryCitizenDays":0,"toolDays":0,"coldHouseDays":0},"houseCompletionDays":[16,25,31,170]},
+        {"seed":49,"endDay":240,"population":20,"resources":{"wood":24,"stone":36,"iron":2,"tools":30,"food":480,"firewood":86},"deaths":{"冻死":1},"deathDayRange":[45,45],"shortages":{"hungryCitizenDays":0,"toolDays":0,"coldHouseDays":0},"houseCompletionDays":[19,27,56]},
+        {"seed":54,"endDay":240,"population":17,"resources":{"wood":50,"stone":40,"iron":2,"tools":30,"food":396.3,"firewood":98},"deaths":{"冻死":1},"deathDayRange":[45,45],"shortages":{"hungryCitizenDays":0,"toolDays":0,"coldHouseDays":0},"houseCompletionDays":[21,30,55,214]},
+        {"seed":55,"endDay":240,"population":18,"resources":{"wood":0,"stone":36,"iron":1,"tools":30,"food":382,"firewood":50},"deaths":{"冻死":1},"deathDayRange":[45,45],"shortages":{"hungryCitizenDays":0,"toolDays":0,"coldHouseDays":0},"houseCompletionDays":[22,32,58]}
+      ],
+      "house16": [
+        {"seed":5,"endDay":240,"population":22,"resources":{"wood":2,"stone":36,"iron":2,"tools":31,"food":224.5,"firewood":44},"deaths":{},"shortages":{"hungryCitizenDays":0,"toolDays":0,"coldHouseDays":0},"houseCompletionDays":[17,22,31]},
+        {"seed":21,"endDay":240,"population":19,"resources":{"wood":36,"stone":20,"iron":1,"tools":29,"food":290.4,"firewood":68},"deaths":{},"shortages":{"hungryCitizenDays":0,"toolDays":0,"coldHouseDays":0},"houseCompletionDays":[17,24,34,193,195]},
+        {"seed":40,"endDay":240,"population":22,"resources":{"wood":28,"stone":46,"iron":14,"tools":26,"food":240.5,"firewood":0},"deaths":{},"shortages":{"hungryCitizenDays":0,"toolDays":0,"coldHouseDays":8},"houseCompletionDays":[18,26,36]},
+        {"seed":41,"endDay":240,"population":22,"resources":{"wood":38,"stone":48,"iron":21,"tools":31,"food":320,"firewood":98},"deaths":{},"shortages":{"hungryCitizenDays":0,"toolDays":0,"coldHouseDays":0},"houseCompletionDays":[14,20,25,163]},
+        {"seed":49,"endDay":240,"population":19,"resources":{"wood":56,"stone":32,"iron":1,"tools":31,"food":320,"firewood":77},"deaths":{},"shortages":{"hungryCitizenDays":0,"toolDays":0,"coldHouseDays":0},"houseCompletionDays":[16,24,41,207,224]},
+        {"seed":54,"endDay":240,"population":21,"resources":{"wood":24,"stone":36,"iron":2,"tools":30,"food":390.3,"firewood":86},"deaths":{},"shortages":{"hungryCitizenDays":0,"toolDays":0,"coldHouseDays":0},"houseCompletionDays":[19,26,34]},
+        {"seed":55,"endDay":240,"population":0,"resources":{"wood":1,"stone":40,"iron":0,"tools":0,"food":1.8,"firewood":31},"deaths":{"饿死":21},"deathDayRange":[191,199],"shortages":{"hungryCitizenDays":68,"toolDays":80,"coldHouseDays":0},"houseCompletionDays":[20,29,37]}
+      ],
+      "fuel50-until-housed": [
+        {"seed":5,"endDay":240,"population":21,"resources":{"wood":2,"stone":36,"iron":2,"tools":31,"food":312.3,"firewood":44},"deaths":{},"shortages":{"hungryCitizenDays":22,"toolDays":0,"coldHouseDays":0},"houseCompletionDays":[12,19,24]},
+        {"seed":21,"endDay":240,"population":25,"resources":{"wood":14,"stone":36,"iron":1,"tools":29,"food":355,"firewood":86},"deaths":{},"shortages":{"hungryCitizenDays":0,"toolDays":0,"coldHouseDays":0},"houseCompletionDays":[10,17,23]},
+        {"seed":40,"endDay":240,"population":19,"resources":{"wood":2,"stone":36,"iron":2,"tools":30,"food":370,"firewood":80},"deaths":{},"shortages":{"hungryCitizenDays":0,"toolDays":0,"coldHouseDays":0},"houseCompletionDays":[10,17,26]},
+        {"seed":41,"endDay":240,"population":22,"resources":{"wood":30,"stone":48,"iron":1,"tools":31,"food":329.2,"firewood":98},"deaths":{},"shortages":{"hungryCitizenDays":0,"toolDays":0,"coldHouseDays":0},"houseCompletionDays":[8,14,20,164]},
+        {"seed":49,"endDay":240,"population":24,"resources":{"wood":0,"stone":16,"iron":22,"tools":29,"food":375,"firewood":80},"deaths":{},"shortages":{"hungryCitizenDays":0,"toolDays":0,"coldHouseDays":0},"houseCompletionDays":[9,17,28]},
+        {"seed":54,"endDay":240,"population":0,"resources":{"wood":26,"stone":60,"iron":20,"tools":0,"food":1.5,"firewood":32},"deaths":{"饿死":24},"deathDayRange":[196,203],"shortages":{"hungryCitizenDays":75,"toolDays":68,"coldHouseDays":0},"houseCompletionDays":[11,20,30]},
+        {"seed":55,"endDay":240,"population":0,"resources":{"wood":16,"stone":20,"iron":30,"tools":0,"food":0.8,"firewood":20},"deaths":{"饿死":22},"deathDayRange":[194,202],"shortages":{"hungryCitizenDays":75,"toolDays":80,"coldHouseDays":0},"houseCompletionDays":[11,21,31]}
+      ],
+      "cancel-for-stone": [
+        {"seed":5,"endDay":240,"population":20,"resources":{"wood":0,"stone":36,"iron":2,"tools":31,"food":338.3,"firewood":0},"deaths":{},"shortages":{"hungryCitizenDays":0,"toolDays":0,"coldHouseDays":10},"houseCompletionDays":[19,25,33]},
+        {"seed":21,"endDay":240,"population":19,"resources":{"wood":26,"stone":36,"iron":1,"tools":29,"food":485.4,"firewood":85},"deaths":{},"shortages":{"hungryCitizenDays":0,"toolDays":0,"coldHouseDays":0},"houseCompletionDays":[19,27,37]},
+        {"seed":40,"endDay":240,"population":19,"resources":{"wood":32,"stone":36,"iron":2,"tools":30,"food":385.4,"firewood":23},"deaths":{},"shortages":{"hungryCitizenDays":0,"toolDays":0,"coldHouseDays":0},"houseCompletionDays":[21,29,41]},
+        {"seed":41,"endDay":240,"population":21,"resources":{"wood":22,"stone":48,"iron":21,"tools":31,"food":290,"firewood":98},"deaths":{},"shortages":{"hungryCitizenDays":0,"toolDays":0,"coldHouseDays":0},"houseCompletionDays":[16,25,31,170]},
+        {"seed":49,"endDay":240,"population":20,"resources":{"wood":60,"stone":36,"iron":21,"tools":31,"food":488.3,"firewood":85},"deaths":{},"shortages":{"hungryCitizenDays":0,"toolDays":0,"coldHouseDays":0},"houseCompletionDays":[19,27,37]},
+        {"seed":54,"endDay":240,"population":17,"resources":{"wood":50,"stone":40,"iron":2,"tools":30,"food":396.3,"firewood":98},"deaths":{"冻死":1},"deathDayRange":[45,45],"shortages":{"hungryCitizenDays":0,"toolDays":0,"coldHouseDays":0},"houseCompletionDays":[21,30,55,214]},
+        {"seed":55,"endDay":240,"population":18,"resources":{"wood":0,"stone":36,"iron":1,"tools":30,"food":382,"firewood":50},"deaths":{"冻死":1},"deathDayRange":[45,45],"shortages":{"hungryCitizenDays":0,"toolDays":0,"coldHouseDays":0},"houseCompletionDays":[22,32,58]}
+      ]
+    }
+  }
+}
