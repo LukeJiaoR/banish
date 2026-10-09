@@ -17,6 +17,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 passed, failed = 0, 0
+session_cookie = None
 
 
 def check(name, cond, extra=''):
@@ -39,11 +40,16 @@ def free_port():
 
 def req(port, path, method='GET', body=None, ctype='application/json'):
     """请求本机临时测试服务：主机固定为 127.0.0.1 回环，仅端口与路径可变。"""
+    global session_cookie
     conn = http.client.HTTPConnection('127.0.0.1', port, timeout=5)
     headers = {'Content-Type': ctype} if body else {}
+    if session_cookie:
+        headers['Cookie'] = session_cookie
     try:
         conn.request(method, path, body=body, headers=headers)
         resp = conn.getresponse()
+        if resp.getheader('Set-Cookie'):
+            session_cookie = resp.getheader('Set-Cookie').split(';', 1)[0]
         return resp.status, resp.read().decode('utf-8', 'replace')
     finally:
         conn.close()
@@ -125,12 +131,13 @@ try:
         body = json.dumps(payload).encode('utf-8') if payload is not None else None
         return req(port, path, method, body)
 
+    req(port, '/api/saves')  # 浏览器探测时建立持久会话
     qname = urllib.parse.quote('测试档·二')
     save_data = {'game': {'year': 2, 'season': 1, 'day': 60, 'res': {'food': 812}},
                  'citizens': [{'id': 1}], 'trees': [], 'buildings': [], 'families': []}
     st, body = saves(port, '/api/saves', 'POST', {'name': '测试档·二', 'data': save_data})
     check('存档写入 200', st == 200 and json.loads(body).get('ok') is True)
-    check('存档落盘 JSON 文件', (Path(saves_tmp) / '测试档·二.json').is_file())
+    check('存档落盘 JSON 文件', len(list(Path(saves_tmp).glob('_sessions/*/测试档·二.json'))) == 1)
 
     st, body = saves(port, '/api/saves')
     lst = json.loads(body)

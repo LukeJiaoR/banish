@@ -64,7 +64,8 @@ G.newGame = function (seed) {
 };
 
 /* ---------- 存档 ---------- */
-/* 序列化当前对局（存档与反馈快照共用；不含 savedAt） */
+/* 序列化当前对局（存档与反馈快照共用；不含 savedAt）。
+ * 尚未保存 RNG 当前位置及市民正在进行/挂起的任务，读档不是确定性逐步回放。 */
 G.serializeGame = function () {
   const w = G.world, g = G.game;
   return {
@@ -73,7 +74,7 @@ G.serializeGame = function () {
       v: G.VERSION,
       h: g.h, day: g.day, season: g.season, year: g.year,
       res: g.res, stats: g.stats, prevFood: g.prevFood, foodNet: g.foodNet, warned: g.warned,
-      hist: g.hist, buildLog: g.buildLog,
+      hist: g.hist, buildLog: g.buildLog, toolWear: g.toolWear,
     },
       trees: w.trees.map(t => [t.i, t.x, t.y, t.b]),
       marked: [...w.marked],
@@ -161,6 +162,8 @@ G.applySaveData = function (d) {
   G.game = G.newGameState();
   const g = G.game, w = G.world;
   Object.assign(g, d.game);
+  // 旧档缺失或导入值无效时从 0 开始；正常存档保留尚未耗尽一把工具的累计磨损。
+  g.toolWear = Number.isFinite(g.toolWear) && g.toolWear >= 0 ? g.toolWear : 0;
   g.res.iron = g.res.iron || 0; // 旧存档迁移：无铁字段时补 0
   g.res.tools = g.res.tools != null ? g.res.tools : 10; // 旧存档迁移：无工具字段补 10 把应急
   g.hist = Array.isArray(g.hist) ? g.hist : [];

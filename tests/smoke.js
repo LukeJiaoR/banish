@@ -316,7 +316,14 @@ G.ui = { toast() {}, refreshHUD() {} };
   wc.fuelLimit = 350;
   G.game.hist.push({ d: 7, season: 2, pop: 3, food: 100, firewood: 10, wood: 10, stone: 5, iron: 0, born: 0, died: 0, warn: 'w' }); // 验证滚动日志随档保存
   G.game.buildLog.push({ d: 6, t: 'house' });
+  G.game.toolWear = 0.995; // 下一天 1 名成人的磨损应使工具寿命越过整数边界
   G.saveGame('test_key', true);
+  check('存档 JSON 包含工具磨损累积值', JSON.parse(localStorage.getItem('test_key')).game.toolWear === 0.995);
+  G.loadGame('test_key');
+  check('存读档保留工具磨损累积值', G.game.toolWear === 0.995);
+  const toolsBeforeWear = G.game.res.tools;
+  G.endDay();
+  check('读档后工具继续累计磨损并按时损耗', G.game.res.tools === toolsBeforeWear - 1 && G.game.toolWear >= 0 && G.game.toolWear < 0.01);
   G.loadGame('test_key');
   const kid2 = G.world.cmap[kid.id], edu2 = G.world.cmap[edu.id];
   check('存读档保留 学生/受教育/学校 字段', kid2 && kid2.student === true && kid2.school === 999 && edu2 && edu2.educated === true);
@@ -328,9 +335,16 @@ G.ui = { toast() {}, refreshHUD() {} };
   // 旧档迁移：无工具字段补 10 把
   const raw3 = JSON.parse(localStorage.getItem('test_key'));
   delete raw3.game.res.tools;
+  delete raw3.game.toolWear;
   localStorage.setItem('migr_key', JSON.stringify(raw3));
   G.loadGame('migr_key');
   check('旧档无工具字段 → 补 10 把应急', G.game.res.tools === 10);
+  check('旧档无工具磨损字段 → 安全回退为 0', G.game.toolWear === 0);
+  for (const invalidWear of [null, -1, '0.5', NaN, Infinity]) {
+    raw3.game.toolWear = invalidWear;
+    G.applySaveData(raw3);
+    check('无效工具磨损值回退为 0：' + String(invalidWear), G.game.toolWear === 0);
+  }
   // 旧档迁移：无 fuelLimit 字段的伐木屋回退默认上限
   const raw = JSON.parse(localStorage.getItem('test_key'));
   delete raw.buildings.find(x => x.type === 'woodcutter').fuelLimit;
