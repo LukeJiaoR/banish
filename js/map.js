@@ -177,6 +177,45 @@ G.markFellAt = function (w, x, y) {
   w.marked.add(i);
   if (first && G.ui && G.ui.toast) G.ui.toast('🪚 已标记砍伐：空闲的市民会自动前往（无人空闲则排队等候）', 'info');
 };
+/* 仅按真实可达标记预留散工。四向连通与禁止穿角的寻路有相同可达性。
+ * 每次派工按当前市民和地形重算；不在渲染帧内运行，也不缓存跨建造失效的路径。 */
+G.reachableMarks = function (w) {
+  const targets = [];
+  for (const i of w.marked || []) if (w.treeIdx[i] >= 0) targets.push(i);
+  for (const i of w.markedRocks || []) if (w.rock[i]) targets.push(i);
+  if (!targets.length) return { count: 0, unreachable: 0 };
+  const N = w.N, seen = new Uint8Array(N * N), queue = [];
+  for (const c of w.citizens) {
+    if (c.dead || !c.adult) continue;
+    const x = Math.round(c.x), y = Math.round(c.y), i = y * N + x;
+    if (x < 0 || y < 0 || x >= N || y >= N || seen[i]) continue;
+    seen[i] = 1; queue.push(i);
+  }
+  const wanted = new Map();
+  for (const i of targets) {
+    let x = i % N, y = Math.floor(i / N);
+    if (G.tileBlocked(w, x, y)) {
+      const alt = G.nearestWalkable(w, x, y, 4);
+      if (!alt) continue;
+      x = alt.x; y = alt.y;
+    }
+    const to = y * N + x;
+    wanted.set(to, (wanted.get(to) || 0) + 1);
+  }
+  let count = 0;
+  for (let head = 0; head < queue.length; head++) {
+    const i = queue[head], x = i % N, y = Math.floor(i / N);
+    if (wanted.has(i)) { count += wanted.get(i); wanted.delete(i); if (!wanted.size) break; }
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = x + dx, ny = y + dy;
+      if (nx < 0 || ny < 0 || nx >= N || ny >= N) continue;
+      const ni = ny * N + nx;
+      if (seen[ni] || G.tileBlocked(w, nx, ny)) continue;
+      seen[ni] = 1; queue.push(ni);
+    }
+  }
+  return { count, unreachable: targets.length - count };
+};
 /* 取离散工最近的标记树（claimed 中的坐标跳过：一人一树） */
 G.pickMarkedTree = function (w, x, y, claimed) {
   let best = null, bd = Infinity;

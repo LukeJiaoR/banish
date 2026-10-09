@@ -488,7 +488,7 @@ G.setTool = function (t) {
   G.ui.setToolActive();
 };
 
-/* 「砍伐」工具：沿线把树木标记为待砍（原版 Harvest Trees 的拖拽框选） */
+/* 「砍伐」工具：沿线把树木标记为待砍（按拖拽轨迹逐格标记，不是矩形框选） */
 G.paintFell = function (x0, y0, x1, y1) {
   const w = G.world;
   const dx = Math.abs(x1 - x0), dy = Math.abs(y1 - y0);

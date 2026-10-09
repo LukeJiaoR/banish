@@ -61,7 +61,7 @@ G.ui = {
       if (t === 'demolish')
         return `<button class="tb" data-tool="demolish" title="${toolTip(t)}"><span class="ic">🚫${icImg(TOOL_ICONS.demolish)}</span><span class="lb">拆除</span></button>`;
       if (t === 'fell')
-        return `<button class="tb" data-tool="fell" title="标记砍伐（原版 Cut Down Trees）：点击或拖选树木做标记，无业散工前来砍倒；未受教育 2 原木、受教育 3 原木入库"><span class="ic">🪚</span><span class="lb">砍伐</span><span class="cost">免费</span></button>`;
+        return `<button class="tb" data-tool="fell" title="标记砍伐：点击或拖拽沿线标记树木，散工前来砍倒再搬运入库；未受教育 2 原木、受教育 3 原木"><span class="ic">🪚</span><span class="lb">砍伐</span><span class="cost">免费</span></button>`;
       const d = G.BDEF[t];
       const cost = Object.keys(d.cost).map(k => `${G.RES[k].icon}${d.cost[k]}`).join(' ') || '免费';
       return `<button class="tb" data-tool="${t}" title="${toolTip(t)}"><span class="ic">${d.icon}${icImg(TOOL_ICONS[t])}</span><span class="lb">${d.name}</span><span class="cost">${cost}</span></button>`;
@@ -118,12 +118,14 @@ G.ui = {
     if (!G.world) return;
     const g = G.game;
     this.refreshGuide();
+    const hauling = G.harvestFeedback();
     for (const k of G.RES_KEYS) {
       const el = document.getElementById('res-' + k);
       if (el) {
         el.querySelector('b').textContent = Math.floor(g.res[k]);
         const cap = G.storageCap();
         el.title = `${G.RES[k].name}：${Math.floor(g.res[k])}${k === 'tools' ? '（工具不限仓储）' : ' / ' + cap}`;
+        if (hauling.carry[k]) el.title += ` · 另有 ${hauling.carry[k]} 随身待入库（尚不可用）`;
         if (k === 'food' && G.world.citizens.length) el.title += ` · 可供 ${(g.res.food / (G.world.citizens.length * G.LIFE.eatPerDay)).toFixed(1)} 天（不计新产出）`;
         if (k === 'tools') {
           const adults = G.world.citizens.filter(c => c.adult).length;
@@ -169,13 +171,43 @@ G.ui = {
     const warmNeed = w.buildings.reduce((n,b) => n + (G.isOccupiedHome(w,b) ? G.BDEF[b.type].warmWoodPerYear : 0), 0);
     const remainingHeat = g.season === 3 ? Math.ceil(warmNeed * Math.max(0, G.SEASON_DAYS - 1 - g.day % G.SEASON_DAYS) / G.SEASON_DAYS) : warmNeed;
     const risks = [];
-    if (g.res.wood < 2) risks.push('木材耗尽：向更远可达森林标记砍伐，后续护林补种；避开食物林。');
+    const harvest = G.harvestFeedback();
+    if (g.res.wood < 2) {
+      if (harvest.carry.wood) risks.push(`木材库存耗尽：另有 ${harvest.carry.wood} 随身待入库，送达后才能使用。`);
+      else if (harvest.trees) risks.push(`木材库存耗尽：${harvest.trees} 棵已标记，查看采运进度；砍倒后仍需送仓。`);
+      else risks.push('木材耗尽：向更远可达森林标记砍伐，后续护林补种；避开食物林。');
+    }
     if (g.season >= 2 && g.res.firewood < remainingHeat) risks.push(`柴火不足：现有 ${Math.floor(g.res.firewood)} / 本冬剩余约 ${remainingHeat}，伐木屋需原木。`);
     const stage = !food ? '① 先保持续食物：在近仓森林建采集小屋；不要先连盖五屋耗尽木石。'
       : !fuel ? '② 近仓建伐木屋备柴；在食物林外标记砍伐和矿石，保留散工。'
       : homeless ? `③ 入冬前安家：还有 ${homeless} 家无房；逐步补住房和取暖柴。`
       : '④ 维持粮柴与工具，预留矿井的10铁保持续矿源，再办学并为下一代留空房。';
-    el.textContent = (G.autosaveBlocked ? '⚠ 原自动档已保护：临时局不自动保存，请打开存档管理备份/手动保存。\n' : '') + `粮食约 ${days.toFixed(1)} 天（不计新产出） · ${G.isWinter() ? '寒冬中' : '距入冬 ' + untilWinter + ' 天'} · ${g.paused ? '已暂停' : '运行中'}\n${stage}${risks.length ? '\n⚠ ' + risks.join(' ') : ''}`;
+    const progress = harvest.total ? `\n采运标记：待领 ${harvest.queued} · 执行 ${harvest.active} · 夜间保留 ${harvest.paused}${harvest.reason ? '；' + harvest.reason : ''}` : '';
+    el.textContent = (G.autosaveBlocked ? '⚠ 原自动档已保护：临时局不自动保存，请打开存档管理备份/手动保存。\n' : '') + `粮食约 ${days.toFixed(1)} 天（不计新产出） · ${G.isWinter() ? '寒冬中' : '距入冬 ' + untilWinter + ' 天'} · ${g.paused ? '已暂停' : '运行中'}\n${stage}${risks.length ? '\n⚠ ' + risks.join(' ') : ''}${progress}`;
+  },
+
+  refreshHarvest: function () {
+    const el = this.el.placement;
+    if (!el || !G.world) return;
+    this._placementKey = null;
+    const h = G.harvestFeedback(), fell = G.tool.kind === 'fell';
+    const cargo = G.RES_KEYS.filter(k => h.carry[k]).map(k => `${G.RES[k].name} ${h.carry[k]}`).join(' · ');
+    const lines = [fell ? '砍伐：点击或拖拽沿线标记树木' : '清矿：点击或拖拽沿线标记岩石；单击建筑仍会拆除',
+      `标记：树 ${h.trees} · 矿 ${h.rocks}；待领 ${h.queued} · 执行 ${h.active}（含赶路） · 夜间保留 ${h.paused}`,
+      `散工 ${h.laborers} 人（含执行、搬运）；每 2 游戏小时自动调度。`];
+    if (cargo) lines.push(`随身待入库：${cargo}；搬运 ${h.haulers} 人 / 待送 ${h.waitingCarriers} 人（不计入库存）。`);
+    if (h.reason) lines.push(h.reason);
+    const check = G.world.markReachability;
+    if (check && h.total && Number.isFinite(check.day) && Number.isFinite(check.h) && check.unreachable > 0)
+      lines.push(`最近派工检查：${check.unreachable} 处不可达（累计第 ${check.day + 1} 天 ${Math.floor(check.h)} 时；通路或标记变化后待复查）。`);
+    if (h.trees && h.rocks) lines.push('散工接新任务时先砍树，再清矿。');
+    if (h.trees >= 300 || h.rocks >= 300) lines.push('单类标记上限 300，达到上限后不再新增。');
+    lines.push('绿色虚线为采集/狩猎食物林；砍树会降低食物产出。');
+    lines.push('右键/Esc 退出工具；已画下的标记仍会执行。');
+    const text = lines.join('\n');
+    if (el.textContent !== text) el.textContent = text;
+    el.dataset.state = h.reason ? 'warning' : 'ready';
+    el.classList.remove('hidden');
   },
 
   refreshPlacement: function (type, x, y) {
@@ -287,8 +319,9 @@ G.ui = {
       if (!c) { this.hideInfo(); return; }
       let status = '闲逛';
       if (c.state === 'rest') status = '睡觉';
-      else if (c.state === 'work') status = c.task ? (c.task.kind === 'clearSite' ? '清理工地' : c.task.kind === 'build' ? '建造中' : c.task.kind === 'sow' ? '播种' : c.task.kind === 'harvest' ? '收获' : '工作中') : '工作中';
+      else if (c.state === 'work') status = c.task ? (c.task.kind === 'clearSite' ? '清理工地' : c.task.kind === 'chop' ? '砍伐' : c.task.kind === 'clearrock' ? '清矿' : c.task.kind === 'build' ? '建造中' : c.task.kind === 'sow' ? '播种' : c.task.kind === 'harvest' ? '收获' : '工作中') : '工作中';
       else if (c.state === 'walk' || c.state === 'haul') status = c.carry ? `搬运${G.RES[c.carry.type].name}` : (c.walkKind === 'home' ? '回家' : '赶路');
+      else if (c.carry) status = '等待送仓';
       const jobB = c.job != null ? w.bmap[c.job] : null;
       const jobName = jobB ? G.BDEF[jobB.type].name : (c.student ? '学堂学生' : (c.adult ? '无业' : '儿童'));
       const fam = G.familyOf(c);
@@ -296,6 +329,7 @@ G.ui = {
         <div class="info-head"><span>🧑 ${this.escHtml(c.name)}</span><button id="info-close">✕</button></div>
         <div class="row">${c.sex === 'm' ? '男' : '女'} · ${Math.floor(c.age)} 岁 · ${c.student ? '学生' : c.adult ? '成人' : '儿童'}</div>
         <div class="row">职业：${jobName} · ${this.escHtml(status)}</div>
+        ${c.carry ? `<div class="row">随身：${G.RES[c.carry.type].name} ${Number(c.carry.qty)}（未入库）</div>` : ''}
         <div class="row">家庭：${fam ? (fam.houseId != null ? '有房' : '无房') : '单身'}</div>
         <div class="row">学识：${c.student ? '🎓 就读中' : c.educated ? '📖 受过教育' : '未受教育'}</div>
         <div class="row">饥饿 ${'▕'.repeat(Math.min(4, c.hunger)) || '无'} · 受冻 ${c.cold > 1 ? '是' : '无'}</div>`;
@@ -570,6 +604,64 @@ G.ui = {
       `<br><small style="opacity:.6">版本 ${G.VERSION} · 反馈时提到它可帮我对号入座</small>`;
     this.el.over.classList.remove('hidden');
   },
+};
+
+/* Observation only: no pathfinding, task assignment, or inventory mutation here. */
+G.harvestFeedback = function () {
+  const w = G.world;
+  const trees = new Set([...(w.marked || [])].filter(i => w.treeIdx && w.treeIdx[i] >= 0));
+  const rocks = new Set([...(w.markedRocks || [])].filter(i => w.rock && w.rock[i]));
+  const active = new Set(), paused = new Set();
+  const h = { trees: trees.size, rocks: rocks.size, total: trees.size + rocks.size, active: 0, paused: 0, queued: 0,
+    laborers: 0, haulers: 0, waitingCarriers: 0, carry: {}, reason: '' };
+  for (const k of G.RES_KEYS) h.carry[k] = 0;
+  let adults = 0, builders = 0, foodWorkers = 0, otherWorkers = 0;
+  const claim = t => {
+    if (!t) return null;
+    const i = t.tree ? t.tree.y * w.N + t.tree.x : t.ty * w.N + t.tx;
+    if ((t.kind === 'chop' || t.kind === 'clearSite') && trees.has(i) && (!t.tree || w.trees[w.treeIdx[i]] === t.tree)) return 't' + i;
+    if (t.kind === 'clearrock' && rocks.has(i)) return 'r' + i;
+    return null;
+  };
+  for (const c of w.citizens) {
+    if (c.dead) continue;
+    const current = claim(c.task), held = claim(c.pausedTask);
+    if (current) active.add(current);
+    if (held) paused.add(held);
+    if (c.adult) {
+      adults++;
+      if (c.job == null) h.laborers++;
+      else {
+        const b = w.bmap[c.job];
+        if (b && b.state === 'site') builders++;
+        else if (b && ['gatherer', 'hunting', 'dock', 'farm'].includes(b.type)) foodWorkers++;
+        else otherWorkers++;
+      }
+    }
+    if (c.carry && G.RES_KEYS.includes(c.carry.type) && Number.isFinite(c.carry.qty) && c.carry.qty > 0) {
+      h.carry[c.carry.type] += c.carry.qty;
+      if (c.state === 'haul') h.haulers++;
+      else h.waitingCarriers++;
+    }
+  }
+  for (const key of active) paused.delete(key);
+  h.active = active.size; h.paused = paused.size;
+  h.queued = Math.max(0, h.total - h.active - h.paused);
+  if (h.total && G.isRestTime()) h.reason = '夜间休息，已认领任务天亮继续。';
+  else if (h.queued && !h.active && !h.paused) {
+    if (!adults) h.reason = '暂无可工作的成人。';
+    else if (!h.laborers) h.reason = `暂无散工：工地 ${builders} 人 · 食物岗 ${foodWorkers} 人 · 其他 ${otherWorkers} 人。${G.game.foodUrgent ? '粮食偏紧时优先保粮。' : '减少并行工地可减轻争用。'}`;
+    else h.reason = '标记尚未接单：散工可能正搬货或等待调度；持续无进展时检查通路。';
+  }
+  return h;
+};
+
+/* Same inclusive square bounds as treesInRadius, also used by the map overlay. */
+G.foodForestBounds = function (w) {
+  return w.buildings.filter(b => b.state === 'ok' && ['gatherer', 'hunting'].includes(b.type)).map(b => {
+    const r = G.PROD[b.type].radius;
+    return [Math.max(0, b.x - r), Math.max(0, b.y - r), Math.min(w.N, b.x + r + 1), Math.min(w.N, b.y + r + 1)];
+  });
 };
 
 /* Placement facts use exactly the same origin and square work bounds as production. */
