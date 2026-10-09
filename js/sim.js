@@ -413,10 +413,10 @@ G.assignHousing = function () {
     fam.houseId = house.id;
     house.family = fam.id;
   }
-  // 没有空独栋：无房家庭入住宿舍（原版 Boarding House 最多 5 家）
+  // 没有空独栋：无房家庭（含单人户）入住宿舍，仍先安排多人户（最多 5 家）
   const boardings = w.buildings.filter(b => b.type === 'boarding' && b.state === 'ok');
   if (boardings.length) {
-    for (const fam of homeless) {
+    for (const fam of homeless.concat(homelessSolo)) {
       if (fam.houseId != null) continue;
       const b = boardings.find(b2 => G.boardingFamilies(w, b2).length < G.LIFE.boardingCap);
       if (!b) break;
