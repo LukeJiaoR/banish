@@ -281,3 +281,21 @@ body {
 .mini-tog:hover { background: #7d622c; }
 .mini-tog.off { opacity: 0.5; border-style: dashed; }
 .mini-tog.off:hover { opacity: 0.8; }
+
+/* Compact windows keep every tool reachable without replacing the hand-painted palette. */
+#toolbar { max-width: calc(100vw - 24px); overflow-x: auto; overflow-y: hidden; scrollbar-width: auto; scrollbar-color: #b79b64 #302619; }
+.tb { flex: 0 0 auto; }
+button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 2px solid #ffe4a0; outline-offset: 2px; }
+#topbar { flex-wrap: wrap; gap: 6px 14px; }
+#res-row { flex-wrap: wrap; }
+#survival-guide, #placement-info { position: absolute; left: 12px; width: min(450px, calc(100vw - 24px)); white-space: pre-line; background: rgba(24,18,10,.9); border: 1px solid rgba(216,178,90,.35); border-radius: 8px; padding: 7px 10px; font-size: 12px; line-height: 1.5; }
+#survival-guide { top: 90px; }
+#placement-info { bottom: 114px; border-left: 3px solid #a0c47a; }
+#placement-info[data-state="blocked"] { border-left-color: #e0705a; }
+#placement-info[data-state="warning"] { border-left-color: #e8b350; }
+#info { top: 90px; max-height: calc(100vh - 210px); overflow-y: auto; }
+.dialog { max-height: calc(100vh - 24px); overflow-y: auto; max-width: min(620px, calc(100vw - 24px)); }
+#toasts { bottom: 114px; pointer-events: none; }
+#hud:has(#placement-info:not(.hidden)) #toasts { left: auto; right: 12px; max-width: max(220px, calc(100vw - 490px)); z-index: 3; }
+@media (max-width: 1024px) { #survival-guide { width: min(440px, calc(100vw - 290px)); } #topbar { font-size: 12px; padding: 6px 10px; } #res-row { gap: 7px; } }
+@media (max-width: 600px) { #survival-guide { top: 122px; width: calc(100vw - 24px); font-size: 11px; } #info { top: 208px; width: min(280px, calc(100vw - 24px)); max-height: calc(100vh - 325px); } #topbar { gap: 4px 8px; } #placement-info { max-height: 32vh; overflow-y: auto; pointer-events: auto; } .dialog { padding: 18px; } }

@@ -597,15 +597,25 @@ G.frame = function (dtReal) {
     const def = G.BDEF[G.tool.type];
     const ox = G.hover.tx - ((def.w - 1) >> 1), oy = G.hover.ty - ((def.h - 1) >> 1);
     const chk = G.canPlace(w, G.tool.type, ox, oy);
+    const preview = G.ui.refreshPlacement(G.tool.type, ox, oy);
+    const radius = preview && preview.radius;
+    if (radius) {
+      const [x0,y0,x1,y1] = preview.bounds;
+      const corners = [[x0,y0],[x1,y0],[x1,y1],[x0,y1]];
+      ctx.save(); ctx.beginPath();
+      corners.forEach(([x,y], i) => { const [sx,sy] = G.T2S(x,y); if (i) ctx.lineTo(sx,sy); else ctx.moveTo(sx,sy); });
+      ctx.closePath(); ctx.fillStyle = 'rgba(216,178,90,0.08)'; ctx.fill();
+      ctx.strokeStyle = '#f0ce84'; ctx.lineWidth = 1.5 / G.cam.z; ctx.setLineDash([6 / G.cam.z,4 / G.cam.z]); ctx.stroke(); ctx.restore();
+    }
     for (let j = 0; j < def.h; j++)
       for (let i = 0; i < def.w; i++) {
         const [sx, sy] = G.T2S(ox + i, oy + j);
         G.diamondPath(ctx, sx, sy);
-        ctx.fillStyle = chk.ok ? 'rgba(120,230,140,0.4)' : 'rgba(230,90,80,0.4)';
+        ctx.fillStyle = (!chk.ok || (preview && !preview.affordable)) ? 'rgba(230,90,80,0.4)' : (preview && preview.warning) ? 'rgba(235,180,65,0.4)' : 'rgba(120,230,140,0.4)';
         ctx.fill();
       }
     G._ghost = { ox, oy };
-  } else G._ghost = null;
+  } else { G._ghost = null; G.ui.refreshPlacement(null); }
 
   // 道路工具悬停（同样贴地）
   if (G.tool && G.tool.kind === 'road' && G.hover.tx >= 0) {

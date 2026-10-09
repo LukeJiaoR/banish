@@ -228,64 +228,154 @@ G.onSeasonChange = function (from, to) {
 };
 
 /* ================= 家庭 ================= */
-/* 单身判定：从未成家，或丧偶/单亲（家里已无其他成人，可带孩子重组家庭） */
-G.isSingle = function (c) {
-  if (c.dead || c.student || c.age < G.MOTHER_MIN) return false;
-  if (c.familyId == null) return true;
-  const f = G.familyOf(c);
-  if (!f) { c.familyId = null; return true; } // 脏数据自愈
-  return f.members.every(id => { const o = G.world.cmap[id]; return !o || o === c || o.age < G.ADULT_AGE; });
-};
-
-/* 结为夫妇：双方家庭合并（各自的孩子随迁），有房一方保留住房 */
-G.joinFamilies = function (a, b) {
-  const w = G.world;
-  const fa = a.familyId != null ? G.familyOf(a) : null;
-  const fb = b.familyId != null ? G.familyOf(b) : null;
-  const size = (f) => (f ? f.members.length : 0);
-  if (size(fa) + size(fb) >= G.LIFE.maxFamily) return false; // 合并后超过家庭人口上限，不结
-  let fam;
-  if (!fa && !fb) {
-    fam = { id: G.nextId(), members: [a.id, b.id], houseId: null };
-    w.families.push(fam);
-  } else {
-    fam = fa || fb;
-    const joiner = fam === fa ? b : a;
-    const other = fa && fb ? (fam === fa ? fb : fa) : null;
-    if (other) {
-      for (const id of other.members) {
-        const o = w.cmap[id];
-        if (o) { o.familyId = fam.id; fam.members.push(id); }
+/* 亲缘独立于同住家庭：搬家、丧偶与父母去世不能抹掉血缘。
+ * 旧档只有同住名单，不能可靠推断谁是夫妇；保留住户与住房，以原户作为
+ * 保守的亲缘屏障。仅明确、双向的配偶关系可生育，迁移不会凭同住造配偶。 */
+G.normalizeFamilyRelations = function (w = G.world) {
+  const ids = a => Array.from(new Set(Array.isArray(a) ? a.filter(id => Number.isSafeInteger(id) && id > 0) : []));
+  for (const c of w.citizens) {
+    c.parentIds = ids(c.parentIds).filter(id => id !== c.id);
+    c.grandparentIds = ids(c.grandparentIds).filter(id => id !== c.id);
+    c.ancestorIds = ids(c.ancestorIds).filter(id => id !== c.id);
+    if (!Number.isSafeInteger(c.birthFamilyId)) c.birthFamilyId = null;
+    if (!Number.isSafeInteger(c.partnerId)) c.partnerId = null;
+  }
+  const seen = new Set();
+  for (const f of w.families) {
+    const legacy = !Array.isArray(f.coupleIds);
+    f.members = ids(f.members).filter(id => {
+      const c = w.cmap[id];
+      if (!c || c.dead || seen.has(id) || (c.familyId != null && c.familyId !== f.id)) return false;
+      seen.add(id); c.familyId = f.id; return true;
+    });
+    for (const c of w.citizens) if (c.familyId === f.id && !seen.has(c.id)) { f.members.push(c.id); seen.add(c.id); }
+    if (legacy) {
+      // 旧版开局的唯一可证关系：连续生成男、女，再生成家庭 ID。
+      // 丈妻均活着时旧逻辑绝不会重组此户；父母亡故后孩子 ID 大于户 ID，
+      // 不可能落入此模式。其余同住名单不能作为婚配证据。
+      const m = w.cmap[f.members[0]], mother = w.cmap[f.members[1]];
+      if (m && mother && m.id === f.id - 2 && mother.id === f.id - 1 && m.sex === 'm' && mother.sex === 'f' && m.age >= 18 && mother.age >= 18) {
+        f.coupleIds = [m.id, mother.id]; m.partnerId = mother.id; mother.partnerId = m.id;
+        for (const id of f.members.slice(2)) {
+          const child = w.cmap[id];
+          if (!child.parentIds.length) child.parentIds = [m.id, mother.id];
+          if (child.birthFamilyId == null) child.birthFamilyId = f.id;
+        }
+      } else for (const id of f.members) {
+        const c = w.cmap[id];
+        if (c.birthFamilyId == null) c.birthFamilyId = f.id;
       }
-      if (other.houseId != null) { // 腾空原住房
-        const h = w.bmap[other.houseId];
-        if (h && h.family === other.id) h.family = null;
-      }
-      w.families = w.families.filter(f => f !== other);
-    } else {
-      fam.members.push(joiner.id);
-      joiner.familyId = fam.id;
+    }
+    f.coupleIds = ids(f.coupleIds).filter(id => f.members.includes(id));
+    for (const id of f.members) {
+      const c = w.cmap[id];
+      if (c.parentIds.length && c.birthFamilyId == null) c.birthFamilyId = f.id;
     }
   }
+  for (const c of w.citizens) if (!seen.has(c.id)) c.familyId = null;
+  // 祖辈 ID 随孩子保存；祖辈死亡后不依赖 cmap，重载后仍可判亲缘。
+  for (let pass = 0; pass < w.citizens.length; pass++) {
+    let changed = false;
+    for (const c of w.citizens) {
+      const ancestry = new Set(c.ancestorIds.concat(c.parentIds)), grandparents = new Set(c.grandparentIds);
+      for (const id of c.parentIds) {
+        const p = w.cmap[id];
+        if (p) {
+          for (const id of p.parentIds) if (id !== c.id) grandparents.add(id);
+          for (const ancestor of p.parentIds.concat(p.ancestorIds)) if (ancestor !== c.id) ancestry.add(ancestor);
+        }
+      }
+      if (grandparents.size !== c.grandparentIds.length) { c.grandparentIds = Array.from(grandparents); changed = true; }
+      if (ancestry.size !== c.ancestorIds.length) { c.ancestorIds = Array.from(ancestry); changed = true; }
+    }
+    if (!changed) break;
+  }
+  for (const c of w.citizens) {
+    const p = w.cmap[c.partnerId];
+    if (!p || p.dead || p.partnerId !== c.id || c.familyId == null || p.familyId !== c.familyId || G.areCloseKin(c, p)) c.partnerId = null;
+  }
+  for (const f of w.families) {
+    const pairs = f.members.map(id => w.cmap[id]).filter(c => c.partnerId != null);
+    // 一个居住家庭只有一对育儿伴侣；修复意外的重复关系不任意再配对。
+    const first = pairs.find(c => f.coupleIds.includes(c.id)) || pairs[0];
+    f.coupleIds = first ? [first.id, first.partnerId] : [];
+    for (const c of pairs) if (!f.coupleIds.includes(c.id)) c.partnerId = null;
+  }
+};
+
+G.areCloseKin = function (a, b) {
+  if (!a || !b || a.id === b.id) return true;
+  if (a.birthFamilyId != null && a.birthFamilyId === b.birthFamilyId) return true;
+  const aa = new Set((a.parentIds || []).concat(a.ancestorIds || []));
+  const bb = new Set((b.parentIds || []).concat(b.ancestorIds || []));
+  if (aa.has(b.id) || bb.has(a.id)) return true;
+  // 旁系限于父母/祖父母两代；更远的共同祖先不能永久封死整个村庄。
+  const nearA = new Set((a.parentIds || []).concat(a.grandparentIds || []));
+  const nearB = new Set((b.parentIds || []).concat(b.grandparentIds || []));
+  for (const id of nearA) if (nearB.has(id)) return true;
+  return false;
+};
+
+/* 工作成年年龄不等于成家年龄；在读学生与已婚者不参与配对。 */
+G.isSingle = function (c) {
+  if (!c || c.dead || c.student || c.age < Math.max(18, G.MOTHER_MIN)) return false;
+  const p = G.world.cmap[c.partnerId];
+  return !p || p.dead || p.partnerId !== c.id;
+};
+
+/* 只让本人及其未独立子女随迁，成年子女不再困在父母家庭中。
+ * 双方原户还有其他住户时，需要空独栋住宅才另立门户。 */
+G.joinFamilies = function (a, b) {
+  const w = G.world;
+  if (!G.isSingle(a) || !G.isSingle(b) || a.sex === b.sex || G.areCloseKin(a, b)) return false;
+  const fa = G.familyOf(a), fb = G.familyOf(b);
+  if (fa && fa === fb) return false;
+  const moving = c => {
+    const f = G.familyOf(c);
+    return [c.id].concat(f ? f.members.filter(id => {
+      const child = w.cmap[id];
+      return child && child.id !== c.id && (child.parentIds || []).includes(c.id) && child.partnerId == null && (child.age < 18 || child.student);
+    }) : []);
+  };
+  const am = moving(a), bm = moving(b), members = Array.from(new Set(am.concat(bm)));
+  if (members.length > G.LIFE.maxFamily) return false;
+  const wholeA = fa && fa.members.every(id => am.includes(id));
+  const wholeB = fb && fb.members.every(id => bm.includes(id));
+  const retained = [wholeA && fa, wholeB && fb].filter(Boolean).sort((x, y) => (x.houseId == null ? 1 : 0) - (y.houseId == null ? 1 : 0))[0];
+  const free = w.buildings.find(h => (h.type === 'house' || h.type === 'stonehouse') && h.state === 'ok' && h.family == null);
+  if (!retained && (fa || fb) && !free) return false;
+  const fam = retained || { id: G.nextId(), members: [], houseId: free ? free.id : null, coupleIds: [] };
+  for (const old of [fa, fb]) {
+    if (!old || old === fam) continue;
+    old.members = old.members.filter(id => !members.includes(id));
+    old.coupleIds = (old.coupleIds || []).filter(id => old.members.includes(id));
+    if (!old.members.length) {
+      const h = w.bmap[old.houseId];
+      if (h && h.family === old.id) h.family = null;
+      w.families = w.families.filter(f => f !== old);
+    }
+  }
+  if (!retained) w.families.push(fam);
+  fam.members = members;
+  fam.coupleIds = [a.id, b.id];
+  for (const id of members) w.cmap[id].familyId = fam.id;
+  a.partnerId = b.id; b.partnerId = a.id;
+  const home = w.bmap[fam.houseId];
+  if (home && home.type !== 'boarding') home.family = fam.id;
   G.ui.toast(`${a.name} 与 ${b.name} 结为夫妇`, 'good');
   return true;
 };
 
 G.formFamilies = function () {
   const w = G.world;
+  G.normalizeFamilyRelations(w);
   const men = w.citizens.filter(c => c.sex === 'm' && G.isSingle(c));
   const women = w.citizens.filter(c => c.sex === 'f' && G.isSingle(c));
   for (const m of men) {
     if (!G.isSingle(m)) continue;
-    // 找最近的单身女性
-    let best = null, bd = Infinity;
-    for (const f of women) {
-      if (!G.isSingle(f)) continue;
-      const d = G.d2(m.x, m.y, f.x, f.y);
-      if (d < bd) { bd = d; best = f; }
-    }
-    if (!best) return;
-    G.joinFamilies(m, best);
+    const candidates = women.filter(f => G.isSingle(f) && !G.areCloseKin(m, f))
+      .sort((a, b) => G.d2(m.x, m.y, a.x, a.y) - G.d2(m.x, m.y, b.x, b.y));
+    for (const f of candidates) if (G.joinFamilies(m, f)) break;
   }
 };
 
@@ -340,11 +430,15 @@ G.tryBirths = function () {
   const pop = Math.max(1, w.citizens.length);
   for (const fam of w.families) {
     if (fam.members.length < 2 || fam.houseId == null || fam.members.length >= G.LIFE.maxFamily) continue;
-    const mother = fam.members.map(id => w.cmap[id]).find(c => c && !c.dead && c.sex === 'f');
-    if (!mother || mother.age < G.MOTHER_MIN || mother.age > G.MOTHER_MAX) continue;
+    const couple = (fam.coupleIds || []).map(id => w.cmap[id]);
+    if (couple.length !== 2 || couple.some(c => !c || c.dead || c.student || c.familyId !== fam.id || !fam.members.includes(c.id))) continue;
+    const mother = couple.find(c => c.sex === 'f'), father = couple.find(c => c.sex === 'm');
+    if (!mother || !father || mother.partnerId !== father.id || father.partnerId !== mother.id || G.areCloseKin(mother, father)) continue;
+    if (mother.age < Math.max(18, G.MOTHER_MIN) || mother.age > G.MOTHER_MAX || father.age < 18) continue;
+    const house = w.bmap[fam.houseId];
+    if (!house || house.state !== 'ok' || !['house', 'stonehouse', 'boarding'].includes(house.type)) continue;
     if (g.res.food < pop * G.LIFE.eatPerDay * G.LIFE.birthFoodDays) continue; // 粮食紧张时不生育
     if (G.chance(G.LIFE.birthChance)) {
-      const house = w.bmap[fam.houseId];
       // 出生点必须在房屋脚印之外：占位格不可通行，站进去寻路全失败，
       // 夜里回不了家按露宿挨冻、白天也挪不动（冬季婴儿冻死的根源）
       const spot = G.nearestWalkable(w, house.x + 1, house.y + 1, 4);
@@ -353,7 +447,10 @@ G.tryBirths = function () {
         y: spot ? spot.y : house.y + 1,
         sex: G.chance(0.5) ? 'm' : 'f',
         age: 0, adult: false,
-        familyId: fam.id,
+        familyId: fam.id, partnerId: null, parentIds: [mother.id, father.id],
+        grandparentIds: Array.from(new Set((mother.parentIds || []).concat(father.parentIds || []))),
+        ancestorIds: Array.from(new Set([mother.id, father.id].concat(mother.ancestorIds || [], father.ancestorIds || [], mother.parentIds || [], father.parentIds || []))),
+        birthFamilyId: fam.id,
       });
       fam.members.push(w.citizens[w.citizens.length - 1].id);
       g.stats.born++;
@@ -366,14 +463,20 @@ G.tryBirths = function () {
 /* ================= 市民 ================= */
 G.spawnCitizen = function (opt) {
   const w = G.world;
+  const sex = opt.sex || (G.chance(0.5) ? 'm' : 'f');
   const c = {
     id: G.nextId(),
-    name: G.citizenName(opt.sex || (G.chance(0.5) ? 'm' : 'f')),
-    sex: opt.sex || 'm',
+    name: G.citizenName(sex),
+    sex,
     age: opt.age !== undefined ? opt.age : G.ri(18, 40),
     adult: opt.adult !== undefined ? opt.adult : (opt.age === undefined ? true : opt.age >= G.ADULT_AGE),
     x: opt.x, y: opt.y,
     familyId: opt.familyId != null ? opt.familyId : null,
+    partnerId: opt.partnerId != null ? opt.partnerId : null,
+    parentIds: Array.isArray(opt.parentIds) ? opt.parentIds.slice() : [],
+    grandparentIds: Array.isArray(opt.grandparentIds) ? opt.grandparentIds.slice() : [],
+    ancestorIds: Array.isArray(opt.ancestorIds) ? opt.ancestorIds.slice() : [],
+    birthFamilyId: opt.birthFamilyId != null ? opt.birthFamilyId : null,
     job: null, task: null, carry: null, pausedTask: null,
     student: false, educated: false, school: null,
     state: 'idle', walkKind: '', path: null, pi: 0, camped: false,
@@ -391,6 +494,9 @@ G.killCitizen = function (c, why) {
   if (c.dead) return;
   c.dead = true;
   const w = G.world, g = G.game;
+  const partner = w.cmap[c.partnerId];
+  if (partner && partner.partnerId === c.id) partner.partnerId = null;
+  c.partnerId = null;
   g.stats.died++;
   g.stats.deadReasons[why] = (g.stats.deadReasons[why] || 0) + 1;
   G.ui.toast(`🕯 ${c.name}${why}（享年 ${Math.floor(c.age)} 岁）`, 'bad');
@@ -401,6 +507,7 @@ G.killCitizen = function (c, why) {
   const fam = G.familyOf(c);
   if (fam) {
     fam.members = fam.members.filter(id => id !== c.id);
+    if ((fam.coupleIds || []).includes(c.id)) fam.coupleIds = [];
     if (fam.members.length === 0) {
       if (fam.houseId != null) {
         const h = w.bmap[fam.houseId];
@@ -484,6 +591,9 @@ G.resumeTask = function (c) {
   if (ok && t.kind === 'chop') {
     const idx = w.treeIdx[t.ty * w.N + t.tx];
     ok = idx >= 0 && w.trees[idx] === t.tree;   // 同一棵树还在（防止重种/互换后误续）
+  } else if (ok && t.kind === 'clearSite') {
+    const idx = w.treeIdx[t.tree.y * w.N + t.tree.x];
+    ok = t.b.state === 'site' && idx >= 0 && w.trees[idx] === t.tree;
   } else if (ok && t.kind === 'clearrock') {
     ok = w.rock[t.ty * w.N + t.tx] === t.rock;
   } else if (ok && t.kind === 'plant') {
@@ -648,6 +758,7 @@ G.stepCitizen = function (c, dtH) {
     }
     case 'work': {
       if (!c.task) { c.state = 'idle'; return; }
+      if (c.task.b && c.task.b.state === 'site') c.task.b.constructionStarted = true;
       c.task.workLeft -= dtH;
       c.animT += dtH * 12;
       if (c.task.workLeft <= 0) G.completeTask(c);
@@ -705,7 +816,7 @@ G.requestTask = function (c) {
     // 同一棵标记树只派一人（标记数量有限，不允许多人工复重叠）
     const claimed = new Set();
     for (const c2 of w.citizens) for (const t2 of [c2.task, c2.pausedTask])
-      if (c2 !== c && t2 && t2.kind === 'chop' && !t2.b) claimed.add(t2.ty * w.N + t2.tx);
+      if (c2 !== c && t2 && (t2.kind === 'chop' || t2.kind === 'clearSite') && t2.tree) claimed.add(t2.tree.y * w.N + t2.tree.x);
     const mt = G.pickMarkedTree(w, c.x, c.y, claimed);
     if (mt) {
       c.task = { kind: 'chop', b: null, tx: mt.x, ty: mt.y, tree: mt.tree, logs: G.taskYield(G.taskLogYield(c)), work: G.taskWork(c, G.PROD.forester.workH), workLeft: 0 };
@@ -727,6 +838,24 @@ G.requestTask = function (c) {
     return;
   }
   if (b.state === 'site') {
+    const trees = G.siteTrees(b);
+    if (trees.length) {
+      const claimed = new Set();
+      for (const c2 of w.citizens) for (const t of [c2.task, c2.pausedTask])
+        if (c2 !== c && t && (t.kind === 'clearSite' || t.kind === 'chop') && t.tree) claimed.add(t.tree);
+      const targets = trees.filter(t => !claimed.has(t)).sort((a, z) => G.d2(c.x, c.y, a.x, a.y) - G.d2(c.x, c.y, z.x, z.y));
+      for (const tree of targets) {
+        // 农田可以走进树格；实体建筑在边缘施工，目标树仍以独立坐标记录。
+        const spot = G.siteClearSpot(c, b, tree);
+        // 实体工地所有树共用周边入口，无需重复做整图寻路。
+        // 可穿行农田仍逐树判断，保留各目标的独立路径语义。
+        if (!spot) { if (!G.BDEF[b.type].passable) break; else continue; }
+        c.task = { kind: 'clearSite', b, tree, tx: spot.x, ty: spot.y,
+          logs: G.taskYield(G.taskLogYield(c)), work: G.taskWork(c, G.PROD.forester.workH), workLeft: 0 };
+        G.sendTo(c, spot.x, spot.y); return;
+      }
+      c.state = 'idle'; c.wanderT = 2; return; // 其余树已有人砍，不能提前建造。
+    }
     if (b.workLeft <= 0) { G.finishBuilding(b); c.state = 'idle'; return; }
     const spot = G.workSpot(w, b, c.x, c.y) || { x: b.x, y: b.y };
     c.task = {
@@ -811,7 +940,7 @@ G.makeTask = function (b, c) {
         return spot ? { kind: 'plant', b, tx: spot.x, ty: spot.y, work: G.taskWork(c, P.forester.plantH), workLeft: 0 } : null;
       };
       if (b.doCut) { // 砍伐成熟树（面板可开关，原版 Forester 的 Cut 选项）
-        const trees = G.treesInRadius(w, b.x, b.y, R, true);
+        const trees = G.treesInRadius(w, b.x, b.y, R, true).filter(t => w.bgrid[t.i] < 0);
         // 成熟树存量低于下限就停砍育林：防止清穿森林（也会拖垮同址采集小屋），等补种长回来
         if (trees.length > P.forester.minMature) {
           // 已被其他工人认领的树不再重复认领（全部被认领时允许重叠）
@@ -972,8 +1101,18 @@ G.completeTask = function (c) {
       }
       break;
     }
+    case 'clearSite': {
+      const w = G.world, idx = w.treeIdx[t.tree.y * w.N + t.tree.x];
+      if (b && w.bmap[b.id] === b && b.state === 'site' && idx >= 0 && w.trees[idx] === t.tree) {
+        G.removeTree(w, t.tree.x, t.tree.y);
+        c.carry = { type: 'wood', qty: t.logs || G.TREE_LOGS };
+        G.recordProduction(b, 'wood', c.carry.qty);
+      }
+      break;
+    }
     case 'chop': {
-      const treeOk = G.world.treeIdx[t.ty * G.world.N + t.tx] >= 0;
+      const treeIndex = G.world.treeIdx[t.ty * G.world.N + t.tx];
+      const treeOk = treeIndex >= 0 && G.world.trees[treeIndex] === t.tree;
       const jobOk = !t.b || G.world.bmap[t.b.id] === t.b; // b 为空 = 散工砍标记树
       if (treeOk && jobOk) {
         G.removeTree(G.world, t.tx, t.ty);
@@ -1301,6 +1440,25 @@ G.scheduleJobs = function () {
 };
 
 /* ================= 建筑 ================= */
+G.siteClearSpot = function (c, b, tree) {
+  const w = G.world;
+  const spots = [];
+  if (!G.tileBlocked(w, tree.x, tree.y)) spots.push({ x: tree.x, y: tree.y });
+  else for (let y = b.y - 1; y <= b.y + b.h; y++) for (let x = b.x - 1; x <= b.x + b.w; x++) {
+    if (x !== b.x - 1 && x !== b.x + b.w && y !== b.y - 1 && y !== b.y + b.h) continue;
+    if (!G.tileBlocked(w, x, y)) spots.push({ x, y });
+  }
+  spots.sort((a, z) => G.d2(a.x, a.y, tree.x, tree.y) - G.d2(z.x, z.y, tree.x, tree.y) || G.d2(c.x, c.y, a.x, a.y) - G.d2(c.x, c.y, z.x, z.y));
+  return spots.find(p => G.findPath(w, Math.round(c.x), Math.round(c.y), p.x, p.y)) || null;
+};
+G.siteTrees = function (b) {
+  const w = G.world, trees = [];
+  for (let y = b.y; y < b.y + b.h; y++) for (let x = b.x; x < b.x + b.w; x++) {
+    const i = w.treeIdx[y * w.N + x];
+    if (i >= 0) trees.push(w.trees[i]);
+  }
+  return trees;
+};
 G.addBuilding = function (type, x, y, opt) {
   opt = opt || {};
   const def = G.BDEF[type];
@@ -1312,19 +1470,10 @@ G.addBuilding = function (type, x, y, opt) {
   }
   const chk = G.canPlace(w, type, x, y);
   if (!chk.ok) return chk;
+  if (opt.instant && G.siteTrees({ x, y, w: def.w, h: def.h }).length) return { ok: false, reason: '立即放置需要已清场的地面' };
   if (!opt.free) for (const k in def.cost) G.game.res[k] -= def.cost[k];
 
-  // 清理占地上的树（得木材）；岩石已被 canPlace 拦截，这里仅兜底清理占位（不再直接给资源）
-  let bonusWood = 0;
-  for (let j = y; j < y + def.h; j++)
-    for (let i = x; i < x + def.w; i++) {
-      if (w.treeIdx[j * w.N + i] >= 0) {
-        G.removeTree(w, i, j);
-        bonusWood += 2;
-      }
-      G.clearRock(w, i, j);
-    }
-  if (bonusWood) G.deposit('wood', bonusWood);
+  // 保留占地资源；工地先安排真实砍伐与搬运，清场完毕才开始建造。
 
   const b = {
     id: G.nextId(), type, x, y, w: def.w, h: def.h,
@@ -1333,6 +1482,7 @@ G.addBuilding = function (type, x, y, opt) {
     workLeft: opt.instant ? 0 : def.buildWork,
     totalWork: def.buildWork || 1,
     workers: [], family: null, noWork: false, warnText: '',
+    paidCost: opt.free ? {} : Object.assign({}, def.cost), constructionStarted: false,
   };
   if (type === 'farm') {
     b.farm = [];
@@ -1365,12 +1515,12 @@ G.addBuilding = function (type, x, y, opt) {
     }
   }
   G.scheduleJobs();
-  if (opt.instant && type === 'house') G.assignHousing();
+  if (opt.instant && ['house', 'stonehouse', 'boarding'].includes(type)) G.assignHousing();
   return { ok: true, b };
 };
 
 G.finishBuilding = function (b) {
-  if (b.state !== 'site') return;
+  if (b.state !== 'site' || G.siteTrees(b).length) return;
   b.state = 'ok';
   b.progress = 1;
   // 建造工人多于正式岗位时，释放多余人员
@@ -1381,7 +1531,7 @@ G.finishBuilding = function (b) {
     if (c) { c.job = null; c.task = null; c.state = 'idle'; }
   }
   G.ui.toast(`🏗 ${G.BDEF[b.type].name} 建成了`, 'good');
-  if (b.type === 'house') G.assignHousing();
+  if (['house', 'stonehouse', 'boarding'].includes(b.type)) G.assignHousing();
   G.scheduleJobs();
   G.ui.refreshHUD();
 };
@@ -1394,13 +1544,15 @@ G.removeBuilding = function (b) {
   }
   for (const id of b.workers) {
     const c = w.cmap[id];
-    if (c) { c.job = null; c.task = null; c.state = 'idle'; }
+    if (c) { c.job = null; c.task = null; c.pausedTask = null; c.path = null; c.state = 'idle'; }
   }
-  // 原版：拆除建筑返还约一半建材（本作建造材料在下令时一次扣除）
+  // 尚未开工的规划全额撤销；已经劳动/建成的建筑拆除返还一半。
   const def = G.BDEF[b.type];
+  const paid = b.paidCost || def.cost; // 旧档没有付款快照，沿用历史建材成本。
+  const untouched = b.state === 'site' && !b.constructionStarted && b.progress === 0 && b.workLeft >= b.totalWork;
   const refund = [];
-  for (const k in def.cost) {
-    const n = Math.floor(def.cost[k] / 2);
+  for (const k in paid) {
+    const n = untouched ? paid[k] : Math.floor(paid[k] / 2);
     if (n > 0) { G.game.res[k] += n; refund.push(`${G.RES[k].icon}×${n}`); }
   }
   // 住户搬出（独栋住宅与宿舍都以 fam.houseId 指向本建筑）

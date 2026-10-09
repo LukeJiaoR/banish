@@ -13,7 +13,7 @@ const years = Number(arg('--years', 5));
 const seeds = arg('--seeds', '1,2,3,4,5,6,7,8').split(',').map(Number);
 const strategies = arg('--strategies', 'normal,original,neglect,no-fuel,overexpand').split(',');
 const allowed = ['normal', 'original', 'neglect', 'no-fuel', 'overexpand', 'fuel200', 'adaptive-mining'];
-if (!Number.isInteger(years) || years < 1 || years > 20 || seeds.some(s => !Number.isInteger(s) || s < 1) || strategies.some(s => !allowed.includes(s))) throw Error('Invalid years/seeds/strategies');
+if (!Number.isInteger(years) || years < 1 || years > 40 || seeds.some(s => !Number.isInteger(s) || s < 1) || strategies.some(s => !allowed.includes(s))) throw Error('Invalid years/seeds/strategies');
 const tuning = {};
 if (arg('--gatherer-yield', null) !== null) {
   tuning.gathererYield = Number(arg('--gatherer-yield', null));

@@ -10,9 +10,30 @@ G.tool = null;                 // null | {kind:'build',type} | {kind:'road'} | {
 G.hover = { tx: -1, ty: -1 };
 G.sel = null;
 G.keys = {};
+G.autosaveBlocked = false;
+G.RECOVERY_SAVE_KEY = G.AUTOSAVE_KEY + '_recovery';
+
+G.topModal = function () {
+  // Overlay order matches the DOM stacking order (all use the same z-index).
+  return ['over', 'fb', 'errs', 'saves', 'help'].map(id => document.getElementById(id))
+    .find(el => el && !el.classList.contains('hidden')) || null;
+};
+G.hasOpenModal = function () { return !!G.topModal(); };
+G.isEditingTarget = function (target) {
+  if (!target) return false;
+  return target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName || '') ||
+    !!(target.closest && target.closest('input, textarea, select, [role="textbox"]'));
+};
+G.isInputTarget = function (target) {
+  if (!target) return false;
+  return target.isContentEditable || /^(INPUT|TEXTAREA|SELECT|BUTTON|A)$/.test(target.tagName || '') ||
+    !!(target.closest && target.closest('input, textarea, select, button, a, [role="textbox"]'));
+};
 
 /* ---------- 新游戏 ---------- */
-G.newGame = function (seed) {
+G.newGame = function (seed, options) {
+  options = options || {};
+  G.autosaveBlocked = !!options.preserveSaves;
   seed = seed || ((Math.random() * 0xffffffff) >>> 0);
   G.rng = G.makeRng(seed ^ 0x51f15e);
   G.world = G.genWorld(seed);
@@ -24,8 +45,10 @@ G.newGame = function (seed) {
   G.tool = null;
   G.smoke = [];
   G.flakes = null;
-  localStorage.removeItem(G.AUTOSAVE_KEY); // 主动重开时清掉旧自动存档
-  G.deleteServerSaveQuiet('autosave');     // 服务器自动档同步清理（不可用时静默跳过）
+  if (!options.preserveSaves) {
+    try { localStorage.removeItem(G.AUTOSAVE_KEY); } catch (e) { G.ui.toast('无法清理本机旧自动档：' + e.message, 'warn'); }
+    G.deleteServerSaveQuiet('autosave');
+  }
   G.ui.hideInfo();
   G.ui.setToolActive();
   document.getElementById('over').classList.add('hidden');
@@ -41,14 +64,18 @@ G.newGame = function (seed) {
     const hx = s.x + Math.round(Math.cos(ang) * 2), hy = s.y + Math.round(Math.sin(ang) * 2);
     const m = G.spawnCitizen({ x: hx, y: hy, sex: 'm', age: G.ri(19, 38) });
     const fm = G.spawnCitizen({ x: hx, y: hy, sex: 'f', age: G.ri(18, 36) });
-    const fam = { id: G.nextId(), members: [m.id, fm.id], houseId: null };
+    const fam = { id: G.nextId(), members: [m.id, fm.id], houseId: null, coupleIds: [m.id, fm.id] };
+    m.partnerId = fm.id; fm.partnerId = m.id;
     m.familyId = fam.id; fm.familyId = fam.id;
     G.world.families.push(fam);
     for (let k = 0; k < kidPlan[f]; k++) {
       const kid = G.spawnCitizen({ x: hx, y: hy, age: G.ri(2, 9), adult: false, familyId: fam.id });
+      kid.parentIds = [m.id, fm.id];
       fam.members.push(kid.id);
     }
   }
+
+  if (G.normalizeFamilyRelations) G.normalizeFamilyRelations(G.world);
 
   // 相机对准镇址
   const [sx, sy] = G.T2S(s.x, s.y);
@@ -58,10 +85,11 @@ G.newGame = function (seed) {
   G.groundDirty.clear();
 
   G.ui.toast('归园 · 放逐小镇复刻原型（原版数值）', 'good');
-  G.ui.toast('中难度开局：5 个家庭无家可归。先盖木屋（16木+8石）安家，再修采集小屋、护林小屋保食物木材', 'warn');
+  G.ui.toast('先保食物：把采集小屋建在成熟森林旁，再补住房与柴火；别一口气盖满五间木屋耗光材料', 'warn');
   G.ui.toast('岩石给石头、锈色铁矿给铁 · 入冬前备好柴火（木屋每年约 30，石屋省一半）', 'info');
   G.scheduleJobs();
   G.ui.refreshHUD();
+  if (!G._hasShownHelp && G.ui.toggleHelp) { G._hasShownHelp = true; G.ui.toggleHelp(true); }
 };
 
 /* ---------- 存档 ---------- */
@@ -77,22 +105,24 @@ G.serializeGame = function () {
       res: g.res, stats: g.stats, prevFood: g.prevFood, foodNet: g.foodNet, foodUrgent: g.foodUrgent, warned: g.warned,
       hist: g.hist, buildLog: g.buildLog, toolWear: g.toolWear,
     },
-      trees: w.trees.map(t => [t.i, t.x, t.y, t.b]),
-      marked: [...w.marked],
-      markedRocks: [...(w.markedRocks || [])],
-      rockCleared: w.rockCleared,
+    roads: Array.from(w.road).flatMap((road, i) => road ? [i] : []),
+    trees: w.trees.map(t => [t.i, t.x, t.y, t.b]),
+    marked: [...w.marked],
+    markedRocks: [...(w.markedRocks || [])],
+    rockCleared: w.rockCleared,
     buildings: w.buildings.map(b => ({
       id: b.id, type: b.type, x: b.x, y: b.y, state: b.state,
-      progress: b.progress, workLeft: b.workLeft, totalWork: b.totalWork,
+      progress: b.progress, workLeft: b.workLeft, totalWork: b.totalWork, paidCost: b.paidCost, constructionStarted: b.constructionStarted,
       workers: b.workers, family: b.family, noWork: b.noWork, warnText: b.warnText,
       doCut: b.doCut, doPlant: b.doPlant, fuelLimit: b.fuelLimit, toolLimit: b.toolLimit,
       farm: b.farm ? b.farm.map(f => [f.sown ? 1 : 0, f.harvested ? 1 : 0]) : undefined,
       sownAll: b.sownAll, growth: b.growth, harvestDone: b.harvestDone,
     })),
-    families: w.families.map(f => ({ id: f.id, members: f.members, houseId: f.houseId })),
+    families: w.families.map(f => ({ id: f.id, members: f.members, houseId: f.houseId, coupleIds: f.coupleIds })),
     citizens: w.citizens.map(c => ({
       id: c.id, name: c.name, sex: c.sex, age: c.age, adult: c.adult,
       x: c.x, y: c.y, familyId: c.familyId, job: c.job,
+      partnerId: c.partnerId, parentIds: c.parentIds, grandparentIds: c.grandparentIds, ancestorIds: c.ancestorIds, birthFamilyId: c.birthFamilyId,
       student: c.student ? 1 : 0, educated: c.educated ? 1 : 0, school: c.school != null ? c.school : null,
       hunger: c.hunger, cold: c.cold, camped: c.camped ? 1 : 0, carry: c.carry,
     })),
@@ -102,6 +132,7 @@ G.serializeGame = function () {
 
 G.saveGame = function (key, silent) {
   key = key || G.SAVE_KEY;
+  if (key === G.AUTOSAVE_KEY && G.autosaveBlocked) return false;
   try {
     const data = G.serializeGame();
     data.savedAt = Date.now();
@@ -114,7 +145,7 @@ G.saveGame = function (key, silent) {
 
 /* 自动存档（换季 / 离开页面时调用，启动时自动恢复） */
 G.autosave = function () {
-  if (G.world && !G.game.over) {
+  if (G.world && !G.game.over && !G.autosaveBlocked) {
     G.saveGame(G.AUTOSAVE_KEY, true);
     G.saveToServer('autosave', true).catch(() => {}); // 自动档镜像到服务器；不可用时静默跳过
   }
@@ -146,122 +177,214 @@ G.tryReplayLoad = function () {
 
 G.loadGame = function (key) {
   key = key || G.SAVE_KEY;
-  const raw = localStorage.getItem(key);
-  if (!raw) { G.ui.toast('没有找到存档', 'warn'); return; }
   try {
+    const raw = localStorage.getItem(key);
+    if (!raw) { G.ui.toast('没有找到存档', 'warn'); return false; }
     G.applySaveData(JSON.parse(raw));
     G.ui.toast(key === G.AUTOSAVE_KEY ? '📂 已自动恢复上次进度（🌱 可开新局）' : '📂 存档已载入', 'good');
+    return true;
   } catch (e) {
     console.error(e);
     G.ui.toast('读档失败：' + e.message, 'bad');
+    return false;
   }
+};
+
+/* A broken startup save must never strand the player on an uninitialized world,
+ * delete the server copy, or get silently overwritten by the temporary new town. */
+G.recoverBrokenAutosave = function (raw) {
+  G._recoveryBackedUp = false;
+  try {
+    let key = G.RECOVERY_SAVE_KEY;
+    const previous = localStorage.getItem(key);
+    if (previous && previous !== raw) key += '_' + Date.now();
+    localStorage.setItem(key, raw);
+    if (localStorage.getItem(key) !== raw) throw new Error('备份未写入');
+    G.recoverySaveKey = key; G._recoveryBackedUp = true;
+  } catch (e) { /* Keep the original untouched even if quota/privacy blocks the backup. */ }
+  G.newGame(undefined, { preserveSaves: true });
+  G.ui.toast('自动档无法载入，原文已保留。已开临时新局并暂停自动保存；可手动保存，或确认新游戏后继续自动保存。', 'warn');
+};
+
+/* Validate and build a candidate without changing the running town. All entry points
+ * (local, server, replay and file import) use this same transaction boundary. */
+G.prepareSaveData = function (d) {
+  const bad = field => { throw new Error('存档数据无效：' + field); };
+  const record = (v, field) => { if (!v || typeof v !== 'object' || Array.isArray(v)) bad(field); return v; };
+  const number = (v, field, min = -Infinity, max = Infinity) => {
+    if (!Number.isFinite(v) || v < min || v > max) bad(field);
+    return v;
+  };
+  const integer = (v, field, min = 0, max = Number.MAX_SAFE_INTEGER) => {
+    number(v, field, min, max); if (!Number.isSafeInteger(v)) bad(field); return v;
+  };
+  const array = (v, field) => { if (!Array.isArray(v)) bad(field); return v; };
+  const optionalArray = (v, field) => v === undefined ? [] : array(v, field);
+  const id = (v, field) => integer(v, field, 1, 0x7ffffffe);
+  const nullableId = (v, field) => v == null ? null : id(v, field);
+  const ids = (v, field) => array(v, field).map(x => id(x, field));
+  const clone = v => JSON.parse(JSON.stringify(v));
+  record(d, '根对象');
+  if (d.v !== undefined && d.v !== 1) bad('版本不受支持');
+  integer(d.seed, '地图种子', -0x80000000, 0xffffffff);
+  const oldN = d.N === undefined ? G.MAP : integer(d.N, '地图尺寸', 1, 4096);
+  const gd = record(d.game, '游戏状态'), g = G.newGameState();
+  g.h = number(gd.h, '小时', 0, G.DAY_H); if (g.h === G.DAY_H) bad('小时');
+  g.day = integer(gd.day, '天数'); g.season = integer(gd.season, '季节', 0, 3); g.year = integer(gd.year, '年份', 1);
+  record(gd.res, '资源');
+  for (const key of G.RES_KEYS) {
+    const value = gd.res[key] === undefined && key === 'iron' ? 0 : gd.res[key] === undefined && key === 'tools' ? 10 : gd.res[key];
+    g.res[key] = number(value, '资源 ' + key, 0);
+  }
+  if (gd.stats !== undefined) {
+    const stats = record(gd.stats, '统计');
+    g.stats.born = integer(stats.born, '出生统计'); g.stats.died = integer(stats.died, '死亡统计');
+    const reasons = record(stats.deadReasons || {}, '死亡原因');
+    for (const key of Object.keys(reasons)) integer(reasons[key], '死亡原因统计');
+    g.stats.deadReasons = clone(reasons);
+  }
+  if (gd.prevFood !== undefined) g.prevFood = number(gd.prevFood, '昨日食物', 0);
+  if (gd.foodNet !== undefined) g.foodNet = number(gd.foodNet, '食物变化');
+  g.toolWear = Number.isFinite(gd.toolWear) && gd.toolWear >= 0 ? gd.toolWear : 0;
+  g.warned = gd.warned === undefined ? {} : clone(record(gd.warned, '提醒状态'));
+  g.hist = clone(optionalArray(gd.hist, '历史记录'));
+  g.buildLog = clone(optionalArray(gd.buildLog, '建造记录'));
+  const trees = array(d.trees, '树木'), buildings = array(d.buildings, '建筑');
+  const families = array(d.families, '家庭'), citizens = array(d.citizens, '市民');
+  g.foodUrgent = typeof gd.foodUrgent === 'boolean' ? gd.foodUrgent : g.res.food < citizens.length * G.LIFE.eatPerDay * 8;
+  // Loading while reading a dialog must never secretly resume its simulation.
+  g.paused = !!(G.game && G.game.paused) || G.hasOpenModal();
+  g.speed = G.game && [1, 2, 5].includes(G.game.speed) ? G.game.speed : 1;
+
+  const w = G.genWorld(d.seed, { starterResources: d.mapVersion >= 1 });
+  const gridIndex = (i, field) => {
+    integer(i, field, 0, oldN * oldN - 1);
+    const x = i % oldN, y = Math.floor(i / oldN);
+    // A smaller map drops off-map cells; never let x overflow into a new row.
+    return x < w.N && y < w.N ? y * w.N + x : null;
+  };
+  w.trees = []; w.treeIdx.fill(-1);
+  for (const row of trees) {
+    if (!Array.isArray(row) || row.length !== 4) bad('树木记录');
+    const x = integer(row[1], '树木 x', 0, oldN - 1), y = integer(row[2], '树木 y', 0, oldN - 1);
+    const born = number(row[3], '树龄');
+    if (x >= w.N || y >= w.N) continue;
+    const i = y * w.N + x;
+    if (w.treeIdx[i] >= 0) bad('重复树木');
+    w.treeIdx[i] = w.trees.length; w.trees.push({ i, x, y, b: born });
+  }
+  for (const i of optionalArray(d.rockCleared, '已清理岩石')) {
+    const t = gridIndex(i, '岩石索引'); if (t === null) continue;
+    if (!w.rockCleared.includes(t)) w.rockCleared.push(t);
+    w.rock[t] = 0;
+  }
+  for (const i of optionalArray(d.marked, '砍伐标记')) { const t = gridIndex(i, '砍伐索引'); if (t !== null) w.marked.add(t); }
+  for (const i of optionalArray(d.markedRocks, '采矿标记')) { const t = gridIndex(i, '采矿索引'); if (t !== null && w.rock[t]) w.markedRocks.add(t); }
+  for (const i of optionalArray(d.roads, '道路')) { const t = gridIndex(i, '道路索引'); if (t !== null) w.road[t] = 1; }
+
+  const used = new Set(); let usedMax = 0;
+  const uniqueId = (value, field) => {
+    id(value, field); if (used.has(value)) bad('重复 ID');
+    used.add(value); usedMax = Math.max(usedMax, value); return value;
+  };
+  for (const bd of buildings) {
+    record(bd, '建筑记录');
+    if (!Object.prototype.hasOwnProperty.call(G.BDEF, bd.type)) bad('建筑类型');
+    const def = G.BDEF[bd.type];
+    const x = integer(bd.x, '建筑 x', 0, Math.min(oldN, w.N) - def.w);
+    const y = integer(bd.y, '建筑 y', 0, Math.min(oldN, w.N) - def.h);
+    if (bd.state !== 'ok' && bd.state !== 'site') bad('建筑状态');
+    const b = {
+      id: uniqueId(bd.id, '建筑 ID'), type: bd.type, x, y, w: def.w, h: def.h, state: bd.state,
+      progress: bd.progress === undefined ? (bd.state === 'ok' ? 1 : 0) : number(bd.progress, '建造进度', 0, 1),
+      workLeft: bd.workLeft === undefined ? (bd.state === 'ok' ? 0 : def.buildWork) : number(bd.workLeft, '剩余工时'),
+      totalWork: bd.totalWork === undefined ? (def.buildWork || 1) : number(bd.totalWork, '总工时', 0),
+      workers: ids(bd.workers, '工人'), family: nullableId(bd.family, '建筑家庭'),
+      noWork: !!bd.noWork, warnText: typeof bd.warnText === 'string' ? bd.warnText : '',
+      doCut: bd.doCut !== false, doPlant: bd.doPlant !== false,
+      toolLimit: bd.type === 'blacksmith' ? G.toolLimitOf(bd) : undefined,
+      fuelLimit: bd.type === 'woodcutter' ? G.fuelLimitOf(bd) : undefined,
+    };
+    if (bd.constructionStarted !== undefined && typeof bd.constructionStarted !== 'boolean') bad('工地开工状态');
+    b.constructionStarted = bd.constructionStarted === true;
+    if (bd.paidCost !== undefined) {
+      record(bd.paidCost, '已付建材'); b.paidCost = {};
+      for (const key of Object.keys(bd.paidCost)) {
+        if (!G.RES_KEYS.includes(key)) bad('已付建材类型');
+        b.paidCost[key] = number(bd.paidCost[key], '已付建材数量', 0);
+      }
+    }
+    if (bd.type === 'farm') {
+      if (!Array.isArray(bd.farm) || bd.farm.length !== b.w * b.h) bad('农田格数');
+      b.farm = bd.farm.map((row, k) => {
+        if (!Array.isArray(row) || row.length !== 2 || !row.every(v => v === 0 || v === 1 || v === false || v === true)) bad('农田状态');
+        return { x: x + k % b.w, y: y + Math.floor(k / b.w), sown: !!row[0], harvested: !!row[1] };
+      });
+      b.sownAll = !!bd.sownAll; b.harvestDone = !!bd.harvestDone;
+      b.growth = bd.growth === undefined ? 0 : number(bd.growth, '农田生长', 0, 1);
+    }
+    for (let yy = y; yy < y + b.h; yy++) for (let xx = x; xx < x + b.w; xx++) {
+      const i = yy * w.N + xx; if (w.bgrid[i] >= 0) bad('建筑重叠'); w.bgrid[i] = b.id;
+    }
+    w.buildings.push(b); w.bmap[b.id] = b;
+  }
+  w.families = families.map(fd => {
+    record(fd, '家庭记录');
+    return { id: uniqueId(fd.id, '家庭 ID'), members: ids(fd.members, '家庭成员'), houseId: nullableId(fd.houseId, '住房'),
+      coupleIds: fd.coupleIds === undefined ? undefined : ids(fd.coupleIds, '配偶') };
+  });
+  for (const cd of citizens) {
+    record(cd, '市民记录');
+    if (typeof cd.name !== 'string' || !['m', 'f'].includes(cd.sex)) bad('市民身份');
+    let carry = null;
+    if (cd.carry != null) {
+      record(cd.carry, '随身资源'); if (!G.RES_KEYS.includes(cd.carry.type)) bad('随身资源类型');
+      carry = { type: cd.carry.type, qty: number(cd.carry.qty, '随身资源数量', 0) };
+    }
+    const c = {
+      id: uniqueId(cd.id, '市民 ID'), name: cd.name, sex: cd.sex, age: number(cd.age, '年龄', 0), adult: !!cd.adult,
+      x: number(cd.x, '市民 x', 0, Math.min(oldN, w.N) - 1), y: number(cd.y, '市民 y', 0, Math.min(oldN, w.N) - 1),
+      familyId: nullableId(cd.familyId, '市民家庭'), job: nullableId(cd.job, '岗位'),
+      partnerId: cd.partnerId === undefined ? undefined : nullableId(cd.partnerId, '配偶 ID'),
+      parentIds: cd.parentIds === undefined ? undefined : ids(cd.parentIds, '父母 ID'),
+      grandparentIds: cd.grandparentIds === undefined ? [] : ids(cd.grandparentIds, '祖父母 ID'),
+      ancestorIds: cd.ancestorIds === undefined ? undefined : ids(cd.ancestorIds, '祖辈 ID'),
+      birthFamilyId: cd.birthFamilyId === undefined ? undefined : nullableId(cd.birthFamilyId, '原生家庭'),
+      student: !!cd.student, educated: !!cd.educated, school: nullableId(cd.school, '学校'),
+      task: null, pausedTask: null, carry, state: 'idle', walkKind: '', path: null, pi: 0, camped: !!cd.camped,
+      wanderT: 0, hunger: cd.hunger === undefined ? 0 : number(cd.hunger, '饥饿', 0),
+      cold: cd.cold === undefined ? 0 : number(cd.cold, '寒冷', 0), animT: 0, dead: false,
+    };
+    w.citizens.push(c); w.cmap[c.id] = c;
+  }
+  if (G.normalizeFamilyRelations) G.normalizeFamilyRelations(w);
+  // Relocate old saves' citizens trapped inside a footprint before committing.
+  for (const c of w.citizens) {
+    const cx = Math.round(c.x), cy = Math.round(c.y);
+    if (G.tileBlocked(w, cx, cy)) {
+      const spot = G.nearestWalkable(w, cx, cy, 8);
+      if (spot) { c.x = spot.x; c.y = spot.y; c.camped = false; }
+    }
+  }
+  const nextUid = d.nextUid === undefined ? 10000 : id(d.nextUid, '下一个 ID');
+  return { world: w, game: g, nextUid: Math.max(nextUid, usedMax + 1), rng: G.makeRng((d.seed ^ 0x51f15e) >>> 0) };
 };
 
 /* 把存档 JSON 应用为当前局面（本机档 / 服务器档 / 导入文件共用） */
 G.applySaveData = function (d) {
-  G.rng = G.makeRng((d.seed ^ 0x51f15e) >>> 0);
-  G.world = G.genWorld(d.seed, { starterResources: d.mapVersion >= 1 });
-  G.game = G.newGameState();
-  const g = G.game, w = G.world;
-  Object.assign(g, d.game);
-  // 旧档缺失或导入值无效时从 0 开始；正常存档保留尚未耗尽一把工具的累计磨损。
-  g.foodUrgent = typeof d.game.foodUrgent === 'boolean' ? d.game.foodUrgent : g.res.food < (d.citizens || []).length * G.LIFE.eatPerDay * 8;
-  g.toolWear = Number.isFinite(g.toolWear) && g.toolWear >= 0 ? g.toolWear : 0;
-  g.res.iron = g.res.iron || 0; // 旧存档迁移：无铁字段时补 0
-  g.res.tools = g.res.tools != null ? g.res.tools : 10; // 旧存档迁移：无工具字段补 10 把应急
-  g.hist = Array.isArray(g.hist) ? g.hist : [];
-  g.buildLog = Array.isArray(g.buildLog) ? g.buildLog : [];
-  G.sel = null; G.tool = null; G.smoke = []; G.flakes = null;
+  const candidate = G.prepareSaveData(d);
+  G.world = candidate.world; G.game = candidate.game; G.rng = candidate.rng; G.setUid(candidate.nextUid);
+  if (G._recoveryBackedUp) G.autosaveBlocked = false;
+  G.sel = null; G.tool = null; G.smoke = []; G.flakes = null; G.keys = {};
   G.ui.hideInfo(); G.ui.setToolActive();
   document.getElementById('over').classList.add('hidden');
-
-  // 旧版地图尺寸迁移：76×76 存档里的裸索引（岩石清理/砍伐标记）按旧 N 重映射
-  const oldN = d.N || w.N;
-  const remap = i => (i >= 0 && i < oldN * oldN && oldN !== w.N)
-    ? ((i / oldN) | 0) * w.N + (i % oldN) : i;
-
-  // id 下限防御：旧版 _peekUid 有差一错误，旧档里的 nextUid 可能落后于现存最大 id——
-  // 直接沿用会让新建筑重发现存 id 再次碰撞，这里取两者较大值
-  const usedMax = Math.max(
-    d.buildings.reduce((m, b) => Math.max(m, b.id || 0), 0),
-    (d.citizens || []).reduce((m, c) => Math.max(m, c.id || 0), 0),
-    (d.families || []).reduce((m, f) => Math.max(m, f.id || 0), 0),
-  );
-  G.setUid(Math.max(d.nextUid || 10000, usedMax + 1));
-  // 树：清空重建（索引一律按 x,y 现算，天然兼容旧尺寸存档）
-  w.trees = []; w.treeIdx.fill(-1);
-  for (const [, x, y, b] of d.trees) {
-    const i = y * w.N + x;
-    w.trees.push({ i, x, y, b });
-    w.treeIdx[i] = w.trees.length - 1;
-  }
-  // 已清理的岩石
-  for (const i of d.rockCleared || []) {
-    const t = remap(i);
-    w.rock[t] = 0;
-    w.rockCleared.push(t);
-  }
-  // 「砍伐」标记
-  if (d.marked) for (const i of d.marked) w.marked.add(remap(i));
-  // 「清除岩石」标记（只保留仍存在岩石的格子）
-  if (d.markedRocks) for (const i of d.markedRocks) { const t = remap(i); if (w.rock[t]) w.markedRocks.add(t); }
-    // 建筑
-    for (const bd of d.buildings) {
-      const b = {
-        id: bd.id, type: bd.type, x: bd.x, y: bd.y, w: G.BDEF[bd.type].w, h: G.BDEF[bd.type].h,
-        state: bd.state, progress: bd.progress, workLeft: bd.workLeft, totalWork: bd.totalWork,
-        workers: bd.workers, family: bd.family, noWork: bd.noWork, warnText: bd.warnText || '',
-        doCut: bd.doCut !== false, doPlant: bd.doPlant !== false, // 旧档无此字段默认全开
-        toolLimit: bd.type === 'blacksmith' ? G.toolLimitOf(bd) : undefined,
-        fuelLimit: bd.type === 'woodcutter' ? G.fuelLimitOf(bd) : undefined, // 旧档回退默认上限
-      };
-      if (bd.type === 'farm') {
-        b.farm = [];
-        let k = 0;
-        for (let j = b.y; j < b.y + b.h; j++)
-          for (let i = b.x; i < b.x + b.w; i++)
-            b.farm.push({ x: i, y: j, sown: !!bd.farm[k][0], harvested: !!bd.farm[k][1] }), k++;
-        b.sownAll = bd.sownAll; b.growth = bd.growth; b.harvestDone = bd.harvestDone;
-      }
-      w.buildings.push(b);
-      w.bmap[b.id] = b;
-      for (let j = b.y; j < b.y + b.h; j++)
-        for (let i = b.x; i < b.x + b.w; i++)
-          w.bgrid[j * w.N + i] = b.id;
-    }
-    // 家庭 & 市民
-    w.families = d.families.map(f => ({ id: f.id, members: f.members, houseId: f.houseId }));
-    for (const cd of d.citizens) {
-      const c = {
-        id: cd.id, name: cd.name, sex: cd.sex, age: cd.age, adult: cd.adult,
-        x: cd.x, y: cd.y, familyId: cd.familyId, job: cd.job,
-        student: !!cd.student, educated: !!cd.educated, school: cd.school != null ? cd.school : null,
-        task: null, pausedTask: null, carry: cd.carry, state: 'idle', walkKind: '', path: null, pi: 0, camped: !!cd.camped,
-        wanderT: Math.random() * 3, hunger: cd.hunger, cold: cd.cold, animT: 0, dead: false,
-      };
-      w.citizens.push(c);
-      w.cmap[c.id] = c;
-    }
-    // 存档时正在搬运的资源：重新派人送仓（读档后市民都回到 idle，不处理会一直挂在身上）
-    for (const c of w.citizens) {
-      if (c.carry) G.startHaul(c);
-    }
-    // 旧档兜底：把站在建筑脚印/岩石等不可通行格上的市民挪到最近可站格
-    // （旧版婴儿出生点在房屋占位格内：寻路全失败 → 整夜按露宿挨冻）
-    for (const c of w.citizens) {
-      const cx = Math.round(c.x), cy = Math.round(c.y);
-      if (G.tileBlocked(w, cx, cy)) {
-        const spot = G.nearestWalkable(w, cx, cy, 8);
-        if (spot) { c.x = spot.x; c.y = spot.y; c.path = null; c.pi = 0; c.camped = false; }
-      }
-    }
-    const s = w.start;
-    const [sx, sy] = G.T2S(s.x, s.y);
-    G.cam.x = window.innerWidth / 2 - sx * G.cam.z;
-    G.cam.y = window.innerHeight / 2 - sy * G.cam.z;
-    G.needGround = true;
-    G.groundDirty.clear();
-    G.ui.refreshHUD();
+  // All cargo is validated and owned by the candidate; now resume its deliveries.
+  for (const c of G.world.citizens) if (c.carry) G.startHaul(c);
+  const s = G.world.start, [sx, sy] = G.T2S(s.x, s.y);
+  G.cam.x = window.innerWidth / 2 - sx * G.cam.z;
+  G.cam.y = window.innerHeight / 2 - sy * G.cam.z;
+  G.needGround = true; G.groundDirty.clear();
+  G.ui.refreshHUD();
 };
 
 /* ---------- 服务器存档（server.py /api/saves；静态/dev 服务器上不可用） ---------- */
@@ -442,8 +565,13 @@ G.init = function () {
   G.feedback.init();
   // 启动：一键复盘页（已注入快照）→ 有自动存档则恢复上次进度 → 否则开新局
   if (!G.tryReplayLoad()) {
-    if (localStorage.getItem(G.AUTOSAVE_KEY)) G.loadGame(G.AUTOSAVE_KEY);
-    else G.newGame();
+    let raw = null;
+    try { raw = localStorage.getItem(G.AUTOSAVE_KEY); } catch (e) {
+      G.ui.toast('本机存储不可用，已开临时新局。请导出文件保存进度。', 'warn');
+      G.newGame(undefined, { preserveSaves: true });
+    }
+    if (raw) { if (!G.loadGame(G.AUTOSAVE_KEY)) G.recoverBrokenAutosave(raw); }
+    else if (!G.world) G.newGame();
   }
   G.probeServerSaves(); // 探测服务器存档接口（server.py 托管时可用）
 
@@ -451,7 +579,7 @@ G.init = function () {
   window.addEventListener('beforeunload', () => G.autosave());
   window.addEventListener('pagehide', () => G.autosave());
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') G.autosave();
+    if (document.visibilityState === 'hidden') { resetInput(); G.autosave(); }
   });
   // 定时自动存档：每 90 秒（游戏进行中）
   setInterval(() => G.autosave(), 90000);
@@ -461,6 +589,13 @@ G.init = function () {
   let roadLast = null;
   let fellLast = null;
   let rockLast = null;
+  function resetInput() {
+    G.keys = {};
+    dragging = false; dragBtn = -1; dragMoved = 0;
+    roadLast = null; fellLast = null; rockLast = null;
+  }
+  window.addEventListener('blur', resetInput);
+  document.addEventListener('focusin', e => { if (G.isInputTarget(e.target)) resetInput(); });
 
   const toLocal = (e) => {
     const r = G.cv.getBoundingClientRect();
@@ -470,6 +605,7 @@ G.init = function () {
   G.cv.addEventListener('contextmenu', e => e.preventDefault());
 
   G.cv.addEventListener('mousedown', e => {
+    if (G.hasOpenModal()) { resetInput(); return; }
     const p = toLocal(e);
     if (e.button === 2 && G.tool) { G.setTool(null); return; } // 右键取消工具
     dragging = true; dragBtn = e.button; dragMoved = 0;
@@ -495,6 +631,7 @@ G.init = function () {
   });
 
   window.addEventListener('mousemove', e => {
+    if (G.hasOpenModal()) { resetInput(); return; }
     const p = toLocal(e);
     const t = G.screenToTile(p.x, p.y);
     G.hover = { tx: Math.floor(t.tx), ty: Math.floor(t.ty) };
@@ -526,6 +663,7 @@ G.init = function () {
   });
 
   window.addEventListener('mouseup', e => {
+    if (G.hasOpenModal()) { resetInput(); return; }
     if (!dragging) return;
     dragging = false;
     const p = toLocal(e);
@@ -545,6 +683,7 @@ G.init = function () {
   });
 
   G.cv.addEventListener('wheel', e => {
+    if (G.hasOpenModal()) return;
     e.preventDefault();
     const p = toLocal(e);
     const oldZ = G.cam.z;
@@ -556,27 +695,54 @@ G.init = function () {
   }, { passive: false });
 
   window.addEventListener('keydown', e => {
-    G.keys[e.key.toLowerCase()] = true;
-    if (e.key === ' ') { G.game.paused = !G.game.paused; G.ui.refreshHUD(); e.preventDefault(); }
-    else if (e.key === '1') { G.game.paused = false; G.game.speed = 1; G.ui.refreshHUD(); }
-    else if (e.key === '2') { G.game.paused = false; G.game.speed = 2; G.ui.refreshHUD(); }
-    else if (e.key === '3') { G.game.paused = false; G.game.speed = 5; G.ui.refreshHUD(); }
-    else if (e.key === 'Escape') {
-      if (!document.getElementById('errs').classList.contains('hidden')) document.getElementById('errs').classList.add('hidden');
-      else if (!document.getElementById('fb').classList.contains('hidden')) G.feedback.close();
-      else if (!document.getElementById('saves').classList.contains('hidden')) G.ui.closeSaves();
+    if (e.isComposing || e.ctrlKey || e.metaKey || e.altKey) return;
+    const key = e.key.toLowerCase();
+    const modal = G.topModal();
+    if (e.key === 'Tab' && modal) {
+      const stops = Array.from(modal.querySelectorAll('button, input, select, textarea, a[href], [tabindex]'))
+        .filter(el => !el.disabled && el.tabIndex !== -1 && (!el.getClientRects || el.getClientRects().length));
+      const index = stops.indexOf(document.activeElement);
+      if (!stops.length) { e.preventDefault(); return; }
+      if (index < 0 || (e.shiftKey && index === 0) || (!e.shiftKey && index === stops.length - 1)) {
+        stops[e.shiftKey ? stops.length - 1 : 0].focus(); e.preventDefault();
+      }
+      return;
+    }
+    const visible = id => { const el = document.getElementById(id); return el && !el.classList.contains('hidden'); };
+    // Escape dismisses the front dialog even if its text field owns focus.
+    if (e.key === 'Escape' && !e.repeat) {
+      if (visible('over')) return;
+      else if (visible('fb')) G.feedback.close();
+      else if (visible('errs')) G.ui.closeErrs();
+      else if (visible('saves')) G.ui.closeSaves();
+      else if (visible('help')) G.ui.toggleHelp(false);
+      else if (G.isEditingTarget(e.target) || G.isEditingTarget(document.activeElement)) return;
       else if (G.tool) G.setTool(null);
       else if (G.sel) G.ui.hideInfo();
-      else G.ui.toggleHelp(false);
-    } else if (e.key === '?') G.ui.toggleHelp();
+      resetInput(); e.preventDefault(); return;
+    }
+    if (G.isInputTarget(e.target) || G.isInputTarget(document.activeElement) || G.hasOpenModal()) {
+      G.keys = {}; return;
+    }
+    if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
+      G.keys[key] = true; e.preventDefault(); return;
+    }
+    if (e.key === ' ') {
+      e.preventDefault(); if (e.repeat) return;
+      G.game.paused = !G.game.paused; G.ui.refreshHUD();
+    } else if (['1', '2', '3'].includes(e.key) && !e.repeat) {
+      G.game.paused = false; G.game.speed = { 1: 1, 2: 2, 3: 5 }[e.key]; G.ui.refreshHUD();
+    } else if (e.key === '?' && !e.repeat) G.ui.toggleHelp();
   });
-  window.addEventListener('keyup', e => { G.keys[e.key.toLowerCase()] = false; });
+  window.addEventListener('keyup', e => { delete G.keys[e.key.toLowerCase()]; });
 
   /* ----- 主循环 ----- */
   let last = performance.now();
   let lastFrameWall = performance.now();
   let uiAcc = 0;
   function stepGame(dtReal) {
+    // A dialog or newly focused field also stops a key held before it opened.
+    if (G.hasOpenModal() || G.isInputTarget(document.activeElement)) G.keys = {};
     // 键盘平移
     const pan = 520 * dtReal / G.cam.z;
     if (G.keys['w'] || G.keys['arrowup']) G.cam.y += pan;
