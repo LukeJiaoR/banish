@@ -99,7 +99,7 @@ G.fillTexDiamond = function (c, name, sx, sy, tint, tintA) {
 G.BUILD_SPR_W = {
   house: 1.16, stonehouse: 1.12, boarding: 1.04, storage: 1.03, mine: 1.12,
   gatherer: 1.10, forester: 1.06, woodcutter: 1.12, dock: 1.0,
-  school: 1.06, site_2x2: 1.0, site_3x3: 1.0,
+  school: 1.06, blacksmith: 1.06, hunting: 1.08, site_2x2: 1.0, site_3x3: 1.0,
 };
 /* 精灵内烟囱的横向位置（相对精灵宽度，负=偏左），用于挂炊烟粒子 */
 G.BUILD_CHIMNEY_X = { house: -0.30, stonehouse: 0.02, boarding: -0.32 };
@@ -167,15 +167,12 @@ G.drawGroundTile = function (c, w, pal, x, y) {
     const iron = w.rock[i] === 2;
     const rk = iron ? pal.iron : pal.rock, rkD = iron ? pal.ironD : pal.rockD;
     const cx = sx, cy = sy + 16;
-    const rn = 'rock_' + (((x * 7 + y * 13) % 2) ? 'b' : 'a') + (G.isWinter() ? '_snow' : '');
+    const rn = iron ? 'res_iron' : 'rock_' + (((x * 7 + y * 13) % 2) ? 'b' : 'a') + (G.isWinter() ? '_snow' : '');
     const spr = G.sprDraw(c, rn, cx, cy + 10, { w: 26 });
     if (spr) {
-      if (iron) { // 铁矿：在岩石上叠锈色矿粒示区分
-        c.fillStyle = pal.iron;
-        c.beginPath(); c.ellipse(cx - 4, cy + 1, 3, 1.8, 0, 0, Math.PI * 2); c.fill();
-        c.beginPath(); c.ellipse(cx + 3, cy + 4, 2.4, 1.5, 0, 0, Math.PI * 2); c.fill();
-        c.fillStyle = pal.ironD;
-        c.beginPath(); c.ellipse(cx + 1, cy + 7, 2, 1.2, 0, 0, Math.PI * 2); c.fill();
+      if (iron && G.isWinter()) { // 雪顶保持矿脉轮廓可辨，不依赖颜色区分
+        c.fillStyle = '#d8e6ef';
+        c.beginPath(); c.ellipse(cx - 2, cy - 8, 4, 1.5, 0, 0, Math.PI * 2); c.fill();
       }
     } else {
       c.fillStyle = rkD;
@@ -513,6 +510,32 @@ G.drawCitizen = function (ctx, c, time) {
     ctx.stroke();
   }
   if (resting) ctx.globalAlpha = 1;
+  // Only sustained danger gets a badge, so normal winter exposure stays quiet.
+  const cold = c.cold >= G.LIFE.coldDays * 0.5;
+  const hungry = c.hunger >= G.LIFE.starveDays * 0.5;
+  if (cold || hungry) G.drawNeedBadge(ctx, sx, sy - (child ? 19 : 24), cold ? 'cold' : 'food');
+};
+
+// Code-native HUD symbols: a snowflake and a food bowl, not font/emoji dependent.
+G.drawNeedBadge = function (ctx, x, y, kind) {
+  ctx.save();
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = '#242b30';
+  ctx.strokeStyle = kind === 'cold' ? '#bce9ff' : '#ffd174';
+  ctx.lineWidth = 1.2;
+  ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.beginPath();
+  if (kind === 'cold') {
+    for (let i = 0; i < 3; i++) {
+      const a = i * Math.PI / 3, dx = Math.cos(a) * 3.4, dy = Math.sin(a) * 3.4;
+      ctx.moveTo(x - dx, y - dy); ctx.lineTo(x + dx, y + dy);
+    }
+  } else {
+    ctx.moveTo(x - 3.5, y - 1); ctx.lineTo(x + 3.5, y - 1);
+    ctx.lineTo(x + 2, y + 2); ctx.lineTo(x - 2, y + 2); ctx.closePath();
+    ctx.moveTo(x, y - 4); ctx.lineTo(x, y - 2);
+  }
+  ctx.stroke(); ctx.restore();
 };
 
 /* ---------- 粒子 ---------- */
@@ -645,6 +668,11 @@ G.frame = function (dtReal) {
     }
     else if (it.k === 1) {
       G.drawBuilding(ctx, it.b, now);
+      // Cold homes get a distinct snowflake; no-work warning remains separate.
+      if (G.isWinter() && it.b.unheated && it.b.state === 'ok') {
+        const T = G.T2S(it.b.x + it.b.w / 2, it.b.y);
+        G.drawNeedBadge(ctx, T[0] + 13, T[1] - 25, 'cold');
+      }
       // 警告标记
       if (it.b.noWork && it.b.state === 'ok') {
         const T = G.T2S(it.b.x + it.b.w / 2, it.b.y);

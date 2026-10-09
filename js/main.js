@@ -31,7 +31,8 @@ G.newGame = function (seed) {
   document.getElementById('over').classList.add('hidden');
 
   const s = G.world.start;
-  G.addBuilding('storage', s.x - 1, s.y - 1, { instant: true, free: true });
+  const initialStorage = G.addBuilding('storage', s.x - 1, s.y - 1, { instant: true, free: true });
+  if (!initialStorage.ok) throw new Error('起始储物车放置失败：' + initialStorage.reason);
 
   // 5 个家庭（原版中难度）：2 名成人 + 若干孩子，开局全部无家可归，入冬前必须盖房
   let kidPlan = [2, 2, 1, 0, 0];
@@ -69,11 +70,11 @@ G.newGame = function (seed) {
 G.serializeGame = function () {
   const w = G.world, g = G.game;
   return {
-    v: 1, seed: w.seed, N: w.N, // N：地图尺寸（旧档跨尺寸迁移裸索引用）
+    v: 1, seed: w.seed, N: w.N, mapVersion: w.mapVersion || 0, // N：地图尺寸（旧档跨尺寸迁移裸索引用）
     game: {
       v: G.VERSION,
       h: g.h, day: g.day, season: g.season, year: g.year,
-      res: g.res, stats: g.stats, prevFood: g.prevFood, foodNet: g.foodNet, warned: g.warned,
+      res: g.res, stats: g.stats, prevFood: g.prevFood, foodNet: g.foodNet, foodUrgent: g.foodUrgent, warned: g.warned,
       hist: g.hist, buildLog: g.buildLog, toolWear: g.toolWear,
     },
       trees: w.trees.map(t => [t.i, t.x, t.y, t.b]),
@@ -84,7 +85,7 @@ G.serializeGame = function () {
       id: b.id, type: b.type, x: b.x, y: b.y, state: b.state,
       progress: b.progress, workLeft: b.workLeft, totalWork: b.totalWork,
       workers: b.workers, family: b.family, noWork: b.noWork, warnText: b.warnText,
-      doCut: b.doCut, doPlant: b.doPlant, fuelLimit: b.fuelLimit,
+      doCut: b.doCut, doPlant: b.doPlant, fuelLimit: b.fuelLimit, toolLimit: b.toolLimit,
       farm: b.farm ? b.farm.map(f => [f.sown ? 1 : 0, f.harvested ? 1 : 0]) : undefined,
       sownAll: b.sownAll, growth: b.growth, harvestDone: b.harvestDone,
     })),
@@ -159,11 +160,12 @@ G.loadGame = function (key) {
 /* 把存档 JSON 应用为当前局面（本机档 / 服务器档 / 导入文件共用） */
 G.applySaveData = function (d) {
   G.rng = G.makeRng((d.seed ^ 0x51f15e) >>> 0);
-  G.world = G.genWorld(d.seed);
+  G.world = G.genWorld(d.seed, { starterResources: d.mapVersion >= 1 });
   G.game = G.newGameState();
   const g = G.game, w = G.world;
   Object.assign(g, d.game);
   // 旧档缺失或导入值无效时从 0 开始；正常存档保留尚未耗尽一把工具的累计磨损。
+  g.foodUrgent = typeof d.game.foodUrgent === 'boolean' ? d.game.foodUrgent : g.res.food < (d.citizens || []).length * G.LIFE.eatPerDay * 8;
   g.toolWear = Number.isFinite(g.toolWear) && g.toolWear >= 0 ? g.toolWear : 0;
   g.res.iron = g.res.iron || 0; // 旧存档迁移：无铁字段时补 0
   g.res.tools = g.res.tools != null ? g.res.tools : 10; // 旧存档迁移：无工具字段补 10 把应急
@@ -210,7 +212,8 @@ G.applySaveData = function (d) {
         state: bd.state, progress: bd.progress, workLeft: bd.workLeft, totalWork: bd.totalWork,
         workers: bd.workers, family: bd.family, noWork: bd.noWork, warnText: bd.warnText || '',
         doCut: bd.doCut !== false, doPlant: bd.doPlant !== false, // 旧档无此字段默认全开
-        fuelLimit: bd.fuelLimit != null ? bd.fuelLimit : (bd.type === 'woodcutter' ? G.PROD.woodcutter.fuelLimit : undefined), // 旧档回退默认上限
+        toolLimit: bd.type === 'blacksmith' ? G.toolLimitOf(bd) : undefined,
+        fuelLimit: bd.type === 'woodcutter' ? G.fuelLimitOf(bd) : undefined, // 旧档回退默认上限
       };
       if (bd.type === 'farm') {
         b.farm = [];

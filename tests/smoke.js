@@ -486,7 +486,7 @@ G.ui = { toast() {}, refreshHUD() {} };
   localStorage.setItem('test_key', JSON.stringify(raw));
   G.loadGame('test_key');
   const wc3 = G.world.buildings.find(x => x.type === 'woodcutter');
-  check('旧档无 fuelLimit → 回退默认上限 200', wc3 && wc3.fuelLimit === 200);
+  check('旧档无 fuelLimit → 回退默认上限 100', wc3 && wc3.fuelLimit === 100);
   delete global.localStorage;
   delete global.document;
 }
@@ -893,11 +893,11 @@ G.markGroundDirty = G.markGroundDirty || (() => {}); // render.js 未加载时�
   const c = G.spawnCitizen({ x: 5, y: 5, sex: 'm', age: 25 });
   c.job = b.id;
   G.game.res.wood = 10;
-  check('燃料上限默认 200', G.fuelLimitOf(b) === 200);
+  check('燃料上限默认 100（扩张后可调）', G.fuelLimitOf(b) === 100);
   G.game.res.firewood = 300; // 超过默认上限
   const t1 = G.makeTask(b, c);
   check('柴火达到上限 → 停工', t1 === null && b.noWork === true && b.warnText === '柴火已达上限');
-  G.game.res.firewood = 100;
+  G.game.res.firewood = 80;
   b.noWork = false;
   const t2 = G.makeTask(b, c);
   check('低于上限 → 正常接活', !!t2 && t2.kind === 'firewood');
@@ -918,7 +918,7 @@ G.markGroundDirty = G.markGroundDirty || (() => {}); // render.js 未加载时�
   G.game.res.firewood = 200;
   G.scheduleJobs();
   check('到上限的伐木屋不派工', b.workers.length === 0 && c.job == null);
-  G.game.res.firewood = 100;
+  G.game.res.firewood = 80;
   G.scheduleJobs();
   check('库存降回上限以下 → 恢复派工', b.workers.length === 1 && b.workers[0] === c.id);
 }

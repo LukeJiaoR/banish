@@ -18,7 +18,7 @@ G.ui = {
 
     // 资源栏
     this.el.resRow.innerHTML = G.RES_KEYS.map(k =>
-      `<span class="res" id="res-${k}" title="${G.RES[k].name}">${G.RES[k].icon}<b>0</b>${k === 'food' ? '<i id="net-food"></i>' : ''}</span>`
+      `<span class="res" id="res-${k}" title="${G.RES[k].name}"><span class="res-icon">${G.RES[k].icon}<img src="assets/icons/res_${k}.png" alt="" onerror="this.remove()"></span><b>0</b>${k === 'food' ? '<i id="net-food"></i>' : ''}</span>`
     ).join('');
 
     // 速度按钮（原版：暂停 / 1x / 2x / 5x）
@@ -41,6 +41,8 @@ G.ui = {
 
     // 建造菜单（有切图图标的工具把精灵图叠在 emoji 上，图加载失败自动回退 emoji）
     const TOOL_ICONS = {
+      stonehouse: 'tool_stonehouse', boarding: 'tool_boarding', mine: 'tool_mine',
+      blacksmith: 'tool_blacksmith', hunting: 'tool_hunting',
       house: 'tool_house', storage: 'tool_storage', gatherer: 'tool_gatherer',
       forester: 'tool_forester', woodcutter: 'tool_woodcutter', dock: 'tool_dock',
       school: 'tool_school', farm: 'tool_farm', road: 'tool_road', demolish: 'tool_demolish',
@@ -114,7 +116,20 @@ G.ui = {
     const g = G.game;
     for (const k of G.RES_KEYS) {
       const el = document.getElementById('res-' + k);
-      if (el) el.querySelector('b').textContent = Math.floor(g.res[k]);
+      if (el) {
+        el.querySelector('b').textContent = Math.floor(g.res[k]);
+        const cap = G.storageCap();
+        el.title = `${G.RES[k].name}：${Math.floor(g.res[k])}${k === 'tools' ? '（工具不限仓储）' : ' / ' + cap}`;
+        if (k === 'food' && G.world.citizens.length) el.title += ` · 可供 ${(g.res.food / (G.world.citizens.length * G.LIFE.eatPerDay)).toFixed(1)} 天（不计新产出）`;
+        if (k === 'tools') {
+          const adults = G.world.citizens.filter(c => c.adult).length;
+          if (adults) el.title += ` · 当前成人约可用 ${Math.floor(g.res.tools * G.LIFE.toolLifeDays / adults)} 天；铁匠需木材与铁矿`;
+        }
+        if (k === 'firewood') {
+          const need = G.world.buildings.reduce((n, b) => n + (G.isOccupiedHome(G.world, b) ? G.BDEF[b.type].warmWoodPerYear : 0), 0);
+          el.title += ` · 已入住住房整冬需 ${need}`;
+        }
+      }
     }
     const netEl = document.getElementById('net-food');
     if (netEl) {
@@ -162,7 +177,11 @@ G.ui = {
         status = !b.sownAll ? '待播种（春）' : b.growth < 1 ? `生长中 ${Math.floor(b.growth * 100)}%` : (b.harvestDone ? '已收获' : '待收获（秋）');
       } else if (b.type === 'woodcutter' && G.fuelLimited(b)) {
         status = '停工：柴火已达上限';
-      } else status = b.noWork ? `停工：${b.warnText || '无法工作'}` : '运作中';
+      } else if (G.toolLimited(b)) {
+        status = '工具已达上限，暂停生产';
+      } else if (def.jobs > 0 && !G.jobCanProduce(b)) {
+        status = '停工：' + (b.type === 'blacksmith' ? '缺铁或木材' : b.type === 'woodcutter' ? '缺木材' : b.type === 'mine' ? '仓库已满' : '工作圈内暂无可用资源');
+      } else status = (b.noWork || (b.warnText && !b.workers.length)) ? `停工：${b.warnText || '无法工作'}` : (def.jobs > 0 && !b.workers.length ? '等待可用工人' : '运作中');
       let workers = '';
       if (def.jobs > 0 || b.state === 'site') {
         const names = b.workers.map(id => w.cmap[id]).filter(Boolean).map(c => c.name).join('、');
@@ -189,6 +208,21 @@ G.ui = {
           <button class="mini-tog" data-fl="-50" title="降低上限 50">−</button>
           <button class="mini-tog" data-fl="50" title="提高上限 50">＋</button>
         </div>`;
+      }
+      if (b.type === 'blacksmith') {
+        extra = `<div class="row tog-row">
+          <span>工具上限：<b>${G.toolLimitOf(b)}</b>（库存 ${Math.floor(G.game.res.tools)}）</span>
+          <button class="mini-tog" data-tl="-10" title="降低上限 10">−</button>
+          <button class="mini-tog" data-tl="10" title="提高上限 10">＋</button>
+        </div>`;
+      }
+      if (['gatherer', 'hunting', 'forester'].includes(b.type)) {
+        const trees = G.treesInRadius(w, b.x, b.y, G.PROD[b.type].radius, false);
+        const mature = trees.filter(t => G.treeStage(t) >= 2).length;
+        extra += `<div class="row">工作圈：${trees.length} 棵树 · 成熟 ${mature}（砍伐、建造清林会影响产出）</div>`;
+      }
+      if (b.type === 'farm' && b.farm) {
+        extra += `<div class="row">播种 ${b.farm.filter(f => f.sown).length}/${b.farm.length} · 收获 ${b.farm.filter(f => f.harvested).length}/${b.farm.length}</div>`;
       }
       el.innerHTML = `
         <div class="info-head"><span>${def.icon} ${def.name}</span><button id="info-close">✕</button></div>
@@ -218,6 +252,12 @@ G.ui = {
     el.querySelectorAll('.mini-tog').forEach(btn => btn.addEventListener('click', () => {
       const bb = w.bmap[G.sel.id];
       if (!bb) return;
+      if (btn.dataset.tl) {
+        bb.toolLimit = G.clamp(G.toolLimitOf(bb) + Number(btn.dataset.tl), 0, G.PROD.blacksmith.toolMax);
+        bb.noWork = false;
+        this.renderInfo();
+        return;
+      }
       if (btn.dataset.fl) { // 伐木屋燃料上限 ±50
         const P = G.PROD.woodcutter;
         bb.fuelLimit = G.clamp(G.fuelLimitOf(bb) + Number(btn.dataset.fl), 0, P.fuelMax);

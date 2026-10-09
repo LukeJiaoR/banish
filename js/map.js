@@ -19,10 +19,11 @@ function fbm(seed, x, y) {
 }
 
 /* 生成新世界 */
-G.genWorld = function (seed) {
+G.genWorld = function (seed, options) {
+  const starterResources = !options || options.starterResources !== false;
   const N = G.MAP;
   const w = {
-    seed, N,
+    seed, N, mapVersion: starterResources ? 1 : 0,
     water: new Uint8Array(N * N),
     rock: new Uint8Array(N * N),
     rockCleared: [],
@@ -84,6 +85,8 @@ G.genWorld = function (seed) {
       const sx = Math.round(cx + Math.cos(ang) * r), sy = Math.round(cy + Math.sin(ang) * r);
       if (sx < 6 || sy < 6 || sx > N - 7 || sy > N - 7) continue;
       if (!G.areaLand(w, sx - 2, sy - 2, 6, 6)) continue;
+      // 起始仓库必须放得下；areaLand 不检查岩石，不能让储物车静默消失。
+      if (!G.canPlace(w, 'storage', sx - 1, sy - 1).ok) continue;
       const forest = G.countTreesInRadius(w, sx, sy, 8);
       const waterN = G.countWaterInRadius(w, sx, sy, 12);
       const rockN = G.countRocksInRadius(w, sx, sy, 12);
@@ -97,7 +100,37 @@ G.genWorld = function (seed) {
     }
     if (best && r > 10) break;
   }
-  w.start = best || fallback || w.start;
+  if (!best && !fallback) {
+    // 稀有地图没有满足环境评分的镇址时，穷举最近的可放仓库陆地。
+    let nearest = Infinity;
+    for (let y = 2; y < N - 3; y++) for (let x = 2; x < N - 3; x++) {
+      const d = G.d2(x, y, cx, cy);
+      if (d < nearest && G.canPlace(w, 'storage', x - 1, y - 1).ok) {
+        nearest = d; fallback = { x, y };
+      }
+    }
+  }
+  if (!best && !fallback) throw new Error('地图没有可用镇址');
+  w.start = best || fallback;
+  // 新地图保底可劳动获得的启动铁矿；矿井本身要铁，零铁地图会永久锁死工具循环。
+  // 旧档重建地形时关闭此补点，避免给已建村庄凭空塞入矿石。
+  if (starterResources) {
+    const candidates = [];
+    for (let y = Math.max(1, w.start.y - 14); y <= Math.min(N - 2, w.start.y + 14); y++)
+      for (let x = Math.max(1, w.start.x - 14); x <= Math.min(N - 2, w.start.x + 14); x++) {
+        const i = y * N + x, d = G.d2(x, y, w.start.x, w.start.y);
+        if (d < 36 || d > 196 || w.water[i] || w.treeIdx[i] >= 0) continue;
+        const path = G.findPath(w, w.start.x, w.start.y, x, y);
+        if (path && path.length <= 24) candidates.push({ i, d, rock: w.rock[i] });
+      }
+    let needed = Math.max(0, 3 - candidates.filter(p => p.rock === 2).length);
+    candidates.sort((a, b) => (a.rock === 1 ? 0 : 1) - (b.rock === 1 ? 0 : 1) || a.d - b.d || a.i - b.i);
+    for (const p of candidates) {
+      if (!needed) break;
+      if (p.rock === 2) continue;
+      w.rock[p.i] = 2; needed--;
+    }
+  }
   // 清出空地
   G.clearTreesInRadius(w, w.start.x, w.start.y, 3.2);
   return w;
@@ -153,7 +186,7 @@ G.pickMarkedTree = function (w, x, y, claimed) {
     if (idx < 0) continue;
     const tx = i % w.N, ty = (i / w.N) | 0;
     const d = G.d2(x, y, tx, ty);
-    if (d < bd) { bd = d; best = { x: tx, y: ty, tree: w.trees[idx] }; }
+    if (d < bd && G.findPath(w, Math.round(x), Math.round(y), tx, ty)) { bd = d; best = { x: tx, y: ty, tree: w.trees[idx] }; }
   }
   return best;
 };
@@ -175,7 +208,7 @@ G.pickMarkedRock = function (w, x, y, claimed) {
     if (!w.rock[i]) continue;
     const tx = i % w.N, ty = (i / w.N) | 0;
     const d = G.d2(x, y, tx, ty);
-    if (d < bd) { bd = d; best = { x: tx, y: ty, rock: w.rock[i] }; }
+    if (d < bd && G.findPath(w, Math.round(x), Math.round(y), tx, ty)) { bd = d; best = { x: tx, y: ty, rock: w.rock[i] }; }
   }
   return best;
 };
