@@ -44,11 +44,13 @@ G.feedback = {
     this._resumePaused = G.game.paused;
     G.game.paused = true;
     box.classList.remove('hidden');
+    if (G.ui.enterDialog) G.ui.enterDialog('fb');
     document.getElementById('fb-text').focus();
   },
 
   close: function () {
     document.getElementById('fb').classList.add('hidden');
+    if (G.ui.leaveDialog) G.ui.leaveDialog('fb');
     if (!G.game.over) G.game.paused = !!this._resumePaused;
     G.ui.refreshHUD();
   },

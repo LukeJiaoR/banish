@@ -1064,11 +1064,11 @@ G.markGroundDirty = G.markGroundDirty || (() => {}); // render.js 未加载时�
   const m1 = G.spawnCitizen({ x: 5, y: 5, sex: 'm', age: 30 });
   const d1 = G.spawnCitizen({ x: 6, y: 5, sex: 'f', age: 8, adult: false });
   const fam1 = { id: G.nextId(), members: [m1.id, d1.id], houseId: null };
-  m1.familyId = fam1.id; d1.familyId = fam1.id; w.families.push(fam1);
+  m1.familyId = fam1.id; d1.familyId = fam1.id; d1.parentIds = [m1.id]; fam1.coupleIds = []; w.families.push(fam1);
   const m2 = G.spawnCitizen({ x: 8, y: 5, sex: 'f', age: 28 });
   const s2 = G.spawnCitizen({ x: 9, y: 5, sex: 'm', age: 6, adult: false });
   const fam2 = { id: G.nextId(), members: [m2.id, s2.id], houseId: null };
-  m2.familyId = fam2.id; s2.familyId = fam2.id; w.families.push(fam2);
+  m2.familyId = fam2.id; s2.familyId = fam2.id; s2.parentIds = [m2.id]; fam2.coupleIds = []; w.families.push(fam2);
   G.formFamilies();
   check('两个单亲家庭合并重组（孩子随迁）',
     w.families.length === 1 && fam1.members.length === 4 && m2.familyId === fam1.id && s2.familyId === fam1.id);
@@ -1277,6 +1277,7 @@ G.markGroundDirty = G.markGroundDirty || (() => {}); // render.js 未加载时�
   const f = G.spawnCitizen({ x: 13, y: 12, sex: 'f', age: 20 });
   const fam = { id: G.nextId(), members: [m.id, f.id], houseId: h.id };
   w.families.push(fam); m.familyId = fam.id; f.familyId = fam.id; h.family = fam.id;
+  fam.coupleIds = [m.id, f.id]; m.partnerId = f.id; f.partnerId = m.id;
   g.res.food = 100000;
   const saved = G.LIFE.birthChance;
   G.LIFE.birthChance = 1;

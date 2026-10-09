@@ -14,6 +14,7 @@ G.ui = {
       resRow: $('res-row'), speed: $('speed'),
       toolbar: $('toolbar'), info: $('info'), toasts: $('toasts'),
       over: $('over'), overText: $('over-text'), help: $('help'),
+      guide: $('survival-guide'), placement: $('placement-info'),
     };
 
     // 资源栏
@@ -32,6 +33,7 @@ G.ui = {
     ).join('');
     this.el.speed.querySelectorAll('button').forEach(btn => {
       btn.addEventListener('click', () => {
+        if (G.hasOpenModal && G.hasOpenModal()) return;
         const v = btn.dataset.v;
         if (v === 'pause') G.game.paused = !G.game.paused;
         else { G.game.paused = false; G.game.speed = +v; }
@@ -66,6 +68,7 @@ G.ui = {
     }).join('');
     this.el.toolbar.querySelectorAll('button').forEach(btn => {
       btn.addEventListener('click', () => {
+        if (G.hasOpenModal && G.hasOpenModal()) return;
         const k = btn.dataset.tool;
         const active = !!G.tool && (G.tool.kind === k || (G.tool.kind === 'build' && G.tool.type === k));
         G.setTool(active ? null : k); // 再点一次取消
@@ -78,7 +81,7 @@ G.ui = {
     document.getElementById('btn-new').addEventListener('click', () => { if (confirm('放弃当前进度，开创新家园？')) G.newGame(); });
     document.getElementById('btn-help').addEventListener('click', () => this.toggleHelp());
     document.getElementById('btn-err').addEventListener('click', () => this.showErrs());
-    document.getElementById('errs-close').addEventListener('click', () => document.getElementById('errs').classList.add('hidden'));
+    document.getElementById('errs-close').addEventListener('click', () => this.closeErrs());
     document.getElementById('errs-clear').addEventListener('click', () => {
       window.__errs.length = 0;
       this.refreshHUD();
@@ -114,6 +117,7 @@ G.ui = {
   refreshHUD: function () {
     if (!G.world) return;
     const g = G.game;
+    this.refreshGuide();
     for (const k of G.RES_KEYS) {
       const el = document.getElementById('res-' + k);
       if (el) {
@@ -153,6 +157,45 @@ G.ui = {
     });
   },
 
+  refreshGuide: function () {
+    const el = this.el.guide;
+    if (!el || !G.world) return;
+    const g = G.game, w = G.world;
+    const days = w.citizens.length ? g.res.food / (w.citizens.length * G.LIFE.eatPerDay) : 0;
+    const untilWinter = (G.SEASON_DAYS * 3 - g.day % G.YEAR_DAYS + G.YEAR_DAYS) % G.YEAR_DAYS;
+    const food = w.buildings.some(b => ['gatherer', 'dock'].includes(b.type) && b.state === 'ok');
+    const fuel = w.buildings.some(b => b.type === 'woodcutter' && b.state === 'ok');
+    const homeless = w.families.filter(f => f.members.length && f.houseId == null).length;
+    const warmNeed = w.buildings.reduce((n,b) => n + (G.isOccupiedHome(w,b) ? G.BDEF[b.type].warmWoodPerYear : 0), 0);
+    const remainingHeat = g.season === 3 ? Math.ceil(warmNeed * Math.max(0, G.SEASON_DAYS - 1 - g.day % G.SEASON_DAYS) / G.SEASON_DAYS) : warmNeed;
+    const risks = [];
+    if (g.res.wood < 2) risks.push('木材耗尽：向更远可达森林标记砍伐，后续护林补种；避开食物林。');
+    if (g.season >= 2 && g.res.firewood < remainingHeat) risks.push(`柴火不足：现有 ${Math.floor(g.res.firewood)} / 本冬剩余约 ${remainingHeat}，伐木屋需原木。`);
+    const stage = !food ? '① 先保持续食物：在近仓森林建采集小屋；不要先连盖五屋耗尽木石。'
+      : !fuel ? '② 近仓建伐木屋备柴；在食物林外标记砍伐和矿石，保留散工。'
+      : homeless ? `③ 入冬前安家：还有 ${homeless} 家无房；逐步补住房和取暖柴。`
+      : '④ 维持粮柴与工具，预留矿井的10铁保持续矿源，再办学并为下一代留空房。';
+    el.textContent = (G.autosaveBlocked ? '⚠ 原自动档已保护：临时局不自动保存，请打开存档管理备份/手动保存。\n' : '') + `粮食约 ${days.toFixed(1)} 天（不计新产出） · ${G.isWinter() ? '寒冬中' : '距入冬 ' + untilWinter + ' 天'} · ${g.paused ? '已暂停' : '运行中'}\n${stage}${risks.length ? '\n⚠ ' + risks.join(' ') : ''}`;
+  },
+
+  refreshPlacement: function (type, x, y) {
+    const el = this.el.placement;
+    if (!el) return null;
+    if (!type) { el.classList.add('hidden'); this._placementKey = null; return null; }
+    // Avoid a path search on every animation frame; refresh moving terrain/resources regularly.
+    const key = [type, x, y, G.world.seed, G.world.buildings.map(b => b.id).join(','), Math.floor(G.game.h * 2), G.game.day,
+      ...G.RES_KEYS.map(k => Math.floor(G.game.res[k]))].join(':');
+    if (key !== this._placementKey || this._placementWorld !== G.world) {
+      this._placementWorld = G.world;
+      this._placementKey = key;
+      this._placement = G.placementInfo(type, x, y);
+      el.textContent = this._placement.text;
+      el.dataset.state = !this._placement.ok ? 'blocked' : this._placement.warning ? 'warning' : 'ready';
+    }
+    el.classList.remove('hidden');
+    return this._placement;
+  },
+
   /* ---------- 信息面板 ---------- */
   showInfo: function (sel) {
     this.el.info.classList.remove('hidden');
@@ -162,15 +205,23 @@ G.ui = {
     G.sel = null;
     this.el.info.classList.add('hidden');
   },
-  renderInfo: function () {
+  renderInfo: function (force) {
     if (!G.sel) return;
     const w = G.world, el = this.el.info;
+    // Keep a keyboard user's active control stable across timed refreshes.
+    const active = document.activeElement;
+    const hadFocus = active && el.contains && el.contains(active);
+    if (hadFocus && !force) return;
+    const focusSelector = hadFocus ? (active.id ? '#' + active.id : active.dataset.tl ? '[data-tl="' + active.dataset.tl + '"]' : active.dataset.fl ? '[data-fl="' + active.dataset.fl + '"]' : active.dataset.k ? '[data-k="' + active.dataset.k + '"]' : null) : null;
     if (G.sel.kind === 'b') {
       const b = w.bmap[G.sel.id];
       if (!b) { this.hideInfo(); return; }
       const def = G.BDEF[b.type];
       let status;
-      if (b.state === 'site') status = `建造中 ${Math.floor(b.progress * 100)}%`;
+      if (b.state === 'site') {
+        const trees = G.siteTrees ? G.siteTrees(b).length : 0;
+        status = trees ? `清理工地：还需砍 ${trees} 棵树（工人搬运入仓）` : `建造中 ${Math.floor(b.progress * 100)}%`;
+      }
       else if (b.type === 'house' || b.type === 'stonehouse') status = b.family != null ? '有人居住' : '空置';
       else if (b.type === 'boarding') status = `入住 ${G.boardingFamilies(w, b).length} / ${G.LIFE.boardingCap} 家`;
       else if (b.type === 'farm') {
@@ -184,13 +235,13 @@ G.ui = {
       } else status = (b.noWork || (b.warnText && !b.workers.length)) ? `停工：${b.warnText || '无法工作'}` : (def.jobs > 0 && !b.workers.length ? '等待可用工人' : '运作中');
       let workers = '';
       if (def.jobs > 0 || b.state === 'site') {
-        const names = b.workers.map(id => w.cmap[id]).filter(Boolean).map(c => c.name).join('、');
+        const names = b.workers.map(id => w.cmap[id]).filter(Boolean).map(c => this.escHtml(c.name)).join('、');
         workers = `<div class="row">工人：<span>${names || (b.state === 'site' ? '等待建筑工人' : '无')}</span></div>`;
       }
       let extra = '';
       if ((b.type === 'house' || b.type === 'stonehouse') && b.family != null) {
         const fam = w.families.find(f => f.id === b.family);
-        if (fam) extra = `<div class="row">住户：${fam.members.map(id => w.cmap[id]).filter(Boolean).map(c => `${c.name}(${Math.floor(c.age)}岁)`).join('、')}</div>`;
+        if (fam) extra = `<div class="row">住户：${fam.members.map(id => w.cmap[id]).filter(Boolean).map(c => `${this.escHtml(c.name)}(${Math.floor(c.age)}岁)`).join('、')}</div>`;
       }
       if (b.type === 'school') {
         const n = w.citizens.filter(cc => cc.school === b.id).length;
@@ -226,24 +277,25 @@ G.ui = {
       }
       el.innerHTML = `
         <div class="info-head"><span>${def.icon} ${def.name}</span><button id="info-close">✕</button></div>
-        <div class="row">${status}</div>
+        <div class="row">${this.escHtml(status)}</div>
         ${workers}${extra}
         <div class="row desc">${def.desc}</div>
-        <button id="info-demolish" class="danger">拆除</button>`;
+        <div class="row desc">${b.state === 'site' && !b.constructionStarted && b.progress === 0 && b.workLeft >= b.totalWork ? '未开工：取消退还全部已付建材，保留树木' : '已开工：拆除退还一半已付建材，已砍树不恢复'}</div>
+        <button id="info-demolish" class="danger">${b.state === 'site' ? '取消工地' : '拆除'}</button>`;
     } else {
       const c = w.cmap[G.sel.id];
       if (!c) { this.hideInfo(); return; }
       let status = '闲逛';
       if (c.state === 'rest') status = '睡觉';
-      else if (c.state === 'work') status = c.task ? (c.task.kind === 'build' ? '建造中' : c.task.kind === 'sow' ? '播种' : c.task.kind === 'harvest' ? '收获' : '工作中') : '工作中';
+      else if (c.state === 'work') status = c.task ? (c.task.kind === 'clearSite' ? '清理工地' : c.task.kind === 'build' ? '建造中' : c.task.kind === 'sow' ? '播种' : c.task.kind === 'harvest' ? '收获' : '工作中') : '工作中';
       else if (c.state === 'walk' || c.state === 'haul') status = c.carry ? `搬运${G.RES[c.carry.type].name}` : (c.walkKind === 'home' ? '回家' : '赶路');
       const jobB = c.job != null ? w.bmap[c.job] : null;
       const jobName = jobB ? G.BDEF[jobB.type].name : (c.student ? '学堂学生' : (c.adult ? '无业' : '儿童'));
       const fam = G.familyOf(c);
       el.innerHTML = `
-        <div class="info-head"><span>🧑 ${c.name}</span><button id="info-close">✕</button></div>
+        <div class="info-head"><span>🧑 ${this.escHtml(c.name)}</span><button id="info-close">✕</button></div>
         <div class="row">${c.sex === 'm' ? '男' : '女'} · ${Math.floor(c.age)} 岁 · ${c.student ? '学生' : c.adult ? '成人' : '儿童'}</div>
-        <div class="row">职业：${jobName} · ${status}</div>
+        <div class="row">职业：${jobName} · ${this.escHtml(status)}</div>
         <div class="row">家庭：${fam ? (fam.houseId != null ? '有房' : '无房') : '单身'}</div>
         <div class="row">学识：${c.student ? '🎓 就读中' : c.educated ? '📖 受过教育' : '未受教育'}</div>
         <div class="row">饥饿 ${'▕'.repeat(Math.min(4, c.hunger)) || '无'} · 受冻 ${c.cold > 1 ? '是' : '无'}</div>`;
@@ -255,20 +307,21 @@ G.ui = {
       if (btn.dataset.tl) {
         bb.toolLimit = G.clamp(G.toolLimitOf(bb) + Number(btn.dataset.tl), 0, G.PROD.blacksmith.toolMax);
         bb.noWork = false;
-        this.renderInfo();
+        this.renderInfo(true);
         return;
       }
       if (btn.dataset.fl) { // 伐木屋燃料上限 ±50
         const P = G.PROD.woodcutter;
         bb.fuelLimit = G.clamp(G.fuelLimitOf(bb) + Number(btn.dataset.fl), 0, P.fuelMax);
         bb.noWork = false; // 清掉停工标记，下次派活时按新上限重新评估
-        this.renderInfo();
+        this.renderInfo(true);
         return;
       }
       bb[btn.dataset.k] = !bb[btn.dataset.k];
       bb.noWork = false;
-      this.renderInfo();
+      this.renderInfo(true);
     }));
+    if (focusSelector && el.querySelector) { const next = el.querySelector(focusSelector); if (next) next.focus(); }
     const dem = document.getElementById('info-demolish');
     if (dem) dem.addEventListener('click', () => {
       const b = w.bmap[G.sel.id];
@@ -283,17 +336,49 @@ G.ui = {
     }
   },
 
+  enterDialog: function (id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    this._dialogFocus = this._dialogFocus || {};
+    this._dialogFocus[id] = document.activeElement;
+    if (el.setAttribute) { el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true'); }
+    const first = el.querySelector && el.querySelector('textarea, input:not([type="file"]), button:not([disabled]), select, [tabindex="0"]');
+    if (first && first.focus) first.focus();
+    if (G.keys) G.keys = {};
+  },
+  leaveDialog: function (id) {
+    const prior = this._dialogFocus && this._dialogFocus[id];
+    if (prior && prior.isConnected !== false && prior.focus) prior.focus();
+    if (this._dialogFocus) delete this._dialogFocus[id];
+    if (G.keys) G.keys = {};
+  },
+
   toggleHelp: function (force) {
     const h = this.el.help;
     const show = force !== undefined ? force : h.classList.contains('hidden');
+    const wasHidden = h.classList.contains('hidden');
+    if (show && wasHidden) { this._helpPaused = G.game.paused; G.game.paused = true; }
     h.classList.toggle('hidden', !show);
+    if (show && wasHidden) this.enterDialog('help');
+    if (!show && !wasHidden) this.leaveDialog('help');
+    if (!show && !wasHidden && !G.game.over) G.game.paused = !!this._helpPaused;
+    if (G.keys) G.keys = {};
+    this.refreshHUD();
   },
 
   /* ---------- 错误记录面板（window.__errs，index.html 注入） ---------- */
+  closeErrs: function () {
+    document.getElementById('errs').classList.add('hidden');
+    if (!G.game.over) G.game.paused = !!this._errsPaused;
+    this.leaveDialog('errs'); this.refreshHUD();
+  },
   showErrs: function () {
+    if (!document.getElementById('errs').classList.contains('hidden')) return;
+    this._errsPaused = G.game.paused; G.game.paused = true;
     document.getElementById('err-list').textContent =
       window.__errs.length ? window.__errs.join('\n') : '（当前没有记录到脚本错误）';
     document.getElementById('errs').classList.remove('hidden');
+    this.enterDialog('errs'); this.refreshHUD();
   },
 
   /* ---------- 存档管理面板 ---------- */
@@ -302,19 +387,25 @@ G.ui = {
     { key: G.AUTOSAVE_KEY, name: '自动档' },
   ],
   showSaves: function () {
+    if (!document.getElementById('saves').classList.contains('hidden')) return;
     // 打开面板时暂停，关闭时恢复
     this._resumePaused = G.game.paused;
     G.game.paused = true;
     document.getElementById('saves').classList.remove('hidden');
     this.renderSaves();
+    this.enterDialog('saves');
   },
   closeSaves: function () {
     document.getElementById('saves').classList.add('hidden');
+    this.leaveDialog('saves');
     if (!G.game.over) G.game.paused = !!this._resumePaused;
     G.ui.refreshHUD();
   },
+  readRawSave: function (key) {
+    try { return localStorage.getItem(key); } catch (e) { this.storageReadFailed = true; return null; }
+  },
   readSave: function (key) {
-    try { return JSON.parse(localStorage.getItem(key)); } catch (e) { return null; }
+    try { return JSON.parse(this.readRawSave(key)); } catch (e) { return null; }
   },
   saveTimeStr: function (d) {
     if (!d || !d.savedAt) return '存档时间未知';
@@ -323,25 +414,28 @@ G.ui = {
     return `${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(t.getDate())} ${pad(t.getHours())}:${pad(t.getMinutes())}`;
   },
   saveGameStr: function (d) {
-    if (!d || !d.game) return '';
+    if (!d || !d.game || !d.game.res || !['year','day','season'].every(k => Number.isFinite(d.game[k])) || !Number.isFinite(d.game.res.food)) return '格式不完整，可导出原文备份';
     const g = d.game;
     const pop = d.citizens ? d.citizens.length : 0;
     return `第 ${g.year} 年·${G.SEASON_NAMES[g.season]} 第 ${(g.day % G.SEASON_DAYS) + 1} 天 · 人口 ${pop} · 食物 ${Math.floor(g.res.food)}`;
   },
   renderSaves: function () {
+    this.storageReadFailed = false;
     const list = document.getElementById('save-list');
     document.getElementById('saves-hint').textContent =
-      '自动档在每个季节更替、每 90 秒、离开页面时自动写入；打开游戏时自动恢复自动档。';
+      G.autosaveBlocked ? '⚠ 原自动档损坏且已保护：当前临时局不会自动覆盖它。请先导出原文，载入有效档，或手动保存当前局；明确开新局才恢复正常自动存档。' : '自动档在每个季节更替、每 90 秒、离开页面时自动写入；打开游戏时自动恢复自动档。';
     let html = '';
     let any = false;
     for (const slot of this.SLOTS) {
       const d = this.readSave(slot.key);
-      if (d) {
+      const raw = this.readRawSave(slot.key);
+      if (raw != null) {
         any = true;
         html += `<div class="save-row">
           <span class="sav-name">${slot.name}</span>
-          <span class="sav-info">${this.saveTimeStr(d)}<small>${this.saveGameStr(d)}</small></span>
-          <button data-act="load" data-key="${slot.key}">载入</button>
+          <span class="sav-info">${d ? this.saveTimeStr(d) : '损坏的 JSON（已保留原文）'}<small>${d ? this.saveGameStr(d) : '可导出后恢复'}</small></span>
+          <button data-act="load" data-key="${slot.key}" ${d ? '' : 'disabled'}>载入</button>
+          <button data-act="export" data-key="${slot.key}">导出原文</button>
           <button class="del" data-act="del" data-key="${slot.key}">删除</button>
         </div>`;
       } else {
@@ -352,15 +446,22 @@ G.ui = {
         </div>`;
       }
     }
+    if (this.storageReadFailed) document.getElementById('saves-hint').textContent = '浏览器本机存储不可用；仍可导出当前局为文件，或导入已有存档。';
     list.innerHTML = html;
     list.querySelectorAll('button[data-act]').forEach(btn => {
       btn.addEventListener('click', () => {
         const key = btn.dataset.key;
-        if (btn.dataset.act === 'load') {
+        if (btn.dataset.act === 'export') {
+          const raw = this.readRawSave(key);
+          if (raw == null) return;
+          const url = URL.createObjectURL(new Blob([raw], { type: 'application/json' }));
+          const a = document.createElement('a'); a.href = url; a.download = key + '-backup.json';
+          a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+        } else if (btn.dataset.act === 'load') {
           this.closeSaves();
           G.loadGame(key);
         } else if (btn.dataset.act === 'del') {
-          localStorage.removeItem(key);
+          try { localStorage.removeItem(key); } catch (e) { this.toast('本机存储不可用，未删除存档', 'warn'); }
           this.renderSaves();
         }
       });
@@ -370,7 +471,8 @@ G.ui = {
     clearBtn.classList.toggle('hidden', !any);
     clearBtn.onclick = () => {
       if (!confirm('确定清空全部存档（手动档 + 自动档）？\n当前对局不受影响，但刷新后将无法恢复进度。')) return;
-      for (const slot of this.SLOTS) localStorage.removeItem(slot.key);
+      try { for (const slot of this.SLOTS) localStorage.removeItem(slot.key); }
+      catch (e) { this.toast('本机存储不可用，清理未完成', 'warn'); this.renderSaves(); return; }
       G.ui.toast('🗑 已清空全部存档', 'warn');
       this.renderSaves();
     };
@@ -464,8 +566,46 @@ G.ui = {
     this.el.overText.innerHTML =
       `你的小镇在<strong>第 ${g.year} 年</strong>消亡了。<br><br>` +
       `存续 ${Math.floor(g.day / G.SEASON_DAYS)} 个季度 · 出生 ${g.stats.born} 人 · 死亡 ${g.stats.died} 人<br>` +
-      (Object.keys(g.stats.deadReasons).map(k => `${k} ×${g.stats.deadReasons[k]}`).join(' · ')) +
+      (Object.keys(g.stats.deadReasons).map(k => `${this.escHtml(k)} ×${Number(g.stats.deadReasons[k]) || 0}`).join(' · ')) +
       `<br><small style="opacity:.6">版本 ${G.VERSION} · 反馈时提到它可帮我对号入座</small>`;
     this.el.over.classList.remove('hidden');
   },
+};
+
+/* Placement facts use exactly the same origin and square work bounds as production. */
+G.placementInfo = function (type, x, y) {
+  const w = G.world, def = G.BDEF[type], p = G.PROD[type] || {};
+  const check = G.canPlace(w, type, x, y);
+  const affordable = Object.keys(def.cost).every(k => G.game.res[k] >= def.cost[k]);
+  const result = { ok: check.ok && affordable, affordable, radius: p.radius || p.waterR || 0, warning: false };
+  result.bounds = [Math.max(0,x-result.radius), Math.max(0,y-result.radius), Math.min(w.N,x+result.radius+1), Math.min(w.N,y+result.radius+1)];
+  const lines = [`${def.name} · ${!check.ok ? '不能建：' + check.reason : !affordable ? '材料不足' : '可建造'}`];
+  lines.push('材料（现有/需要）：' + (Object.keys(def.cost).map(k => `${G.RES[k].name} ${Math.floor(G.game.res[k])}/${def.cost[k]}`).join(' · ') || '无需建材，仍需施工'));
+  if (p.radius) {
+    const trees = G.treesInRadius(w, x, y, p.radius, false).filter(t => !(t.x >= x && t.x < x + def.w && t.y >= y && t.y < y + def.h));
+    result.trees = trees.length; result.mature = trees.filter(t => G.treeStage(t) >= 2).length;
+    lines.push(`工作范围 ±${p.radius} 格（方形，建筑原点） · 占地清场后 ${result.trees} 棵树 / 成熟 ${result.mature}`);
+    if (type === 'gatherer' || type === 'hunting') {
+      const n = type === 'hunting' ? result.mature : result.trees;
+      if (n < p.needTrees) { result.warning = true; lines.push(`⚠ 可建但当前无法生产：至少需 ${p.needTrees} 棵${type === 'hunting' ? '成熟' : ''}树`); }
+      else if (result.mature < p.fullForest) { result.warning = true; lines.push(`△ 林量偏低：产量随成熟林增加，充足参考 ${p.fullForest} 棵`); }
+    }
+    if (type === 'forester') lines.push('砍伐会降低重叠食物林产量；可在建筑面板关闭砍伐育林。');
+  }
+  if (type === 'dock') {
+    result.water = G.countWaterInRadius(w, x, y, p.waterR);
+    lines.push(`工作范围 ±${p.waterR} 格（方形） · 水域 ${result.water} 格 / 满产参考 ${p.fullWater}`);
+    if (result.water < p.fullWater) { result.warning = true; lines.push('△ 可建但水域较少，单次渔获降低'); }
+  }
+  if (check.ok) {
+    const route = G.storageRoute(x, y);
+    if (route) lines.push(`当前地形可达仓：约 ${route.path.length} 步；道路更快，完工后须保留出入口。`);
+    else { result.warning = true; lines.push('⚠ 当前找不到可达仓库，产物无法正常入库'); }
+  } else lines.push('物流：地块合法后显示可达仓；近仓且通路畅通，搬运更快。');
+  let clearing = 0;
+  for (let yy = Math.max(0,y); yy < Math.min(w.N,y+def.h); yy++) for (let xx = Math.max(0,x); xx < Math.min(w.N,x+def.w); xx++) if (w.treeIdx[yy*w.N+xx] >= 0) clearing++;
+  if (clearing) lines.push(`清场 ${clearing} 棵树：工人逐棵砍伐并搬运，完成后才施工；取消保留未砍树。`);
+  lines.push('工人自动分配：食品优先；工地过多会争用散工。');
+  result.text = lines.join('\n');
+  return result;
 };

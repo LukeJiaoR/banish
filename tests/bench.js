@@ -50,7 +50,15 @@ function bestSpot(type, cx, cy, r, score) {
   return best;
 }
 
-G.addBuilding('storage', s.x - 1, s.y - 1, { instant: true, free: true });
+// Isolated production benchmark: prepare already-cleared fixture footprints explicitly.
+// Real player construction must perform timed clearing; this is not a survival test.
+function placeFixture(type, x, y, options) {
+  const def = G.BDEF[type];
+  for (let yy = y; yy < y + def.h; yy++) for (let xx = x; xx < x + def.w; xx++) G.removeTree(w, xx, yy);
+  return G.addBuilding(type, x, y, options);
+}
+
+placeFixture('storage', s.x - 1, s.y - 1, { instant: true, free: true });
 const built = {};
 const PG = G.PROD.gatherer, PF = G.PROD.forester, PD = G.PROD.dock;
 // 逐座现算现建（先算好的候选点会被后建的建筑占掉）
@@ -67,12 +75,12 @@ for (const [type, score, r] of plan) {
   if (score) spot = bestSpot(type, s.x, s.y, r, score);
   else spot = canPlaceSpots(type, s.x, s.y, r)[0];
   if (!spot) { console.error(type, '附近找不到可建位置'); process.exit(1); }
-  const res = G.addBuilding(type, spot.x, spot.y, { instant: true, free: true });
+  const res = placeFixture(type, spot.x, spot.y, { instant: true, free: true });
   if (!res.ok) { console.error(type, '建造失败：', res.reason); process.exit(1); }
   built[type] = res.b;
 }
 const spot2 = canPlaceSpots('storage', s.x, s.y, 9)[0]; // 第二仓库放最后：木/柴产出不被仓储上限截断，也不挤占伐木屋的位置
-if (spot2) G.addBuilding('storage', spot2.x, spot2.y, { instant: true, free: true });
+if (spot2) placeFixture('storage', spot2.x, spot2.y, { instant: true, free: true });
 built.woodcutter.fuelLimit = 999999; // 隔离燃料上限对测量的干扰
 
 for (const type of Object.keys(built)) {

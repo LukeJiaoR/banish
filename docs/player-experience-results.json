@@ -1,0 +1,2377 @@
+{
+  "version": "0.3.4",
+  "baseline": "c699714acbf92588c2e36ca00759e496ca71cc54",
+  "engineSourceHash": "dcfd1219440ab41ba9a71f537a11e4216341bee5a0ac70d3c8c0139363cf5c88",
+  "browserAcceptance": "Not performed; logic, DOM stubs and static constraints only.",
+  "fiveYear": {
+    "strategyHash": "b878b0328bc7a70c8f8aafebd04143c926ee21f764ef04ba3afbfc6c2121d206",
+    "checks": [
+      {
+        "name": "normal seed1: survives requested horizon",
+        "pass": true
+      },
+      {
+        "name": "normal seed1: no first-winter deaths",
+        "pass": true
+      },
+      {
+        "name": "normal seed1: no starvation",
+        "pass": true
+      },
+      {
+        "name": "normal seed1: at most two cold deaths over five years",
+        "pass": true
+      },
+      {
+        "name": "normal seed1: three food days at finish",
+        "pass": true
+      },
+      {
+        "name": "normal seed1: tools maintained",
+        "pass": true
+      },
+      {
+        "name": "normal seed2: survives requested horizon",
+        "pass": true
+      },
+      {
+        "name": "normal seed2: no first-winter deaths",
+        "pass": true
+      },
+      {
+        "name": "normal seed2: no starvation",
+        "pass": true
+      },
+      {
+        "name": "normal seed2: at most two cold deaths over five years",
+        "pass": true
+      },
+      {
+        "name": "normal seed2: three food days at finish",
+        "pass": true
+      },
+      {
+        "name": "normal seed2: tools maintained",
+        "pass": true
+      },
+      {
+        "name": "normal seed3: survives requested horizon",
+        "pass": true
+      },
+      {
+        "name": "normal seed3: no first-winter deaths",
+        "pass": true
+      },
+      {
+        "name": "normal seed3: no starvation",
+        "pass": true
+      },
+      {
+        "name": "normal seed3: at most two cold deaths over five years",
+        "pass": true
+      },
+      {
+        "name": "normal seed3: three food days at finish",
+        "pass": true
+      },
+      {
+        "name": "normal seed3: tools maintained",
+        "pass": true
+      },
+      {
+        "name": "normal seed4: survives requested horizon",
+        "pass": true
+      },
+      {
+        "name": "normal seed4: no first-winter deaths",
+        "pass": true
+      },
+      {
+        "name": "normal seed4: no starvation",
+        "pass": true
+      },
+      {
+        "name": "normal seed4: at most two cold deaths over five years",
+        "pass": true
+      },
+      {
+        "name": "normal seed4: three food days at finish",
+        "pass": true
+      },
+      {
+        "name": "normal seed4: tools maintained",
+        "pass": true
+      },
+      {
+        "name": "normal seed5: survives requested horizon",
+        "pass": true
+      },
+      {
+        "name": "normal seed5: no first-winter deaths",
+        "pass": true
+      },
+      {
+        "name": "normal seed5: no starvation",
+        "pass": true
+      },
+      {
+        "name": "normal seed5: at most two cold deaths over five years",
+        "pass": true
+      },
+      {
+        "name": "normal seed5: three food days at finish",
+        "pass": true
+      },
+      {
+        "name": "normal seed5: tools maintained",
+        "pass": true
+      },
+      {
+        "name": "normal seed6: survives requested horizon",
+        "pass": true
+      },
+      {
+        "name": "normal seed6: no first-winter deaths",
+        "pass": true
+      },
+      {
+        "name": "normal seed6: no starvation",
+        "pass": true
+      },
+      {
+        "name": "normal seed6: at most two cold deaths over five years",
+        "pass": true
+      },
+      {
+        "name": "normal seed6: three food days at finish",
+        "pass": true
+      },
+      {
+        "name": "normal seed6: tools maintained",
+        "pass": true
+      },
+      {
+        "name": "normal seed7: survives requested horizon",
+        "pass": true
+      },
+      {
+        "name": "normal seed7: no first-winter deaths",
+        "pass": true
+      },
+      {
+        "name": "normal seed7: no starvation",
+        "pass": true
+      },
+      {
+        "name": "normal seed7: at most two cold deaths over five years",
+        "pass": true
+      },
+      {
+        "name": "normal seed7: three food days at finish",
+        "pass": true
+      },
+      {
+        "name": "normal seed7: tools maintained",
+        "pass": true
+      },
+      {
+        "name": "normal seed8: survives requested horizon",
+        "pass": true
+      },
+      {
+        "name": "normal seed8: no first-winter deaths",
+        "pass": true
+      },
+      {
+        "name": "normal seed8: no starvation",
+        "pass": true
+      },
+      {
+        "name": "normal seed8: at most two cold deaths over five years",
+        "pass": true
+      },
+      {
+        "name": "normal seed8: three food days at finish",
+        "pass": true
+      },
+      {
+        "name": "normal seed8: tools maintained",
+        "pass": true
+      },
+      {
+        "name": "neglect seed1: initial food does not make survival free",
+        "pass": true
+      },
+      {
+        "name": "neglect seed2: initial food does not make survival free",
+        "pass": true
+      },
+      {
+        "name": "neglect seed3: initial food does not make survival free",
+        "pass": true
+      },
+      {
+        "name": "neglect seed4: initial food does not make survival free",
+        "pass": true
+      },
+      {
+        "name": "neglect seed5: initial food does not make survival free",
+        "pass": true
+      },
+      {
+        "name": "neglect seed6: initial food does not make survival free",
+        "pass": true
+      },
+      {
+        "name": "neglect seed7: initial food does not make survival free",
+        "pass": true
+      },
+      {
+        "name": "neglect seed8: initial food does not make survival free",
+        "pass": true
+      },
+      {
+        "name": "no-fuel seed1: cold remains consequential",
+        "pass": true
+      },
+      {
+        "name": "no-fuel seed2: cold remains consequential",
+        "pass": true
+      },
+      {
+        "name": "no-fuel seed3: cold remains consequential",
+        "pass": true
+      },
+      {
+        "name": "no-fuel seed4: cold remains consequential",
+        "pass": true
+      },
+      {
+        "name": "no-fuel seed5: cold remains consequential",
+        "pass": true
+      },
+      {
+        "name": "no-fuel seed6: cold remains consequential",
+        "pass": true
+      },
+      {
+        "name": "no-fuel seed7: cold remains consequential",
+        "pass": true
+      },
+      {
+        "name": "no-fuel seed8: cold remains consequential",
+        "pass": true
+      },
+      {
+        "name": "overexpansion causes more deaths in a majority of paired seeds",
+        "pass": true
+      }
+    ],
+    "results": [
+      {
+        "seed": 1,
+        "strategy": "normal",
+        "years": 5,
+        "day": 240,
+        "population": 19,
+        "born": 4,
+        "died": 0,
+        "causes": {},
+        "resources": {
+          "wood": 72,
+          "stone": 52,
+          "iron": 2,
+          "tools": 30,
+          "food": 425,
+          "firewood": 68
+        },
+        "shortages": {
+          "hungryCitizenDays": 0,
+          "toolDays": 0,
+          "unheatedHomeDays": 0
+        },
+        "production": {
+          "laborer.wood": 380,
+          "gatherer.food": 9285,
+          "woodcutter.firewood": 618,
+          "laborer.stone": 100,
+          "laborer.iron": 20,
+          "blacksmith.tools": 36,
+          "farm.food": 910.0000000000002
+        }
+      },
+      {
+        "seed": 2,
+        "strategy": "normal",
+        "years": 5,
+        "day": 240,
+        "population": 17,
+        "born": 2,
+        "died": 0,
+        "causes": {},
+        "resources": {
+          "wood": 126,
+          "stone": 40,
+          "iron": 11,
+          "tools": 29,
+          "food": 400,
+          "firewood": 68
+        },
+        "shortages": {
+          "hungryCitizenDays": 0,
+          "toolDays": 0,
+          "unheatedHomeDays": 0
+        },
+        "production": {
+          "laborer.wood": 408,
+          "gatherer.food": 9280,
+          "laborer.stone": 100,
+          "woodcutter.firewood": 558,
+          "laborer.iron": 30,
+          "blacksmith.tools": 38,
+          "farm.food": 1596,
+          "forester.wood": 100
+        }
+      },
+      {
+        "seed": 3,
+        "strategy": "normal",
+        "years": 5,
+        "day": 240,
+        "population": 20,
+        "born": 5,
+        "died": 0,
+        "causes": {},
+        "resources": {
+          "wood": 42,
+          "stone": 36,
+          "iron": 2,
+          "tools": 30,
+          "food": 300,
+          "firewood": 50
+        },
+        "shortages": {
+          "hungryCitizenDays": 0,
+          "toolDays": 0,
+          "unheatedHomeDays": 0
+        },
+        "production": {
+          "laborer.wood": 352,
+          "gatherer.food": 7795,
+          "laborer.stone": 80,
+          "woodcutter.firewood": 450,
+          "laborer.iron": 20,
+          "farm.food": 1750,
+          "blacksmith.tools": 36
+        }
+      },
+      {
+        "seed": 4,
+        "strategy": "normal",
+        "years": 5,
+        "day": 240,
+        "population": 20,
+        "born": 5,
+        "died": 0,
+        "causes": {},
+        "resources": {
+          "wood": 150,
+          "stone": 32,
+          "iron": 0,
+          "tools": 29,
+          "food": 679,
+          "firewood": 56
+        },
+        "shortages": {
+          "hungryCitizenDays": 0,
+          "toolDays": 0,
+          "unheatedHomeDays": 0
+        },
+        "production": {
+          "laborer.wood": 388,
+          "gatherer.food": 9210,
+          "woodcutter.firewood": 576,
+          "laborer.stone": 120,
+          "laborer.iron": 20,
+          "blacksmith.tools": 40,
+          "farm.food": 1960,
+          "forester.wood": 224
+        }
+      },
+      {
+        "seed": 5,
+        "strategy": "normal",
+        "years": 5,
+        "day": 240,
+        "population": 20,
+        "born": 5,
+        "died": 0,
+        "causes": {},
+        "resources": {
+          "wood": 0,
+          "stone": 36,
+          "iron": 2,
+          "tools": 31,
+          "food": 338.3,
+          "firewood": 0
+        },
+        "shortages": {
+          "hungryCitizenDays": 0,
+          "toolDays": 0,
+          "unheatedHomeDays": 10
+        },
+        "production": {
+          "laborer.wood": 286,
+          "gatherer.food": 8800,
+          "woodcutter.firewood": 378,
+          "laborer.stone": 80,
+          "laborer.iron": 20,
+          "farm.food": 1400.0000000000002,
+          "blacksmith.tools": 36
+        }
+      },
+      {
+        "seed": 6,
+        "strategy": "normal",
+        "years": 5,
+        "day": 240,
+        "population": 17,
+        "born": 2,
+        "died": 0,
+        "causes": {},
+        "resources": {
+          "wood": 56,
+          "stone": 60,
+          "iron": 2,
+          "tools": 31,
+          "food": 414.6,
+          "firewood": 98
+        },
+        "shortages": {
+          "hungryCitizenDays": 0,
+          "toolDays": 0,
+          "unheatedHomeDays": 0
+        },
+        "production": {
+          "laborer.wood": 380,
+          "gatherer.food": 8970,
+          "woodcutter.firewood": 528,
+          "laborer.stone": 100,
+          "laborer.iron": 20,
+          "farm.food": 1372,
+          "blacksmith.tools": 36
+        }
+      },
+      {
+        "seed": 7,
+        "strategy": "normal",
+        "years": 5,
+        "day": 240,
+        "population": 20,
+        "born": 5,
+        "died": 0,
+        "causes": {},
+        "resources": {
+          "wood": 60,
+          "stone": 36,
+          "iron": 1,
+          "tools": 30,
+          "food": 448.3,
+          "firewood": 88.5
+        },
+        "shortages": {
+          "hungryCitizenDays": 0,
+          "toolDays": 0,
+          "unheatedHomeDays": 0
+        },
+        "production": {
+          "laborer.wood": 384,
+          "gatherer.food": 8310,
+          "woodcutter.firewood": 486,
+          "laborer.stone": 80,
+          "laborer.iron": 20,
+          "farm.food": 2450,
+          "blacksmith.tools": 38
+        }
+      },
+      {
+        "seed": 8,
+        "strategy": "normal",
+        "years": 5,
+        "day": 240,
+        "population": 24,
+        "born": 9,
+        "died": 0,
+        "causes": {},
+        "resources": {
+          "wood": 12,
+          "stone": 60,
+          "iron": 1,
+          "tools": 30,
+          "food": 804,
+          "firewood": 92
+        },
+        "shortages": {
+          "hungryCitizenDays": 0,
+          "toolDays": 0,
+          "unheatedHomeDays": 0
+        },
+        "production": {
+          "laborer.wood": 380,
+          "gatherer.food": 9475,
+          "laborer.stone": 120,
+          "woodcutter.firewood": 492,
+          "laborer.iron": 20,
+          "blacksmith.tools": 38,
+          "farm.food": 2226
+        }
+      },
+      {
+        "seed": 1,
+        "strategy": "original",
+        "years": 5,
+        "day": 100,
+        "population": 0,
+        "born": 1,
+        "died": 16,
+        "causes": {
+          "饿死": 16
+        },
+        "resources": {
+          "wood": 202,
+          "stone": 191,
+          "iron": 0,
+          "tools": 8,
+          "food": 0.4,
+          "firewood": 0
+        },
+        "shortages": {
+          "hungryCitizenDays": 76,
+          "toolDays": 0,
+          "unheatedHomeDays": 8
+        },
+        "production": {
+          "laborer.stone": 220,
+          "woodcutter.firewood": 54,
+          "gatherer.food": 2410,
+          "laborer.wood": 284
+        }
+      },
+      {
+        "seed": 2,
+        "strategy": "original",
+        "years": 5,
+        "day": 240,
+        "population": 2,
+        "born": 3,
+        "died": 16,
+        "causes": {
+          "冻死": 8,
+          "饿死": 8
+        },
+        "resources": {
+          "wood": 94,
+          "stone": 135,
+          "iron": 23,
+          "tools": 15,
+          "food": 82.1,
+          "firewood": 0
+        },
+        "shortages": {
+          "hungryCitizenDays": 147,
+          "toolDays": 0,
+          "unheatedHomeDays": 38
+        },
+        "production": {
+          "laborer.iron": 30,
+          "laborer.stone": 280,
+          "woodcutter.firewood": 144,
+          "gatherer.food": 4060,
+          "laborer.wood": 448,
+          "blacksmith.tools": 14
+        }
+      },
+      {
+        "seed": 3,
+        "strategy": "original",
+        "years": 5,
+        "day": 228,
+        "population": 0,
+        "born": 2,
+        "died": 17,
+        "causes": {
+          "冻死": 5,
+          "饿死": 12
+        },
+        "resources": {
+          "wood": 52,
+          "stone": 185,
+          "iron": 18,
+          "tools": 27,
+          "food": 1.3,
+          "firewood": 22.8
+        },
+        "shortages": {
+          "hungryCitizenDays": 181,
+          "toolDays": 0,
+          "unheatedHomeDays": 0
+        },
+        "production": {
+          "laborer.iron": 30,
+          "woodcutter.firewood": 204,
+          "laborer.stone": 250,
+          "gatherer.food": 3278,
+          "laborer.wood": 252,
+          "forester.wood": 56,
+          "blacksmith.tools": 24
+        }
+      },
+      {
+        "seed": 4,
+        "strategy": "original",
+        "years": 5,
+        "day": 240,
+        "population": 16,
+        "born": 2,
+        "died": 1,
+        "causes": {
+          "饿死": 1
+        },
+        "resources": {
+          "wood": 296,
+          "stone": 173,
+          "iron": 10,
+          "tools": 31,
+          "food": 258.8,
+          "firewood": 168.5
+        },
+        "shortages": {
+          "hungryCitizenDays": 46,
+          "toolDays": 0,
+          "unheatedHomeDays": 0
+        },
+        "production": {
+          "laborer.iron": 30,
+          "woodcutter.firewood": 876,
+          "laborer.stone": 270,
+          "gatherer.food": 5900,
+          "laborer.wood": 454,
+          "forester.wood": 384,
+          "blacksmith.tools": 40,
+          "farm.food": 1372
+        }
+      },
+      {
+        "seed": 5,
+        "strategy": "original",
+        "years": 5,
+        "day": 55,
+        "population": 0,
+        "born": 0,
+        "died": 15,
+        "causes": {
+          "饿死": 15
+        },
+        "resources": {
+          "wood": 22,
+          "stone": 127,
+          "iron": 44,
+          "tools": 24,
+          "food": 1.3,
+          "firewood": 65
+        },
+        "shortages": {
+          "hungryCitizenDays": 55,
+          "toolDays": 0,
+          "unheatedHomeDays": 0
+        },
+        "production": {
+          "laborer.iron": 50,
+          "woodcutter.firewood": 90,
+          "laborer.stone": 180,
+          "gatherer.food": 895,
+          "laborer.wood": 204,
+          "blacksmith.tools": 12
+        }
+      },
+      {
+        "seed": 6,
+        "strategy": "original",
+        "years": 5,
+        "day": 78,
+        "population": 0,
+        "born": 0,
+        "died": 15,
+        "causes": {
+          "饿死": 15
+        },
+        "resources": {
+          "wood": 82,
+          "stone": 119,
+          "iron": 30,
+          "tools": 10,
+          "food": 1.3,
+          "firewood": 125
+        },
+        "shortages": {
+          "hungryCitizenDays": 69,
+          "toolDays": 0,
+          "unheatedHomeDays": 0
+        },
+        "production": {
+          "laborer.iron": 30,
+          "laborer.stone": 170,
+          "woodcutter.firewood": 150,
+          "gatherer.food": 1555,
+          "laborer.wood": 246
+        }
+      },
+      {
+        "seed": 7,
+        "strategy": "original",
+        "years": 5,
+        "day": 240,
+        "population": 3,
+        "born": 3,
+        "died": 15,
+        "causes": {
+          "冻死": 5,
+          "饿死": 10
+        },
+        "resources": {
+          "wood": 110,
+          "stone": 167,
+          "iron": 93,
+          "tools": 30,
+          "food": 0.1,
+          "firewood": 74
+        },
+        "shortages": {
+          "hungryCitizenDays": 156,
+          "toolDays": 0,
+          "unheatedHomeDays": 0
+        },
+        "production": {
+          "laborer.iron": 110,
+          "laborer.stone": 240,
+          "woodcutter.firewood": 354,
+          "gatherer.food": 4069,
+          "laborer.wood": 182,
+          "forester.wood": 260,
+          "farm.food": 882,
+          "blacksmith.tools": 34
+        }
+      },
+      {
+        "seed": 8,
+        "strategy": "original",
+        "years": 5,
+        "day": 187,
+        "population": 0,
+        "born": 4,
+        "died": 19,
+        "causes": {
+          "冻死": 5,
+          "饿死": 14
+        },
+        "resources": {
+          "wood": 86,
+          "stone": 187,
+          "iron": 17,
+          "tools": 27,
+          "food": 1.3,
+          "firewood": 124.3
+        },
+        "shortages": {
+          "hungryCitizenDays": 65,
+          "toolDays": 0,
+          "unheatedHomeDays": 0
+        },
+        "production": {
+          "laborer.iron": 30,
+          "laborer.stone": 260,
+          "woodcutter.firewood": 288,
+          "gatherer.food": 3458,
+          "laborer.wood": 266,
+          "forester.wood": 126,
+          "blacksmith.tools": 26,
+          "farm.food": 961
+        }
+      },
+      {
+        "seed": 1,
+        "strategy": "neglect",
+        "years": 5,
+        "day": 20,
+        "population": 0,
+        "born": 0,
+        "died": 15,
+        "causes": {
+          "饿死": 15
+        },
+        "resources": {
+          "wood": 80,
+          "stone": 48,
+          "iron": 0,
+          "tools": 14,
+          "food": 0,
+          "firewood": 50
+        },
+        "shortages": {
+          "hungryCitizenDays": 45,
+          "toolDays": 0,
+          "unheatedHomeDays": 0
+        },
+        "production": {}
+      },
+      {
+        "seed": 2,
+        "strategy": "neglect",
+        "years": 5,
+        "day": 20,
+        "population": 0,
+        "born": 0,
+        "died": 15,
+        "causes": {
+          "饿死": 15
+        },
+        "resources": {
+          "wood": 80,
+          "stone": 48,
+          "iron": 0,
+          "tools": 14,
+          "food": 0,
+          "firewood": 50
+        },
+        "shortages": {
+          "hungryCitizenDays": 45,
+          "toolDays": 0,
+          "unheatedHomeDays": 0
+        },
+        "production": {}
+      },
+      {
+        "seed": 3,
+        "strategy": "neglect",
+        "years": 5,
+        "day": 20,
+        "population": 0,
+        "born": 0,
+        "died": 15,
+        "causes": {
+          "饿死": 15
+        },
+        "resources": {
+          "wood": 80,
+          "stone": 48,
+          "iron": 0,
+          "tools": 14,
+          "food": 0,
+          "firewood": 50
+        },
+        "shortages": {
+          "hungryCitizenDays": 45,
+          "toolDays": 0,
+          "unheatedHomeDays": 0
+        },
+        "production": {}
+      },
+      {
+        "seed": 4,
+        "strategy": "neglect",
+        "years": 5,
+        "day": 20,
+        "population": 0,
+        "born": 0,
+        "died": 15,
+        "causes": {
+          "饿死": 15
+        },
+        "resources": {
+          "wood": 80,
+          "stone": 48,
+          "iron": 0,
+          "tools": 14,
+          "food": 0,
+          "firewood": 50
+        },
+        "shortages": {
+          "hungryCitizenDays": 45,
+          "toolDays": 0,
+          "unheatedHomeDays": 0
+        },
+        "production": {}
+      },
+      {
+        "seed": 5,
+        "strategy": "neglect",
+        "years": 5,
+        "day": 20,
+        "population": 0,
+        "born": 0,
+        "died": 15,
+        "causes": {
+          "饿死": 15
+        },
+        "resources": {
+          "wood": 80,
+          "stone": 48,
+          "iron": 0,
+          "tools": 14,
+          "food": 0,
+          "firewood": 50
+        },
+        "shortages": {
+          "hungryCitizenDays": 45,
+          "toolDays": 0,
+          "unheatedHomeDays": 0
+        },
+        "production": {}
+      },
+      {
+        "seed": 6,
+        "strategy": "neglect",
+        "years": 5,
+        "day": 20,
+        "population": 0,
+        "born": 0,
+        "died": 15,
+        "causes": {
+          "饿死": 15
+        },
+        "resources": {
+          "wood": 80,
+          "stone": 48,
+          "iron": 0,
+          "tools": 14,
+          "food": 0,
+          "firewood": 50
+        },
+        "shortages": {
+          "hungryCitizenDays": 45,
+          "toolDays": 0,
+          "unheatedHomeDays": 0
+        },
+        "production": {}
+      },
+      {
+        "seed": 7,
+        "strategy": "neglect",
+        "years": 5,
+        "day": 20,
+        "population": 0,
+        "born": 0,
+        "died": 15,
+        "causes": {
+          "饿死": 15
+        },
+        "resources": {
+          "wood": 80,
+          "stone": 48,
+          "iron": 0,
+          "tools": 14,
+          "food": 0,
+          "firewood": 50
+        },
+        "shortages": {
+          "hungryCitizenDays": 45,
+          "toolDays": 0,
+          "unheatedHomeDays": 0
+        },
+        "production": {}
+      },
+      {
+        "seed": 8,
+        "strategy": "neglect",
+        "years": 5,
+        "day": 20,
+        "population": 0,
+        "born": 0,
+        "died": 15,
+        "causes": {
+          "饿死": 15
+        },
+        "resources": {
+          "wood": 80,
+          "stone": 48,
+          "iron": 0,
+          "tools": 14,
+          "food": 0,
+          "firewood": 50
+        },
+        "shortages": {
+          "hungryCitizenDays": 45,
+          "toolDays": 0,
+          "unheatedHomeDays": 0
+        },
+        "production": {}
+      },
+      {
+        "seed": 1,
+        "strategy": "no-fuel",
+        "years": 5,
+        "day": 240,
+        "population": 10,
+        "born": 7,
+        "died": 12,
+        "causes": {
+          "冻死": 12
+        },
+        "resources": {
+          "wood": 150,
+          "stone": 44,
+          "iron": 20,
+          "tools": 0,
+          "food": 347,
+          "firewood": 0
+        },
+        "shortages": {
+          "hungryCitizenDays": 0,
+          "toolDays": 61,
+          "unheatedHomeDays": 160
+        },
+        "production": {
+          "laborer.wood": 188,
+          "gatherer.food": 7134,
+          "laborer.stone": 60,
+          "laborer.iron": 20,
+          "farm.food": 196
+        }
+      },
+      {
+        "seed": 2,
+        "strategy": "no-fuel",
+        "years": 5,
+        "day": 240,
+        "population": 11,
+        "born": 7,
+        "died": 11,
+        "causes": {
+          "冻死": 11
+        },
+        "resources": {
+          "wood": 150,
+          "stone": 44,
+          "iron": 2,
+          "tools": 30,
+          "food": 889.2,
+          "firewood": 0
+        },
+        "shortages": {
+          "hungryCitizenDays": 0,
+          "toolDays": 0,
+          "unheatedHomeDays": 232
+        },
+        "production": {
+          "laborer.wood": 336,
+          "gatherer.food": 8587.083333333336,
+          "laborer.stone": 100,
+          "laborer.iron": 20,
+          "blacksmith.tools": 36,
+          "farm.food": 1162
+        }
+      },
+      {
+        "seed": 3,
+        "strategy": "no-fuel",
+        "years": 5,
+        "day": 240,
+        "population": 10,
+        "born": 9,
+        "died": 14,
+        "causes": {
+          "冻死": 14
+        },
+        "resources": {
+          "wood": 78,
+          "stone": 48,
+          "iron": 3,
+          "tools": 29,
+          "food": 470.8,
+          "firewood": 0
+        },
+        "shortages": {
+          "hungryCitizenDays": 0,
+          "toolDays": 0,
+          "unheatedHomeDays": 184
+        },
+        "production": {
+          "laborer.wood": 244,
+          "gatherer.food": 7350,
+          "laborer.stone": 100,
+          "laborer.iron": 20,
+          "blacksmith.tools": 34,
+          "farm.food": 168
+        }
+      },
+      {
+        "seed": 4,
+        "strategy": "no-fuel",
+        "years": 5,
+        "day": 240,
+        "population": 13,
+        "born": 8,
+        "died": 10,
+        "causes": {
+          "冻死": 10
+        },
+        "resources": {
+          "wood": 156,
+          "stone": 44,
+          "iron": 0,
+          "tools": 31,
+          "food": 971.2,
+          "firewood": 0
+        },
+        "shortages": {
+          "hungryCitizenDays": 0,
+          "toolDays": 0,
+          "unheatedHomeDays": 244
+        },
+        "production": {
+          "laborer.wood": 340,
+          "gatherer.food": 9377.916666666675,
+          "laborer.stone": 100,
+          "laborer.iron": 20,
+          "blacksmith.tools": 40,
+          "farm.food": 2450
+        }
+      },
+      {
+        "seed": 5,
+        "strategy": "no-fuel",
+        "years": 5,
+        "day": 240,
+        "population": 10,
+        "born": 11,
+        "died": 16,
+        "causes": {
+          "冻死": 16
+        },
+        "resources": {
+          "wood": 82,
+          "stone": 32,
+          "iron": 3,
+          "tools": 29,
+          "food": 492.6,
+          "firewood": 0
+        },
+        "shortages": {
+          "hungryCitizenDays": 0,
+          "toolDays": 0,
+          "unheatedHomeDays": 256
+        },
+        "production": {
+          "laborer.wood": 294,
+          "gatherer.food": 6240,
+          "laborer.stone": 100,
+          "laborer.iron": 20,
+          "blacksmith.tools": 34,
+          "farm.food": 686
+        }
+      },
+      {
+        "seed": 6,
+        "strategy": "no-fuel",
+        "years": 5,
+        "day": 240,
+        "population": 10,
+        "born": 5,
+        "died": 10,
+        "causes": {
+          "冻死": 10
+        },
+        "resources": {
+          "wood": 156,
+          "stone": 44,
+          "iron": 3,
+          "tools": 29,
+          "food": 979.2,
+          "firewood": 0
+        },
+        "shortages": {
+          "hungryCitizenDays": 0,
+          "toolDays": 0,
+          "unheatedHomeDays": 232
+        },
+        "production": {
+          "laborer.wood": 332,
+          "gatherer.food": 8806.666666666668,
+          "laborer.stone": 100,
+          "laborer.iron": 20,
+          "blacksmith.tools": 34,
+          "farm.food": 1330
+        }
+      },
+      {
+        "seed": 7,
+        "strategy": "no-fuel",
+        "years": 5,
+        "day": 240,
+        "population": 10,
+        "born": 5,
+        "died": 10,
+        "causes": {
+          "冻死": 10
+        },
+        "resources": {
+          "wood": 54,
+          "stone": 32,
+          "iron": 3,
+          "tools": 29,
+          "food": 648.4,
+          "firewood": 0
+        },
+        "shortages": {
+          "hungryCitizenDays": 0,
+          "toolDays": 0,
+          "unheatedHomeDays": 202
+        },
+        "production": {
+          "laborer.wood": 268,
+          "gatherer.food": 8230,
+          "laborer.stone": 100,
+          "laborer.iron": 20,
+          "farm.food": 405.9999999999998,
+          "blacksmith.tools": 34
+        }
+      },
+      {
+        "seed": 8,
+        "strategy": "no-fuel",
+        "years": 5,
+        "day": 240,
+        "population": 11,
+        "born": 10,
+        "died": 14,
+        "causes": {
+          "冻死": 14
+        },
+        "resources": {
+          "wood": 150,
+          "stone": 44,
+          "iron": 2,
+          "tools": 30,
+          "food": 984.2,
+          "firewood": 0
+        },
+        "shortages": {
+          "hungryCitizenDays": 0,
+          "toolDays": 0,
+          "unheatedHomeDays": 256
+        },
+        "production": {
+          "laborer.wood": 332,
+          "gatherer.food": 8720,
+          "laborer.stone": 100,
+          "laborer.iron": 20,
+          "blacksmith.tools": 36,
+          "farm.food": 1974
+        }
+      },
+      {
+        "seed": 1,
+        "strategy": "overexpand",
+        "years": 5,
+        "day": 211,
+        "population": 0,
+        "born": 8,
+        "died": 23,
+        "causes": {
+          "饿死": 23
+        },
+        "resources": {
+          "wood": 2,
+          "stone": 4,
+          "iron": 20,
+          "tools": 0,
+          "food": 2,
+          "firewood": 53
+        },
+        "shortages": {
+          "hungryCitizenDays": 81,
+          "toolDays": 35,
+          "unheatedHomeDays": 0
+        },
+        "production": {
+          "laborer.wood": 286,
+          "gatherer.food": 7265,
+          "woodcutter.firewood": 543,
+          "laborer.stone": 60,
+          "laborer.iron": 20,
+          "farm.food": 511
+        }
+      },
+      {
+        "seed": 2,
+        "strategy": "overexpand",
+        "years": 5,
+        "day": 173,
+        "population": 0,
+        "born": 8,
+        "died": 23,
+        "causes": {
+          "饿死": 23
+        },
+        "resources": {
+          "wood": 26,
+          "stone": 0,
+          "iron": 10,
+          "tools": 0,
+          "food": 1,
+          "firewood": 152
+        },
+        "shortages": {
+          "hungryCitizenDays": 75,
+          "toolDays": 13,
+          "unheatedHomeDays": 0
+        },
+        "production": {
+          "laborer.wood": 306,
+          "gatherer.food": 6026,
+          "laborer.stone": 40,
+          "woodcutter.firewood": 492,
+          "farm.food": 546,
+          "laborer.iron": 15
+        }
+      },
+      {
+        "seed": 3,
+        "strategy": "overexpand",
+        "years": 5,
+        "day": 192,
+        "population": 0,
+        "born": 5,
+        "died": 20,
+        "causes": {
+          "饿死": 20
+        },
+        "resources": {
+          "wood": 9,
+          "stone": 0,
+          "iron": 20,
+          "tools": 0,
+          "food": 1.7,
+          "firewood": 16.5
+        },
+        "shortages": {
+          "hungryCitizenDays": 86,
+          "toolDays": 16,
+          "unheatedHomeDays": 0
+        },
+        "production": {
+          "laborer.wood": 284,
+          "gatherer.food": 5303,
+          "laborer.stone": 40,
+          "woodcutter.firewood": 474,
+          "farm.food": 812,
+          "laborer.iron": 20
+        }
+      },
+      {
+        "seed": 4,
+        "strategy": "overexpand",
+        "years": 5,
+        "day": 167,
+        "population": 0,
+        "born": 9,
+        "died": 24,
+        "causes": {
+          "饿死": 24
+        },
+        "resources": {
+          "wood": 2,
+          "stone": 4,
+          "iron": 20,
+          "tools": 0,
+          "food": 0.1,
+          "firewood": 74
+        },
+        "shortages": {
+          "hungryCitizenDays": 75,
+          "toolDays": 22,
+          "unheatedHomeDays": 0
+        },
+        "production": {
+          "laborer.wood": 292,
+          "gatherer.food": 5736,
+          "woodcutter.firewood": 414,
+          "laborer.stone": 60,
+          "laborer.iron": 20,
+          "farm.food": 867.9999999999999
+        }
+      },
+      {
+        "seed": 5,
+        "strategy": "overexpand",
+        "years": 5,
+        "day": 196,
+        "population": 0,
+        "born": 5,
+        "died": 20,
+        "causes": {
+          "饿死": 20
+        },
+        "resources": {
+          "wood": 1,
+          "stone": 28,
+          "iron": 20,
+          "tools": 0,
+          "food": 0.1,
+          "firewood": 14
+        },
+        "shortages": {
+          "hungryCitizenDays": 63,
+          "toolDays": 20,
+          "unheatedHomeDays": 0
+        },
+        "production": {
+          "laborer.wood": 253,
+          "gatherer.food": 6297,
+          "woodcutter.firewood": 444,
+          "laborer.stone": 60,
+          "farm.food": 1484,
+          "laborer.iron": 20
+        }
+      },
+      {
+        "seed": 6,
+        "strategy": "overexpand",
+        "years": 5,
+        "day": 167,
+        "population": 0,
+        "born": 10,
+        "died": 25,
+        "causes": {
+          "饿死": 25
+        },
+        "resources": {
+          "wood": 6,
+          "stone": 28,
+          "iron": 20,
+          "tools": 2,
+          "food": 1.6,
+          "firewood": 104
+        },
+        "shortages": {
+          "hungryCitizenDays": 94,
+          "toolDays": 0,
+          "unheatedHomeDays": 0
+        },
+        "production": {
+          "laborer.wood": 244,
+          "gatherer.food": 5915,
+          "woodcutter.firewood": 414,
+          "laborer.stone": 60,
+          "farm.food": 643.9999999999999,
+          "laborer.iron": 20
+        }
+      },
+      {
+        "seed": 7,
+        "strategy": "overexpand",
+        "years": 5,
+        "day": 196,
+        "population": 0,
+        "born": 7,
+        "died": 22,
+        "causes": {
+          "饿死": 22
+        },
+        "resources": {
+          "wood": 3,
+          "stone": 0,
+          "iron": 0,
+          "tools": 0,
+          "food": 0.8,
+          "firewood": 19.5
+        },
+        "shortages": {
+          "hungryCitizenDays": 95,
+          "toolDays": 32,
+          "unheatedHomeDays": 0
+        },
+        "production": {
+          "laborer.wood": 286,
+          "gatherer.food": 5634,
+          "woodcutter.firewood": 477,
+          "laborer.stone": 40,
+          "farm.food": 1722
+        }
+      },
+      {
+        "seed": 8,
+        "strategy": "overexpand",
+        "years": 5,
+        "day": 223,
+        "population": 0,
+        "born": 4,
+        "died": 19,
+        "causes": {
+          "饿死": 19
+        },
+        "resources": {
+          "wood": 1,
+          "stone": 12,
+          "iron": 20,
+          "tools": 0,
+          "food": 1.3,
+          "firewood": 53
+        },
+        "shortages": {
+          "hungryCitizenDays": 63,
+          "toolDays": 61,
+          "unheatedHomeDays": 0
+        },
+        "production": {
+          "laborer.wood": 318,
+          "gatherer.food": 7189,
+          "laborer.stone": 60,
+          "woodcutter.firewood": 513,
+          "farm.food": 1274.0000000000002,
+          "laborer.iron": 20
+        }
+      }
+    ]
+  },
+  "holdoutFiveYear": {
+    "strategyHash": "b878b0328bc7a70c8f8aafebd04143c926ee21f764ef04ba3afbfc6c2121d206",
+    "checks": [
+      {
+        "name": "adaptive-mining seed41: survives requested horizon",
+        "pass": true
+      },
+      {
+        "name": "adaptive-mining seed41: no first-winter deaths",
+        "pass": true
+      },
+      {
+        "name": "adaptive-mining seed41: no starvation",
+        "pass": true
+      },
+      {
+        "name": "adaptive-mining seed41: at most two cold deaths over five years",
+        "pass": true
+      },
+      {
+        "name": "adaptive-mining seed41: three food days at finish",
+        "pass": true
+      },
+      {
+        "name": "adaptive-mining seed41: tools maintained",
+        "pass": true
+      },
+      {
+        "name": "adaptive-mining seed42: survives requested horizon",
+        "pass": true
+      },
+      {
+        "name": "adaptive-mining seed42: no first-winter deaths",
+        "pass": true
+      },
+      {
+        "name": "adaptive-mining seed42: no starvation",
+        "pass": true
+      },
+      {
+        "name": "adaptive-mining seed42: at most two cold deaths over five years",
+        "pass": true
+      },
+      {
+        "name": "adaptive-mining seed42: three food days at finish",
+        "pass": true
+      },
+      {
+        "name": "adaptive-mining seed42: tools maintained",
+        "pass": true
+      },
+      {
+        "name": "adaptive-mining seed43: survives requested horizon",
+        "pass": true
+      },
+      {
+        "name": "adaptive-mining seed43: no first-winter deaths",
+        "pass": true
+      },
+      {
+        "name": "adaptive-mining seed43: no starvation",
+        "pass": true
+      },
+      {
+        "name": "adaptive-mining seed43: at most two cold deaths over five years",
+        "pass": true
+      },
+      {
+        "name": "adaptive-mining seed43: three food days at finish",
+        "pass": true
+      },
+      {
+        "name": "adaptive-mining seed43: tools maintained",
+        "pass": true
+      },
+      {
+        "name": "adaptive-mining seed44: survives requested horizon",
+        "pass": false
+      },
+      {
+        "name": "adaptive-mining seed44: no first-winter deaths",
+        "pass": true
+      },
+      {
+        "name": "adaptive-mining seed44: no starvation",
+        "pass": true
+      },
+      {
+        "name": "adaptive-mining seed44: at most two cold deaths over five years",
+        "pass": false
+      },
+      {
+        "name": "adaptive-mining seed44: three food days at finish",
+        "pass": true
+      },
+      {
+        "name": "adaptive-mining seed44: tools maintained",
+        "pass": true
+      },
+      {
+        "name": "adaptive-mining seed45: survives requested horizon",
+        "pass": true
+      },
+      {
+        "name": "adaptive-mining seed45: no first-winter deaths",
+        "pass": true
+      },
+      {
+        "name": "adaptive-mining seed45: no starvation",
+        "pass": true
+      },
+      {
+        "name": "adaptive-mining seed45: at most two cold deaths over five years",
+        "pass": true
+      },
+      {
+        "name": "adaptive-mining seed45: three food days at finish",
+        "pass": true
+      },
+      {
+        "name": "adaptive-mining seed45: tools maintained",
+        "pass": true
+      },
+      {
+        "name": "adaptive-mining seed46: survives requested horizon",
+        "pass": true
+      },
+      {
+        "name": "adaptive-mining seed46: no first-winter deaths",
+        "pass": true
+      },
+      {
+        "name": "adaptive-mining seed46: no starvation",
+        "pass": true
+      },
+      {
+        "name": "adaptive-mining seed46: at most two cold deaths over five years",
+        "pass": true
+      },
+      {
+        "name": "adaptive-mining seed46: three food days at finish",
+        "pass": true
+      },
+      {
+        "name": "adaptive-mining seed46: tools maintained",
+        "pass": true
+      },
+      {
+        "name": "adaptive-mining seed47: survives requested horizon",
+        "pass": true
+      },
+      {
+        "name": "adaptive-mining seed47: no first-winter deaths",
+        "pass": true
+      },
+      {
+        "name": "adaptive-mining seed47: no starvation",
+        "pass": true
+      },
+      {
+        "name": "adaptive-mining seed47: at most two cold deaths over five years",
+        "pass": true
+      },
+      {
+        "name": "adaptive-mining seed47: three food days at finish",
+        "pass": true
+      },
+      {
+        "name": "adaptive-mining seed47: tools maintained",
+        "pass": true
+      },
+      {
+        "name": "adaptive-mining seed48: survives requested horizon",
+        "pass": true
+      },
+      {
+        "name": "adaptive-mining seed48: no first-winter deaths",
+        "pass": true
+      },
+      {
+        "name": "adaptive-mining seed48: no starvation",
+        "pass": true
+      },
+      {
+        "name": "adaptive-mining seed48: at most two cold deaths over five years",
+        "pass": true
+      },
+      {
+        "name": "adaptive-mining seed48: three food days at finish",
+        "pass": true
+      },
+      {
+        "name": "adaptive-mining seed48: tools maintained",
+        "pass": true
+      }
+    ],
+    "results": [
+      {
+        "seed": 41,
+        "strategy": "adaptive-mining",
+        "years": 5,
+        "day": 240,
+        "population": 21,
+        "born": 6,
+        "died": 0,
+        "causes": {},
+        "resources": {
+          "wood": 22,
+          "stone": 48,
+          "iron": 21,
+          "tools": 31,
+          "food": 290,
+          "firewood": 98
+        },
+        "shortages": {
+          "hungryCitizenDays": 0,
+          "toolDays": 0,
+          "unheatedHomeDays": 0
+        },
+        "production": {
+          "laborer.wood": 378,
+          "gatherer.food": 8780,
+          "woodcutter.firewood": 558,
+          "laborer.stone": 100,
+          "laborer.iron": 40,
+          "blacksmith.tools": 38,
+          "farm.food": 1246
+        }
+      },
+      {
+        "seed": 42,
+        "strategy": "adaptive-mining",
+        "years": 5,
+        "day": 240,
+        "population": 20,
+        "born": 5,
+        "died": 0,
+        "causes": {},
+        "resources": {
+          "wood": 16,
+          "stone": 40,
+          "iron": 1,
+          "tools": 30,
+          "food": 385,
+          "firewood": 68
+        },
+        "shortages": {
+          "hungryCitizenDays": 0,
+          "toolDays": 0,
+          "unheatedHomeDays": 0
+        },
+        "production": {
+          "laborer.wood": 398,
+          "gatherer.food": 9005,
+          "woodcutter.firewood": 588,
+          "laborer.stone": 100,
+          "laborer.iron": 20,
+          "blacksmith.tools": 38,
+          "farm.food": 1162
+        }
+      },
+      {
+        "seed": 43,
+        "strategy": "adaptive-mining",
+        "years": 5,
+        "day": 240,
+        "population": 18,
+        "born": 3,
+        "died": 0,
+        "causes": {},
+        "resources": {
+          "wood": 50,
+          "stone": 40,
+          "iron": 2,
+          "tools": 30,
+          "food": 445,
+          "firewood": 106
+        },
+        "shortages": {
+          "hungryCitizenDays": 0,
+          "toolDays": 0,
+          "unheatedHomeDays": 0
+        },
+        "production": {
+          "laborer.wood": 370,
+          "gatherer.food": 8395,
+          "woodcutter.firewood": 516,
+          "laborer.stone": 80,
+          "laborer.iron": 20,
+          "blacksmith.tools": 36,
+          "farm.food": 2744
+        }
+      },
+      {
+        "seed": 44,
+        "strategy": "adaptive-mining",
+        "years": 5,
+        "day": 240,
+        "population": 12,
+        "born": 5,
+        "died": 8,
+        "causes": {
+          "冻死": 8
+        },
+        "resources": {
+          "wood": 0,
+          "stone": 28,
+          "iron": 8,
+          "tools": 17,
+          "food": 495,
+          "firewood": 0
+        },
+        "shortages": {
+          "hungryCitizenDays": 0,
+          "toolDays": 0,
+          "unheatedHomeDays": 84
+        },
+        "production": {
+          "laborer.wood": 174,
+          "gatherer.food": 7680,
+          "woodcutter.firewood": 180,
+          "laborer.stone": 60,
+          "laborer.iron": 20,
+          "farm.food": 2954,
+          "blacksmith.tools": 24
+        }
+      },
+      {
+        "seed": 45,
+        "strategy": "adaptive-mining",
+        "years": 5,
+        "day": 240,
+        "population": 25,
+        "born": 10,
+        "died": 0,
+        "causes": {},
+        "resources": {
+          "wood": 60,
+          "stone": 36,
+          "iron": 2,
+          "tools": 30,
+          "food": 275,
+          "firewood": 80
+        },
+        "shortages": {
+          "hungryCitizenDays": 0,
+          "toolDays": 0,
+          "unheatedHomeDays": 0
+        },
+        "production": {
+          "laborer.wood": 358,
+          "gatherer.food": 9845,
+          "laborer.stone": 80,
+          "woodcutter.firewood": 480,
+          "laborer.iron": 20,
+          "blacksmith.tools": 36,
+          "farm.food": 881.9999999999998
+        }
+      },
+      {
+        "seed": 46,
+        "strategy": "adaptive-mining",
+        "years": 5,
+        "day": 240,
+        "population": 20,
+        "born": 5,
+        "died": 0,
+        "causes": {},
+        "resources": {
+          "wood": 70,
+          "stone": 52,
+          "iron": 1,
+          "tools": 30,
+          "food": 370,
+          "firewood": 80
+        },
+        "shortages": {
+          "hungryCitizenDays": 0,
+          "toolDays": 0,
+          "unheatedHomeDays": 0
+        },
+        "production": {
+          "laborer.wood": 412,
+          "gatherer.food": 9325,
+          "laborer.stone": 100,
+          "woodcutter.firewood": 540,
+          "laborer.iron": 20,
+          "farm.food": 3136,
+          "blacksmith.tools": 38
+        }
+      },
+      {
+        "seed": 47,
+        "strategy": "adaptive-mining",
+        "years": 5,
+        "day": 240,
+        "population": 20,
+        "born": 5,
+        "died": 0,
+        "causes": {},
+        "resources": {
+          "wood": 88,
+          "stone": 32,
+          "iron": 1,
+          "tools": 31,
+          "food": 350,
+          "firewood": 74
+        },
+        "shortages": {
+          "hungryCitizenDays": 0,
+          "toolDays": 0,
+          "unheatedHomeDays": 0
+        },
+        "production": {
+          "laborer.wood": 432,
+          "gatherer.food": 9205,
+          "laborer.stone": 80,
+          "woodcutter.firewood": 594,
+          "laborer.iron": 20,
+          "blacksmith.tools": 38,
+          "farm.food": 2030
+        }
+      },
+      {
+        "seed": 48,
+        "strategy": "adaptive-mining",
+        "years": 5,
+        "day": 240,
+        "population": 22,
+        "born": 7,
+        "died": 0,
+        "causes": {},
+        "resources": {
+          "wood": 10,
+          "stone": 48,
+          "iron": 2,
+          "tools": 30,
+          "food": 436.7,
+          "firewood": 110
+        },
+        "shortages": {
+          "hungryCitizenDays": 0,
+          "toolDays": 0,
+          "unheatedHomeDays": 0
+        },
+        "production": {
+          "laborer.wood": 322,
+          "gatherer.food": 9860,
+          "woodcutter.firewood": 570,
+          "laborer.stone": 100,
+          "laborer.iron": 20,
+          "blacksmith.tools": 36,
+          "farm.food": 700.0000000000001
+        }
+      }
+    ]
+  },
+  "thirtyYear": {
+    "results": [
+      {
+        "seed": 1,
+        "years": 30,
+        "day": 1440,
+        "population": 53,
+        "born": 38,
+        "secondGenerationBorn": 8,
+        "died": 0,
+        "causes": {},
+        "resources": {
+          "wood": 199,
+          "stone": 2267,
+          "iron": 508,
+          "tools": 42,
+          "food": 2409.5833333333253,
+          "firewood": 0
+        },
+        "shortages": {
+          "hungryCitizenDays": 0,
+          "hungryDays": 0,
+          "foodEmptyDays": 0,
+          "toolDays": 0,
+          "unheatedHomeDays": 226
+        },
+        "production": {
+          "laborer.wood": 1330,
+          "gatherer.food": 109716.16666666688,
+          "woodcutter.firewood": 4590,
+          "laborer.stone": 200,
+          "laborer.iron": 80,
+          "blacksmith.tools": 248,
+          "farm.food": 5175,
+          "forester.wood": 1240,
+          "mine.stone": 2331,
+          "mine.iron": 573
+        }
+      },
+      {
+        "seed": 2,
+        "years": 30,
+        "day": 1440,
+        "population": 49,
+        "born": 34,
+        "secondGenerationBorn": 6,
+        "died": 0,
+        "causes": {},
+        "resources": {
+          "wood": 177,
+          "stone": 1791,
+          "iron": 372,
+          "tools": 42,
+          "food": 2353.583333333296,
+          "firewood": 52
+        },
+        "shortages": {
+          "hungryCitizenDays": 0,
+          "hungryDays": 0,
+          "foodEmptyDays": 0,
+          "toolDays": 0,
+          "unheatedHomeDays": 19
+        },
+        "production": {
+          "laborer.wood": 1642,
+          "gatherer.food": 105083.24999999999,
+          "laborer.stone": 140,
+          "woodcutter.firewood": 5150,
+          "laborer.iron": 30,
+          "blacksmith.tools": 251,
+          "farm.food": 6482,
+          "forester.wood": 1117,
+          "mine.stone": 1923,
+          "mine.iron": 486
+        }
+      },
+      {
+        "seed": 41,
+        "years": 30,
+        "day": 1440,
+        "population": 25,
+        "born": 17,
+        "secondGenerationBorn": 0,
+        "died": 7,
+        "causes": {
+          "冻死": 7
+        },
+        "resources": {
+          "wood": 110,
+          "stone": 689,
+          "iron": 183,
+          "tools": 31,
+          "food": 1365.0000000000227,
+          "firewood": 72
+        },
+        "shortages": {
+          "hungryCitizenDays": 0,
+          "hungryDays": 0,
+          "foodEmptyDays": 0,
+          "toolDays": 3,
+          "unheatedHomeDays": 70
+        },
+        "production": {
+          "laborer.wood": 1648,
+          "gatherer.food": 82308.74999999996,
+          "woodcutter.firewood": 3426,
+          "laborer.stone": 180,
+          "laborer.iron": 160,
+          "blacksmith.tools": 232,
+          "farm.food": 9310,
+          "forester.wood": 274,
+          "mine.stone": 681,
+          "mine.iron": 165
+        }
+      }
+    ]
+  },
+  "woodControl44": [
+    {
+      "strategy": "original",
+      "results": [
+        {
+          "seed": 44,
+          "strategy": "opening",
+          "years": 5,
+          "day": 240,
+          "population": 12,
+          "born": 5,
+          "secondGenerationBorn": 0,
+          "died": 8,
+          "causes": {
+            "冻死": 8
+          },
+          "resources": {
+            "wood": 0,
+            "stone": 28,
+            "iron": 8,
+            "tools": 17,
+            "food": 495.0000000000002,
+            "firewood": 0
+          },
+          "shortages": {
+            "hungryCitizenDays": 0,
+            "hungryDays": 0,
+            "foodEmptyDays": 0,
+            "toolDays": 0,
+            "unheatedHomeDays": 84
+          },
+          "production": {
+            "laborer.wood": 174,
+            "gatherer.food": 7680,
+            "woodcutter.firewood": 180,
+            "laborer.stone": 60,
+            "laborer.iron": 20,
+            "farm.food": 2954,
+            "blacksmith.tools": 24
+          }
+        }
+      ]
+    },
+    {
+      "strategy": "protected",
+      "results": [
+        {
+          "seed": 44,
+          "strategy": "protected26",
+          "years": 5,
+          "day": 240,
+          "population": 12,
+          "born": 8,
+          "secondGenerationBorn": 0,
+          "died": 11,
+          "causes": {
+            "冻死": 11
+          },
+          "resources": {
+            "wood": 0,
+            "stone": 8,
+            "iron": 13,
+            "tools": 7,
+            "food": 470.0000000000009,
+            "firewood": 0
+          },
+          "shortages": {
+            "hungryCitizenDays": 0,
+            "hungryDays": 0,
+            "foodEmptyDays": 0,
+            "toolDays": 0,
+            "unheatedHomeDays": 88
+          },
+          "production": {
+            "laborer.wood": 156,
+            "gatherer.food": 7660,
+            "woodcutter.firewood": 156,
+            "laborer.stone": 40,
+            "laborer.iron": 20,
+            "farm.food": 3248,
+            "blacksmith.tools": 14
+          }
+        }
+      ]
+    },
+    {
+      "strategy": "expanded",
+      "results": [
+        {
+          "seed": 44,
+          "strategy": "expanded-wood",
+          "years": 5,
+          "day": 240,
+          "population": 21,
+          "born": 7,
+          "secondGenerationBorn": 0,
+          "died": 1,
+          "causes": {
+            "冻死": 1
+          },
+          "resources": {
+            "wood": 2,
+            "stone": 36,
+            "iron": 1,
+            "tools": 31,
+            "food": 305.0000000000048,
+            "firewood": 87
+          },
+          "shortages": {
+            "hungryCitizenDays": 0,
+            "hungryDays": 0,
+            "foodEmptyDays": 0,
+            "toolDays": 0,
+            "unheatedHomeDays": 0
+          },
+          "production": {
+            "laborer.wood": 314,
+            "gatherer.food": 7760,
+            "woodcutter.firewood": 462,
+            "laborer.stone": 80,
+            "laborer.iron": 20,
+            "farm.food": 2520,
+            "blacksmith.tools": 38
+          }
+        }
+      ]
+    }
+  ],
+  "longProvenance": {
+    "finalTestSha256": "68b0642b05815bc419a2f08c485a4026fac4541042ebf67d71370ea571a2b9f9",
+    "frozenTestSha256": "21489d509bd3ec0bf4e0244b2c997c78c0a1158644993d935ff2eeef180e81be",
+    "frozenLongFunctionSha256": "1d0918186ba6e3e0a23a29c2fc84a03b8b0b38c7612d3cab5982ce8508d53ec7",
+    "helperSha256": "6c45afb95cfcdbc6b7ca07a80884b29d8c596b8b89e8e6b758f79667b5f15c1d",
+    "currentEngineSourceHash": "dcfd1219440ab41ba9a71f537a11e4216341bee5a0ac70d3c8c0139363cf5c88",
+    "longRuleHash": "d6ded4bcf9490e5dd971f756db4cb77478382c997042d84592064c9110c3e197",
+    "frozenLongPolicyUnchanged": true,
+    "allFinalResultsUseCurrentEngine": true,
+    "reports": [
+      {
+        "file": "long-economy-final.json",
+        "fileSha256": "98ac4d4670ef3fa8f4d2b61b72dc21ff07ff22b52165dad19ab0c7795060fac0",
+        "strategyHash": "b0112925cb8779e199acf045a4e227f08444da80be1d787d3e5c687dca5f3a24",
+        "sourceHash": "dcfd1219440ab41ba9a71f537a11e4216341bee5a0ac70d3c8c0139363cf5c88"
+      },
+      {
+        "file": "long-economy-holdout44.json",
+        "fileSha256": "8d1d7ac0fd2cb5b0dc1054cdcae9d1157b0218464c8bce753856fceab56faa4b",
+        "strategyHash": "e4fa40c8d6a428b99f6c419dbed23383a8eda9c26f7d4574afb2d4d15e8a97ad",
+        "sourceHash": "dcfd1219440ab41ba9a71f537a11e4216341bee5a0ac70d3c8c0139363cf5c88"
+      },
+      {
+        "file": "wood-control-original44.json",
+        "fileSha256": "fa9a73509491a44df3f16da1644d4f0b12bdd8a61a413165eb801dfec470edf4",
+        "strategyHash": "9b51da8910b031d51ec10af034ddba1fc2a2333bae57145d739dc27ce240c8fd",
+        "sourceHash": "dcfd1219440ab41ba9a71f537a11e4216341bee5a0ac70d3c8c0139363cf5c88"
+      },
+      {
+        "file": "wood-control-protected44.json",
+        "fileSha256": "39b7e4ace06379be7ae5bafb670028272512cf6744d653c1e13df9d581a979aa",
+        "strategyHash": "baa334368ec2784c6181e26320a886b2275f96e8b80848b7953621666900afd9",
+        "sourceHash": "dcfd1219440ab41ba9a71f537a11e4216341bee5a0ac70d3c8c0139363cf5c88"
+      },
+      {
+        "file": "wood-control-expanded44.json",
+        "fileSha256": "a3fe5f1282d091220c4162bb9b1d2c3d64521390ed11854758c8b58e583fc1f4",
+        "strategyHash": "c24ee0f0b2dab4af2c8db7df97595ff7947a99e74b69781639a3505f2568aa67",
+        "sourceHash": "dcfd1219440ab41ba9a71f537a11e4216341bee5a0ac70d3c8c0139363cf5c88"
+      }
+    ]
+  },
+  "strengthenedLongChecks": {
+    "note": "Read-only revalidation of immutable reports. Null means not applicable at short horizon. Player policy is byte-identical to the frozen v5 longStrategy function; only independent controls, observation and assertions were added.",
+    "checks": [
+      {
+        "file": "long-economy-final.json",
+        "seed": 1,
+        "years": 30,
+        "sourceHash": "dcfd1219440ab41ba9a71f537a11e4216341bee5a0ac70d3c8c0139363cf5c88",
+        "strategyHash": "b0112925cb8779e199acf045a4e227f08444da80be1d787d3e5c687dca5f3a24",
+        "survives": true,
+        "crossGeneration": true,
+        "educationAndMine": true,
+        "noToolExhaustion": true,
+        "noStarvation": true,
+        "noPreventableDeaths": true
+      },
+      {
+        "file": "long-economy-final.json",
+        "seed": 2,
+        "years": 30,
+        "sourceHash": "dcfd1219440ab41ba9a71f537a11e4216341bee5a0ac70d3c8c0139363cf5c88",
+        "strategyHash": "b0112925cb8779e199acf045a4e227f08444da80be1d787d3e5c687dca5f3a24",
+        "survives": true,
+        "crossGeneration": true,
+        "educationAndMine": true,
+        "noToolExhaustion": true,
+        "noStarvation": true,
+        "noPreventableDeaths": true
+      },
+      {
+        "file": "long-economy-final.json",
+        "seed": 41,
+        "years": 30,
+        "sourceHash": "dcfd1219440ab41ba9a71f537a11e4216341bee5a0ac70d3c8c0139363cf5c88",
+        "strategyHash": "b0112925cb8779e199acf045a4e227f08444da80be1d787d3e5c687dca5f3a24",
+        "survives": true,
+        "crossGeneration": false,
+        "educationAndMine": true,
+        "noToolExhaustion": false,
+        "noStarvation": true,
+        "noPreventableDeaths": false
+      },
+      {
+        "file": "long-economy-holdout44.json",
+        "seed": 44,
+        "years": 5,
+        "sourceHash": "dcfd1219440ab41ba9a71f537a11e4216341bee5a0ac70d3c8c0139363cf5c88",
+        "strategyHash": "e4fa40c8d6a428b99f6c419dbed23383a8eda9c26f7d4574afb2d4d15e8a97ad",
+        "survives": true,
+        "crossGeneration": null,
+        "educationAndMine": null,
+        "noToolExhaustion": true,
+        "noStarvation": false,
+        "noPreventableDeaths": false
+      },
+      {
+        "file": "wood-control-original44.json",
+        "seed": 44,
+        "years": 5,
+        "sourceHash": "dcfd1219440ab41ba9a71f537a11e4216341bee5a0ac70d3c8c0139363cf5c88",
+        "strategyHash": "9b51da8910b031d51ec10af034ddba1fc2a2333bae57145d739dc27ce240c8fd",
+        "survives": true,
+        "crossGeneration": null,
+        "educationAndMine": null,
+        "noToolExhaustion": true,
+        "noStarvation": true,
+        "noPreventableDeaths": false
+      },
+      {
+        "file": "wood-control-protected44.json",
+        "seed": 44,
+        "years": 5,
+        "sourceHash": "dcfd1219440ab41ba9a71f537a11e4216341bee5a0ac70d3c8c0139363cf5c88",
+        "strategyHash": "baa334368ec2784c6181e26320a886b2275f96e8b80848b7953621666900afd9",
+        "survives": true,
+        "crossGeneration": null,
+        "educationAndMine": null,
+        "noToolExhaustion": true,
+        "noStarvation": true,
+        "noPreventableDeaths": false
+      },
+      {
+        "file": "wood-control-expanded44.json",
+        "seed": 44,
+        "years": 5,
+        "sourceHash": "dcfd1219440ab41ba9a71f537a11e4216341bee5a0ac70d3c8c0139363cf5c88",
+        "strategyHash": "c24ee0f0b2dab4af2c8db7df97595ff7947a99e74b69781639a3505f2568aa67",
+        "survives": true,
+        "crossGeneration": null,
+        "educationAndMine": null,
+        "noToolExhaustion": true,
+        "noStarvation": true,
+        "noPreventableDeaths": false
+      }
+    ]
+  }
+}
