@@ -47,7 +47,7 @@ G.ui = {
     };
     const icImg = (n) => n ? `<img class="icimg" src="assets/icons/${n}.png" alt="" onerror="this.remove()">` : '';
     const toolTip = (t) => {
-      if (t === 'demolish') return '拆除：点击建筑 / 树木 / 道路移除；点击岩石/铁矿做清除标记，空闲市民会前来采集入库';
+      if (t === 'demolish') return '拆除：点击建筑 / 树木 / 道路移除；点击或拖拽沿线标记岩石/铁矿，空闲市民会前来采集入库';
       const d = G.BDEF[t];
       const cost = Object.keys(d.cost).map(k => `${G.RES[k].icon}×${d.cost[k]}`).join(' ') || '免费';
       const jobs = d.jobs ? ` · 岗位×${d.jobs}` : '';

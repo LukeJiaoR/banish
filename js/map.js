@@ -72,8 +72,11 @@ G.genWorld = function (seed) {
       }
     }
 
-  // 寻找镇址：平坦陆地 + 附近有森林 + 不太远有水 + 附近有岩石（第一冬安家的石头来源）
+  // 寻找镇址：平坦陆地 + 附近有森林 + 不太远有水 + 附近有岩石（第一冬安家的石头来源）。
+  // 三项约束是过滤器而非保证——全图筛空时不能静默回退默认出生点（实测约一半种子半径 12 内 0 岩石，
+  // 最近矿簇在 24 格外，清一格要 15-40 小时走路），必须兜底选岩石最多的候选。
   let best = null, bestScore = -1;
+  let fallback = null, fallbackScore = -1;
   const cx = N >> 1, cy = N >> 1;
   for (let r = 0; r < N; r += 2) {
     for (let a = 0; a < 16; a++) {
@@ -84,13 +87,17 @@ G.genWorld = function (seed) {
       const forest = G.countTreesInRadius(w, sx, sy, 8);
       const waterN = G.countWaterInRadius(w, sx, sy, 12);
       const rockN = G.countRocksInRadius(w, sx, sy, 12);
-      if (forest < 25 || waterN < 6 || rockN < 3) continue; // 没有近处岩石，开局石头撑不起第一冬的住房
       const score = forest + waterN + rockN * 2 - r * 0.6;
-      if (score > bestScore) { bestScore = score; best = { x: sx, y: sy }; }
+      if (forest >= 25 && waterN >= 6 && rockN >= 3) { // 没有近处岩石，开局石头撑不起第一冬的住房
+        if (score > bestScore) { bestScore = score; best = { x: sx, y: sy }; }
+      } else if (!best) {
+        const fb = rockN * 10 + Math.min(forest, 30) + waterN - r * 0.3; // 兜底分：岩石优先，森林/水/距离做次级权衡
+        if (fb > fallbackScore) { fallbackScore = fb; fallback = { x: sx, y: sy }; }
+      }
     }
     if (best && r > 10) break;
   }
-  if (best) w.start = best;
+  w.start = best || fallback || w.start;
   // 清出空地
   G.clearTreesInRadius(w, w.start.x, w.start.y, 3.2);
   return w;

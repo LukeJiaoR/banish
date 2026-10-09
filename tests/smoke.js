@@ -105,9 +105,144 @@ G.ui = { toast() {}, refreshHUD() {} };
   const hs = G.world.buildings.filter(b => b.type === 'house');
   check('柴火按屋消耗至 0', g.res.firewood === 0);
   check('前两栋暖、第三栋 unheated', !hs[0].unheated && !hs[1].unheated && hs[2].unheated === true);
-  check('冷屋居民 cold=0.3（低于露宿），无房者 0.4，暖屋 0',
-    G.world.cmap[fams[2].members[0]].cold === G.LIFE.unheatedCold && homeless.cold === G.LIFE.homelessCold &&
-    G.world.cmap[fams[0].members[0]].cold === 0);
+}
+
+/* ---- 受冻双侧模型（原版）：户外累积 / 暖屋恢复 / 冷屋缓冻 / 露宿整夜累积 ---- */
+{
+  freshGame();
+  const g = G.game;
+  g.season = 3; // 冬
+  const out = G.spawnCitizen({ x: 9, y: 9, sex: 'm', age: 30 });  // 无房者，全天户外
+  const kid = G.spawnCitizen({ x: 9, y: 9, sex: 'f', age: 8 });   // 无房儿童
+  const warm = G.spawnCitizen({ x: 3, y: 3, sex: 'm', age: 30 }); // 有房：暖屋
+  const { house } = houseWith(G.world, warm);
+  out.state = warm.state = 'work';
+  G.coldStep(out, 24);
+  check('户外满 24h 受冻 +0.4', Math.abs(out.cold - G.LIFE.coldOutdoor) < 1e-9);
+  G.coldStep(kid, 24);
+  check('儿童户外满 24h 受冻 ×1.5', Math.abs(kid.cold - G.LIFE.coldOutdoor * G.LIFE.coldChildMul) < 1e-9);
+  // 暖屋过夜：一夜 8h 恢复 0.5（warmRecover 1.5/天）
+  warm.cold = 1; warm.state = 'rest'; warm.camped = false;
+  warm.x = house.x + 1; warm.y = house.y + 1;
+  G.coldStep(warm, 8);
+  check('暖屋睡 8h 恢复 0.5', Math.abs(warm.cold - 0.5) < 1e-9);
+  // 暖屋工人一天净账：白天 16h 户外累积 0.267，夜里恢复 0.5 → 归零
+  warm.cold = 0; warm.state = 'work'; G.coldStep(warm, 16);
+  warm.state = 'rest'; G.coldStep(warm, 8);
+  check('暖屋市民「白天冻+夜里烤火」净归零', warm.cold === 0);
+  // 冷屋：挡风不取暖，屋内 8h 照样累积
+  const coldHome = G.spawnCitizen({ x: 3, y: 3, sex: 'm', age: 30 });
+  const { house: h2 } = houseWith(G.world, coldHome);
+  h2.unheated = true;
+  coldHome.cold = 1; coldHome.state = 'rest'; coldHome.camped = false;
+  G.coldStep(coldHome, 8);
+  check('冷屋睡 8h 累积 +0.1', Math.abs(coldHome.cold - 1.1) < 1e-9);
+  // 露宿（有房但 camped，如护林人远岗）：整夜户外照常累积
+  h2.unheated = false; coldHome.camped = true; coldHome.cold = 1;
+  G.coldStep(coldHome, 8);
+  check('露宿整夜（camped）累积户外速率', Math.abs(coldHome.cold - (1 + G.LIFE.coldOutdoor / 3)) < 1e-9);
+  // 非冬季持续回暖清零
+  g.season = 0; coldHome.cold = 2;
+  G.coldStep(coldHome, 1);
+  check('非冬季受冻清零', coldHome.cold === 0);
+  // 整冬净账（12 天）：成人露宿 4.8 < 5 勉强扛住，儿童 7.2 ≥ 5 冻死
+  g.season = 3;
+  const camper = G.spawnCitizen({ x: 20, y: 20, sex: 'm', age: 30 });
+  camper.state = 'rest'; camper.camped = true;
+  for (let i = 0; i < 12; i++) G.coldStep(camper, 24);
+  check('成人露宿整冬 4.8 < 5 扛住', Math.abs(camper.cold - 4.8) < 1e-9 && camper.cold < G.LIFE.coldDays);
+  const camperKid = G.spawnCitizen({ x: 20, y: 20, sex: 'f', age: 8 });
+  camperKid.state = 'rest'; camperKid.camped = true;
+  for (let i = 0; i < 12; i++) G.coldStep(camperKid, 24);
+  check('儿童露宿整冬 7.2 ≥ 5 冻死', camperKid.cold > G.LIFE.coldDays);
+}
+
+/* ---- 时间粒度不变性：日夜压缩只是播放速度——工时/走路/受冻全部按游戏小时同钟累积 ---- */
+{
+  freshGame();
+  const g = G.game;
+  g.season = 3; // 冬：移速 ×0.75，受冻激活
+  g.h = 12;     // 工作日中午，避开作息边界
+  const worker = G.spawnCitizen({ x: 6, y: 6, sex: 'm', age: 30 });
+  const hauler = G.spawnCitizen({ x: 6, y: 6, sex: 'f', age: 30 });
+  const camper = G.spawnCitizen({ x: 40, y: 40, sex: 'm', age: 30 }); // 无家露宿：纯户外受冻
+  const longPath = [];
+  for (let i = 1; i <= 100; i++) longPath.push({ x: 6 + i, y: 6 });
+  const run = (dtH) => {
+    worker.state = 'work'; worker.task = { workLeft: 100, work: 100, kind: 'chop' };
+    hauler.state = 'walk'; hauler.walkKind = 'task'; hauler.x = 6; hauler.y = 6;
+    hauler.path = longPath.map(p => ({ x: p.x, y: p.y })); hauler.pi = 0;
+    camper.state = 'rest'; camper.camped = true; camper.cold = 0;
+    let done = 0;
+    while (done < 14 - 1e-9) { // 一个工作日（8–22 点）的 14 游戏小时
+      const dt = Math.min(dtH, 14 - done);
+      G.stepCitizen(worker, dt); G.stepCitizen(hauler, dt); G.coldStep(camper, dt);
+      done += dt;
+    }
+    return {
+      workDone: 100 - worker.task.workLeft,
+      walked: Math.hypot(hauler.x - 6, hauler.y - 6),
+      cold: camper.cold,
+    };
+  };
+  const fine = run(2 / 60); // 1x @60fps 的真实帧粒度
+  const coarse = run(1.0);  // 每游戏小时一步的粗粒度
+  check('工时按游戏小时累积，与帧粒度无关', Math.abs(fine.workDone - 14) < 1e-6 && Math.abs(fine.workDone - coarse.workDone) < 1e-6);
+  check('走路按游戏小时累积，与帧粒度无关', Math.abs(fine.walked - coarse.walked) < 1e-6);
+  check('受冻按游戏小时累积，与帧粒度无关', Math.abs(fine.cold - 14 * G.LIFE.coldOutdoor / 24) < 1e-6 && Math.abs(fine.cold - coarse.cold) < 1e-6);
+}
+
+/* ---- 选址保底：镇址必须临近岩石（旧版三项约束筛空时静默回退默认出生点，
+ *      实测一半种子半径 12 内 0 岩石，最近矿簇 24 格外，清一格要 15-40 小时走路） ---- */
+{
+  for (const seed of [1, 2, 3, 4, 5, 6, 7, 8]) {
+    const w = G.genWorld(seed);
+    check(`种子 ${seed} 镇址半径 12 内 ≥3 格岩石`, G.countRocksInRadius(w, w.start.x, w.start.y, 12) >= 3);
+  }
+}
+
+/* ---- 散工保留：有「砍伐/清石」标记时，工地抽调不得吃光无业者（扩张期清石不再停摆） ---- */
+{
+  freshGame();
+  const w = G.world;
+  const site = addB(w, 'house', 2, 2, 2, 2);
+  site.state = 'site'; site.workLeft = 50; site.totalWork = 90;
+  w.rock[8 * w.N + 8] = 1;
+  w.markedRocks.add(8 * w.N + 8); // 1 格待清岩石 → wantLabor = 1
+  const c1 = G.spawnCitizen({ x: 5, y: 5, sex: 'm', age: 30 });
+  G.scheduleJobs();
+  check('有标记时工地不吃光散工（保留 1 人清石）', c1.job == null && site.workers.length === 0);
+  w.markedRocks.clear();
+  G.scheduleJobs();
+  check('无标记时工地照常拉散工', c1.job === site.id);
+}
+
+/* ---- 散工不足时自动释放：标记出现后从「闲余岗位」抽人承接（调度器代行原版玩家保留劳动者的动作） ---- */
+{
+  freshGame();
+  const g = G.game, w = G.world;
+  const wc = addB(w, 'woodcutter', 2, 2, 2, 2);
+  const w1 = G.spawnCitizen({ x: 3, y: 3, sex: 'm', age: 30 });
+  w1.job = wc.id; wc.workers.push(w1.id);
+  g.res.firewood = 1e9; // 燃料上限已到 → 伐木屋纯闲
+  w.rock[8 * w.N + 8] = 1;
+  w.markedRocks.add(8 * w.N + 8);
+  G.scheduleJobs();
+  check('无业者不足 → 自动从柴满伐木屋释放散工', w1.job == null);
+}
+{
+  freshGame();
+  const w = G.world;
+  const fo = addB(w, 'forester', 2, 2, 2, 2);
+  const a = G.spawnCitizen({ x: 3, y: 3, sex: 'm', age: 30 });
+  const b2 = G.spawnCitizen({ x: 4, y: 3, sex: 'f', age: 30 });
+  a.job = fo.id; fo.workers.push(a.id);
+  b2.job = fo.id; fo.workers.push(b2.id);
+  w.rock[8 * w.N + 8] = 1;
+  w.markedRocks.add(8 * w.N + 8);
+  G.scheduleJobs();
+  check('人手富余的非粮食岗放人清石（留 1 人）',
+    (a.job == null) !== (b2.job == null) && fo.workers.length === 1);
 }
 
 /* ---- 伐木屋：完工才扣料 + 两段式背料 ---- */
@@ -472,7 +607,7 @@ G.ui = { toast() {}, refreshHUD() {} };
   check('树被砍后标记自动清除', !w.marked.has(6 * w.N + 5) && w.marked.has(5 * w.N + 5));
 }
 {
-  // 有标记时不从岗位抽人：只有空闲市民才处理标记；空闲者也不会被派进岗位
+  // 有标记 → 自动放 1 名散工承接（原版玩家手动保留劳动者，本作自动调度由调度器代行）；空闲者不会被派进岗位
   freshGame();
   const w = G.world;
   G.addTree(w, 5, 5, -200);
@@ -484,8 +619,9 @@ G.ui = { toast() {}, refreshHUD() {} };
   check('预备：两名工人都被派进护林小屋', b.workers.length === 2 && w1.job != null && w2.job != null);
   w.marked.add(5 * w.N + 5);
   G.scheduleJobs();
-  check('无人空闲 → 不抽调，岗位不动', b.workers.length === 2 && w1.job != null && w2.job != null);
-  G.releaseWorker(w1); // 模拟岗位自然释放（如建筑被拆），w1 成为空闲市民
+  check('有标记 → 自动放 1 名散工承接（岗位留 1 人）',
+    (w1.job == null) !== (w2.job == null) && b.workers.length === 1);
+  G.releaseWorker(w1); // 已被调度器释放的话此处为幂等清理，随后仍是空闲市民
   G.scheduleJobs();
   check('有空闲者时不再把他派进岗位（留给标记）', w1.job == null);
   G.requestTask(w1);
@@ -967,7 +1103,7 @@ G.markGroundDirty = G.markGroundDirty || (() => {}); // render.js 未加载时�
 {
   freshGame();
   const w = G.world, g = G.game;
-  g.res.wood = 1000; g.res.stone = 1000; g.res.iron = 100; // 备足建材
+  g.res.wood = 1000; g.res.stone = 100; g.res.iron = 100; // 备足建材（石头留仓储上限余量）
   check('矿井成本 80木+40石+10铁', G.BDEF.mine && G.BDEF.mine.cost.wood === 80 && G.BDEF.mine.cost.stone === 40 && G.BDEF.mine.cost.iron === 10);
   check('矿井进工具栏', G.TOOLBAR.includes('mine'));
   const b = addB(w, 'mine', 4, 4, 3, 3);
@@ -980,7 +1116,20 @@ G.markGroundDirty = G.markGroundDirty || (() => {}); // render.js 未加载时�
   check('每 5 趟 1 趟铁', t5 && t5.yield.type === 'iron' && t5.yield.qty === 3);
   c.task = t1; c.state = 'work'; t1.workLeft = 0;
   G.completeTask(c);
-  check('采石完工 3 石入库', g.res.stone === 1000 + 3);
+  check('采石完工 3 石入库', g.res.stone === 100 + 3);
+  // 满仓不白挖：石铁都到上限停工；只有一项满仓时专采另一项
+  g.res.stone = G.storageCap(); g.res.iron = 10;
+  b.noWork = false; b.mineTick = 0;
+  const ts = G.makeTask(b, c);
+  check('石头满仓时专采铁', ts && ts.yield.type === 'iron');
+  g.res.stone = 100; g.res.iron = G.storageCap();
+  b.noWork = false; b.mineTick = 4; // 本该轮到铁趟
+  const ti2 = G.makeTask(b, c);
+  check('铁满仓时铁趟改采石', ti2 && ti2.yield.type === 'stone');
+  g.res.stone = G.storageCap(); g.res.iron = G.storageCap();
+  b.noWork = false;
+  check('石铁双满仓 → 停工', G.makeTask(b, c) === null && b.noWork === true && b.warnText === '仓库已满');
+  g.res.stone = 100; g.res.iron = 100;
 }
 
 /* ---- 滚动日志：每日摘要环形缓冲（60 条封顶）+ 建造/拆除记录 ---- */
@@ -1079,11 +1228,11 @@ G.markGroundDirty = G.markGroundDirty || (() => {}); // render.js 未加载时�
   seedMatureTrees(w, 5, 5, 20); // 圈内成熟树达满产基准
   b.noWork = false;
   t = G.makeTask(b, c);
-  check('密林狩猎满产 4 食物', t && t.kind === 'work' && t.yield.type === 'food' && t.yield.qty === 4);
+  check('密林狩猎满产 5 食物', t && t.kind === 'work' && t.yield.type === 'food' && t.yield.qty === 5);
   g.res.tools = 0;
   b.noWork = false;
   t = G.makeTask(b, c);
-  check('无工具狩猎减半（4→2）', t && t.yield.qty === 2);
+  check('无工具狩猎减半（5→3）', t && t.yield.qty === 3);
 }
 /* ---- 森林自然播种：护林屋之外森林也能再生 ---- */
 {
@@ -1092,6 +1241,64 @@ G.markGroundDirty = G.markGroundDirty || (() => {}); // render.js 未加载时�
   G.addTree(w, 6, 6, -200); // 仅 1 棵树
   for (let d = 0; d < 200 && G.game.season !== 3; d++) G.endDay();
   check('自然播种：森林从 1 棵缓慢扩张', w.trees.length > 5);
+}
+
+/* ---- 仓储上限：每仓 500/资源，满仓丢弃，建新仓解锁（工具随身不受限） ---- */
+{
+  freshGame();
+  const g = G.game, w = G.world;
+  addB(w, 'storage', 2, 2, 3, 3);
+  g.res.food = 498;
+  check('仓储上限 = 500×仓库数', G.storageCap() === 500);
+  G.deposit('food', 5);
+  check('满仓丢弃超出部分（498+2/5）', g.res.food === 500 && g.warned.storageFull === true);
+  g.res.tools = 498;
+  G.deposit('tools', 5);
+  check('工具不受仓容限制', g.res.tools === 503);
+  addB(w, 'storage', 8, 2, 3, 3);
+  G.deposit('food', 10);
+  check('新仓库解锁容量（500→1000）', g.res.food === 510);
+}
+
+/* ---- id 生成：_peekUid 偷看不消耗（回退过多会重发已用 id → 两栋建筑同 id，后者覆盖 w.bmap） ---- */
+{
+  G.setUid(9000);
+  const a = G.nextId();
+  G._peekUid();
+  check('_peekUid 偷看 id 不消耗', G.nextId() === a + 1);
+}
+
+/* ---- 出生点：婴儿必须落在可站立格（站进房屋脚印 → 寻路全失败 → 整夜按露宿挨冻） ---- */
+{
+  const g = freshGame();
+  const w = G.world;
+  const h = addB(w, 'house', 10, 10, 2, 2);
+  const m = G.spawnCitizen({ x: 13, y: 10, sex: 'm', age: 20 });
+  const f = G.spawnCitizen({ x: 13, y: 12, sex: 'f', age: 20 });
+  const fam = { id: G.nextId(), members: [m.id, f.id], houseId: h.id };
+  w.families.push(fam); m.familyId = fam.id; f.familyId = fam.id; h.family = fam.id;
+  g.res.food = 100000;
+  const saved = G.LIFE.birthChance;
+  G.LIFE.birthChance = 1;
+  G.tryBirths();
+  G.LIFE.birthChance = saved;
+  const baby = w.citizens[w.citizens.length - 1];
+  check('婴儿出生在房屋脚印之外', baby !== m && baby !== f && w.bgrid[baby.y * w.N + baby.x] === -1 && !G.tileBlocked(w, baby.x, baby.y));
+}
+
+/* ---- 回家：已站在家门口（路径为空）也算到家，不再误判成露宿整夜挨冻 ---- */
+{
+  freshGame();
+  const w = G.world;
+  const h = addB(w, 'house', 10, 10, 2, 2);
+  const c = G.spawnCitizen({ x: 12, y: 11, sex: 'm', age: 25 });
+  const fam = { id: G.nextId(), members: [c.id], houseId: h.id };
+  w.families.push(fam); c.familyId = fam.id;
+  const spot = G.workSpot(w, h, 12, 11);
+  if (spot) { c.x = spot.x; c.y = spot.y; }
+  c.task = null; c.pausedTask = null;
+  G.goHome(c);
+  check('站在家门口 = 到家休息（camped=false）', c.state === 'rest' && c.camped === false);
 }
 
 console.log(`\n${fail === 0 ? '全部通过' : '有失败'}: ${pass} passed, ${fail} failed`);

@@ -82,6 +82,7 @@ G.endDay = function () {
   if (g.res.tools > 0) {
     g.toolWear = (g.toolWear || 0) + adultsNow / G.LIFE.toolLifeDays;
     while (g.toolWear >= 1 && g.res.tools > 0) { g.toolWear -= 1; g.res.tools -= 1; }
+    if (g.res.tools <= 0) g.toolWear = 0; // 恰好磨完最后一把：清掉陈旧累积，别把新打的第一件工具秒扣掉
   } else g.toolWear = 0;
   // 有人住的房子才烧柴（含石屋/宿舍；取暖量按建筑类型，原版石屋省一半）
   const houses = w.buildings.filter(b => G.isOccupiedHome(w, b));
@@ -126,16 +127,7 @@ G.endDay = function () {
       c.student = false; c.adult = true; c.educated = true; c.school = null;
       G.ui.toast(`🎓 ${c.name} 学成毕业`, 'good');
     }
-    // 冻：取暖看自家的屋子——没分到柴火的房子挨冻，无房更冷
-    if (winter) {
-      const fam = c.familyId != null ? w.families.find(f => f.id === c.familyId) : null;
-      const home = fam && fam.houseId != null ? w.bmap[fam.houseId] : null;
-      const housed = !!(home && home.state === 'ok');
-      const childMul = c.age < G.ADULT_AGE ? G.LIFE.coldChildMul : 1;
-      if (housed && !home.unheated) c.cold = 0;
-      else if (housed) c.cold += G.LIFE.unheatedCold * childMul; // 冷屋挡风但没柴火，受冻慢于露宿
-      else c.cold += G.LIFE.homelessCold * childMul;             // 无家可归
-    } else c.cold = 0;
+    // 冻死判定（受冻累积在 stepCitizen 的 coldStep 按小时结算：户外累积/暖屋恢复/冷屋缓冻）
     // 自然老死（原版市民多活到 70~85 岁；死亡率随年龄缓升，实测死亡多落在 71~85 区间）
     if (c.age > G.OLD_AGE && G.chance(Math.min(0.25, (c.age - G.OLD_AGE) * 0.002)))
       dead.push([c, '寿终正寝']);
@@ -186,6 +178,10 @@ G.endDay = function () {
     G.ui.toast('⚠ 工具用尽，生产减半——尽快建铁匠铺打工具（1铁+2木→2件）', 'bad');
   }
   if (g.res.tools > 0) g.warned.noTools = false;
+  if (g.warned.storageFull) { // 满仓提示在腾出空间后复位
+    const fullest = Math.max(...G.RES_KEYS.filter(k => k !== 'tools').map(k => g.res[k]));
+    if (fullest < G.storageCap() - 50) g.warned.storageFull = false;
+  }
 
   g.foodNet = g.res.food - g.prevFood;
   g.prevFood = g.res.food;
@@ -342,8 +338,12 @@ G.tryBirths = function () {
     if (g.res.food < pop * G.LIFE.eatPerDay * G.LIFE.birthFoodDays) continue; // 粮食紧张时不生育
     if (G.chance(G.LIFE.birthChance)) {
       const house = w.bmap[fam.houseId];
+      // 出生点必须在房屋脚印之外：占位格不可通行，站进去寻路全失败，
+      // 夜里回不了家按露宿挨冻、白天也挪不动（冬季婴儿冻死的根源）
+      const spot = G.nearestWalkable(w, house.x + 1, house.y + 1, 4);
       G.spawnCitizen({
-        x: house.x + 1, y: house.y + 1,
+        x: spot ? spot.x : house.x + 1,
+        y: spot ? spot.y : house.y + 1,
         sex: G.chance(0.5) ? 'm' : 'f',
         age: 0, adult: false,
         familyId: fam.id,
@@ -369,7 +369,7 @@ G.spawnCitizen = function (opt) {
     familyId: opt.familyId != null ? opt.familyId : null,
     job: null, task: null, carry: null, pausedTask: null,
     student: false, educated: false, school: null,
-    state: 'idle', walkKind: '', path: null, pi: 0,
+    state: 'idle', walkKind: '', path: null, pi: 0, camped: false,
     wanderT: G.rng() * 3,
     hunger: 0, cold: 0,
     animT: G.rng() * 10,
@@ -454,15 +454,16 @@ G.goHome = function (c) {
   if (c.task) c.pausedTask = c.task;
   c.task = null;
   const h = G.homeOf(c);
-  if (!h) { c.path = null; c.state = 'rest'; return; }
+  if (!h) { c.path = null; c.state = 'rest'; c.camped = true; return; }
   // 离家太远（如护林人深入林中）：就地露宿，天亮原地续接——
   // 深夜长途回家再折返会把整个工作日耗在路上
   const d = Math.sqrt(G.d2(c.x, c.y, h.x + h.w / 2, h.y + h.h / 2));
-  if (d > G.LIFE.campDist) { c.path = null; c.state = 'rest'; return; }
+  if (d > G.LIFE.campDist) { c.path = null; c.state = 'rest'; c.camped = true; return; }
   const spot = G.workSpot(G.world, h, c.x, c.y);
   const p = G.findPath(G.world, Math.round(c.x), Math.round(c.y), spot ? spot.x : h.x, spot ? spot.y : h.y);
-  if (p && p.length) { c.path = p; c.pi = 0; c.state = 'walk'; c.walkKind = 'home'; }
-  else { c.path = null; c.state = 'rest'; }
+  if (p && p.length) { c.path = p; c.pi = 0; c.state = 'walk'; c.walkKind = 'home'; c.camped = false; }
+  else if (p) { c.path = null; c.state = 'rest'; c.camped = false; } // 已站在家门口：算回家了（空路径 ≠ 找不到路）
+  else { c.path = null; c.state = 'rest'; c.camped = true; }        // 真找不到路也只能露宿
 };
 
 /* 天亮续接昨晚挂起的任务；目标已失效（树被砍/建筑拆了/换岗位）则放弃 */
@@ -509,8 +510,8 @@ G.nearestStorage = function (x, y) {
 /* 开始搬运去仓库 */
 G.startHaul = function (c) {
   const best = G.nearestStorage(c.x, c.y);
-  if (!best) { // 没有仓库：直接入库
-    G.game.res[c.carry.type] += c.carry.qty;
+  if (!best) { // 没有仓库：直接入库（仍受仓储上限约束）
+    G.deposit(c.carry.type, c.carry.qty);
     c.carry = null;
     G.requestTask(c);
     return;
@@ -529,6 +530,26 @@ G.startHaul = function (c) {
 G.fuelLimitOf = function (b) { return b.fuelLimit != null ? b.fuelLimit : G.PROD.woodcutter.fuelLimit; };
 G.fuelLimited = function (b) { return b.type === 'woodcutter' && G.game.res.firewood >= G.fuelLimitOf(b); };
 
+/* 仓储上限：每座（建成的）仓库 +STORAGE_CAP，至少按 1 座计 */
+G.storageCap = function () {
+  const n = G.world.buildings.filter(b => b.type === 'storage' && b.state === 'ok').length;
+  return G.STORAGE_CAP * Math.max(1, n);
+};
+
+/* 入库：受仓储上限约束，满仓部分丢弃并提示（工具随身小件不受限） */
+G.deposit = function (type, qty) {
+  const g = G.game;
+  if (type === 'tools') { g.res.tools += qty; return qty; }
+  const space = Math.max(0, G.storageCap() - g.res[type]);
+  const got = Math.min(qty, space);
+  g.res[type] += got;
+  if (got < qty && !g.warned.storageFull) {
+    g.warned.storageFull = true;
+    G.ui.toast('⚠ 仓库满了，多出的资源只能丢弃——再建一座仓库吧', 'warn');
+  }
+  return got;
+};
+
 /* 背料到达仓库：转入回屋加工段。返回 false = 仓库没料（白跑） */
 G.firewoodFetchDone = function (c, t) {
   if (G.game.res[t.consume.type] < t.consume.qty) return false;
@@ -543,9 +564,27 @@ G.firewoodFetchDone = function (c, t) {
   return true;
 };
 
+/* 受冻（原版双侧模型）：冬季户外累积寒冷，回到烧着柴的家里恢复；
+ * 冷屋挡风但没柴火，屋内缓慢累积；露宿/无房者整夜在外照常累积。
+ * 速率常量为「处于该状态每满 24 小时」的量，按实际小时数折算；非冬季持续回暖清零 */
+G.coldStep = function (c, dtH) {
+  if (!G.isWinter()) { c.cold = 0; return; }
+  const childMul = c.age < G.ADULT_AGE ? G.LIFE.coldChildMul : 1;
+  if (c.state === 'rest' && !c.camped) {
+    const home = G.homeOf(c);
+    if (home && home.state === 'ok') {
+      if (!home.unheated) { c.cold = Math.max(0, c.cold - dtH * G.LIFE.warmRecover / 24); return; }
+      c.cold += dtH * G.LIFE.coldIndoors / 24 * childMul; // 冷屋挡风但不取暖
+      return;
+    }
+  }
+  c.cold += dtH * G.LIFE.coldOutdoor / 24 * childMul;
+};
+
 /* 市民每帧步进 */
 G.stepCitizen = function (c, dtH) {
   if (c.dead) return;
+  G.coldStep(c, dtH);
   if (c.state === 'rest') {
     if (!G.isRestTime()) {
       c.state = 'idle';
@@ -597,7 +636,7 @@ G.arrive = function (c) {
   c.path = null;
   if (c.state === 'haul') {
     if (c.carry) {
-      G.game.res[c.carry.type] += c.carry.qty;
+      G.deposit(c.carry.type, c.carry.qty);
       c.carry = null;
     }
     G.requestTask(c);
@@ -684,6 +723,14 @@ G.taskYield = function (base) {
 
 /* 砍树原木数：未受教育 2、受教育 3（原版 Forester/散工的教育加成） */
 G.taskLogYield = function (c) { return c.educated ? G.PROD.forester.eduLogsYield : G.TREE_LOGS; };
+
+/* 产出时点按建筑累计（建筑详情「累计产出」行）：任务完成即计，与是否送达仓库无关；
+ * 散工砍树/清石无建筑归属，不计入任何建筑 */
+G.recordProduction = function (b, type, qty) {
+  if (!b) return;
+  if (!b.produced) b.produced = {};
+  b.produced[type] = (b.produced[type] || 0) + qty;
+};
 
 /* 按建筑类型生成任务 */
 G.makeTask = function (b, c) {
@@ -784,9 +831,18 @@ G.makeTask = function (b, c) {
     case 'mine': {
       const spot = G.workSpot(w, b, c.x, c.y);
       if (!spot) return null;
-      // 每 ironEvery 趟出 1 趟铁，其余采石
+      // 满仓不白挖：石铁都到仓储上限就停工；只有一项满仓时改为专采另一项
+      const cap = G.storageCap();
+      const stoneFull = g.res.stone >= cap, ironFull = g.res.iron >= cap;
+      if (stoneFull && ironFull) {
+        b.noWork = true; b.warnText = '仓库已满';
+        return null;
+      }
+      // 每 ironEvery 趟出 1 趟铁，其余采石（深井矿脉不枯竭）
       b.mineTick = (b.mineTick || 0) + 1;
-      const ironTurn = b.mineTick % P.mine.ironEvery === 0;
+      let ironTurn = b.mineTick % P.mine.ironEvery === 0;
+      if (stoneFull && !ironTurn) ironTurn = true;
+      else if (ironFull && ironTurn) ironTurn = false;
       return {
         kind: 'work', b, tx: spot.x, ty: spot.y,
         work: G.taskWork(c, P.mine.workH), workLeft: 0,
@@ -819,18 +875,29 @@ G.makeTask = function (b, c) {
       }
       const mature = trees.reduce((s, t2) => s + (G.treeStage(t2) >= 2 ? 1 : 0), 0);
       const qty = G.taskYield(Math.max(1, Math.round(P.hunting.yield * (0.4 + 0.6 * Math.min(1, mature / P.hunting.fullForest)))));
-      const t = trees[G.ri(0, trees.length - 1)];
+      // 走最近的猎场（小抖动分散站位）：随机选树会把猎人的工作日耗在路上
+      let best = null, bd = Infinity;
+      for (const t2 of trees) {
+        const d = G.d2(b.x, b.y, t2.x, t2.y) + G.rng() * 8;
+        if (d < bd) { bd = d; best = t2; }
+      }
       return {
-        kind: 'work', b, tx: t.x, ty: t.y,
+        kind: 'work', b, tx: best.x, ty: best.y,
         work: G.taskWork(c, P.hunting.workH), workLeft: 0, yield: { type: 'food', qty },
       };
     }
     case 'farm': {
       if (b.state !== 'ok') return null;
       const P2 = P.farm;
+      // 同田工人在种/收的格子不再重复认领：四人挤一格会把播种拖成十天，
+      // 成熟期随 sownAll 顺延，秋收窗口不够就只能看着作物冻死
+      const claimed = new Set();
+      for (const c2 of w.citizens)
+        if (c2 !== c && c2.task && c2.task.b === b && (c2.task.kind === 'sow' || c2.task.kind === 'harvest'))
+          claimed.add(c2.task.ti);
       // 播种（春）
       if (!b.sownAll && (g.season === 0 || g.season === 1)) {
-        const ti = b.farm.findIndex(f => !f.sown);
+        const ti = b.farm.findIndex((f, i) => !f.sown && !claimed.has(i));
         if (ti >= 0) {
           const f = b.farm[ti];
           return { kind: 'sow', b, ti, tx: f.x, ty: f.y, work: G.taskWork(c, P2.tileWorkH), workLeft: 0 };
@@ -838,7 +905,7 @@ G.makeTask = function (b, c) {
       }
       // 收获（秋，作物长成）
       if (b.sownAll && b.growth >= 1 && g.season === 2 && !b.harvestDone) {
-        const ti = b.farm.findIndex(f => !f.harvested);
+        const ti = b.farm.findIndex((f, i) => f.sown && !f.harvested && !claimed.has(i));
         if (ti >= 0) {
           const f = b.farm[ti];
           return { kind: 'harvest', b, ti, tx: f.x, ty: f.y, work: G.taskWork(c, P2.tileWorkH), workLeft: 0 };
@@ -870,6 +937,7 @@ G.completeTask = function (c) {
       if (treeOk && jobOk) {
         G.removeTree(G.world, t.tx, t.ty);
         c.carry = { type: 'wood', qty: t.logs || G.TREE_LOGS };
+        G.recordProduction(t.b, 'wood', t.logs || G.TREE_LOGS);
         if (t.replant && t.b && t.b.doPlant) G.addTree(G.world, t.tx, t.ty); // 砍倒即原地补种
       }
       break;
@@ -973,6 +1041,40 @@ G.pickSchool = function (counts) {
   return null;
 };
 
+/* 「砍伐/清石」标记的抽人对象：越闲的岗位越先出人（常规岗位保持至少 1 人留守）。
+ * 顺序：超员 → 柴满伐木屋（燃料上限停产，纯闲）→ 石铁双满的矿井 → 非收获季农田 →
+ * 人手最多的非粮食岗 → 粮食富余岗（人数 > 按人口测算的需求） */
+G.pickMarkDonor = function (w, harvestSeason, foodJobs, needFood) {
+  const staffed = w.buildings.filter(b => b.state === 'ok' && G.BDEF[b.type].jobs > 0 && b.workers.length > 0);
+  const adultsOf = (b) => b.workers.map(id => w.cmap[id]).filter(c => c && !c.dead && c.adult);
+  for (const b of staffed) {
+    const xs = adultsOf(b);
+    if (xs.length > G.BDEF[b.type].jobs) return xs[0]; // 超员
+  }
+  for (const b of staffed)
+    if (b.type === 'woodcutter' && G.fuelLimited(b)) return adultsOf(b)[0];
+  const cap = G.storageCap();
+  for (const b of staffed)
+    if (b.type === 'mine' && G.game.res.stone >= cap && G.game.res.iron >= cap) return adultsOf(b)[0];
+  if (!harvestSeason)
+    for (const b of staffed)
+      if (b.type === 'farm' && b.sownAll) return adultsOf(b)[0]; // 已播完种的农田；播种进行中不抽（否则秋收窗口顺延）
+  let best = null, bestN = 1;
+  for (const b of staffed) {
+    if (b.type === 'school' || foodJobs.includes(b.type)) continue;
+    const n = adultsOf(b).length;
+    if (n > bestN) { bestN = n; best = b; }
+  }
+  if (best) return adultsOf(best)[0];
+  let fb = null, fn = needFood;
+  for (const b of staffed) {
+    if (!foodJobs.includes(b.type)) continue;
+    const n = adultsOf(b).length;
+    if (n > fn) { fn = n; fb = b; }
+  }
+  return fb ? adultsOf(fb)[0] : null;
+};
+
 G.scheduleJobs = function () {
   const w = G.world;
   for (const b of w.buildings) b.noWork = false;
@@ -981,16 +1083,30 @@ G.scheduleJobs = function () {
   const markCount = (w.marked ? w.marked.size : 0) + (w.markedRocks ? w.markedRocks.size : 0);
   const wantLabor = markCount > 0 ? Math.min(2, Math.ceil(markCount / 2)) : 0;
 
+  const harvestSeason = G.game.season === 2;
+  const FOOD_JOBS = harvestSeason ? ['gatherer', 'dock', 'farm'] : ['gatherer', 'dock'];
+  const needFood = Math.ceil(w.citizens.filter(x => !x.dead).length * G.LIFE.eatPerYear / G.YEAR_DAYS / 8);
+  // 落实标记散工预留：本作劳动岗位自动调度、玩家无法像原版那样手动保留劳动者，
+  // 无业者不足额时由调度器从「闲余岗位」释放工人（优先级见 pickMarkDonor）；
+  // 释放者保持无业状态承接标记，标记清完后会被正常岗位重新雇佣
+  if (wantLabor) {
+    while (jobless().length < wantLabor) {
+      const donor = G.pickMarkDonor(w, harvestSeason, FOOD_JOBS, needFood);
+      if (!donor) break;
+      G.releaseWorker(donor);
+    }
+  }
+
   // 第一优先：建筑工地（人手不足时抽调：先抽非粮食岗位；
   // 粮食岗位仅在有富余时抽调 —— 保留约 pop/4 的粮食劳动力。
   // 注意：非收获季的农田没有产出，其工人视为普通劳动力可被抽调）
-  const harvestSeason = G.game.season === 2;
-  const FOOD_JOBS = harvestSeason ? ['gatherer', 'dock', 'farm'] : ['gatherer', 'dock'];
   for (const b of w.buildings) {
     if (b.state !== 'site') continue;
     let guard = 0;
     while (b.workers.length < 4 && guard++ < 8) {
-      let c = G.pickNearest(jobless(), b);
+      // 有标记待处理时给「砍伐/清石」保留 wantLabor 名无业散工——不够额就改抽在岗者（否则扩张期清石永远停摆）
+      const free = jobless();
+      let c = free.length > wantLabor ? G.pickNearest(free, b) : null;
       if (!c) {
         const busyAll = w.citizens.filter(ci => {
           if (ci.dead || !ci.adult || ci.job == null) return false;
@@ -1001,7 +1117,6 @@ G.scheduleJobs = function () {
         if (!pool.length) {
           // 粮食劳动力富余量：按人口测算所需粮食工人
           const foodWorkers = busyAll.filter(ci => FOOD_JOBS.includes(w.bmap[ci.job].type));
-          const needFood = Math.ceil(w.citizens.filter(x => !x.dead).length * G.LIFE.eatPerYear / G.YEAR_DAYS / 8);
           if (foodWorkers.length > needFood) pool = foodWorkers;
         }
         c = G.pickNearest(pool, b);
@@ -1012,8 +1127,7 @@ G.scheduleJobs = function () {
     }
   }
 
-  // 第二优先：普通工作岗位（有标记待砍时，只派到不侵占最后几名空闲市民的程度；
-  // 绝不从岗位抽人——原版 Harvest Trees 由玩家保留的劳动者执行）
+  // 第二优先：普通工作岗位（不侵占标记散工预留；柴火到上限的伐木屋不拉人）
   for (const b of w.buildings) {
     if (b.state !== 'ok') continue;
     const def = G.BDEF[b.type];
@@ -1038,20 +1152,26 @@ G.scheduleJobs = function () {
     .sort((a, b2) => (a.type === 'woodcutter' ? -1 : b2.type === 'woodcutter' ? 1 : 0));
   for (const b of targets) {
     if (jobless().length) break; // 有无业者时由第二优先处理
+    // 从供体岗位抽人：优先抽当下正闲置的那个（别的工人还在干活）
     const give = (x) => {
-      const c = w.cmap[x.workers[x.workers.length - 1]];
+      let idx = x.workers.length - 1;
+      const lazyIdx = x.workers.findIndex(id => { const c = w.cmap[id]; return c && c.state === 'idle' && !c.task; });
+      if (lazyIdx >= 0) idx = lazyIdx;
+      const c = w.cmap[x.workers[idx]];
       if (c) { G.releaseWorker(c); G.assignWorker(b, c); }
     };
-    // 供体 1：非收获季的农田（春夏无产出）
+    // 供体 1：非收获季且已播完种的农田（播种进行中不抽，否则秋收窗口顺延）
     if (!harvestSeason) {
-      const farm = w.buildings.find(x => x.type === 'farm' && x.state === 'ok' && x.workers.length > 0);
+      const farm = w.buildings.find(x => x.type === 'farm' && x.state === 'ok' && x.sownAll && x.workers.length > 0);
       if (farm) { give(farm); continue; }
     }
-    // 供体 2：全员闲置的岗位（粮食岗需 >1 人才能出借）
+    // 供体 2：有闲置工人的岗位（工人正闲着就是临时富余；粮食岗至少留 1 人。
+    // 旧实现要求「全员闲置」——那种时刻几乎不会同时出现，抽调链一断，
+    // 关键岗位（伐木屋）会永久 0 工人，柴火归零冻死人）
     const lazy = w.buildings.find(x => x !== b && x.state === 'ok' && G.BDEF[x.type].jobs > 0 && x.workers.length > 0
       && x.type !== 'school' // 教师不外借，保证学堂开学
       && (!FOOD_SET.includes(x.type) || x.workers.length > 1)
-      && x.workers.every(id => { const c = w.cmap[id]; return c && c.state === 'idle' && !c.task; }));
+      && x.workers.some(id => { const c = w.cmap[id]; return c && c.state === 'idle' && !c.task; }));
     if (lazy) { give(lazy); continue; }
     // 供体 3：伐木屋缺人且木材有富余 → 护林屋（>1 人）抽一人锯柴
     if (b.type === 'woodcutter' && G.game.res.wood > 10 && !G.fuelLimited(b)) {
@@ -1090,7 +1210,7 @@ G.addBuilding = function (type, x, y, opt) {
       }
       G.clearRock(w, i, j);
     }
-  if (bonusWood) G.game.res.wood += bonusWood;
+  if (bonusWood) G.deposit('wood', bonusWood);
 
   const b = {
     id: G.nextId(), type, x, y, w: def.w, h: def.h,

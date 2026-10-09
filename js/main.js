@@ -93,7 +93,7 @@ G.serializeGame = function () {
       id: c.id, name: c.name, sex: c.sex, age: c.age, adult: c.adult,
       x: c.x, y: c.y, familyId: c.familyId, job: c.job,
       student: c.student ? 1 : 0, educated: c.educated ? 1 : 0, school: c.school != null ? c.school : null,
-      hunger: c.hunger, cold: c.cold, carry: c.carry,
+      hunger: c.hunger, cold: c.cold, camped: c.camped ? 1 : 0, carry: c.carry,
     })),
     nextUid: G._peekUid(),
   };
@@ -120,9 +120,10 @@ G.autosave = function () {
 };
 
 G._peekUid = function () {
-  // 生成一个 id 保证单调，再回退
+  // 偷看下一个 id 且不消耗：回退过多会重发已用过的 id——两个建筑同 id 时
+  // 后者会覆盖 w.bmap 里的前者，旧建筑变成「满编幽灵」永远不再派工
   const v = G.nextId();
-  G.setUid(v - 1);
+  G.setUid(v);
   return v;
 };
 
@@ -177,7 +178,14 @@ G.applySaveData = function (d) {
   const remap = i => (i >= 0 && i < oldN * oldN && oldN !== w.N)
     ? ((i / oldN) | 0) * w.N + (i % oldN) : i;
 
-  G.setUid(d.nextUid || 10000);
+  // id 下限防御：旧版 _peekUid 有差一错误，旧档里的 nextUid 可能落后于现存最大 id——
+  // 直接沿用会让新建筑重发现存 id 再次碰撞，这里取两者较大值
+  const usedMax = Math.max(
+    d.buildings.reduce((m, b) => Math.max(m, b.id || 0), 0),
+    (d.citizens || []).reduce((m, c) => Math.max(m, c.id || 0), 0),
+    (d.families || []).reduce((m, f) => Math.max(m, f.id || 0), 0),
+  );
+  G.setUid(Math.max(d.nextUid || 10000, usedMax + 1));
   // 树：清空重建（索引一律按 x,y 现算，天然兼容旧尺寸存档）
   w.trees = []; w.treeIdx.fill(-1);
   for (const [, x, y, b] of d.trees) {
@@ -225,7 +233,7 @@ G.applySaveData = function (d) {
         id: cd.id, name: cd.name, sex: cd.sex, age: cd.age, adult: cd.adult,
         x: cd.x, y: cd.y, familyId: cd.familyId, job: cd.job,
         student: !!cd.student, educated: !!cd.educated, school: cd.school != null ? cd.school : null,
-        task: null, pausedTask: null, carry: cd.carry, state: 'idle', walkKind: '', path: null, pi: 0,
+        task: null, pausedTask: null, carry: cd.carry, state: 'idle', walkKind: '', path: null, pi: 0, camped: !!cd.camped,
         wanderT: Math.random() * 3, hunger: cd.hunger, cold: cd.cold, animT: 0, dead: false,
       };
       w.citizens.push(c);
@@ -234,6 +242,15 @@ G.applySaveData = function (d) {
     // 存档时正在搬运的资源：重新派人送仓（读档后市民都回到 idle，不处理会一直挂在身上）
     for (const c of w.citizens) {
       if (c.carry) G.startHaul(c);
+    }
+    // 旧档兜底：把站在建筑脚印/岩石等不可通行格上的市民挪到最近可站格
+    // （旧版婴儿出生点在房屋占位格内：寻路全失败 → 整夜按露宿挨冻）
+    for (const c of w.citizens) {
+      const cx = Math.round(c.x), cy = Math.round(c.y);
+      if (G.tileBlocked(w, cx, cy)) {
+        const spot = G.nearestWalkable(w, cx, cy, 8);
+        if (spot) { c.x = spot.x; c.y = spot.y; c.path = null; c.pi = 0; c.camped = false; }
+      }
     }
     const s = w.start;
     const [sx, sy] = G.T2S(s.x, s.y);
@@ -360,6 +377,21 @@ G.paintFell = function (x0, y0, x1, y1) {
   }
 };
 
+/* 「拆除」工具拖拽：沿线给岩石做清除标记（与砍伐同款沿线画法；只标岩石，不删建筑） */
+G.paintRockLine = function (x0, y0, x1, y1) {
+  const w = G.world;
+  const dx = Math.abs(x1 - x0), dy = Math.abs(y1 - y0);
+  const sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
+  let err = dx - dy, x = x0, y = y0;
+  while (true) {
+    G.markRockAt(w, x, y);
+    if (x === x1 && y === y1) break;
+    const e2 = 2 * err;
+    if (e2 > -dy) { err -= dy; x += sx; }
+    if (e2 < dx) { err += dx; y += sy; }
+  }
+};
+
 /* ---------- 建造 ---------- */
 G.tryPlace = function (tx, ty) {
   const type = G.tool.type;
@@ -425,6 +457,7 @@ G.init = function () {
   let dragging = false, dragBtn = -1, dragMoved = 0, lastX = 0, lastY = 0;
   let roadLast = null;
   let fellLast = null;
+  let rockLast = null;
 
   const toLocal = (e) => {
     const r = G.cv.getBoundingClientRect();
@@ -450,6 +483,12 @@ G.init = function () {
       G.markFellAt(G.world, tx, ty);
       fellLast = { x: tx, y: ty };
     }
+    if (e.button === 0 && G.tool && G.tool.kind === 'demolish') {
+      const t = G.screenToTile(p.x, p.y);
+      const tx = Math.floor(t.tx), ty = Math.floor(t.ty);
+      G.markRockAt(G.world, tx, ty); // 点击岩石即标记；建筑/树木/道路的删除仍在 mouseup 单击判定
+      rockLast = { x: tx, y: ty };
+    }
   });
 
   window.addEventListener('mousemove', e => {
@@ -473,6 +512,12 @@ G.init = function () {
       if (tx !== fellLast.x || ty !== fellLast.y) {
         G.paintFell(fellLast.x, fellLast.y, tx, ty);
         fellLast = { x: tx, y: ty };
+      }
+    } else if (dragBtn === 0 && G.tool && G.tool.kind === 'demolish' && rockLast) {
+      const tx = Math.floor(t.tx), ty = Math.floor(t.ty);
+      if (tx !== rockLast.x || ty !== rockLast.y) {
+        G.paintRockLine(rockLast.x, rockLast.y, tx, ty);
+        rockLast = { x: tx, y: ty };
       }
     }
   });

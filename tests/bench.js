@@ -2,7 +2,7 @@
  * 固定种子生成真实地图，建一座微型村庄（采集/护林/伐木/码头/农田各一座、满编工人），
  * 预热一年后统计第二年的产出——用于校准 defs.js / README 的产能文案。
  * 选址取「就近最优」（采集/护林挑森林最密处、码头挑水域最大处），衡量的是合理布局下的产能。
- * 为隔离干扰：无住宅市民不冻死（homelessCold/unheatedCold 置 0）、伐木屋燃料上限调高、
+ * 为隔离干扰：市民不受冻不冻死（coldOutdoor/coldIndoors/warmRecover 置 0）、伐木屋燃料上限调高、
  * 市民不组建家庭（避免生育/住房噪声）。产出按任务完工记账，与吃/取暖等消耗无关。 */
 global.window = global;
 global.addEventListener = () => {};
@@ -60,6 +60,7 @@ const plan = [
   ['dock', (x, y) => G.countWaterInRadius(w, x, y, PD.waterR), 14],
   ['woodcutter', null, 3], // 紧邻仓库（README 建议摆法），就近即可
   ['farm', null, 16],
+  ['hunting', (x, y) => G.treesInRadius(w, x, y, G.PROD.hunting.radius, true).length - G.dist(x, y, s.x, s.y) * 2, 14], // 放最后：与护林同林会拉低彼此基准
 ];
 for (const [type, score, r] of plan) {
   let spot;
@@ -70,6 +71,8 @@ for (const [type, score, r] of plan) {
   if (!res.ok) { console.error(type, '建造失败：', res.reason); process.exit(1); }
   built[type] = res.b;
 }
+const spot2 = canPlaceSpots('storage', s.x, s.y, 9)[0]; // 第二仓库放最后：木/柴产出不被仓储上限截断，也不挤占伐木屋的位置
+if (spot2) G.addBuilding('storage', spot2.x, spot2.y, { instant: true, free: true });
 built.woodcutter.fuelLimit = 999999; // 隔离燃料上限对测量的干扰
 
 for (const type of Object.keys(built)) {
@@ -80,7 +83,7 @@ for (const type of Object.keys(built)) {
     c.job = b.id; b.workers.push(c.id);
   }
 }
-G.LIFE.homelessCold = 0; G.LIFE.unheatedCold = 0; // 无住宅市民不冻死（隔离干扰）
+G.LIFE.coldOutdoor = 0; G.LIFE.coldIndoors = 0; G.LIFE.warmRecover = 0; // 市民不受冻不冻死（隔离干扰）
 
 /* 产出记账（按任务完工，与消耗无关） */
 const tally = {}, tasks = {};
@@ -123,6 +126,7 @@ const rows = [
   ['farm', '农田', 'food', G.BDEF.farm.jobs],
   ['forester', '护林小屋', 'wood', G.BDEF.forester.jobs],
   ['woodcutter', '伐木屋', 'firewood', G.BDEF.woodcutter.jobs],
+  ['hunting', '猎人小屋', 'food', G.BDEF.hunting.jobs],
 ];
 for (const [type, name, res, jobs] of rows) {
   const perYear = (tally[type] || 0) - (snap[type] || 0);
