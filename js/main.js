@@ -601,6 +601,8 @@ G.init = function () {
     const r = G.cv.getBoundingClientRect();
     return { x: e.clientX - r.left, y: e.clientY - r.top };
   };
+  const placementPanel = document.getElementById('placement-panel');
+  const onPlacementPanel = e => placementPanel && placementPanel.contains && placementPanel.contains(e.target);
 
   G.cv.addEventListener('contextmenu', e => e.preventDefault());
 
@@ -631,7 +633,7 @@ G.init = function () {
   });
 
   window.addEventListener('mousemove', e => {
-    if (G.hasOpenModal()) { resetInput(); return; }
+    if (G.hasOpenModal() || onPlacementPanel(e)) { resetInput(); return; }
     const p = toLocal(e);
     const t = G.screenToTile(p.x, p.y);
     G.hover = { tx: Math.floor(t.tx), ty: Math.floor(t.ty) };
@@ -663,7 +665,7 @@ G.init = function () {
   });
 
   window.addEventListener('mouseup', e => {
-    if (G.hasOpenModal()) { resetInput(); return; }
+    if (G.hasOpenModal() || onPlacementPanel(e)) { resetInput(); return; }
     if (!dragging) return;
     dragging = false;
     const p = toLocal(e);

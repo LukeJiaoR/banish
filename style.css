@@ -288,9 +288,17 @@ body {
 button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 2px solid #ffe4a0; outline-offset: 2px; }
 #topbar { flex-wrap: wrap; gap: 6px 14px; }
 #res-row { flex-wrap: wrap; }
-#survival-guide, #placement-info { position: absolute; left: 12px; width: min(450px, calc(100vw - 24px)); white-space: pre-line; background: rgba(24,18,10,.9); border: 1px solid rgba(216,178,90,.35); border-radius: 8px; padding: 7px 10px; font-size: 12px; line-height: 1.5; }
-#survival-guide { top: 90px; }
-#placement-info { bottom: 114px; border-left: 3px solid #a0c47a; }
+#survival-guide, #placement-info, #harvest-cancel { white-space: pre-line; background: rgba(24,18,10,.9); border: 1px solid rgba(216,178,90,.35); border-radius: 8px; padding: 7px 10px; font-size: 12px; line-height: 1.5; }
+#survival-guide { position: absolute; left: 12px; top: 90px; width: min(450px, calc(100vw - 24px)); }
+#placement-panel { position: absolute; left: 12px; bottom: 114px; width: min(450px, calc(100vw - 24px)); max-height: calc(100vh - 214px); overflow-y: auto; overscroll-behavior: contain; pointer-events: auto; scrollbar-color: #b79b64 #302619; }
+#placement-info { border-left: 3px solid #a0c47a; }
+#harvest-cancel { margin-bottom: 6px; white-space: normal; }
+.harvest-cancel-buttons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.harvest-cancel-buttons button { background: #5c412d; border: 1px solid #c29a70; border-radius: 6px; color: #ffe9ce; padding: 7px 4px; font: inherit; cursor: pointer; overflow-wrap: anywhere; }
+.harvest-cancel-buttons button:hover:not([aria-disabled="true"]) { background: #75543a; border-color: #ffe4a0; }
+.harvest-cancel-buttons button[aria-disabled="true"] { color: #b8aa99; border-color: #68594a; background: #342c23; cursor: default; }
+#harvest-cancel-hint { margin-top: 6px; color: #c7b899; font-size: 11px; }
+#harvest-cancel-status:not(:empty) { margin-top: 5px; color: #e5cd95; }
 #placement-info[data-state="blocked"] { border-left-color: #e0705a; }
 #placement-info[data-state="warning"] { border-left-color: #e8b350; }
 #info { top: 90px; max-height: calc(100vh - 210px); overflow-y: auto; }
@@ -298,4 +306,6 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 #toasts { bottom: 114px; pointer-events: none; }
 #hud:has(#placement-info:not(.hidden)) #toasts { left: auto; right: 12px; max-width: max(220px, calc(100vw - 490px)); z-index: 3; }
 @media (max-width: 1024px) { #survival-guide { width: min(440px, calc(100vw - 290px)); } #topbar { font-size: 12px; padding: 6px 10px; } #res-row { gap: 7px; } }
-@media (max-width: 600px) { #survival-guide { top: 122px; width: calc(100vw - 24px); font-size: 11px; } #info { top: 208px; width: min(280px, calc(100vw - 24px)); max-height: calc(100vh - 325px); } #topbar { gap: 4px 8px; } #placement-info { max-height: 32vh; overflow-y: auto; pointer-events: auto; } .dialog { padding: 18px; } }
+@media (max-width: 600px) { #survival-guide { top: 122px; width: calc(100vw - 24px); font-size: 11px; } #info { top: 208px; width: min(280px, calc(100vw - 24px)); max-height: calc(100vh - 325px); } #topbar { gap: 4px 8px; } #placement-panel { max-height: calc(100vh - 260px); } .dialog { padding: 18px; } }
+@media (max-width: 600px) { #hud:has(#harvest-cancel:not(.hidden)) #survival-guide { display: none; } }
+@media (max-height: 620px) { #hud:has(#placement-info:not(.hidden)) #survival-guide { display: none; } }

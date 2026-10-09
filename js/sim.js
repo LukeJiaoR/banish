@@ -586,8 +586,11 @@ G.resumeTask = function (c) {
   c.pausedTask = null;
   if (!t) return false;
   const w = G.world;
-  // 有建筑的任务要求仍在原岗位；无建筑任务 = 散工砍标记树，只看树还在不在
-  let ok = t.b ? (c.job != null && w.bmap[c.job] === t.b) : (t.kind === 'chop' || t.kind === 'clearrock');
+  // 建筑任务要求仍在原岗位；散工任务还须保留玩家标记，不能续接已取消的命令。
+  const i = t.ty * w.N + t.tx;
+  let ok = t.b ? (c.job != null && w.bmap[c.job] === t.b) :
+    (t.kind === 'chop' ? !!(w.marked && w.marked.has(i)) :
+      t.kind === 'clearrock' && !!(w.markedRocks && w.markedRocks.has(i)));
   if (ok && t.kind === 'chop') {
     const idx = w.treeIdx[t.ty * w.N + t.tx];
     ok = idx >= 0 && w.trees[idx] === t.tree;   // 同一棵树还在（防止重种/互换后误续）
@@ -595,7 +598,7 @@ G.resumeTask = function (c) {
     const idx = w.treeIdx[t.tree.y * w.N + t.tree.x];
     ok = t.b.state === 'site' && idx >= 0 && w.trees[idx] === t.tree;
   } else if (ok && t.kind === 'clearrock') {
-    ok = w.rock[t.ty * w.N + t.tx] === t.rock;
+    ok = t.rock > 0 && w.rock[i] === t.rock;
   } else if (ok && t.kind === 'plant') {
     const i = t.ty * w.N + t.tx;
     ok = !w.water[i] && !w.rock[i] && !w.road[i] && w.treeIdx[i] < 0 && w.bgrid[i] < 0;
@@ -802,6 +805,32 @@ G.arrive = function (c) {
 };
 
 /* ================= 任务系统 ================= */
+/* 撤销一种玩家采集命令；不撤销护林/清场岗位，也不退工时或已产出的货。
+ * 只中止任务路线，回家、休息、送仓保持原样；新派工仍走正常调度。 */
+G.cancelResourceMarks = function (kind) {
+  const result = { marks: 0, active: 0, paused: 0 }, w = G.world;
+  if (!w || (kind !== 'trees' && kind !== 'rocks')) return result;
+  const marks = kind === 'trees' ? w.marked : w.markedRocks;
+  const taskKind = kind === 'trees' ? 'chop' : 'clearrock';
+  if (marks) { result.marks = marks.size; marks.clear(); }
+  const matches = t => t && !t.b && t.kind === taskKind;
+  for (const c of w.citizens) {
+    const task = c.task, paused = c.pausedTask;
+    if (matches(task)) {
+      c.task = null; result.active++;
+      if (c.state === 'work' || (c.state === 'walk' && c.walkKind === 'task')) {
+        c.path = null; c.pi = 0; c.walkKind = ''; c.state = 'idle'; c.wanderT = 0.5;
+      }
+    }
+    if (matches(paused)) {
+      c.pausedTask = null;
+      if (paused !== task) result.paused++;
+    }
+  }
+  if (result.marks || result.active || result.paused) w.markReachability = null;
+  return result;
+};
+
 G.requestTask = function (c) {
   c.task = null;
   if (G.isRestTime()) { G.goHome(c); return; } // 深夜不接受新任务
