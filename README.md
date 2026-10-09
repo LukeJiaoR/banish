@@ -1,5 +1,7 @@
 # 归园 · 放逐小镇（Banished 复刻原型）
 
+当前版本：**0.3.1**。
+
 一个零依赖、纯前端可玩的《放逐之城》(Banished) 风格城市建造游戏原型。
 等距视角、市民 AI、四季轮转、食物/木材/石头/柴火经济，**所有经济数值对齐原版 Banished**。
 
@@ -19,7 +21,7 @@ python3 dev-server.py 8613     # 禁用缓存的开发服务器
 零依赖、无需数据库，一个 Python 标准库脚本搞定静态托管 + 反馈落盘：
 
 ```bash
-# 把 index.html / style.css / js/ / server.py 上传到服务器任意目录
+# 把 index.html / style.css / js/ / assets/ / server.py 上传到服务器任意目录
 python3 server.py 8613                    # 绑定 0.0.0.0，浏览器访问 http://服务器IP:8613
 nohup python3 server.py 8613 > server.log 2>&1 &   # 或用 systemd 常驻
 ```
@@ -34,15 +36,15 @@ nohup python3 server.py 8613 > server.log 2>&1 &   # 或用 systemd 常驻
 python3 tools/fb_stats.py                    # 聚合报告：版本分布/分类/闭环率/进度直方图/死因合计/饥荒深度/关键词
 python3 tools/fb_extract.py --id p-xxxx      # 按玩家抽快照 → feedback/replays/*.json
 python3 tools/fb_extract.py --server http://IP:8613 --token 秘密token
-                                             # 额外打印「点开即复盘」链接（游戏 ?load= 参数直接载入快照）
+                                             # 额外打印「点开即复盘」链接（受 token 保护的 replay 页面直接载入快照）
 ```
 
-- `fb_extract.py` 导出的 json 就是标准存档：游戏内「📂 存档管理 → ⬆️ 导入存档文件」即可回到该玩家反馈时的**精确局面**（含 60 天资源曲线定位问题发生的时点）；`--server/--token` 打印的链接打开游戏即自动载入。
+- `fb_extract.py` 导出的 json 就是标准存档：游戏内「📂 存档管理 → ⬆️ 导入存档文件」即可回到该玩家反馈时的已保存局面（含 60 天资源曲线定位问题发生的时点）；`--server/--token` 打印的链接打开游戏即自动载入。工具磨损累计值随存档恢复；旧档缺少该字段时从 0 开始。当前不保存随机数流位置、正在执行/挂起的任务和寻路，读档会重新调度，因此是状态快照恢复，**不是确定性逐步复盘**。
 - 反馈表单带可选分类（bug/数值/卡关/建议）；每条反馈有稳定 id，处理完在 `feedback/FIXED.md`（格式见 `tools/FIXED.md`）登记一行，报告即统计闭环率并标注待处理项。
 - 数值补丁发布时递增 `js/core.js` 的 `G.VERSION`，反馈自动归因到版本。
 - 在线查看：`FEEDBACK_TOKEN=私密token python3 server.py 8613` 启动，访问 `http://主机:8613/api/feedback?token=私密token`；不设 token 则该接口关闭，直接 ssh cat 文件。
-- 防滥用：每 IP 每 10 分钟最多 6 条；单条 ≤1.5MB；月文件超 50MB 拒收；目录列表禁用。
-- 反代（可选）：nginx `location / { proxy_pass http://127.0.0.1:8613; }`。
+- 防滥用：每 IP 每 10 分钟最多 6 条；单条 ≤1.5MB；月文件超 50MB 拒收；目录列表禁用。静态服务仅开放游戏首页、样式、脚本及 assets；反馈目录（包括盐值）、存档目录和服务器源码不通过静态 GET/HEAD 暴露。
+- 反代（可选）：nginx `location / { proxy_set_header Host $http_host; proxy_pass http://127.0.0.1:8613; }`。必须保留浏览器请求的 Host（包括非默认端口），否则存档接口的同源校验会拒绝写入/删除。
 
 注意：file:// 或接口不可用时，前端自动降级为「复制反馈内容手动发给开发者」，不会丢反馈。
 
@@ -59,7 +61,11 @@ python3 tools/fb_extract.py --server http://IP:8613 --token 秘密token
 💾 保存 / 📂 读取 = localStorage 手动存档；🌱 新游戏随机地图。
 **存档管理（📂）**：面板中可查看、载入、删除「手动档」与「自动档」（含一键**清空全部存档**，带确认，不影响当前对局），显示存档时间和游戏内进度。
 **自动存档**：每个季节更替、每 90 秒、切走标签页、刷新或关闭页面时自动写入「自动档」；下次打开自动恢复（结算后死档不恢复；🌱 重开会清除旧自动存档）。
-**服务器存档**：用 `python3 server.py` 启动时，存档面板出现「🖥 服务器存档」区——存档为 JSON 文件落在 `saves/` 目录，**跨浏览器、跨设备共享**（同一台服务器上的玩家都能看到）。自动档每 90 秒自动镜像到服务器 `autosave.json`（写失败静默跳过，不影响本机档）；也可输入存档名点「💾 存到服务器」另存命名档位，随时「载入 / 删除」。接口有每 IP 限频、8MB 上限、名称消毒与原子落盘（写一半断电不留坏档）。
+**服务器存档**：用 `python3 server.py` 启动时，存档面板出现「🖥 服务器存档」区。首次探测由服务器签发随机匿名身份 Cookie（HttpOnly、SameSite=Strict，保留一年）；服务端按该 Cookie 隔离列表、读取、写入及删除，前端玩家 ID / owner 参数不能指定其他玩家的目录。自动档每 90 秒镜像到各浏览器独立的 `autosave.json`，同名不会互相覆盖。可输入名称另存、载入或删除。接口保留每 IP 限频、8MB 上限、名称校验与原子落盘；写入要求 `application/json`，拒绝跨源请求。Cookie 是浏览器的存档钥匙，请不要分享；同浏览器同站点的标签页仍共用存档。清除 Cookie、隐私窗口关闭或更换浏览器后不能找回该身份，跨设备请用下方 JSON 导出/导入。
+
+部署到公网请通过 **HTTPS** 反代，并设置 `COOKIE_SECURE=1`，避免身份 Cookie 经明文网络泄露；本机 HTTP 开发默认不设置 Secure。不要让 nginx 等静态服务直接开放整个仓库及反馈/存档目录，也不要在同域托管不可信页面。数据默认仍在 `feedback/` 和 `saves/`，生产环境推荐用 `FEEDBACK_DIR` / `SAVES_DIR` 指向站点根目录外并备份。
+
+**旧共享存档迁移**：升级不会删除或修改 `saves/*.json`，但无法可靠判定旧档所属玩家，因此不自动认领、不再通过 API 公布。管理员先离线备份，核实所属玩家后将对应 JSON 交还玩家，玩家在自己的浏览器导入后另存到服务器。新档位于 `saves/_sessions/<身份摘要>/`；不要随意移动该目录。反馈快照仍仅允许持有 `FEEDBACK_TOKEN` 的管理员读取。
 **存档文件导出/导入**：存档面板底部「⬇️ 导出存档文件 / ⬆️ 导入存档文件」——把当前对局下载为 JSON 文件、或从文件恢复，任何静态服务器（含 dev-server.py、file:// 直开）都能用，是服务器不可用时的兜底。
 
 ## 原版数值对照
@@ -167,3 +173,17 @@ assets/         切出的精灵单件 PNG（地表纹理 / 树木岩石 / 建筑
 - [Arqade – 每人每年消耗约 100 食物](https://gaming.stackexchange.com/questions/156685/good-tactic-to-maintain-a-good-food-supply-in-banished)
 - [Honeywell's Banished Facts – 农田约 7 食物/格/年](https://honeywell-mts.tumblr.com/post/106978999255/honeywells-banished-facts-and-learnings-ive)
 - [r/Banished – 原木/柴火换比与木屋柴火消耗讨论](https://www.reddit.com/r/Banished/comments/2gr1cx/how_many_woodcutters_do_you_need/)
+
+
+## 本地回归检查
+
+```bash
+python3 -m py_compile server.py tests/server_smoke.py tests/server_security.py
+python3 tests/server_smoke.py
+python3 tests/server_security.py
+node tests/smoke.js
+node tests/bench.js
+node tests/opening.js
+```
+
+安全回归仅使用临时目录及合成数据，覆盖两个独立浏览器会话、同名自动档隔离、旧档保留、跨源拒绝、静态 GET/HEAD 路径与符号链接，以及复盘页面脚本和样式加载。bench/opening 是产能及开局诊断输出，并非全部指标都有断言。

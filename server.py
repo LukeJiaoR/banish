@@ -10,15 +10,18 @@
 追加写入 feedback/feedback-YYYYMM.jsonl（每行一个 JSON，含进度摘要 / 存档快照 /
 脚本错误 / IP 哈希）。不设置 FEEDBACK_TOKEN 时无在线查看接口，直接 ssh cat 文件。
 
-服务器存档：存档为 JSON 文件落在 saves/ 目录，跨浏览器、跨设备共享。
-  GET    /api/saves            # 列出全部存档（含年份/季节/人口/食物摘要）
+服务器存档：服务端生成匿名浏览器会话，HttpOnly Cookie 隔离存档。
+旧版共享存档留在 saves/ 根目录，仅供管理员离线导出，不自动归属任何玩家。
+  GET    /api/saves            # 列出当前浏览器的存档（含年份/季节/人口/食物摘要）
   GET    /api/saves/<名字>      # 读取一份存档
   POST   /api/saves            # 写入 {name, data}（原子落盘，同名覆盖）
   DELETE /api/saves/<名字>      # 删除一份存档
-自动档每 90 秒镜像到服务器 autosave.json（写失败静默跳过，不影响本机档）。
+自动档每 90 秒镜像到当前浏览器的服务器 autosave.json（写失败静默跳过，不影响本机档）。
 """
 import functools
 import hashlib
+import secrets
+from http.cookies import SimpleCookie
 import json
 import os
 import re
@@ -34,6 +37,9 @@ TOKEN = os.environ.get('FEEDBACK_TOKEN', '')
 ROOT = os.path.dirname(os.path.abspath(__file__))
 FB_DIR = os.environ.get('FEEDBACK_DIR') or os.path.join(ROOT, 'feedback')
 SAVES_DIR = os.environ.get('SAVES_DIR') or os.path.join(ROOT, 'saves')
+SESSION_COOKIE = 'banish_session'
+COOKIE_SECURE = os.environ.get('COOKIE_SECURE', '') == '1'
+SESSION_RE = re.compile(r'^[0-9a-f]{64}$')
 MAX_BODY = 1_500_000        # 单条反馈上限（字节），超限拒绝
 MAX_SAVE_BODY = 8_000_000   # 单个存档上限（字节）：全图树木+市民约 1-2MB，留足余量
 MAX_TEXT = 2000             # 反馈正文上限（字符），与前端一致
@@ -86,7 +92,7 @@ def _s(v, limit):
     return v.strip()[:limit] if isinstance(v, str) else ''
 
 
-def _save_path(name):
+def _save_path(name, owner_dir):
     """存档名 → saves/ 内的安全路径；非法名返回 None。
     只允许中日韩文字/字母/数字开头，1-40 字符（可含空格 · - _ 括号），
     天然排除路径分隔符、隐藏文件与 ..；realpath 双重确认不逃出存档目录。"""
@@ -95,8 +101,8 @@ def _save_path(name):
     name = name.strip()
     if not SAVE_NAME_RE.match(name):
         return None
-    os.makedirs(SAVES_DIR, exist_ok=True)
-    root = os.path.realpath(SAVES_DIR)
+    os.makedirs(owner_dir, exist_ok=True)
+    root = os.path.realpath(owner_dir)
     p = os.path.realpath(os.path.join(root, name + '.json'))
     if os.path.dirname(p) != root:
         return None
@@ -123,16 +129,73 @@ def _save_summary(path):
 class Handler(SimpleHTTPRequestHandler):
     def end_headers(self):
         self.send_header('Cache-Control', 'no-store, must-revalidate')
+        self.send_header('Referrer-Policy', 'no-referrer')
+        if getattr(self, '_session_cookie', None):
+            self.send_header('Set-Cookie', self._session_cookie)
         super().end_headers()
 
-    def translate_path(self, path):
-        """静态文件一律限制在站点根目录内（防目录穿越，纵深防御）。"""
-        p = super().translate_path(path)
+    def _public_path(self, path):
+        """Canonical allowlist shared by direct files and implicit directory indexes."""
         root = os.path.realpath(ROOT)
-        real = os.path.realpath(p)
+        real = os.path.realpath(path)
         if real != root and not real.startswith(root + os.sep):
-            return os.path.join(ROOT, '__outside__.notexist')
+            return False
+        for private in (FB_DIR, SAVES_DIR):
+            private = os.path.realpath(private)
+            if real == private or real.startswith(private + os.sep):
+                return False
+        rel = os.path.relpath(real, root)
+        return (rel in ('.', 'index.html', 'style.css') or
+                rel.split(os.sep)[0] in ('js', 'assets'))
+
+    def translate_path(self, path):
+        """Apply to GET and inherited HEAD, including aliases and directory indexes."""
+        p = super().translate_path(path)
+        if not self._public_path(p):
+            return os.path.join(ROOT, '__private__.notexist')
+        # SimpleHTTPRequestHandler opens an index after translate_path returns.
+        # Validate that second resolution too, otherwise index symlinks bypass it.
+        if os.path.isdir(p):
+            for index in ('index.html', 'index.htm'):
+                candidate = os.path.join(p, index)
+                if os.path.isfile(candidate):
+                    if not self._public_path(candidate):
+                        return os.path.join(ROOT, '__private__.notexist')
+                    break
         return p
+
+    def _save_owner(self, create=False):
+        """Opaque bearer cookie; no caller-supplied player ID or shared fallback."""
+        if self.headers.get('Sec-Fetch-Site') == 'cross-site':
+            self._json(403, {'ok': False, 'error': '仅允许同源存档请求'})
+            return None
+        origin = self.headers.get('Origin')
+        if origin and origin not in ('http://' + self.headers.get('Host', ''),
+                                     'https://' + self.headers.get('Host', '')):
+            self._json(403, {'ok': False, 'error': '仅允许同源存档请求'})
+            return None
+        cookie = SimpleCookie()
+        try:
+            cookie.load(self.headers.get('Cookie', ''))
+            token = cookie[SESSION_COOKIE].value if SESSION_COOKIE in cookie else ''
+        except Exception:
+            token = ''
+        if not SESSION_RE.fullmatch(token):
+            if not create:
+                self._json(401, {'ok': False, 'error': '请先刷新游戏以建立存档会话'})
+                return None
+            token = secrets.token_hex(32)
+            self._session_cookie = (f'{SESSION_COOKIE}={token}; Path=/; HttpOnly; '
+                                    'SameSite=Strict; Max-Age=31536000' +
+                                    ('; Secure' if COOKIE_SECURE else ''))
+        root = os.path.realpath(SAVES_DIR)
+        sessions = os.path.join(root, '_sessions')
+        owner = os.path.join(sessions, hashlib.sha256(token.encode('ascii')).hexdigest())
+        # Never follow a namespace symlink into another owner or legacy storage.
+        if os.path.islink(sessions) or os.path.realpath(owner) != owner:
+            self._json(500, {'ok': False, 'error': '存档目录配置错误'})
+            return None
+        return owner
 
     def list_directory(self, path):
         self.send_error(403)
@@ -240,6 +303,12 @@ class Handler(SimpleHTTPRequestHandler):
     # ---------- 服务器存档接口 ----------
     def _save_write(self):
         """POST /api/saves {name, data}：校验、限频、原子落盘（同名覆盖）。"""
+        owner = self._save_owner()
+        if owner is None:
+            return
+        if self.headers.get_content_type() != 'application/json':
+            self._json(415, {'ok': False, 'error': '存档需要 application/json'})
+            return
         if self._rate_hit(_save_hits, SAVE_RATE_MAX, '保存太频繁，请稍后再试'):
             return
         data = self._read_json_body(MAX_SAVE_BODY)
@@ -249,7 +318,7 @@ class Handler(SimpleHTTPRequestHandler):
             self._json(400, {'ok': False, 'error': '存档内容格式错误'})
             return
         name = data.get('name')
-        p = _save_path(name)
+        p = _save_path(name, owner)
         if not p:
             self._json(400, {'ok': False, 'error': '存档名限 1-40 字符（中文/字母/数字开头）'})
             return
@@ -277,10 +346,12 @@ class Handler(SimpleHTTPRequestHandler):
         self._json(200, {'ok': True, 'name': name})
 
     def _save_list(self):
-        """GET /api/saves：列出全部存档与摘要，坏档不阻塞列表。"""
+        """GET /api/saves：列出当前会话的存档与摘要，坏档不阻塞列表。"""
+        owner = self._save_owner(create=True)
+        if owner is None:
+            return
         try:
-            os.makedirs(SAVES_DIR, exist_ok=True)
-            names = sorted(os.listdir(SAVES_DIR))
+            names = sorted(os.listdir(owner))
         except OSError:
             self._json(200, {'ok': True, 'saves': []})
             return
@@ -288,7 +359,9 @@ class Handler(SimpleHTTPRequestHandler):
         for fn in names:
             if not fn.endswith('.json') or fn.startswith('.'):
                 continue
-            p = os.path.join(SAVES_DIR, fn)
+            p = _save_path(fn[:-5], owner)
+            if not p:
+                continue
             try:
                 st = os.stat(p)
             except OSError:
@@ -299,7 +372,10 @@ class Handler(SimpleHTTPRequestHandler):
 
     def _save_read(self, name):
         """GET /api/saves/<名字>：返回存档 JSON；不存在 404。"""
-        p = _save_path(name)
+        owner = self._save_owner()
+        if owner is None:
+            return
+        p = _save_path(name, owner)
         if not p or not os.path.isfile(p):
             self._json(404, {'ok': False, 'error': '存档不存在'})
             return
@@ -317,7 +393,10 @@ class Handler(SimpleHTTPRequestHandler):
 
     def _save_delete(self, name):
         """DELETE /api/saves/<名字>：删除一份存档；不存在 404。"""
-        p = _save_path(name)
+        owner = self._save_owner()
+        if owner is None:
+            return
+        p = _save_path(name, owner)
         if not p or not os.path.isfile(p):
             self._json(404, {'ok': False, 'error': '存档不存在'})
             return
@@ -416,6 +495,7 @@ class Handler(SimpleHTTPRequestHandler):
         save.setdefault('savedAt', found.get('t') or time.time() * 1000)
         payload = json.dumps(save, ensure_ascii=False).replace('</', '<\\/')
         inject = '<script>window.__REPLAY_SAVE=' + payload + ';</script>\n<script>'
+        html = html.replace('<head>', '<head>\n<base href="/">', 1)
         html = html.replace('<script>', inject, 1)
         body = html.encode('utf-8')
         self.send_response(200)

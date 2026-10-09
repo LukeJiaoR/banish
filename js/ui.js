@@ -364,7 +364,7 @@ G.ui = {
     if (!box) return;
     if (G.serverSaves.available === false) {
       box.innerHTML = `<div class="server-saves-hint">🖥 服务器存档不可用（用 <code>python3 server.py</code> 启动即启用，
-        跨浏览器/跨设备共享）。本机存档与 ⬇️⬆️ 存档文件导出导入不受影响。</div>`;
+        按当前浏览器身份隔离）。本机存档不受影响；跨浏览器或设备请导出/导入 JSON 存档文件。</div>`;
       return;
     }
     fetch('/api/saves').then(r => (r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))))
@@ -372,11 +372,12 @@ G.ui = {
         if (!j || !j.ok) throw new Error('bad');
         const saves = j.saves || [];
         let html = `<div class="server-saves-head">
-          <span>🖥 服务器存档 <small>跨浏览器 · 跨设备</small></span>
+          <span>🖥 服务器存档 <small>仅当前浏览器身份可见（含自动档）</small></span>
           <span class="server-save-new">
             <input id="server-save-name" maxlength="40" placeholder="存档名，如：第二个冬天">
             <button id="server-save-now">💾 存到服务器</button>
-          </span></div>`;
+          </span></div>
+          <div class="server-saves-hint">浏览器 Cookie 用于识别你的存档；清除 Cookie 后将无法访问原服务器存档。跨浏览器或设备请导出/导入 JSON 存档文件。</div>`;
         html += saves.map(s => {
           const sum = s.summary && s.summary.savedAt
             ? this.saveGameStr({ game: s.summary, citizens: { length: s.summary.pop || 0 } }) : '';
