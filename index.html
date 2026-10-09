@@ -26,7 +26,17 @@
   </div>
 
   <div id="survival-guide" aria-label="生存清单"></div>
-  <div id="placement-info" class="hidden" aria-label="建造预览"></div>
+  <div id="placement-panel">
+    <div id="harvest-cancel" class="hidden" role="group" aria-label="撤销采运标记" aria-describedby="harvest-cancel-hint">
+      <div class="harvest-cancel-buttons">
+        <button type="button" id="cancel-tree-marks" aria-disabled="true">取消全部树标记（0）</button>
+        <button type="button" id="cancel-rock-marks" aria-disabled="true">取消全部矿标记（0）</button>
+      </div>
+      <p id="harvest-cancel-hint">仅撤销散工未完成的标记任务；已采货物仍送仓，护林和工地清场继续。已耗工时不返还。退出工具不撤销标记。</p>
+      <p id="harvest-cancel-status" role="status" aria-live="polite" aria-atomic="true"></p>
+    </div>
+    <div id="placement-info" class="hidden" aria-label="建造或采运预览"></div>
+  </div>
   <div id="toolbar" role="toolbar" aria-label="建造工具，可横向滚动"></div>
 
   <div id="info" class="panel hidden"></div>
@@ -45,7 +55,7 @@
         <li><b>滚轮</b>：缩放；<b>WASD / 方向键</b>：平移</li>
         <li><b>空格</b>：暂停；<b>1 / 2 / 3</b>：速度</li>
         <li><b>Esc</b>：取消工具 / 取消选择。工具栏可横向滚动，Tab 可访问按钮；地图选址需鼠标或触控板。</li>
-        <li><b>🪚 砍伐</b>：点击或拖拽沿线标记树木，散工砍倒后搬运入库；未受教育 2 原木、受教育 3 原木。标记时绿色虚线提示食物林，采运面板区分待领、执行和随身未入库。退出工具不会撤销标记</li>
+        <li><b>🪚 砍伐</b>：点击或拖拽沿线标记树木，散工砍倒后搬运入库；未受教育 2 原木、受教育 3 原木。标记时绿色虚线提示食物林，采运面板区分待领、执行和随身未入库。砍伐或拆除工具内可分别「取消全部树标记 / 取消全部矿标记」，撤销散工未完成的标记任务（含执行和夜间保留）；已采货物仍送仓，护林和工地清场继续，已耗工时不返还。退出工具不会撤销标记</li>
       </ul>
       <p>💾 换季、每 90 秒和离开页面时会自动写入「自动档」，刷新后自动恢复；📂 打开存档管理可载入/删除；💾 为手动存档，🌱 开新局。遇到问题或想法，点右上角 📮 一句话反馈（无需注册）。</p>
       <h3>生存要点（数值对齐原版 Banished）</h3>

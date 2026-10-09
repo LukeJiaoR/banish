@@ -15,6 +15,8 @@ G.ui = {
       toolbar: $('toolbar'), info: $('info'), toasts: $('toasts'),
       over: $('over'), overText: $('over-text'), help: $('help'),
       guide: $('survival-guide'), placement: $('placement-info'),
+      harvestCancel: $('harvest-cancel'), cancelTrees: $('cancel-tree-marks'),
+      cancelRocks: $('cancel-rock-marks'), cancelStatus: $('harvest-cancel-status'),
     };
 
     // 资源栏
@@ -74,6 +76,7 @@ G.ui = {
         G.setTool(active ? null : k); // 再点一次取消
       });
     });
+    this.initHarvestControls();
 
     // 顶栏按钮
     document.getElementById('btn-save').addEventListener('click', () => { G.saveGame(); });
@@ -100,6 +103,63 @@ G.ui = {
       const btn = this.el.toolbar.querySelector(`[data-tool="${t}"]`);
       if (btn) btn.classList.add('active');
     }
+    this.refreshHarvestControls();
+  },
+
+  // Persistent buttons are separate from the text-only, frame-refreshed preview.
+  initHarvestControls: function () {
+    for (const [kind, btn] of [['trees', this.el.cancelTrees], ['rocks', this.el.cancelRocks]]) {
+      if (!btn) continue;
+      btn.addEventListener('click', e => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!G.world || !G.tool || !['fell', 'demolish'].includes(G.tool.kind) ||
+            (G.hasOpenModal && G.hasOpenModal())) return;
+        const marks = kind === 'trees' ? G.world.marked : G.world.markedRocks;
+        // Read live state, not the previous animation frame's count.
+        if (!marks || !marks.size) { this.refreshHarvestControls(); return; }
+        const result = G.cancelResourceMarks(kind);
+        const name = kind === 'trees' ? '树' : '矿';
+        if (this.el.cancelStatus) this.el.cancelStatus.textContent =
+          `已取消 ${result.marks} 处${name}标记；停止执行 ${result.active} 项、夜间保留 ${result.paused} 项。已采货物仍送仓。`;
+        this.refreshHarvest();
+        this.refreshHUD();
+      });
+    }
+  },
+
+  refreshHarvestControls: function () {
+    const el = this.el.harvestCancel;
+    if (!el) return;
+    const visible = !!G.world && !!G.tool && ['fell', 'demolish'].includes(G.tool.kind);
+    if (!visible) {
+      // Escape or a tool switch must not leave keyboard focus in a hidden group.
+      if (el.contains(document.activeElement)) {
+        const tool = G.tool ? (G.tool.kind === 'build' ? G.tool.type : G.tool.kind) : this._harvestTool;
+        const btn = tool && this.el.toolbar.querySelector(`[data-tool="${tool}"]`);
+        if (btn) btn.focus({ preventScroll: true });
+      }
+      el.classList.add('hidden');
+      if (this.el.cancelStatus) this.el.cancelStatus.textContent = '';
+      return;
+    }
+    if (this._harvestControlWorld !== G.world) {
+      this._harvestControlWorld = G.world;
+      if (this.el.cancelStatus) this.el.cancelStatus.textContent = '';
+    }
+    this._harvestTool = G.tool.kind;
+    const blocked = !!(G.hasOpenModal && G.hasOpenModal());
+    for (const [marks, btn, name] of [[G.world.marked, this.el.cancelTrees, '树'], [G.world.markedRocks, this.el.cancelRocks, '矿']]) {
+      if (!btn) continue;
+      const count = marks ? marks.size : 0;
+      const text = `取消全部${name}标记（${count}）`;
+      if (btn.textContent !== text) btn.textContent = text;
+      // aria-disabled retains the focus target after cancelling the last mark.
+      // The click handler independently guards every disabled state.
+      const disabled = String(blocked || count === 0);
+      if (btn.getAttribute('aria-disabled') !== disabled) btn.setAttribute('aria-disabled', disabled);
+    }
+    el.classList.remove('hidden');
   },
 
   toast: function (msg, cls) {
@@ -187,6 +247,7 @@ G.ui = {
   },
 
   refreshHarvest: function () {
+    if (this.refreshHarvestControls) this.refreshHarvestControls();
     const el = this.el.placement;
     if (!el || !G.world) return;
     this._placementKey = null;
@@ -211,6 +272,7 @@ G.ui = {
   },
 
   refreshPlacement: function (type, x, y) {
+    if (this.refreshHarvestControls) this.refreshHarvestControls();
     const el = this.el.placement;
     if (!el) return null;
     if (!type) { el.classList.add('hidden'); this._placementKey = null; return null; }
