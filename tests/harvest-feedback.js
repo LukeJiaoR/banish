@@ -9,7 +9,8 @@ global.window = global; global.G = G;
 require('../js/ui.js');
 const guide = G.ui.refreshGuide, refreshHarvest = G.ui.refreshHarvest, refreshPlacement = G.ui.refreshPlacement;
 const renderInfo = G.ui.renderInfo, escHtml = G.ui.escHtml;
-G.ui = { toast() {}, refreshHUD() {}, hideInfo() {}, setToolActive() {} };
+const heatDemand = G.ui.heatDemand;
+G.ui = { heatDemand, toast() {}, refreshHUD() {}, hideInfo() {}, setToolActive() {} };
 let passed = 0;
 function fresh() {
   G.newGame(44);
