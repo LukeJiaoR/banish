@@ -23,12 +23,14 @@ G.ui = {
   // Read-only citizen feedback. Idle is a scheduler state, not proof of a deadlock.
   citizenStatus: function (c) {
     const b = c.job != null ? G.world.bmap[c.job] : null;
+    if (c.task && c.task.kind === 'care' && G.medicalStatus) return G.medicalStatus(c);
     if (c.state === 'rest') {
       if (G.citizenIndoorHome && G.citizenIndoorHome(c)) return '屋内休息';
       return G.homeOf(c) ? '户外休息（未入屋）' : '露宿（无住房）';
     }
     if (c.state === 'work') {
       if (b && b.type === 'tailor' && c.task) return '制作衣物';
+      if (c.task && c.task.kind === 'clinic') return b && b.type === 'herbalist' ? '采药屋值守' : '诊所值守';
       if (c.task && c.task.kind === 'trade') return c.task.phase === 'return' ? '退回待售库存' : '装卸贸易物资';
       const labels = { clearSite: '清理工地', chop: '砍伐', clearrock: '清矿', build: '建造中', sow: '播种', harvest: '收获', plant: '补种', firewood: '加工柴火' };
       return c.task ? (labels[c.task.kind] || (b && b.type === 'tailor' ? '制作衣物' : b && b.type === 'orchard' ? '果园劳作' : b && b.type === 'pasture' ? '照料羊群' : '工作中')) : '等待下一项任务';
@@ -42,6 +44,7 @@ G.ui = {
       return '前往工作点';
     }
     if (c.carry) return G.cargoWaitReason(c) || '等待送仓（需可达仓库）';
+    if (G.isSick && G.isSick(c) && G.medicalStatus) return G.medicalStatus(c);
     if (c.student) return '就读中';
     if (!b) return c.age >= G.ADULT_AGE ? '散工待命' : '玩耍休息';
     if (b.state === 'site') return '等待下一项施工任务';
@@ -199,7 +202,7 @@ G.ui = {
       { id: 'homes', name: '住房', icon: '🏠', hint: '安家与过冬', tools: ['house', 'stonehouse', 'boarding'] },
       { id: 'food', name: '食物生产', icon: '🌾', hint: '肉类 · 蔬菜 · 主食', tools: ['gatherer', 'hunting', 'dock', 'farm', 'orchard', 'pasture'] },
       { id: 'industry', name: '资源与加工', icon: '⚒️', hint: '木石铁 · 柴火 · 衣物', tools: ['forester', 'woodcutter', 'mine', 'blacksmith', 'tailor'] },
-      { id: 'services', name: '城镇服务', icon: '🏘️', hint: '储运 · 教育 · 贸易', tools: ['storage', 'school', 'tradingpost'] },
+      { id: 'services', name: '城镇服务', icon: '🏘️', hint: '储运 · 教育 · 医疗 · 贸易', tools: ['storage', 'school', 'herbalist', 'hospital', 'tradingpost'] },
       { id: 'land', name: '道路与采运', icon: '🛣️', hint: '修路 · 采集 · 拆除', tools: ['road', 'fell', 'quarry', 'demolish'] },
     ].map(group => ({ ...group, tools: group.tools.filter(available) })).filter(group => group.tools.length);
     const registered = new Set(this.toolGroups.flatMap(group => group.tools));
@@ -245,7 +248,7 @@ G.ui = {
     const icons = { stonehouse: 'tool_stonehouse', boarding: 'tool_boarding', mine: 'tool_mine',
       blacksmith: 'tool_blacksmith', hunting: 'tool_hunting', house: 'tool_house', storage: 'tool_storage',
       gatherer: 'tool_gatherer', forester: 'tool_forester', woodcutter: 'tool_woodcutter', dock: 'tool_dock',
-      school: 'tool_school', farm: 'tool_farm', road: 'tool_road', demolish: 'tool_demolish' };
+      school: 'tool_school', herbalist: 'tool_herbalist', hospital: 'tool_hospital', farm: 'tool_farm', road: 'tool_road', demolish: 'tool_demolish' };
     const special = {
       demolish: { name: '拆除', icon: '🚫', cost: '建筑 · 道路', tip: '拆除：点击建筑或道路移除；树木请用砍伐，岩石和铁矿请用采石采铁' },
       quarry: { name: '采石采铁', icon: '⛏', cost: '灰石 · 锈铁', tip: '采石采铁：框选预览并确认矿石；灰色岩石产石头，锈色铁矿产铁，散工开采后搬运入库' },
@@ -530,6 +533,7 @@ G.ui = {
           const unprotected = G.world.citizens.filter(c => !(c.clothingLeft > 0)).length;
           el.title += ` · ${unprotected} 人衣物已耗尽；裁缝使用皮革或羊毛补充衣物`;
         }
+        if (k === 'herbs') el.title += ' · 采药屋在成熟林中采集，送仓后用于草药保健；诊所治疗不消耗草药';
         if (k === 'firewood') {
           el.title += ` · ${this.heatDemandText(this.heatDemand())}`;
         }
@@ -548,13 +552,20 @@ G.ui = {
     const children = w.citizens.length - adults;
     const homeless = w.families.filter(f => f.houseId == null && f.members.length).length;
     this.el.pop.innerHTML = `👥 ${w.citizens.length} <small>(成人${adults}·儿童${children})</small>` +
-      (homeless ? ` <span class="warn-txt">无房${homeless}家</span>` : '');
+      (homeless ? ` <span class="warn-txt">无房${homeless}家</span>` : '') + this.healthSummaryMarkup();
     const errBtn = document.getElementById('btn-err');
     if (errBtn) errBtn.classList.toggle('hidden', !window.__errs.length);
     this.el.speed.querySelectorAll('button').forEach(btn => {
       const v = btn.dataset.v;
       btn.classList.toggle('active', v === 'pause' ? g.paused : (!g.paused && g.speed === +v));
     });
+  },
+
+  healthSummaryMarkup: function () {
+    if (!G.healthSummary) return '';
+    const h = G.healthSummary();
+    const average = Number.isFinite(h.average) ? h.average.toFixed(1) : '—';
+    return `<span class="town-health${h.sick ? ' warn-txt' : ''}" title="全镇平均健康；三类食物搭配有助健康。草药库存 ${Math.floor(h.herbs || 0)}">健康 ${average}/5 · 患病 ${h.sick} · 治疗 ${h.treated}</span>`;
   },
 
   refreshGuide: function () {
@@ -579,7 +590,7 @@ G.ui = {
     const stage = !food ? '① 先保持续食物：在近仓森林建采集小屋；不要先连盖五屋耗尽木石。'
       : !fuel ? '② 近仓建伐木屋备柴；在食物林外标记砍伐和矿石，保留散工。'
       : homeless ? `③ 入冬前安家：还有 ${homeless} 家无房；逐步补住房和取暖柴。`
-      : '④ 补齐肉、蔬菜、主食与衣物，再扩矿业、教育和贸易，为下一代留空房。';
+      : '④ 补齐肉、蔬菜、主食与衣物，再扩教育、医疗和贸易，为下一代留空房。';
     const foodKinds = (G.FOOD_KEYS || []).filter(type => g.res[type] > 0);
     const variety = G.FOOD_KEYS && foodKinds.length < G.FOOD_KEYS.length ? ` · 食物种类 ${foodKinds.length}/${G.FOOD_KEYS.length}` : '';
     const progress = harvest.total ? `\n采运标记：待领 ${harvest.queued} · 执行 ${harvest.active} · 夜间保留 ${harvest.paused}${harvest.reason ? '；' + harvest.reason : ''}` : '';
@@ -658,6 +669,96 @@ G.ui = {
       refund: !b.constructionStarted && b.progress === 0 && b.workLeft >= b.totalWork ? '未开工：取消退还全部已付建材，保留树木' : '已开工：拆除退还一半已付建材，已砍树不恢复'
     };
   },
+  medicalInfoData: function (b) {
+    if (!['herbalist', 'hospital'].includes(b.type) || b.state !== 'ok' || !G.medicalPatients || !G.medicalStaff) return null;
+    const hospital = b.type === 'hospital', patients = G.medicalPatients(b);
+    const staff = G.medicalStaff(b), workers = b.workers.map(id => G.world.cmap[id]).filter(Boolean);
+    const healthyWorkers = workers.filter(c => !G.isSick(c));
+    const cap = hospital ? G.HEALTH.hospitalBeds : G.HEALTH.herbVisitors;
+    const arrived = patients.filter(c => G.inMedicalCare && G.inMedicalCare(c)).length;
+    const herbs = Math.floor(G.game.res.herbs || 0);
+    let availability = !staff ? hospital ? '等待健康医师到诊所值守' : '等待健康采药员在岗'
+      : patients.length >= cap ? '接诊名额已满（含在途预约）'
+      : !hospital && herbs < 1 ? '等待草药送仓'
+      : '可接诊；居民仍需有可达通路';
+    const role = hospital ? '医师' : '采药员';
+    const data = {
+      status: staff ? hospital ? '医师正在诊所值守' : '采药员在岗，可在工作圈采药'
+        : !workers.length ? `等待分配${role}` : !healthyWorkers.length ? `${role}患病，服务暂停` : `${role}未到岗，服务暂停`,
+      workers: workers.map(c => c.name).join('、') || '无',
+      patients: `${hospital ? '病床' : '调养名额'}：${patients.length} / ${cap}（已到 ${arrived} · 在途 ${patients.length - arrived}）`,
+      herbs: `全镇草药库存：${herbs}`,
+      availability: `接诊：${availability}`,
+    };
+    if (!hospital) {
+      const p = G.PROD.herbalist;
+      const trees = G.treesInRadius(G.world, b.x, b.y, p.radius, false);
+      const mature = trees.filter(t => G.treeStage(t) >= 2).length;
+      data.forest = `采药工作圈：成熟树 ${mature} 棵 / 全部 ${trees.length} 棵；依赖成熟林`;
+      data.production = G.productionLimited(b) && G.buildingGoalStatus(b) ? G.buildingGoalStatus(b)
+        : mature < p.needTrees ? '采药暂停：成熟林不足；已有草药仍可用于保健'
+        : herbs >= G.storageCap() ? '采药暂停：草药仓容已满；仍提供保健'
+        : !healthyWorkers.length ? '采药员患病：劳动变慢，草药保健暂停' : '采药条件满足；采集后需搬运入仓';
+    }
+    return data;
+  },
+  medicalInfoMarkup: function (b, data) {
+    if (!data) return '';
+    const hospital = b.type === 'hospital';
+    return `<section class="medical-details" data-medical="${b.type}">
+      ${Object.keys(data).filter(key => !['status', 'workers'].includes(key)).map(key => `<div class="row" data-medical="${key}">${this.escHtml(data[key])}</div>`).join('')}
+      <div class="medical-patients" data-medical-patient-list></div>
+      <div class="row desc">${hospital ? '病人抵达后，健康医师累计照料24小时治愈；不消耗草药。医师不能治疗自己。季节热病自然8天康复，本批不会直接致死。' : '草药调养改善健康；健康采药员外出采药时仍保留服务资格。砍伐或建造清林会影响采药。'}</div>
+    </section>`;
+  },
+  refreshMedicalPatients: function (b) {
+    const el = this.el.info, list = el.querySelector && el.querySelector('[data-medical-patient-list]');
+    if (!list) return;
+    const patients = G.medicalPatients(b), w = G.world;
+    const key = JSON.stringify(patients.map(c => [c.id, c.name]));
+    if (list._patientKey !== key) {
+      const focused = document.activeElement && list.contains && list.contains(document.activeElement);
+      const focusedId = focused ? document.activeElement.dataset.patientId : null;
+      list.innerHTML = patients.map(c => `<button type="button" class="medical-patient" data-patient-id="${Number(c.id)}"><span>${this.escHtml(c.name)}</span><small></small></button>`).join('');
+      list._patientKey = key;
+      list.querySelectorAll('[data-patient-id]').forEach(btn => btn.addEventListener('click', () => {
+        if (G.world !== w || !G.sel || G.sel.kind !== 'b' || G.sel.id !== b.id || w.bmap[b.id] !== b) return;
+        const c = w.cmap[Number(btn.dataset.patientId)];
+        if (!c) return;
+        G.sel = { kind: 'c', id: c.id }; this.renderInfo(true);
+        const close = document.getElementById('info-close'); if (close && close.focus) close.focus();
+      }));
+      if (focused) {
+        const next = list.querySelector(`[data-patient-id="${Number(focusedId)}"]`) || document.getElementById('info-close');
+        if (next && next.focus) next.focus();
+      }
+    }
+    for (const c of patients) {
+      const node = list.querySelector(`[data-patient-id="${Number(c.id)}"] small`);
+      if (node) node.textContent = G.medicalStatus(c);
+    }
+  },
+  refreshMedicalInfo: function (b) {
+    const el = this.el.info;
+    if (!el.querySelector || !el.querySelector(`[data-medical="${b.type}"]`)) return false;
+    const data = this.medicalInfoData(b);
+    if (!data) return false;
+    const nodes = {};
+    for (const key of Object.keys(data)) {
+      nodes[key] = el.querySelector(`[data-medical="${key}"]`);
+      if (!nodes[key]) return false;
+    }
+    for (const key of Object.keys(data)) if (nodes[key].textContent !== data[key]) nodes[key].textContent = data[key];
+    this.refreshMedicalPatients(b);
+    return true;
+  },
+  citizenHealthMarkup: function (c) {
+    if (!G.healthOf || !G.medicalStatus) return '';
+    const health = G.healthOf(c), sick = G.isSick(c), work = G.healthWorkMul(c);
+    return `<div class="row${health < 3 ? ' warn-txt' : ''}">健康：${health.toFixed(1)} / 5${work > 1 ? ` · 劳作工时 ×${work.toFixed(2)}` : ''}</div>
+      <div class="row${sick ? ' warn-txt' : ''}">疾病：${sick ? `患病第 ${Math.ceil(c.sickDays)} 天` : '无'}${!sick && c.immunityDays > 0 ? ` · 免疫约余 ${Math.ceil(c.immunityDays)} 天` : ''}</div>
+      <div class="row">医疗：${this.escHtml(G.medicalStatus(c))}${c.herbCooldown > 0 ? ` · 草药调养间隔约余 ${Math.ceil(c.herbCooldown)} 天` : ''}</div>`;
+  },
   renderInfo: function (force) {
     if (!G.sel) return;
     const w = G.world, el = this.el.info;
@@ -670,6 +771,7 @@ G.ui = {
     // Update only fuel text, never replace this panel's focused buttons. A new
     // selection or a site finishing construction still gets its own full panel.
     if (sameSelection && selected.state === 'ok' && this._economyInfoState === selected.state && this.refreshEconomyInfo(selected)) return;
+    if (sameSelection && selected.state === 'ok' && this._medicalInfoState === selected.state && this.refreshMedicalInfo(selected)) return;
     if (sameSelection && selected.type === 'woodcutter' && this._fuelInfoState === selected.state && this.refreshFuelInfo(selected)) return;
     if (hadFocus && !force && sameSelection && selected.type !== 'woodcutter' && this._infoBuildState === selected.state) {
       // Patch changing site facts in place without stealing keyboard focus.
@@ -693,9 +795,11 @@ G.ui = {
       const def = G.BDEF[b.type];
       const fuelData = b.type === 'woodcutter' ? this.fuelInfoData(b) : null;
       const siteData = b.state === 'site' ? this.siteInfoData(b) : null;
+      const medicalData = this.medicalInfoData(b);
       let status;
       if (fuelData) status = fuelData.status;
       else if (siteData) status = siteData.status;
+      else if (medicalData) status = medicalData.status;
       else if (G.productionLimited(b) && G.buildingGoalStatus(b)) status = G.buildingGoalStatus(b);
       else if (b.type === 'house' || b.type === 'stonehouse') status = b.family != null ? '有人居住' : '空置';
       else if (['tradingpost', 'pasture', 'orchard'].includes(b.type)) status = this.economyStatus(b);
@@ -710,7 +814,7 @@ G.ui = {
       let workers = '';
       if (def.jobs > 0 || b.state === 'site') {
         const names = b.workers.map(id => w.cmap[id]).filter(Boolean).map(c => this.escHtml(c.name)).join('、');
-        workers = `<div class="row">工人：<span${siteData ? ' data-site-workers' : ''}${fuelData ? ' data-fuel="workers"' : ''}${b.state === 'ok' && ['tradingpost', 'pasture', 'orchard'].includes(b.type) ? ' data-economy-workers' : ''}>${names || (b.state === 'site' ? '等待建筑工人' : '无')}</span></div>`;
+        workers = `<div class="row">${medicalData ? b.type === 'hospital' ? '医师' : '采药员' : '工人'}：<span${siteData ? ' data-site-workers' : ''}${fuelData ? ' data-fuel="workers"' : ''}${medicalData ? ' data-medical="workers"' : ''}${b.state === 'ok' && ['tradingpost', 'pasture', 'orchard'].includes(b.type) ? ' data-economy-workers' : ''}>${names || (b.state === 'site' ? '等待建筑工人' : '无')}</span></div>`;
       }
       let extra = '';
       if ((b.type === 'house' || b.type === 'stonehouse') && b.family != null) {
@@ -747,11 +851,12 @@ G.ui = {
         </div>`;
       }
       if (b.state === 'ok') extra += this.economyInfoMarkup(b);
-      const outputs = { gatherer: ['vegetables'], hunting: ['meat', 'leather'], dock: ['meat'], farm: ['grain'], orchard: ['vegetables'], pasture: ['meat', 'wool'], tailor: ['clothes'] };
+      if (medicalData) extra += this.medicalInfoMarkup(b, medicalData);
+      const outputs = { gatherer: ['vegetables'], hunting: ['meat', 'leather'], dock: ['meat'], farm: ['grain'], orchard: ['vegetables'], pasture: ['meat', 'wool'], tailor: ['clothes'], herbalist: ['herbs'] };
       const produced = (outputs[b.type] || []).filter(type => G.RES[type]);
       if (produced.length) extra += `<div class="row resource-output">产出：${produced.map(type => `${this.resourceIcon(type)}${G.RES[type].name}`).join(' · ')}</div>`;
       if (b.type === 'tailor') extra += `<div class="row">原料库存：皮革 ${Math.floor(G.game.res.leather || 0)} · 羊毛 ${Math.floor(G.game.res.wool || 0)}</div><div class="row">成衣库存：${Math.floor(G.game.res.clothes || 0)}</div>`;
-      if (b.type !== 'woodcutter' && G.buildingGoalStatus(b)) extra += `<div class="row desc"${['tradingpost', 'pasture', 'orchard'].includes(b.type) ? ' data-economy-goals' : ''}>${this.escHtml(G.buildingGoalStatus(b))}</div>`;
+      if (b.type !== 'woodcutter' && !medicalData && G.buildingGoalStatus(b)) extra += `<div class="row desc"${['tradingpost', 'pasture', 'orchard'].includes(b.type) ? ' data-economy-goals' : ''}>${this.escHtml(G.buildingGoalStatus(b))}</div>`;
       if (['gatherer', 'hunting', 'forester'].includes(b.type)) {
         const trees = G.treesInRadius(w, b.x, b.y, G.PROD[b.type].radius, false);
         const mature = trees.filter(t => G.treeStage(t) >= 2).length;
@@ -762,13 +867,15 @@ G.ui = {
       }
       el.innerHTML = `
         <div class="info-head"><span>${def.icon} ${def.name}</span><button id="info-close">✕</button></div>
-        <div class="row"${siteData ? ' data-site-status' : ''}${fuelData ? ' data-fuel="status"' : ''}${b.state === 'ok' && ['tradingpost', 'pasture', 'orchard'].includes(b.type) ? ' data-economy-status' : ''}>${this.escHtml(status)}</div>
+        <div class="row"${siteData ? ' data-site-status' : ''}${fuelData ? ' data-fuel="status"' : ''}${medicalData ? ' data-medical="status"' : ''}${b.state === 'ok' && ['tradingpost', 'pasture', 'orchard'].includes(b.type) ? ' data-economy-status' : ''}>${this.escHtml(status)}</div>
         ${workers}${extra}
         <div class="row desc">${def.desc}</div>
         <div class="row desc" data-info-refund${fuelData ? ' data-fuel="refund"' : ''}>${fuelData ? fuelData.refund : siteData ? siteData.refund : '已开工：拆除退还一半已付建材，已砍树不恢复'}</div>
         <button id="info-demolish" class="danger">${b.state === 'site' ? '取消工地' : '拆除'}</button>`;
       if (fuelData) this._fuelInfoState = b.state;
       this._economyInfoState = b.state;
+      this._medicalInfoState = b.state;
+      if (medicalData) this.refreshMedicalPatients(b);
       if (b.state === 'ok') this.initEconomyInfo(b);
     } else {
       const c = w.cmap[G.sel.id];
@@ -787,6 +894,7 @@ G.ui = {
         <div class="row">饥饿 ${'▕'.repeat(Math.min(4, c.hunger)) || '无'} · 受冻 ${c.cold > 1 ? '是' : '无'}</div>
         ${Number.isFinite(c.clothingLeft) ? `<div class="row${c.clothingLeft > 0 ? '' : ' warn-txt'}">衣物：${c.clothingLeft > 0 ? '约剩 ' + Math.ceil(c.clothingLeft) + ' 天' : '已耗尽，等待成衣'}</div>` : ''}
         ${Number.isFinite(c.dietVariety) ? `<div class="row">最近饮食：${Math.max(0, Math.min(3, c.dietVariety))} / 3 类${Number.isFinite(c.dietScore) ? ' · 长期均衡 ' + c.dietScore.toFixed(1) + '/3' : ''}</div>` : ''}
+        ${this.citizenHealthMarkup(c)}
         ${Number.isFinite(c.happiness) ? `<div class="row">幸福：${Math.max(1, Math.min(5, c.happiness)).toFixed(1)} / 5</div>` : ''}`;
     }
     document.getElementById('info-close').addEventListener('click', () => this.hideInfo());
@@ -1370,9 +1478,9 @@ G.placementInfo = function (type, x, y) {
     const trees = G.treesInRadius(w, x, y, p.radius, false).filter(t => !(t.x >= x && t.x < x + def.w && t.y >= y && t.y < y + def.h));
     result.trees = trees.length; result.mature = trees.filter(t => G.treeStage(t) >= 2).length;
     lines.push(`工作范围 ±${p.radius} 格（方形，建筑原点） · 占地清场后 ${result.trees} 棵树 / 成熟 ${result.mature}`);
-    if (type === 'gatherer' || type === 'hunting') {
-      const n = type === 'hunting' ? result.mature : result.trees;
-      if (n < p.needTrees) { result.warning = true; lines.push(`⚠ 可建但当前无法生产：至少需 ${p.needTrees} 棵${type === 'hunting' ? '成熟' : ''}树`); }
+    if (['gatherer', 'hunting', 'herbalist'].includes(type)) {
+      const n = type !== 'gatherer' ? result.mature : result.trees;
+      if (n < p.needTrees) { result.warning = true; lines.push(`⚠ 可建但当前无法生产：至少需 ${p.needTrees} 棵${type !== 'gatherer' ? '成熟' : ''}树`); }
       else if (result.mature < p.fullForest) { result.warning = true; lines.push(`△ 林量偏低：产量随成熟林增加，充足参考 ${p.fullForest} 棵`); }
     }
     if (type === 'forester') lines.push('砍伐会降低重叠食物林产量；可在建筑面板关闭砍伐育林。');

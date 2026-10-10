@@ -106,6 +106,18 @@ G.BDEF = {
     wall: '#6f5b40', wallD: '#574732', roof: '#8a5a3a',
     desc: '2 名专业渔民，满水域基础每趟8肉类（鱼）。减少占工、通常保住原四人码头的整屋产量；小水域、缺工具和远仓仍影响产出。必须紧邻水面。',
   },
+  herbalist: {
+    id: 'herbalist', name: '采药屋', icon: '🌿', w: 2, h: 2,
+    cost: { wood: 30, stone: 12 }, buildWork: 75, jobs: 1, passable: false,
+    wall: '#857252', wallD: '#61533d', roof: '#65704e',
+    desc: '1名采药员从附近成熟森林采药并真实送仓。市民需走到有人值守的采药屋，消耗1草药恢复0.5健康；药材库存不会自行治病。保留成熟林，搭配肉、蔬菜、主食维持健康。',
+  },
+  hospital: {
+    id: 'hospital', name: '诊所', icon: '⚕️', w: 3, h: 3,
+    cost: { wood: 52, stone: 78, iron: 16 }, buildWork: 140, jobs: 1, passable: false,
+    wall: '#b3a28a', wallD: '#8b7963', roof: '#675e51',
+    desc: '1名医师、8个床位。患病市民需沿可达路线入诊，医师到岗累计照料24小时后康复；入诊后不再向周围传播。无医师时不能治疗。本批季节热病自然8天康复，不直接致死。',
+  },
   school: {
     id: 'school', name: '学堂', icon: '🏫', w: 3, h: 3,
     cost: { wood: 50, stone: 16, iron: 16 }, buildWork: 100, jobs: 1, passable: false,
@@ -146,6 +158,7 @@ G.PROD = {
   // perTile 14/格：原版 7/格但田块可放大到 15×15，本作固定 8×8，翻倍对齐原版人均产出；
   // haulCap 28：收获攒满 4 格再送一趟仓，否则 64 趟搬运会把秋收窗口耗在走路 上
   farm:      { perTile: 14, tileWorkH: 0.5, growDays: 24, haulCap: 28 },
+  herbalist: { workH: 9, yield: 3, radius: 12, needTrees: 6, fullForest: 24 },
   builderChunk: 4,      // 建筑工人每段工作时长
 };
 
