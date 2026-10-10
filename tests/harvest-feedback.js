@@ -127,4 +127,14 @@ test('help describes the implemented rectangle preview and explicit confirmation
   const html = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
   assert.match(html, /鼠标拖出矩形或手机点两个角预览，再确认标记树木/); assert.doesNotMatch(html, /拖拽沿线标记树木/);
 });
+test('full mineral cargo is explained without pathfinding or changing inventory', w => {
+  G.tool = {kind:'quarry'}; G.game.res.stone=500;
+  const c=adult(w,{carry:{type:'stone',qty:9},state:'waitStorage',haulPending:true,haulWait:'space'});
+  const old=G.findPath;G.findPath=()=>{throw Error('feedback must not pathfind')};
+  try {const before=JSON.stringify({res:G.game.res,c});const h=G.harvestFeedback();assert.equal(h.blockedMineralCarriers,1);assert.equal(h.carry.stone,9);assert.match(citizenStatus(c),/仓满.*等待空间/);refreshHarvest.call(G.ui);assert.match(G.ui.el.placement.textContent,/使用石铁库存或建成新仓库/);assert.equal(JSON.stringify({res:G.game.res,c}),before);}finally{G.findPath=old}
+});
+test('full mineral marks report storage cause rather than idle/path failure', w => {
+  G.tool={kind:'quarry'};G.game.res.iron=500;const i=w.rock.findIndex(v=>v===2);assert(i>=0);w.markedRocks.add(i);adult(w);
+  const h=G.harvestFeedback();assert.equal(h.blockedMineralMarks,1);assert.match(h.reason,/仓位已满/);refreshHarvest.call(G.ui);assert.match(G.ui.el.placement.textContent,/另一未满矿种仍可采/);
+});
 console.log(`Harvest feedback: ${passed} checks passed (headless fixtures and renderer contracts only).`);
