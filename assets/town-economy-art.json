@@ -21,28 +21,74 @@
       "name": "tradingpost",
       "file": "assets/buildings/tradingpost.png",
       "width": 512,
-      "height": 402,
+      "height": 431,
       "sourceCrop": {
-        "left": 165,
-        "top": 120,
-        "width": 1106,
-        "height": 921
+        "left": 26,
+        "top": 86,
+        "width": 1274,
+        "height": 1092
       },
       "anchor": "bottom-center",
       "transparentPadding": 2,
-      "prompt": "Use case: style-transfer. Asset type: one original transparent PNG building sprite for a warm, hand-painted isometric medieval frontier town game. Input image 1 is the trading-post edit target; images 2, 3 and 4 are the existing storage barn, blacksmith and cottage STYLE references. Redesign only the trading post to visually belong to this humble rural settlement. Replace the ornate two-storey blue-roof merchant shop with a squat SINGLE-STOREY practical timber trading warehouse and small open-front loading shelter. Match the reference assets' chunky timber proportions, warm weathered brown wood, muted gray-brown stone blocks, broad readable painted shapes, soft upper-left lighting, crisp small-scale game silhouette, equal-sided 2:1 dimetric footprint and roof angles. Roof is a simple low gable of desaturated dark brown wooden shingles, with NO blue slate, dormer, chimney, gold trim, finial, flag, banner, heraldry or hanging sign. A modest plain unstriped oatmeal linen awning covers only a small front counter with a simple dark iron balance scale. Stacked wooden cargo crates, two ordinary barrels, bundled burlap sacks and a short coil of rope identify its trading use. Keep these as a compact orderly group on a narrow timber loading deck supported by a low rough-stone sill; all of the deck and goods fit the near-square footprint. No extending pier and no extra scenic ground. Front doorway faces lower-left, darker side wall faces lower-right. Ground diamond lowest front corner exactly on the image's horizontal center for bottom-center game anchoring. Lower and wider proportions than the old target, visually around the storage barn's roof height when game-scaled. Opaque painted object interiors, antialiasing only at clean edges. Genuine transparent alpha background and 3 percent clear margin all around. NO ground tile, water, people, plants, scenic backdrop, labels, text, watermark, duplicate objects, isolated specks, color fringes, baked drop shadow or cropped elements. Return just the newly redesigned trading-post building, never a sheet or comparison.",
+      "prompt": "Use case: precise-object-edit. Image 1 is the EXISTING BLACKSMITH GAME BUILDING to edit. Image 2 is a trading warehouse for SUBJECT DETAILS ONLY, not for camera or geometry. Make an original TRADING POST by converting image 1's blacksmith into a modest timber cargo warehouse. Critical: preserve image 1's camera elevation, orthographic isometric projection, building width/depth proportions, straight vertical posts, near-square footprint, front corner at bottom center and its roof geometry. Every horizontal world-axis edge must remain parallel: the main roof ridge, corresponding eaves, horizontal wall beams, platform planks and foundation edges should run in the SAME isometric directions, around +26.6 and -26.6 degrees to horizontal (2:1 ground grid). The ridge must recede UP-RIGHT at roughly 26 degrees, not nearly horizontal like image 2. Treat image 1 as a locked geometric underdrawing. Convert the left open forge into a plain open loading bay with stacked crates and burlap sacks; replace furnace, fire, hood, anvil, tools, cut timber pile and chimney with trading cargo. Remove the stone chimney entirely and finish the same roof cleanly. Put a small plain unstriped oatmeal linen shade INSIDE the front loading bay, with a modest wood counter, a small dark metal balance scale and two barrels, all contained within the existing footprint and eaves. Keep the roof dark desaturated brown-gray shingles, walls warm weathered wood, foundation low rough gray stone. Do not enlarge the building, extend a pier or create a new overhanging canopy. Keep the warm painterly material style, soft upper-left lighting, crisp readable small-scale detail and humble rural appearance of image 1. No flags, signs, gold, blue slate, dormers, people, water, grass, scenery or large stone platform. Genuine transparent background, fully opaque object interiors, clean antialiasing, 4 percent transparent margin around the complete asset, no detached specks, shadow, colored edge fringe, text or watermark. Return one isolated original trading-post sprite, not a sheet.",
       "sourcePadding": {
         "top": 0,
         "bottom": 0,
-        "left": 0,
-        "right": 70
+        "left": 26,
+        "right": 0
       },
-      "anchorNote": "Source ground-contact center x=753; 70 transparent pixels added at right before resizing to center the foundation contact, without repainting or distorting the generated sprite.",
-      "revision": "2026-10-10: humble single-storey timber cargo warehouse, dark brown shingles and plain linen shelter; replaces blue-gold two-storey merchant shop.",
-      "refinements": [
-        "Use case: precise-object-edit. This image is the new original trading-post sprite for a 2:1 isometric game. Preserve its existing warm hand-painted rural art style and humble single-storey timber cargo warehouse design: weathered dark brown shingle gable roof, warm wood beams, low gray stone sill, small plain oatmeal linen awning, cargo crates, sacks, two barrels, simple balance scale and rope. Make only the perspective/footprint correction so the sprite snaps cleanly to a square 4-by-4 tile footprint: give the base a clearly symmetric 2:1 diamond projection with equal left and right footprint edges (26.565 degrees to horizontal); move the lowest front foundation corner to exactly the HORIZONTAL CENTER of the whole building image. The front corner dividing the doorway face on the left and the awning/cargo face on the right must run through the horizontal center. Both walls recede equally left and right. Keep the building low and practical and ensure the full stone-and-plank base stays within this diamond. The building should be approximately 1.25 times as wide as tall. Soft warm light from upper-left. Do not add objects or ornament. Genuine transparent alpha background with full opaque object interiors and clean antialias edges only, no halo, no shadows, no specks. Include 3 percent clear space all around the complete uncut sprite. No text, flags, blue roof, gold trim, landscape, grass, water, floor tile or people.",
-        "Use case: precise-object-edit. Edit target: the provided newly designed original rural trading-post game sprite. Preserve this exact building, every cargo object, its low single-storey shape, framing, position, isometric perspective, warm brown wood and neutral dark brown shingle palette. Make ONE cleanup: remove the unnatural thin bright red vertical streak visible immediately outside the leftmost wooden wall below the left roof eave. Also eliminate any tiny detached red/orange stray pixels or colored transparency fringes around the silhouette. Those pixels should become truly transparent, with normal clean antialiased wood/stone edges. Do not redraw or reshape any legitimate building feature. Preserve genuine alpha transparency, fully opaque building interiors, and the current clear margin. Do not add any background, shadow, ground, lettering, people or objects. Return the same full sprite with only the described stray-edge cleanup."
-      ]
+      "anchorNote": "Source ground-contact center x=650; 26 transparent pixels added at left before uniform resizing to center the foundation contact. No perspective warp or non-uniform stretching.",
+      "revision": "2026-10-10: rebuild trading post from the existing blacksmith geometric reference to align roof/foundation isometric axes; render at roughly 200 game-pixel visible width while preserving the 4x4 gameplay footprint.",
+      "projectionValidation": {
+        "note": "Approximate image-edge measurements, not exact CAD angles. Orthographic geometry follows the existing blacksmith reference; the engine ground axes are atan(0.5)=26.565 degrees.",
+        "ridgeUpperEdgeFit": {
+          "method": "Least-squares fit of first alpha>128 pixel in each image column; excludes end caps.",
+          "tradeColumns": [
+            200,
+            315
+          ],
+          "beforeDegrees": 18.6,
+          "afterDegrees": 23.25,
+          "blacksmithColumns": [
+            205,
+            300
+          ],
+          "blacksmithDegrees": 22.84
+        }
+      },
+      "renderValidation": {
+        "widthMultiplier": 0.8,
+        "gameplayFootprint": [
+          4,
+          4
+        ],
+        "alphaBoundsThreshold": 16,
+        "visiblePixelBounds": {
+          "left": 13,
+          "top": 3,
+          "width": 496,
+          "height": 425
+        },
+        "visibleGameSize": {
+          "width": 198.4,
+          "height": 170
+        },
+        "previousVisibleGameSize": {
+          "width": 238,
+          "height": 198
+        },
+        "referenceVisibleGameSizes": {
+          "storage": {
+            "width": 197.1,
+            "height": 167.9
+          },
+          "blacksmith": {
+            "width": 203.52,
+            "height": 186.43
+          }
+        },
+        "method": "Actual G.drawBuilding, same camera and 64x32 tile grid, neighboring real building positions; uniform image scaling only."
+      }
     },
     {
       "name": "pasture",
