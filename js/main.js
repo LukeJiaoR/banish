@@ -103,7 +103,7 @@ G.serializeGame = function () {
       v: G.VERSION,
       h: g.h, day: g.day, season: g.season, year: g.year,
       res: g.res, stats: g.stats, prevFood: g.prevFood, foodNet: g.foodNet, foodUrgent: g.foodUrgent, warned: g.warned,
-      hist: g.hist, buildLog: g.buildLog, toolWear: g.toolWear, healthStartDay: g.healthStartDay, unlocks: g.unlocks, livestock: g.livestock,
+      hist: g.hist, buildLog: g.buildLog, toolWear: g.toolWear, steelToolWear: g.steelToolWear, healthStartDay: g.healthStartDay, unlocks: g.unlocks, livestock: g.livestock,
       productionGoals: g.productionGoals && { ...g.productionGoals }, productionPaused: g.productionPaused && { ...g.productionPaused },
     },
     roads: Array.from(w.road).flatMap((road, i) => road ? [i] : []),
@@ -115,6 +115,7 @@ G.serializeGame = function () {
       id: b.id, type: b.type, x: b.x, y: b.y, state: b.state,
       progress: b.progress, workLeft: b.workLeft, totalWork: b.totalWork, paidCost: b.paidCost, constructionStarted: b.constructionStarted,
       workers: b.workers, family: b.family, noWork: b.noWork, warnText: b.warnText,
+      mineMode: b.mineMode, legacyMine: b.legacyMine, mineTick: b.mineTick, toolRecipe: b.toolRecipe,
       doCut: b.doCut, doPlant: b.doPlant, fuelLimit: b.fuelLimit, toolLimit: b.toolLimit,
       farm: b.farm ? b.farm.map(f => [f.sown ? 1 : 0, f.harvested ? 1 : 0]) : undefined,
       sownAll: b.sownAll, growth: b.growth, harvestDone: b.harvestDone,
@@ -238,7 +239,7 @@ G.prepareSaveData = function (d) {
   g.day = integer(gd.day, '天数'); g.season = integer(gd.season, '季节', 0, 3); g.year = integer(gd.year, '年份', 1);
   record(gd.res, '资源');
   for (const key of G.RES_KEYS) {
-    const value = gd.res[key] === undefined && ['iron', ...G.FOOD_KEYS, 'leather', 'wool', 'clothes', 'herbs'].includes(key) ? 0 : gd.res[key] === undefined && key === 'tools' ? 10 : gd.res[key];
+    const value = gd.res[key] === undefined && ['iron', ...G.FOOD_KEYS, 'leather', 'wool', 'clothes', 'herbs', 'coal', 'steelTools'].includes(key) ? 0 : gd.res[key] === undefined && key === 'tools' ? 10 : gd.res[key];
     g.res[key] = number(value, '资源 ' + key, 0);
   }
   const hasFoodClasses = G.FOOD_KEYS.some(k => gd.res[k] !== undefined);
@@ -270,6 +271,7 @@ G.prepareSaveData = function (d) {
   if (gd.foodNet !== undefined) g.foodNet = number(gd.foodNet, '食物变化');
   g.healthStartDay = gd.healthStartDay === undefined ? g.day : integer(gd.healthStartDay, '健康机制启用日', 0, g.day);
   g.toolWear = Number.isFinite(gd.toolWear) && gd.toolWear >= 0 ? gd.toolWear : 0;
+  g.steelToolWear = gd.steelToolWear === undefined ? 0 : number(gd.steelToolWear, '钢工具磨损', 0, 1);
   g.warned = gd.warned === undefined ? {} : clone(record(gd.warned, '提醒状态'));
   g.hist = clone(optionalArray(gd.hist, '历史记录'));
   g.buildLog = clone(optionalArray(gd.buildLog, '建造记录'));
@@ -329,6 +331,18 @@ G.prepareSaveData = function (d) {
       toolLimit: bd.type === 'blacksmith' ? G.toolLimitOf(bd) : undefined,
       fuelLimit: bd.type === 'woodcutter' ? G.fuelLimitOf(bd) : undefined,
     };
+    if (bd.type === 'mine') {
+      b.mineMode = bd.mineMode === undefined ? 'legacy' : bd.mineMode;
+      if (!['legacy', 'iron', 'coal'].includes(b.mineMode)) bad('矿井产出模式');
+      if (bd.legacyMine !== undefined && typeof bd.legacyMine !== 'boolean') bad('旧矿井标记');
+      b.legacyMine = bd.legacyMine === undefined ? b.mineMode === 'legacy' : bd.legacyMine;
+      if (b.mineMode === 'legacy' && !b.legacyMine) bad('旧矿井模式');
+      b.mineTick = bd.mineTick === undefined ? 0 : integer(bd.mineTick, '混采批次', 0);
+    }
+    if (bd.type === 'blacksmith') {
+      b.toolRecipe = bd.toolRecipe === undefined ? 'iron' : bd.toolRecipe;
+      if (!['iron', 'steel'].includes(b.toolRecipe)) bad('工具配方');
+    }
     if (bd.type === 'tradingpost') {
       for(const field of ['tradeInventory','tradeTargets']){
         b[field]={};if(bd[field]!==undefined){record(bd[field],field);for(const key of Object.keys(bd[field])){

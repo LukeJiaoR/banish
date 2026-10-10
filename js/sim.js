@@ -7,7 +7,7 @@ G.newGameState = function () {
   return {
     h: 6, day: 0, season: 0, year: 1,
     speed: 1, paused: false,
-    res: { wood: 80, stone: 48, iron: 0, tools: 15, food: 500, meat: 0, vegetables: 0, grain: 500, leather: 0, wool: 0, clothes: 0, herbs: 0, firewood: 50 }, // 开局（原版中难度 5 家庭，工具 15 件≈第一轮磨损周期）；存粮较原版加厚：15 人 6 天食物跑道撑不到第一座采集屋建成
+    res: { wood: 80, stone: 48, iron: 0, tools: 15, food: 500, meat: 0, vegetables: 0, grain: 500, leather: 0, wool: 0, clothes: 0, herbs: 0, coal: 0, steelTools: 0, firewood: 50 }, // 开局（原版中难度 5 家庭，工具 15 件≈第一轮磨损周期）；存粮较原版加厚：15 人 6 天食物跑道撑不到第一座采集屋建成
     healthStartDay: 0,
     schedT: 1,
     over: false,
@@ -19,6 +19,7 @@ G.newGameState = function () {
     warned: {},
     hist: [],       // 每日摘要环形缓冲（末 60 条）：反馈快照的时间维度，复盘/分析用
     buildLog: [],   // 最近 30 次建造/拆除（负号前缀 = 拆除）
+    steelToolWear: 0,
     toolWear: 0,    // 工具磨损累积器（满 1 磨掉 1 把）
   };
 };
@@ -91,11 +92,7 @@ G.endDay = function () {
   const winter = g.season === 3;
   // ---- 工具磨损：每个成人每天磨损 1/toolLifeDays 把；用尽则全员生产减半 ----
   const adultsNow = w.citizens.filter(c => !c.dead && c.adult).length;
-  if (g.res.tools > 0) {
-    g.toolWear = (g.toolWear || 0) + adultsNow / G.LIFE.toolLifeDays;
-    while (g.toolWear >= 1 && g.res.tools > 0) { g.toolWear -= 1; g.res.tools -= 1; }
-    if (g.res.tools <= 0) g.toolWear = 0; // 恰好磨完最后一把：清掉陈旧累积，别把新打的第一件工具秒扣掉
-  } else g.toolWear = 0;
+  G.wearTools(adultsNow);
   // 有人住的房子才烧柴（含石屋/宿舍；取暖量按建筑类型，原版石屋省一半）
   const houses = w.buildings.filter(b => G.isOccupiedHome(w, b));
   // 原版：木屋每年约烧 30 柴火（石屋 15），集中在冬季消耗；柴火按屋支付，付不起的屋子挨冻
@@ -185,19 +182,19 @@ G.endDay = function () {
     G.ui.toast('⚠ 食物储备不足 3 天', 'warn');
   }
   if (g.res.food > pop * G.LIFE.eatPerDay * 8) g.warned.foodLow = false;
-  const toolDays = g.res.tools * G.LIFE.toolLifeDays / Math.max(1, adultsNow);
-  if (pop > 0 && g.res.tools > 0 && toolDays <= G.YEAR_DAYS && !g.warned.toolsLow) {
+  const toolDays = G.toolDaysLeft(adultsNow);
+  if (pop > 0 && G.hasTools() && toolDays <= G.YEAR_DAYS && !g.warned.toolsLow) {
     g.warned.toolsLow = true;
     G.ui.toast(`⚠ 工具约够 ${Math.floor(toolDays)} 天，尽早备好铁匠铺与铁矿；近矿耗尽时需向外找矿`, 'warn');
   }
   if (toolDays > G.YEAR_DAYS * 1.5) g.warned.toolsLow = false;
-  if (pop > 0 && !g.warned.noTools && g.res.tools <= 0) {
+  if (pop > 0 && !g.warned.noTools && !G.hasTools()) {
     g.warned.noTools = true;
     G.ui.toast('⚠ 工具用尽，生产减半——尽快建铁匠铺打工具（1铁+2木→2件）', 'bad');
   }
-  if (g.res.tools > 0) g.warned.noTools = false;
+  if (G.hasTools()) g.warned.noTools = false;
   if (g.warned.storageFull) { // 满仓提示在腾出空间后复位
-    const fullest = Math.max(...G.RES_KEYS.filter(k => k !== 'tools').map(k => g.res[k]));
+    const fullest = Math.max(...G.RES_KEYS.filter(k => !G.isTool(k)).map(k => g.res[k]));
     if (fullest < G.storageCap() - 50) g.warned.storageFull = false;
   }
 
@@ -586,7 +583,7 @@ G.alternateTaskEndpoint = function (c, t) {
   if (t.kind === 'clearSite') return G.siteClearSpot(c, t.b, t.tree);
   if (['firewood', 'trade'].includes(t.kind) && t.phase === 'fetch') return G.storageRoute(c.x, c.y)?.spot || null;
   if (t.kind === 'build' || t.kind === 'firewood' || t.kind === 'trade' ||
-      (t.kind === 'work' && ['dock', 'mine', 'blacksmith', 'pasture', 'orchard'].includes(t.b.type)))
+      (t.kind === 'work' && ['dock', 'mine', 'stonequarry', 'blacksmith', 'pasture', 'orchard'].includes(t.b.type)))
     return G.workSpot(G.world, t.b, c.x, c.y, true);
   return null;
 };
@@ -607,7 +604,7 @@ G.routeCanReuse = function (route, c, tx, ty) {
 G.sendTo = function (c, tx, ty, planned = null) {
   let route=planned||(c.task&&c.task.dispatchRoute);
   if(c.task) delete c.task.dispatchRoute;
-  const buildingTask=c.task && (['build','clearSite','firewood','trade','care','clinic'].includes(c.task.kind) || (c.task.kind==='work' && c.task.b && ['dock','mine','blacksmith','pasture','orchard'].includes(c.task.b.type)));
+  const buildingTask=c.task && (['build','clearSite','firewood','trade','care','clinic'].includes(c.task.kind) || (c.task.kind==='work' && c.task.b && ['dock','mine','stonequarry','blacksmith','pasture','orchard'].includes(c.task.b.type)));
   if((route && !G.routeCanReuse(route,c,tx,ty)) || (!route && buildingTask)) {
     const spot=G.alternateTaskEndpoint(c,c.task);
     if(!spot){if(c.task)G.dropBlockedTask(c,c.task);c.path=null;c.state='idle';c.wanderT=.5;return false;}
@@ -718,7 +715,7 @@ G.storageRoute = function (x, y) {
 
 /* Limited minerals retain one ordinary carried batch when a warehouse rejects
  * part of a delivery. Other resource delivery policy is intentionally unchanged. */
-G.isMineralCargo = function (c) { return !!c.carry && (c.carry.type === 'stone' || c.carry.type === 'iron'); };
+G.isMineralCargo = function (c) { return !!c.carry && ['stone', 'iron', 'coal'].includes(c.carry.type); };
 G.mineralStorageSpace = function (type) { return Math.max(0, G.storageCap() - G.game.res[type]); };
 // Ordinary in-flight minerals remain eligible as before; only an already
 // blocked delivery cannot count as available labour or occupy a productive slot.
@@ -733,7 +730,7 @@ G.waitForMineralStorage = function (c, reason) {
 G.warnMineralStorage = function () {
   if (G.game.warned.mineralStorageFull) return;
   G.game.warned.mineralStorageFull = true;
-  G.ui.toast('⚠ 石铁仓位已满，余矿由市民随身保留；使用库存或建成新仓库后继续送仓', 'warn');
+  G.ui.toast('⚠ 矿物仓位已满，余矿由市民随身保留；使用库存或建成新仓库后继续送仓', 'warn');
 };
 G.cargoWaitReason = function (c) {
   if (!G.isMineralCargo(c) || !c.haulPending || c.state === 'haul') return '';
@@ -787,12 +784,12 @@ G.startHaul = function (c) {
 G.fuelLimitOf = function (b) { return Number.isFinite(b.fuelLimit) ? G.clamp(b.fuelLimit, 0, G.PROD.woodcutter.fuelMax) : G.PROD.woodcutter.fuelLimit; };
 G.fuelLimited = function (b) { return b.type === 'woodcutter' && (G.productionGoalOf('firewood') === null ? G.game.res.firewood >= G.fuelLimitOf(b) : G.goalPaused('firewood', b)); };
 G.toolLimitOf = function (b) { return Number.isFinite(b.toolLimit) ? G.clamp(b.toolLimit, 0, G.PROD.blacksmith.toolMax) : G.PROD.blacksmith.toolLimit; };
-G.toolLimited = function (b) { return b.type === 'blacksmith' && (G.productionGoalOf('tools') === null ? G.game.res.tools >= G.toolLimitOf(b) : G.goalPaused('tools', b)); };
+G.toolLimited = function (b) { const type = G.blacksmithOutput(b); return b.type === 'blacksmith' && (G.productionGoalOf(type) === null ? G.game.res[type] >= G.toolLimitOf(b) : G.goalPaused(type, b)); };
 
 /* Optional automatic-production goals. Unset means the exact legacy rules.
  * Hysteresis changes at deliveries and the normal 2h scheduler, never in UI reads. */
 G.PRODUCTION_GOAL_MAX = 1000000;
-G.PRODUCTION_OUTPUTS = { woodcutter: ['firewood'], blacksmith: ['tools'], forester: ['wood'], mine: ['stone', 'iron'], gatherer: ['food', 'vegetables'], dock: ['food', 'meat'], hunting: ['food', 'meat', 'leather'], farm: ['food', 'grain'], tailor: ['clothes'], pasture: ['food', 'meat', 'wool'], orchard: ['food', 'vegetables'], herbalist: ['herbs'] };
+G.PRODUCTION_OUTPUTS = { woodcutter: ['firewood'], blacksmith: ['tools'], forester: ['wood'], mine: ['stone', 'iron'], stonequarry: ['stone'], gatherer: ['food', 'vegetables'], dock: ['food', 'meat'], hunting: ['food', 'meat', 'leather'], farm: ['food', 'grain'], tailor: ['clothes'], pasture: ['food', 'meat', 'wool'], orchard: ['food', 'vegetables'], herbalist: ['herbs'] };
 G.productionGoalOf = function (type, game) {
   const goals = (game || G.game).productionGoals;
   return goals && Object.prototype.hasOwnProperty.call(goals, type) && Number.isFinite(goals[type]) ? goals[type] : null;
@@ -802,7 +799,7 @@ G.effectiveProductionGoal = function (type, b, game) {
   const target = G.productionGoalOf(type, game);
   if (target === null) return null;
   const local = b && b.type === 'woodcutter' && type === 'firewood' ? G.fuelLimitOf(b)
-    : b && b.type === 'blacksmith' && type === 'tools' ? G.toolLimitOf(b) : Infinity;
+    : b && b.type === 'blacksmith' && type === G.blacksmithOutput(b) ? G.toolLimitOf(b) : Infinity;
   return Math.min(target, local);
 };
 G.nextGoalPause = function (stock, target, paused) {
@@ -820,7 +817,7 @@ G.updateProductionGoals = function (game, world) {
     g.productionPaused[type] = G.nextGoalPause(g.res[type], target, g.productionPaused[type]);
   }
   for (const b of w.buildings) {
-    const type = b.type === 'woodcutter' ? 'firewood' : b.type === 'blacksmith' ? 'tools' : null;
+    const type = b.type === 'woodcutter' ? 'firewood' : b.type === 'blacksmith' ? G.blacksmithOutput(b) : null;
     if (!type) continue;
     const target = G.effectiveProductionGoal(type, b, g);
     if (target === null) delete b.productionPaused;
@@ -830,7 +827,7 @@ G.updateProductionGoals = function (game, world) {
 G.goalPaused = function (type, b) {
   if (G.FOOD_KEYS.includes(type) && G.goalPaused('food')) return true;
   if (G.productionGoalOf(type) === null) return false;
-  if (b && ((b.type === 'woodcutter' && type === 'firewood') || (b.type === 'blacksmith' && type === 'tools'))) return b.productionPaused === true || !!(G.game.productionPaused && G.game.productionPaused[type]);
+  if (b && ((b.type === 'woodcutter' && type === 'firewood') || (b.type === 'blacksmith' && type === G.blacksmithOutput(b)))) return b.productionPaused === true || !!(G.game.productionPaused && G.game.productionPaused[type]);
   return !!(G.game.productionPaused && G.game.productionPaused[type]);
 };
 G.farmSeasonCommitted = function (b) {
@@ -848,7 +845,7 @@ G.setProductionGoal = function (type, value) {
       G.world.citizens.some(c => [c.task, c.pausedTask].some(t => t && t.b === b && t.kind === 'sow')))) b.sowingCommitted = true;
   if (value === null) delete g.productionGoals[type]; else g.productionGoals[type] = value;
   delete g.productionPaused[type];
-  for (const b of G.world.buildings) if ((type === 'firewood' && b.type === 'woodcutter') || (type === 'tools' && b.type === 'blacksmith')) {
+  for (const b of G.world.buildings) if ((type === 'firewood' && b.type === 'woodcutter') || (b.type === 'blacksmith' && type === G.blacksmithOutput(b))) {
     const local = type === 'firewood' ? G.fuelLimitOf(b) : G.toolLimitOf(b);
     const oldEffective = previous === null ? null : Math.min(previous, local);
     if (oldEffective !== G.effectiveProductionGoal(type, b)) delete b.productionPaused;
@@ -859,7 +856,7 @@ G.setProductionGoal = function (type, value) {
   return true;
 };
 G.hasProductionGoal = function (b) {
-  const types = G.PRODUCTION_OUTPUTS[b.type] || [];
+  const types = G.productionOutputsOf(b);
   return types.some(type => G.productionGoalOf(type) !== null);
 };
 G.productionLimited = function (b) {
@@ -869,13 +866,17 @@ G.productionLimited = function (b) {
   if (b.type === 'tailor') return G.goalPaused('clothes');
   if (b.type === 'farm') return G.goalPaused('grain') && !G.farmSeasonCommitted(b);
   if (b.type === 'forester') return G.goalPaused('wood') && !b.doPlant;
+  if (b.type === 'stonequarry' || (b.type === 'mine' && G.mineModeOf(b) !== 'legacy')) {
+    const type = b.type === 'stonequarry' ? 'stone' : G.mineModeOf(b);
+    return G.goalPaused(type) || G.game.res[type] >= G.storageCap();
+  }
   if (b.type === 'mine' && (G.productionGoalOf('stone') !== null || G.productionGoalOf('iron') !== null)) return (G.goalPaused('stone') || G.game.res.stone >= G.storageCap()) &&
     (G.goalPaused('iron') || G.game.res.iron >= G.storageCap());
   return false;
 };
 G.buildingGoalStatus = function (b) {
   if (b.state !== 'ok') return '';
-  const types = G.PRODUCTION_OUTPUTS[b.type] || [];
+  const types = G.productionOutputsOf(b);
   const configured = types.filter(type => G.productionGoalOf(type) !== null);
   if (!configured.length) return '';
   if (b.type === 'farm' && G.farmSeasonCommitted(b)) return '本季已开始：继续播完和收获，目标仅限制未开始的新一季';
@@ -883,7 +884,7 @@ G.buildingGoalStatus = function (b) {
     const target = G.effectiveProductionGoal(type, b), local = ['woodcutter', 'blacksmith'].includes(b.type);
     const source = local ? `（全镇 ${G.productionGoalOf(type)} 与本屋 ${type === 'firewood' ? G.fuelLimitOf(b) : G.toolLimitOf(b)} 取较低值）` : '（全镇）';
     const state = G.goalPaused(type, b) ? (target === 0 ? '已关闭新生产' : `暂停新生产，库存≤${G.productionResumeAt(target)}恢复`)
-      : type !== 'tools' && G.game.res[type] >= G.storageCap() ? '硬仓容已满' : '可接新生产';
+      : !G.isTool(type) && G.game.res[type] >= G.storageCap() ? '硬仓容已满' : '可接新生产';
     return `${G.RES[type].name}目标 ${target}${source}：${state}${b.type === 'forester' && G.goalPaused(type) && b.doPlant ? '；仍可补种育林' : ''}`;
   }).join('；');
 };
@@ -894,7 +895,14 @@ G.goalCommitment = function (c) {
   const b = G.world.bmap[c.job];
   if (b && b.type === 'hospital' && !G.isSick(c) && G.world.citizens.some(G.isSick)) return true;
   if (!b || b.state !== 'ok') return false;
-  const outputs = G.PRODUCTION_OUTPUTS[b.type] || [];
+  const outputs = G.productionOutputsOf(b);
+  // A player switching specialization must not make the old accepted batch
+  // disposable to the scheduler merely because the new product is paused.
+  if (['mine', 'blacksmith'].includes(b.type)) {
+    const previousOutput = type => type && !outputs.includes(type);
+    if (c.carry && previousOutput(c.carry.type)) return true;
+    if ([c.task, c.pausedTask].some(t => t && t.b === b && t.yield && previousOutput(t.yield.type))) return true;
+  }
   const paused = type => outputs.includes(type) && G.goalPaused(type, b);
   if (c.carry && paused(c.carry.type)) return true;
   return [c.task, c.pausedTask].some(task => {
@@ -941,10 +949,10 @@ G.deposit = function (type, qty) {
   if (type === 'food') type = 'grain'; // old carried food retains its quantity
   if (G.FOOD_KEYS.includes(type)) G.reconcileFood();
   const stock = G.FOOD_KEYS.includes(type) ? g.res.food : g.res[type];
-  const space = type === 'tools' ? Infinity : Math.max(0, G.storageCap() - stock);
+  const space = G.isTool(type) ? Infinity : Math.max(0, G.storageCap() - stock);
   const got = Math.min(qty, space); g.res[type] = (g.res[type] || 0) + got;
   if (G.FOOD_KEYS.includes(type)) g.res.food += got;
-  if (got < qty && type !== 'stone' && type !== 'iron' && !g.warned.storageFull) {
+  if (got < qty && !['stone', 'iron', 'coal'].includes(type) && !g.warned.storageFull) {
     g.warned.storageFull = true; G.ui.toast('⚠ 仓库满了，多出的资源只能丢弃——再建一座仓库吧', 'warn');
   }
   G.updateProductionGoals(); return got;
@@ -1233,7 +1241,7 @@ G.taskWork = function (c, hours) { return c.educated ? hours * G.LIFE.eduWorkMul
 
 /* 任务产出按工具状态折算：工具用尽时减产（原版工具是效率核心，约 2.5 年磨坏一件） */
 G.taskYield = function (base) {
-  const m = G.game.res.tools > 0 ? 1 : G.NO_TOOL_MULT;
+  const m = G.hasTools() ? 1 : G.NO_TOOL_MULT;
   return Math.max(1, Math.round(base * m));
 };
 
@@ -1290,7 +1298,7 @@ G.foodForestCanWork = function (b) {
 /* 按建筑类型生成任务 */
 G.makeTask = function (b, c) {
   const P = G.PROD, g = G.game, w = G.world;
-  if (b.state === 'ok' && G.productionLimited(b) && !['woodcutter', 'blacksmith', 'herbalist'].includes(b.type)) {
+  if (b.state === 'ok' && G.productionLimited(b) && !['woodcutter', 'blacksmith', 'herbalist', 'mine', 'stonequarry'].includes(b.type)) {
     b.warnText = G.buildingGoalStatus(b); return null;
   }
   switch (b.type) {
@@ -1399,27 +1407,8 @@ G.makeTask = function (b, c) {
         work: G.taskWork(c, P.dock.workH), workLeft: 0, yield: { type: P.dock.yield.type, qty },
       }, spot.route);
     }
-    case 'mine': {
-      const spot = G.workSpot(w, b, c.x, c.y);
-      if (!spot) return null;
-      // 满仓不白挖：石铁都到仓储上限就停工；只有一项满仓时改为专采另一项
-      const cap = G.storageCap();
-      const stoneFull = g.res.stone >= cap || G.goalPaused('stone'), ironFull = g.res.iron >= cap || G.goalPaused('iron');
-      if (stoneFull && ironFull) {
-        b.noWork = true; b.warnText = '仓库已满';
-        return null;
-      }
-      // 每 ironEvery 趟出 1 趟铁，其余采石（深井矿脉不枯竭）
-      b.mineTick = (b.mineTick || 0) + 1;
-      let ironTurn = b.mineTick % P.mine.ironEvery === 0;
-      if (stoneFull && !ironTurn) ironTurn = true;
-      else if (ironFull && ironTurn) ironTurn = false;
-      return G.withTaskRoute({
-        kind: 'work', b, tx: spot.x, ty: spot.y,
-        work: G.taskWork(c, P.mine.workH), workLeft: 0,
-        yield: { type: ironTurn ? 'iron' : 'stone', qty: G.taskYield(P.mine.yield) },
-      }, spot.route);
-    }
+    case 'mine':
+    case 'stonequarry': return G.makeMineralTask(b, c);
     case 'tradingpost': return G.makeTradeTask(b,c);
     case 'pasture': {
       G.ensureEconomyBuilding(b);
@@ -1450,9 +1439,9 @@ G.makeTask = function (b, c) {
       if (G.toolLimited(b)) { b.noWork = true; b.warnText = '工具已达上限'; return null; }
       const spot = G.workSpot(w, b, c.x, c.y);
       if (!spot) return null;
-      const cons = P.blacksmith.consume;
+      const cons = G.blacksmithRecipe(b);
       if (cons.some(c2 => g.res[c2.type] < c2.qty)) {
-        b.noWork = true; b.warnText = '缺铁或木材';
+        b.noWork = true; b.warnText = G.blacksmithOutput(b) === 'steelTools' ? '缺铁、木材或煤' : '缺铁或木材';
         return null;
       }
       // 1铁+2木 → 2 件工具（受教育 3）；铁匠抡锤不用工具，不吃减产
@@ -1460,7 +1449,7 @@ G.makeTask = function (b, c) {
         kind: 'work', b, tx: spot.x, ty: spot.y,
         work: G.taskWork(c, P.blacksmith.workH), workLeft: 0,
         consume: cons,
-        yield: { type: 'tools', qty: c.educated ? P.blacksmith.eduToolsOut : P.blacksmith.toolsOut },
+        yield: { type: G.blacksmithOutput(b), qty: c.educated ? P.blacksmith.eduToolsOut : P.blacksmith.toolsOut },
       }, spot.route);
     }
     case 'hunting': {
@@ -1686,9 +1675,8 @@ G.pickMarkDonor = function (w, harvestSeason, foodJobs, needFood) {
   }
   for (const b of staffed)
     if (G.productionLimited(b)) { const c = adultsOf(b)[0]; if (c) return c; }
-  const cap = G.storageCap();
   for (const b of staffed)
-    if (b.type === 'mine' && G.game.res.stone >= cap && G.game.res.iron >= cap) { const c = adultsOf(b)[0]; if (c) return c; }
+    if (['mine', 'stonequarry'].includes(b.type) && !G.jobCanProduce(b)) { const c = adultsOf(b)[0]; if (c) return c; }
   if (!harvestSeason)
     for (const b of staffed)
       if (b.type === 'farm' && b.sownAll) { const c = adultsOf(b)[0]; if (c) return c; } // 已播完种的农田；播种进行中不抽（否则秋收窗口顺延）
@@ -1724,11 +1712,11 @@ G.jobCanProduce = function (b) {
   if (b.type === 'pasture') return (b.animals || 0)>0;
   if (b.type === 'orchard') return G.game.unlocks.orchard && ((b.orchardAge || 0)<G.YEAR_DAYS*4 ? b.tendedDay!==G.game.day : (b.orchardYield || 0)>0 && G.game.season===2);
   if (b.type === 'tailor') return r.clothes < G.storageCap() && (r.leather >= 2 || r.wool >= 2);
-  if (b.type === 'blacksmith') return p.blacksmith.consume.every(c => r[c.type] >= c.qty);
+  if (b.type === 'blacksmith') return G.blacksmithRecipe(b).every(c => r[c.type] >= c.qty);
   if (b.type === 'forester') return (b.doCut && !G.goalPaused('wood') && G.treesInRadius(w, b.x, b.y, p.forester.radius, true).length > p.forester.minMature) ||
     (b.doPlant && !!G.nearestPlantSpot(w, b.x, b.y, p.forester.radius));
   if (b.type === 'gatherer' || b.type === 'hunting') return G.foodForestCanWork(b);
-  if (b.type === 'mine') return (!G.goalPaused('stone') && r.stone < G.storageCap()) || (!G.goalPaused('iron') && r.iron < G.storageCap());
+  if (['mine', 'stonequarry'].includes(b.type)) return G.productionOutputsOf(b).some(type => !G.goalPaused(type) && r[type] < G.storageCap());
   return true;
 };
 
@@ -1960,7 +1948,8 @@ G.addBuilding = function (type, x, y, opt) {
     b.sownAll = false; b.growth = 0; b.harvestDone = false;
   }
   if (type === 'forester') { b.doCut = true; b.doPlant = true; } // 原版 Forester 的 Cut / Plant 开关
-  if (type === 'blacksmith') b.toolLimit = G.PROD.blacksmith.toolLimit;
+  if (type === 'mine') { b.mineMode = 'iron'; b.legacyMine = false; b.mineTick = 0; }
+  if (type === 'blacksmith') { b.toolLimit = G.PROD.blacksmith.toolLimit; b.toolRecipe = 'iron'; }
   if (type === 'woodcutter') b.fuelLimit = G.PROD.woodcutter.fuelLimit; // 燃料上限（原版 Fuel Limit）
   if (G.game && G.game.buildLog) { // 建造/拆除记录（反馈分析用；负号前缀 = 拆除）
     G.game.buildLog.push({ d: G.game.day, t: type });
@@ -2068,8 +2057,8 @@ G.demolishAt = function (tx, ty) {
 /* Town development: explicit inventories and worker trips, not global free production. */
 G.TRADE_CAPACITY = 2000;
 G.tradeStored = b => Object.values(b.tradeInventory || {}).reduce((n,q) => n + q, 0);
-G.TRADE_VALUES = {wood:2,stone:7,iron:5,tools:8,firewood:4,meat:1,vegetables:1,grain:1,leather:10,wool:5,clothes:15,herbs:4};
-G.TRADE_GOODS = {sheep:{name:'羊',price:600,stock:4},orchardSeed:{name:'果树种子',price:2500,stock:1},grain:{name:'主食',price:1,stock:400},iron:{name:'铁',price:5,stock:100},leather:{name:'皮革',price:10,stock:80}};
+G.TRADE_VALUES = {wood:2,stone:7,iron:5,tools:8,firewood:4,meat:1,vegetables:1,grain:1,leather:10,wool:5,clothes:15,herbs:4,coal:6,steelTools:10};
+G.TRADE_GOODS = {coal:{name:'煤',price:6,stock:100},steelTools:{name:'钢工具',price:10,stock:20},sheep:{name:'羊',price:600,stock:4},orchardSeed:{name:'果树种子',price:2500,stock:1},grain:{name:'主食',price:1,stock:400},iron:{name:'铁',price:5,stock:100},leather:{name:'皮革',price:10,stock:80}};
 G.ensureEconomyBuilding = function(b) {
   if(b.type==='tradingpost'){b.tradeInventory=b.tradeInventory||{};b.tradeTargets=b.tradeTargets||{};if(!Number.isFinite(b.nextMerchantDay))b.nextMerchantDay=G.game.day+G.SEASON_DAYS;}
   if(b.type==='pasture'){b.animals=b.animals||0;b.animalGrowth=b.animalGrowth||0;b.woolReady=b.woolReady||0;if(!Number.isFinite(b.animalTarget))b.animalTarget=8;}
@@ -2299,4 +2288,62 @@ G.advanceHealth = function () {
   const summary = G.healthSummary();
   if (summary.average < 3.5 && !g.warned.healthLow) { g.warned.healthLow=true; G.ui.toast('🌿 镇民健康正在下降：补齐肉类、蔬菜、主食，并让采药员在成熟林旁采药、为居民保健。','warn'); }
   if (summary.average > 4) g.warned.healthLow=false;
+};
+
+/* Resource specialization retains the old mine/save contract until the player
+ * chooses another product. Exhaustion and irreversible pits are a later slice. */
+G.isTool = type => type === 'tools' || type === 'steelTools';
+G.toolStock = () => (G.game.res.tools || 0) + (G.game.res.steelTools || 0);
+G.hasTools = () => G.toolStock() > 0;
+G.toolDaysLeft = function (adults) {
+  const g = G.game;
+  const days = Math.max(0,(g.res.tools || 0)-(g.toolWear || 0))*G.LIFE.toolLifeDays +
+    Math.max(0,(g.res.steelTools || 0)-(g.steelToolWear || 0))*G.LIFE.steelToolLifeDays;
+  return days / Math.max(1,adults);
+};
+G.wearTools = function (adults) {
+  const g = G.game; let demand = Math.max(0,adults);
+  // Existing pooled-tool abstraction: steel supplies work-days first; any
+  // overflow demand uses iron. Never charge both pools for the same adult-day.
+  for (const [type,key,life] of [['steelTools','steelToolWear',G.LIFE.steelToolLifeDays],['tools','toolWear',G.LIFE.toolLifeDays]]) {
+    let stock = Math.max(0,g.res[type] || 0), wear = Math.max(0,g[key] || 0);
+    if (!stock) { g[key]=0; continue; }
+    const used = Math.min(demand,Math.max(0,stock-wear)*life);
+    wear += used/life; demand -= used;
+    if (wear >= stock-1e-9) { stock=0; wear=0; }
+    else { const broken=Math.floor(wear+1e-9); stock-=broken; wear=Math.max(0,wear-broken); }
+    g.res[type]=stock; g[key]=wear;
+  }
+};
+G.mineModeOf = b => ['iron','coal'].includes(b.mineMode) ? b.mineMode : 'legacy';
+G.blacksmithOutput = b => b && b.toolRecipe === 'steel' ? 'steelTools' : 'tools';
+G.blacksmithRecipe = b => G.blacksmithOutput(b) === 'steelTools' ? [...G.PROD.blacksmith.consume,{type:'coal',qty:2}] : G.PROD.blacksmith.consume;
+G.productionOutputsOf = function (b) {
+  if (b.type === 'mine') return G.mineModeOf(b) === 'legacy' ? ['stone','iron'] : [G.mineModeOf(b)];
+  if (b.type === 'blacksmith') return [G.blacksmithOutput(b)];
+  return G.PRODUCTION_OUTPUTS[b.type] || [];
+};
+G.setMineMode = function (b, mode) {
+  if (!b || G.world.bmap[b.id] !== b || b.type !== 'mine' || b.state !== 'ok' ||
+      !['iron','coal','legacy'].includes(mode) || (mode === 'legacy' && !b.legacyMine)) return false;
+  b.mineMode=mode; b.noWork=false; b.warnText=''; G.game.schedT=0; return true;
+};
+G.setToolRecipe = function (b, recipe) {
+  if (!b || G.world.bmap[b.id] !== b || b.type !== 'blacksmith' || b.state !== 'ok' || !['iron','steel'].includes(recipe)) return false;
+  b.toolRecipe=recipe; delete b.productionPaused; b.noWork=false; b.warnText=''; G.updateProductionGoals(); G.game.schedT=0; return true;
+};
+G.makeMineralTask = function (b, c) {
+  const w=G.world, g=G.game, cap=G.storageCap(), p=b.type==='stonequarry'?G.PROD.stonequarry:G.PROD.mine;
+  let type=b.type==='stonequarry'?'stone':G.mineModeOf(b);
+  const blocked = k => g.res[k]>=cap || G.goalPaused(k);
+  if (type==='legacy') {
+    if (blocked('stone') && blocked('iron')) { b.noWork=true; b.warnText='仓库已满'; return null; }
+    b.mineTick=(b.mineTick || 0)+1;
+    type=b.mineTick%p.ironEvery===0?'iron':'stone';
+    if (blocked(type)) type=type==='iron'?'stone':'iron';
+  } else if (blocked(type)) { b.noWork=true; b.warnText=G.RES[type].name+'仓容或目标已满'; return null; }
+  const spot=G.workSpot(w,b,c.x,c.y);
+  if (!spot) { b.noWork=true; b.warnText='采矿入口不可达'; return null; }
+  const qty=type==='coal'?p.coalYield:p.yield;
+  return G.withTaskRoute({kind:'work',b,tx:spot.x,ty:spot.y,work:G.taskWork(c,p.workH),workLeft:0,yield:{type,qty:G.taskYield(qty)}},spot.route);
 };

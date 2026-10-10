@@ -404,6 +404,10 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 
 /* Compact real-economy controls in the selected-building panel. */
 .economy-details { margin-top: 8px; padding-top: 5px; border-top: 1px solid rgba(216,178,90,.3); }
+.resource-chain-details { margin-top: 8px; padding-top: 5px; border-top: 1px solid rgba(216,178,90,.3); }
+.resource-chain-target { align-items: center; flex-wrap: wrap; }
+.resource-chain-target > span { flex: 1 1 150px; }
+.resource-chain-target .mini-tog { min-width: 32px; min-height: 32px; }
 .economy-details p, .trade-inventory p { white-space: pre-line; }
 .economy-form { margin: 9px 0; padding: 9px; background: rgba(77,59,31,.25); border: 1px solid rgba(216,178,90,.25); border-radius: 6px; }
 .economy-form h3 { font-size: 12px; color: #ffd98a; margin-bottom: 6px; }

@@ -44,7 +44,13 @@ G.BDEF = {
     id: 'mine', name: '矿井', icon: '⛏️', w: 3, h: 3,
     cost: { wood: 80, stone: 40, iron: 10 }, buildWork: 140, jobs: 2, passable: false,
     wall: '#6f6a62', wallD: '#524e47', roof: '#4a463f',
-    desc: '深井采矿，2 名专业工人，每批基础产出 6 石或铁，通常每 5 趟有 1 趟铁；满仓或生产目标暂停某矿种时改采另一种。地表矿仍由散工采集，单块产量不变。',
+    desc: '2名矿工，可选择专采铁或煤；基础每批6铁或8煤，需要真实送仓。旧档矿井保留原石铁混采，只有主动切换才改变。当前原型深井不枯竭；采石场单独供应石头。',
+  },
+  stonequarry: {
+    id: 'stonequarry', name: '采石场', icon: '🪨', w: 3, h: 3,
+    cost: { wood: 64, stone: 32 }, buildWork: 140, jobs: 2, passable: false,
+    wall: '#999084', wallD: '#726a60', roof: '#6b5b45',
+    desc: '2名石匠专门采石，每批基础6石、9小时，仍要搬到可达仓库。满仓余石由工人保留，目标达到后暂停。当前原型矿脉不枯竭，可正常拆除；不加入塌方伤亡。',
   },
   tradingpost: {
     id: 'tradingpost', name: '贸易站', icon: '⛵', w: 4, h: 4,
@@ -74,7 +80,7 @@ G.BDEF = {
     id: 'blacksmith', name: '铁匠铺', icon: '⚒️', w: 3, h: 3,
     cost: { wood: 42, stone: 24 }, buildWork: 120, jobs: 1, passable: false,
     wall: '#7a5a45', wallD: '#5c4334', roof: '#6b4a3a',
-    desc: '1 名铁匠，基础加工 4 小时。1 铁+2 木打 2 件工具（受教育 3 件），原料配比不变。默认备30件，达到目标即停止新批次；工具用尽会降低生产。',
+    desc: '1名铁匠，可选择铁/钢工具。铁配方1铁+2木→2件（受教育3）；钢配方额外2煤，产量相同。钢工具耐久是铁工具的2倍，生产速度相同。默认备当前种类30件；已接批次沿用原配方。',
   },
   gatherer: {
     id: 'gatherer', name: '采集小屋', icon: '🧺', w: 2, h: 2,
@@ -152,7 +158,8 @@ G.PROD = {
   woodcutter: { workH: 3.5, logsIn: 2, firewoodOut: 6, eduFirewoodPerLog: 4,
     fuelLimit: 100, fuelStep: 50, fuelMax: 2000 }, // 燃料上限（原版 Fuel Limit）：柴火库存达到上限即停产；默认 100 ≈ 3 栋木屋一年取暖量，扩张后按面板需求提高，避免开局过量劈柴挤掉住房木材
   dock:      { workH: 5, yield: { type: 'meat', qty: 8 }, waterR: 10, fullWater: 40 },
-  mine:      { workH: 9, yield: 6, ironEvery: 5 }, // 每 5 趟 1 趟铁，其余采石（深井矿脉不枯竭）
+  mine:      { workH: 9, yield: 6, coalYield: 8, ironEvery: 5 }, // 新井专采铁/煤；旧档混采每5趟1趟铁，其余石（本批不枯竭）
+  stonequarry: { workH: 9, yield: 6 },
   blacksmith: { toolLimit: 30, toolMax: 500, workH: 4, consume: [{ type: 'iron', qty: 1 }, { type: 'wood', qty: 2 }], toolsOut: 2, eduToolsOut: 3 }, // 1铁+2木→2工具（受教育 3）
   hunting:   { workH: 5, yield: 10, radius: 12, needTrees: 10, fullForest: 20 }, // 狩猎依赖成熟林（鹿群栖息地），猎物随森林再生
   // perTile 14/格：原版 7/格但田块可放大到 15×15，本作固定 8×8，翻倍对齐原版人均产出；
@@ -184,6 +191,7 @@ G.LIFE = {
   schoolCap: 20,          // 每所学堂学生容量（原版 20）
   boardingCap: 5,         // 每栋宿舍可入住的家庭数（原版 5）
   eduWorkMul: 0.7,        // 受教育工人任务工时倍率（同产出更快，≈ 产出 +43%）
+  steelToolLifeDays: 240, // 钢工具寿命为铁工具的两倍，不额外提速
   toolLifeDays: 120,      // 工具寿命（约 2.5 年，原版 2~3 年）：每个成人每天磨损 1/寿命
 };
 G.NO_TOOL_MULT = 0.5;     // 工具用尽时生产任务产出倍率（原版无工具减产）
