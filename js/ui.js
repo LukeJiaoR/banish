@@ -158,7 +158,7 @@ G.ui = {
     const toolTip = (t) => {
       if (t === 'demolish') return '拆除：点击建筑或道路移除；树木请用砍伐，岩石和铁矿请用采石采铁';
       if (t === 'road') return '道路：点选起点和终点预览连通路线，确认后铺设；树木需先标记由工人清除';
-      if (t === 'quarry') return '采石采铁：点击或拖拽沿线标记矿石；灰色岩石产石头，锈色铁矿产铁，散工开采后搬运入库';
+      if (t === 'quarry') return '采石采铁：框选预览并确认矿石；灰色岩石产石头，锈色铁矿产铁，散工开采后搬运入库';
       const d = G.BDEF[t];
       const cost = this.resourceCost(d.cost, false);
       const jobs = d.jobs ? ` · 岗位×${d.jobs}` : '';
@@ -170,7 +170,7 @@ G.ui = {
       if (t === 'quarry')
         return `<button class="tb" data-tool="quarry" title="${toolTip(t)}"><span class="ic" aria-hidden="true">⛏</span><span class="lb">采石采铁</span><span class="cost">灰石 · 锈铁</span></button>`;
       if (t === 'fell')
-        return `<button class="tb" data-tool="fell" title="标记砍伐：点击或拖拽沿线标记树木，散工前来砍倒再搬运入库；未受教育 2 原木、受教育 3 原木"><span class="ic">🪚</span><span class="lb">砍伐</span><span class="cost">免费</span></button>`;
+        return `<button class="tb" data-tool="fell" title="标记砍伐：框选预览并确认树木，散工前来砍倒再搬运入库；未受教育 2 原木、受教育 3 原木"><span class="ic">🪚</span><span class="lb">砍伐</span><span class="cost">免费</span></button>`;
       const d = G.BDEF[t];
       const cost = this.resourceCost(d.cost, true);
       return `<button class="tb" data-tool="${t}" title="${toolTip(t)}"><span class="ic">${d.icon}${icImg(TOOL_ICONS[t])}</span><span class="lb">${d.name}</span><span class="cost">${cost}</span></button>`;
@@ -184,6 +184,7 @@ G.ui = {
       });
     });
     this.initHarvestControls();
+    this.initHarvestRangeControls();
     this.initProductionGoals();
     this.initRoadControls();
 
@@ -213,7 +214,67 @@ G.ui = {
       if (btn) btn.classList.add('active');
     }
     this.refreshHarvestControls();
+    this.refreshHarvestRangeControls();
     this.refreshRoadControls();
+  },
+
+  initHarvestRangeControls: function () {
+    const confirm = document.getElementById('harvest-confirm'), cancel = document.getElementById('harvest-preview-cancel');
+    if (!confirm || !cancel) return;
+    let armed = null, keyHeld = false;
+    const capture = e => {
+      if (e.type === 'mousedown' && armed && armed.source === 'touchstart') return;
+      keyHeld = false;
+      armed = confirm._harvestIntent ? { ...confirm._harvestIntent, source: e.type } : null;
+    };
+    for (const name of (window.PointerEvent ? ['pointerdown'] : ['mousedown', 'touchstart'])) confirm.addEventListener(name, capture);
+    confirm.addEventListener('keydown', e => {
+      if (!['Enter', ' '].includes(e.key) || e.repeat) return;
+      keyHeld = true;
+      armed = confirm._harvestIntent ? { ...confirm._harvestIntent, source: 'keyboard' } : null;
+    });
+    confirm.addEventListener('keyup', e => { if (['Enter', ' '].includes(e.key)) keyHeld = false; });
+    confirm.addEventListener('pointercancel', () => { armed = null; keyHeld = false; });
+    confirm.addEventListener('touchcancel', () => { armed = null; keyHeld = false; });
+    window.addEventListener('blur', () => { armed = null; keyHeld = false; });
+    confirm.addEventListener('click', e => {
+      e.preventDefault(); e.stopPropagation();
+      const intent = armed || confirm._harvestIntent;
+      if (!keyHeld) armed = null;
+      if (!intent) { this.refreshHarvestRangeControls(); return; }
+      const result = G.confirmHarvestRange(intent);
+      if (result.reason) this.toast(result.reason, 'warn');
+      else if (result.ok) this.toast(`已新增 ${result.marked} 处采集标记；工人仍需作业和搬运`, 'good');
+      this.refreshHarvestRangeControls();
+    });
+    cancel.addEventListener('click', e => {
+      e.preventDefault(); e.stopPropagation();
+      if (G.hasOpenModal()) return;
+      G.cancelHarvestPlan(); this.refreshHarvestRangeControls();
+    });
+  },
+  refreshHarvestRangeControls: function (force = true) {
+    const el = document.getElementById('harvest-range-controls'); if (!el) return;
+    const visible = !!G.world && !!G.tool && ['fell', 'quarry'].includes(G.tool.kind);
+    if (!visible && el.contains(document.activeElement)) {
+      const tool = G.tool ? (G.tool.kind === 'build' ? G.tool.type : G.tool.kind) : this._harvestRangeTool;
+      const button = tool && this.el.toolbar.querySelector(`[data-tool="${tool}"]`);
+      if (button) button.focus({ preventScroll: true });
+    }
+    el.classList.toggle('hidden', !visible); if (!visible) return;
+    this._harvestRangeTool = G.tool.kind;
+    const now = Date.now(), stamp = [G.harvestPlan, G.world, G.tool.kind, G.hasOpenModal(), G.world.marked.size, G.world.markedRocks.size];
+    if (!force && this._rangeStamp && stamp.every((v, i) => v === this._rangeStamp[i]) && now - this._rangeRefreshAt < 250) return;
+    this._rangeStamp = stamp; this._rangeRefreshAt = now;
+    const text = document.getElementById('harvest-range-status'), button = document.getElementById('harvest-confirm');
+    if (!text || !button) return;
+    const s = G.harvestRangeStatus();
+    let message = s.reason || '';
+    if (s.counts) message = `树木 ${s.counts.wood} 棵 · 石头 ${s.counts.stone} 处 · 铁矿 ${s.counts.iron} 处\n新增 ${s.added.length} 处 · 已标记 ${s.existing} 处` + (s.reason ? '\n' + s.reason : '');
+    message += '\n鼠标拖出矩形；手机点两个角。单格也可确认。退出预览不撤销已下达任务。';
+    if (text.textContent !== message) text.textContent = message;
+    button._harvestIntent = s.ok ? { plan: s.plan, signature: s.signature } : null;
+    button.disabled = !s.ok || !s.added.length || G.hasOpenModal();
   },
 
   initRoadControls: function () {
@@ -416,13 +477,14 @@ G.ui = {
   },
 
   refreshHarvest: function () {
+    if (this.refreshHarvestRangeControls) this.refreshHarvestRangeControls(false);
     if (this.refreshHarvestControls) this.refreshHarvestControls();
     const el = this.el.placement;
     if (!el || !G.world) return;
     this._placementKey = null;
     const h = G.harvestFeedback(), fell = G.tool.kind === 'fell';
     const cargo = G.RES_KEYS.filter(k => h.carry[k]).map(k => `${G.RES[k].name} ${h.carry[k]}`).join(' · ');
-    const lines = [fell ? '砍伐：点击或拖拽沿线标记树木' : '采石采铁：点击或拖拽沿线标记；灰色岩石产石头，锈色铁矿产铁',
+    const lines = [fell ? '砍伐：框选预览并确认树木' : '采石采铁：框选预览并确认；灰色岩石产石头，锈色铁矿产铁',
       `标记：树 ${h.trees} · 矿 ${h.rocks}；待领 ${h.queued} · 执行 ${h.active}（含赶路） · 夜间保留 ${h.paused}`,
       `散工 ${h.laborers} 人（含执行、搬运）；每 2 游戏小时自动调度。`];
     if (!fell) {
@@ -448,6 +510,7 @@ G.ui = {
 
   refreshPlacement: function (type, x, y) {
     if (this.refreshRoadControls) this.refreshRoadControls();
+    if (this.refreshHarvestRangeControls) this.refreshHarvestRangeControls(false);
     if (this.refreshHarvestControls) this.refreshHarvestControls();
     const el = this.el.placement;
     if (!el) return null;

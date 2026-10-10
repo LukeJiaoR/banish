@@ -333,3 +333,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 #road-controls button { min-height: 44px; min-width: 100px; margin: 0 6px 4px 0; }
 @media (max-width: 600px), (max-height: 620px) { #hud:has(#road-controls:not(.hidden)) #survival-guide { display: none; } }
 #hud:has(#road-controls:not(.hidden)) #toasts { left: auto; right: 12px; max-width: max(220px, calc(100vw - 490px)); z-index: 3; }
+
+#harvest-range-controls { background: rgba(24,18,10,.94); border: 1px solid #d5b16c; border-radius: 8px; padding: 8px 10px; font-size: 12px; line-height: 1.5; margin-bottom: 6px; }
+#harvest-range-status { white-space: pre-line; margin-bottom: 6px; }
+#harvest-range-controls button { min-height: 44px; min-width: 100px; margin: 0 6px 4px 0; }

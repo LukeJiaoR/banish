@@ -91,7 +91,7 @@ test('render feedback never pathfinds and dates reachability as a previous check
   const findPath = G.findPath; G.findPath = () => { throw Error('UI must not pathfind'); };
   try { refreshHarvest.call(G.ui); } finally { G.findPath = findPath; }
   const text = G.ui.el.placement.textContent;
-  assert.match(text, /沿线标记/); assert.match(text, /最近派工检查/); assert.match(text, /第 1 天 10 时/);
+  assert.match(text, /框选预览并确认/); assert.match(text, /最近派工检查/); assert.match(text, /第 1 天 10 时/);
   assert.match(text, /变化后待复查/); assert.match(text, /已画下的标记仍会执行/);
 });
 test('switching build to harvest and back rebuilds placement feedback at the same tile', () => {
@@ -99,7 +99,7 @@ test('switching build to harvest and back rebuilds placement feedback at the sam
   G.placementInfo = () => ({ ok: true, text: 'build preview ' + ++calls });
   try {
     refreshPlacement.call(G.ui, 'farm', 10, 10); assert.equal(calls, 1);
-    refreshHarvest.call(G.ui); assert.match(G.ui.el.placement.textContent, /沿线标记/);
+    refreshHarvest.call(G.ui); assert.match(G.ui.el.placement.textContent, /框选预览并确认/);
     refreshPlacement.call(G.ui, 'farm', 10, 10); assert.equal(calls, 2);
     assert.equal(G.ui.el.placement.textContent, 'build preview 2');
   } finally { G.placementInfo = placementInfo; }
@@ -123,8 +123,8 @@ test('food forest overlay uses exact square production bounds and clips the map'
   G.drawFoodForestBounds(ctx);
   assert.equal(vertices.length, 8); assert.deepEqual(vertices[0], G.T2S(0, 0)); assert.deepEqual(vertices[2], G.T2S(r + 2, r + 2));
 });
-test('help no longer promises a box selection that the input handler does not implement', () => {
+test('help describes the implemented rectangle preview and explicit confirmation', () => {
   const html = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
-  assert.match(html, /拖拽沿线标记树木/); assert.doesNotMatch(html, /框选树木/);
+  assert.match(html, /鼠标拖出矩形或手机点两个角预览，再确认标记树木/); assert.doesNotMatch(html, /拖拽沿线标记树木/);
 });
 console.log(`Harvest feedback: ${passed} checks passed (headless fixtures and renderer contracts only).`);
