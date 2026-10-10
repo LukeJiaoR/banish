@@ -330,10 +330,12 @@ G.onRoad = function (w, x, y) {
 
 // All normal road writes go through this helper. Unknown maps keep the
 // conservative road-speed lower bound rather than guessing a cached count.
+G.bumpNavigation = function (w) { w.navigationRevision = (w.navigationRevision || 0) + 1; };
 G.setRoad = function (w, x, y, present) {
   const i = y * w.N + x, next = present ? 1 : 0, previous = w.road[i] ? 1 : 0;
   if (next === previous) return;
   w.road[i] = next;
+  G.bumpNavigation(w);
   if (Number.isInteger(w.roadCount)) {
     w.roadCount += next - previous;
     // Half-tile expansion matches round(position) surface boundaries. Removing
@@ -372,30 +374,70 @@ G.travelLowerBound = function (dx, dy, fastest = Math.max(G.TRAVEL_SPEED.road, G
   return Math.min(distance / field, distance / fastest + fieldTail * (1 / field - 1 / fastest));
 };
 
-G.findPath = function (w, sx, sy, tx, ty) {
+// Reaching any point in the destination envelope is an optimistic relaxation.
+// The road envelope adds only the unavoidable final field distance to that set.
+G.destinationFieldTail = function (w, b) {
+  const r = w.roadBounds;
+  if (!Number.isInteger(w.roadCount) || !r) return 0;
+  return G.travelGridDistance(Math.max(b.minX-r.maxX,r.minX-b.maxX,0), Math.max(b.minY-r.maxY,r.minY-b.maxY,0));
+};
+G.destinationLowerBound = function (x, y, b, fastest, tail) {
+  return G.travelLowerBound(Math.max(b.minX-x,x-b.maxX,0), Math.max(b.minY-y,y-b.maxY,0), fastest, tail);
+};
+G.routeSpot = function (route) {
+  if (!route) return null;
+  const spot = {x:route.target.x,y:route.target.y};
+  Object.defineProperty(spot,'route',{value:route});
+  return spot;
+};
+G.findPathToAny = function (w, x, y, targets) {
+  if (!targets.length) return null;
+  const sx = Math.round(x), sy = Math.round(y);
+  const path = G.findPath(w, sx, sy, targets[0].x, targets[0].y, targets);
+  if (!path) return null;
+  const end = path.length ? path[path.length-1] : {x:sx,y:sy};
+  const target = targets.find(p => p.x === end.x && p.y === end.y);
+  if (!target) return null;
+  let eta = 0, px = sx, py = sy;
+  for (const p of path) { eta += G.travelEdgeHours(w,px,py,p.x,p.y); px=p.x; py=p.y; }
+  return {target,path,eta,world:w,revision:w.navigationRevision||0,fromX:x,fromY:y};
+};
+
+G.findPath = function (w, sx, sy, tx, ty, destinations = null) {
   sx |= 0; sy |= 0; tx |= 0; ty |= 0;
-  if (G.tileBlocked(w, tx, ty)) {
-    const alt = G.nearestWalkable(w, tx, ty, 4);
-    if (!alt) return null;
-    tx = alt.x; ty = alt.y;
+  let goals = null, bounds = null;
+  if (destinations) {
+    const valid = destinations.filter(p => Number.isInteger(p.x) && Number.isInteger(p.y) && !G.tileBlocked(w, p.x, p.y));
+    if (!valid.length) return null;
+    goals = new Set(valid.map(p => p.y * w.N + p.x));
+    bounds = { minX: Math.min(...valid.map(p => p.x)), maxX: Math.max(...valid.map(p => p.x)), minY: Math.min(...valid.map(p => p.y)), maxY: Math.max(...valid.map(p => p.y)) };
+    if (goals.has(sy * w.N + sx)) return [];
+  } else {
+    if (G.tileBlocked(w, tx, ty)) {
+      const alt = G.nearestWalkable(w, tx, ty, 4);
+      if (!alt) return null;
+      tx = alt.x; ty = alt.y;
+    }
+    if (sx === tx && sy === ty) return [];
   }
-  if (sx === tx && sy === ty) return [];
   const N = w.N;
   const gen = ++G._pfGen || (G._pfGen = 1);
   if (!w._pf) {
     w._pf = { g: new Float32Array(N * N), f: new Float32Array(N * N), from: new Int32Array(N * N), gen: new Int32Array(N * N), closed: new Int32Array(N * N) };
   }
   const pf = w._pf;
-  // 二叉小顶堆：按 f 取最小。允许重复入堆（代替 decrease-key），弹出时用 closed 标记跳过过期项
-  const heap = [];
+  // Immutable priority snapshots keep duplicate heap entries ordered when a node
+  // receives a cheaper route. Reading mutable pf.f for old entries breaks heap order.
+  const heap = [], heapF = [];
   let hn = 0;
   const push = (i) => {
     let k = hn++;
-    heap[k] = i;
+    heap[k] = i; heapF[k] = pf.f[i];
     while (k > 0) {
       const p = (k - 1) >> 1;
-      if (pf.f[heap[p]] <= pf.f[heap[k]]) break;
+      if (heapF[p] <= heapF[k]) break;
       const t = heap[p]; heap[p] = heap[k]; heap[k] = t;
+      const f = heapF[p]; heapF[p] = heapF[k]; heapF[k] = f;
       k = p;
     }
   };
@@ -403,32 +445,37 @@ G.findPath = function (w, sx, sy, tx, ty) {
     const top = heap[0];
     hn--;
     if (hn > 0) {
-      heap[0] = heap[hn];
+      heap[0] = heap[hn]; heapF[0] = heapF[hn];
       let k = 0;
       for (;;) {
         const l = 2 * k + 1, r = l + 1;
         let m = k;
-        if (l < hn && pf.f[heap[l]] < pf.f[heap[m]]) m = l;
-        if (r < hn && pf.f[heap[r]] < pf.f[heap[m]]) m = r;
+        if (l < hn && heapF[l] < heapF[m]) m = l;
+        if (r < hn && heapF[r] < heapF[m]) m = r;
         if (m === k) break;
         const t = heap[m]; heap[m] = heap[k]; heap[k] = t;
+        const f = heapF[m]; heapF[m] = heapF[k]; heapF[k] = f;
         k = m;
       }
     }
     return top;
   };
   const fastest = w.roadCount === 0 ? G.TRAVEL_SPEED.field : Math.max(G.TRAVEL_SPEED.road, G.TRAVEL_SPEED.field);
-  const fieldTail = G.roadExitDistance(w, tx, ty);
-  const start = sy * N + sx, goal = ty * N + tx;
-  pf.g[start] = 0; pf.f[start] = G.travelLowerBound(tx - sx, ty - sy, fastest, fieldTail); pf.from[start] = -1; pf.gen[start] = gen;
+  const fieldTail = bounds ? G.destinationFieldTail(w, bounds) : G.roadExitDistance(w, tx, ty);
+  const heuristic = bounds
+    ? (x, y) => G.destinationLowerBound(x, y, bounds, fastest, fieldTail)
+    : (x, y) => G.travelLowerBound(tx - x, ty - y, fastest, fieldTail);
+  const start = sy * N + sx;
+  let goal = ty * N + tx;
+  pf.g[start] = 0; pf.f[start] = heuristic(sx, sy); pf.from[start] = -1; pf.gen[start] = gen;
   push(start);
   let iter = 0, found = false;
   while (hn > 0) {
-    if (++iter > 20000) break;
     const cur = pop();
-    if (pf.closed[cur] === gen) continue; // 过期堆项
+    if (pf.closed[cur] === gen) continue; // stale entries do not spend the expansion budget
+    if (++iter > N * N) break; // each real grid cell can close at most once
     pf.closed[cur] = gen;
-    if (cur === goal) { found = true; break; }
+    if (goals ? goals.has(cur) : cur === goal) { goal = cur; found = true; break; }
     const cx = cur % N, cy = (cur / N) | 0;
     for (let d = 0; d < 8; d++) {
       const nx = cx + PF_DIRS[d][0], ny = cy + PF_DIRS[d][1], base = PF_DIRS[d][2];
@@ -443,7 +490,7 @@ G.findPath = function (w, sx, sy, tx, ty) {
       if (pf.gen[ni] !== gen || ng < pf.g[ni]) {
         pf.gen[ni] = gen;
         pf.g[ni] = ng;
-        pf.f[ni] = ng + G.travelLowerBound(tx - nx, ty - ny, fastest, fieldTail);
+        pf.f[ni] = ng + heuristic(nx, ny);
         pf.from[ni] = cur;
         push(ni);
       }
@@ -485,8 +532,8 @@ G.nearestPlantSpot = function (w, cx, cy, r, claimed, reachable) {
       }
   return null;
 };
-/* 建筑（或工地）旁的可站立点：离 (fx,fy) 最近。
- * 施工须检查可达性：最近的边缘可能被水面和相邻建筑隔成封闭口袋。 */
+/* 建筑（或工地）旁最省预计时间的真实可达入口。
+ * reachable 参数保留兼容旧调用；默认也不返回水面隔离的死口。 */
 G.workSpot = function (w, b, fx, fy, reachable = false) {
   const spots = [];
   for (let j = b.y - 1; j <= b.y + b.h; j++)
@@ -495,10 +542,10 @@ G.workSpot = function (w, b, fx, fy, reachable = false) {
       if (!edge) continue;
       if (i < 0 || j < 0 || i >= w.N || j >= w.N) continue;
       if (G.tileBlocked(w, i, j)) continue;
-      spots.push({ x: i, y: j });
+      spots.push({ x: i, y: j, building: b, state: b.state });
     }
-  spots.sort((a, z) => G.d2(a.x, a.y, fx, fy) - G.d2(z.x, z.y, fx, fy));
-  return (reachable ? spots.find(p => G.findPath(w, Math.round(fx), Math.round(fy), p.x, p.y)) : spots[0]) || null;
+  const route = G.findPathToAny(w, fx, fy, spots);
+  return G.routeSpot(route);
 };
 
 /* ---------- 放置判定 ---------- */

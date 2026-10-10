@@ -569,6 +569,8 @@ G.dropBlockedTask = function (c, t) {
 };
 G.alternateTaskEndpoint = function (c, t) {
   if (!t || G.physicalTaskEndpoint(t) || !t.b || G.world.bmap[t.b.id] !== t.b) return null;
+  if (['build','clearSite'].includes(t.kind) ? t.b.state !== 'site' : t.b.state !== 'ok') return null;
+  if (t.kind === 'clearSite' && (!t.tree || G.world.trees[G.world.treeIdx[t.tree.i]] !== t.tree)) return null;
   if (t.kind === 'clearSite') return G.siteClearSpot(c, t.b, t.tree);
   if (t.kind === 'firewood' && t.phase === 'fetch') return G.storageRoute(c.x, c.y)?.spot || null;
   if (t.kind === 'build' || t.kind === 'firewood' ||
@@ -577,14 +579,34 @@ G.alternateTaskEndpoint = function (c, t) {
   return null;
 };
 
+// An immediate dispatch hint is non-serialized and never a persistent route cache.
+G.withTaskRoute = function (task, route) {
+  if (route) Object.defineProperty(task,'dispatchRoute',{value:route,configurable:true});
+  return task;
+};
+G.routeCanReuse = function (route, c, tx, ty) {
+  if (!route || route.world !== G.world || route.revision !== (G.world.navigationRevision||0) || route.fromX !== c.x || route.fromY !== c.y || route.target.x !== tx || route.target.y !== ty) return false;
+  const owner=route.target.building||route.target.storage;
+  if (owner && (G.world.bmap[owner.id]!==owner || owner.state!==(route.target.storage?'ok':route.target.state))) return false;
+  return !G.tileBlocked(G.world,tx,ty);
+};
+
 /* 发送市民去任务点 */
-G.sendTo = function (c, tx, ty) {
+G.sendTo = function (c, tx, ty, planned = null) {
+  let route=planned||(c.task&&c.task.dispatchRoute);
+  if(c.task) delete c.task.dispatchRoute;
+  const buildingTask=c.task && (['build','clearSite','firewood'].includes(c.task.kind) || (c.task.kind==='work' && c.task.b && ['dock','mine','blacksmith'].includes(c.task.b.type)));
+  if((route && !G.routeCanReuse(route,c,tx,ty)) || (!route && buildingTask)) {
+    const spot=G.alternateTaskEndpoint(c,c.task);
+    if(!spot){if(c.task)G.dropBlockedTask(c,c.task);c.path=null;c.state='idle';c.wanderT=.5;return false;}
+    tx=spot.x;ty=spot.y;route=spot.route;c.task.tx=tx;c.task.ty=ty;
+  }
   if (G.tileBlocked(G.world, tx, ty)) {
     const spot = G.alternateTaskEndpoint(c, c.task);
     if (!spot) { if (c.task) G.dropBlockedTask(c, c.task); c.state = 'idle'; c.path = null; c.wanderT = .5; return false; }
-    tx = spot.x; ty = spot.y; c.task.tx = tx; c.task.ty = ty;
+    tx = spot.x; ty = spot.y; route=spot.route; c.task.tx = tx; c.task.ty = ty;
   }
-  const p = G.findPath(G.world, Math.round(c.x), Math.round(c.y), tx, ty);
+  const p = G.routeCanReuse(route,c,tx,ty) ? route.path : G.findPath(G.world, Math.round(c.x), Math.round(c.y), tx, ty);
   if (!p) { c.state = 'idle'; c.task = null; return false; }
   c.path = p; c.pi = 0;
   if (p.length === 0) { c.state = 'work'; if (c.task && !(c.task.workLeft > 0)) c.task.workLeft = c.task.work; }
@@ -604,7 +626,7 @@ G.goHome = function (c) {
   const d = Math.sqrt(G.d2(c.x, c.y, h.x + h.w / 2, h.y + h.h / 2));
   if (d > G.LIFE.campDist) { c.path = null; c.state = 'rest'; c.camped = true; return; }
   const spot = G.workSpot(G.world, h, c.x, c.y);
-  const p = G.findPath(G.world, Math.round(c.x), Math.round(c.y), spot ? spot.x : h.x, spot ? spot.y : h.y);
+  const p = spot ? (G.routeCanReuse(spot.route,c,spot.x,spot.y) ? spot.route.path : G.findPath(G.world,Math.round(c.x),Math.round(c.y),spot.x,spot.y)) : null;
   // A nearby home can require a long detour around water or buildings. For a
   // suspended job, reuse the route already found rather than restarting the same
   // unfinished commute every morning. No new path search or cross-day cache.
@@ -671,22 +693,15 @@ G.nearestStorage = function (x, y) {
 
 /* 找最近可达的交货点。直线最近仓库可能隔河，不能让它挡住其他可用仓库。 */
 G.storageRoute = function (x, y) {
-  const w = G.world;
-  const stores = w.buildings.filter(b => b.type === 'storage' && b.state === 'ok')
-    .sort((a, b) => G.d2(x, y, a.x + a.w / 2, a.y + a.h / 2) - G.d2(x, y, b.x + b.w / 2, b.y + b.h / 2));
-  for (const storage of stores) {
-    const spots = [];
-    for (let sy = storage.y - 1; sy <= storage.y + storage.h; sy++)
-      for (let sx = storage.x - 1; sx <= storage.x + storage.w; sx++)
-        if ((sx < storage.x || sx >= storage.x + storage.w || sy < storage.y || sy >= storage.y + storage.h) && !G.tileBlocked(w, sx, sy))
-          spots.push({ x: sx, y: sy });
-    spots.sort((a, b) => G.d2(x, y, a.x, a.y) - G.d2(x, y, b.x, b.y));
-    for (const spot of spots) {
-      const path = G.findPath(w, Math.round(x), Math.round(y), spot.x, spot.y);
-      if (path) return { storage, spot, path };
-    }
+  const w = G.world, targets = [];
+  for (const storage of w.buildings) {
+    if (storage.type !== 'storage' || storage.state !== 'ok') continue;
+    for (let sy=storage.y-1;sy<=storage.y+storage.h;sy++)
+      for (let sx=storage.x-1;sx<=storage.x+storage.w;sx++)
+        if ((sx<storage.x||sx>=storage.x+storage.w||sy<storage.y||sy>=storage.y+storage.h)&&!G.tileBlocked(w,sx,sy)) targets.push({x:sx,y:sy,storage});
   }
-  return null;
+  const route=G.findPathToAny(w,x,y,targets);
+  return route ? {storage:route.target.storage,spot:G.routeSpot(route),path:route.path,eta:route.eta} : null;
 };
 
 /* Limited minerals retain one ordinary carried batch when a warehouse rejects
@@ -904,8 +919,7 @@ G.firewoodFetchDone = function (c, t) {
   t.workLeft = t.work;
   c.task = t;   // completeTask 入口会清空任务，续段要挂回去
   c.state = 'idle';
-  G.sendTo(c, t.tx, t.ty);
-  return true;
+  return G.sendTo(c, t.tx, t.ty, spot.route);
 };
 
 /* 受冻（原版双侧模型）：冬季户外累积寒冷，回到烧着柴的家里恢复；
@@ -945,7 +959,7 @@ G.detourCitizen = function (c, dtH) {
     if (c.state === 'haul' && c.carry) { G.startHaul(c); return; }
     if (c.walkKind === 'home') {
       const home = G.homeOf(c);
-      if (!home || !G.workSpot(G.world, home, c.x, c.y)) { c.path = null; c.state = 'rest'; c.camped = true; }
+      if (!home) { c.path = null; c.state = 'rest'; c.camped = true; }
       else G.goHome(c);
       return;
     }
@@ -958,7 +972,7 @@ G.detourCitizen = function (c, dtH) {
     } else if (c.walkKind === 'wander') { c.path = null; c.state = 'idle'; c.wanderT = 2; return; }
     else return;
   }
-  const path = G.findPath(G.world, Math.round(c.x), Math.round(c.y), goal.x, goal.y);
+  const path = G.routeCanReuse(goal.route,c,goal.x,goal.y) ? goal.route.path : G.findPath(G.world, Math.round(c.x), Math.round(c.y), goal.x, goal.y);
   if (!path) {
     if (c.state === 'haul' && G.isMineralCargo(c)) { c.haulPending = true; G.waitForMineralStorage(c, 'route'); }
     return;
@@ -1138,7 +1152,7 @@ G.requestTask = function (c) {
         if (!spot) { if (!G.BDEF[b.type].passable) break; else continue; }
         c.task = { kind: 'clearSite', b, tree, tx: spot.x, ty: spot.y,
           logs: G.taskYield(G.taskLogYield(c)), work: G.taskWork(c, G.PROD.forester.workH), workLeft: 0 };
-        G.sendTo(c, spot.x, spot.y); return;
+        G.sendTo(c, spot.x, spot.y, spot.route); return;
       }
       c.state = 'idle'; c.wanderT = 2; return; // 其余树已有人砍，不能提前建造。
     }
@@ -1150,7 +1164,7 @@ G.requestTask = function (c) {
       work: Math.min(G.taskWork(c, G.PROD.builderChunk), b.workLeft),
       workLeft: 0, total: b.totalWork,
     };
-    G.sendTo(c, spot.x, spot.y);
+    G.sendTo(c, spot.x, spot.y, spot.route);
     return;
   }
   const t = G.makeTask(b, c);
@@ -1239,20 +1253,20 @@ G.makeTask = function (b, c) {
         return null;
       }
       if (g.res.wood >= P.woodcutter.logsIn) {
-        const spot = G.workSpot(w, b, c.x, c.y);
-        if (!spot) return null;
-        // 两段式（原版）：先去仓库背原木，回伐木屋加工，产出再背回仓库；没仓库就就地加工
+        // Plan only the current leg. The return workshop route is chosen from
+        // the warehouse at fetchDone, against the then-current map.
         const st = G.nearestStorage(c.x, c.y);
         const route = st ? G.storageRoute(c.x, c.y) : null;
         if (st && !route) { b.noWork = true; b.warnText = '仓库不可达'; return null; }
-        const target = route ? route.spot : spot;
-        return {
+        const target = route ? route.spot : G.workSpot(w, b, c.x, c.y);
+        if (!target) { b.noWork = true; b.warnText = '工作入口不可达'; return null; }
+        return G.withTaskRoute({
           kind: 'firewood', b, tx: target.x, ty: target.y, phase: st ? 'fetch' : 'work',
           work: P.woodcutter.workH, workLeft: 0,
           consume: { type: 'wood', qty: P.woodcutter.logsIn },
           // 原版：受教育工人 1 原木出 4 柴火（配比加成，而非提速）
           yield: { type: 'firewood', qty: G.taskYield(c.educated ? P.woodcutter.logsIn * P.woodcutter.eduFirewoodPerLog : P.woodcutter.firewoodOut) },
-        };
+        }, target.route);
       }
       b.noWork = true; b.warnText = '缺木材';
       return null;
@@ -1331,10 +1345,10 @@ G.makeTask = function (b, c) {
       // 渔获随水域大小浮动：一片小水洼撑不起满产
       const waterN = G.countWaterInRadius(w, b.x, b.y, P.dock.waterR);
       const qty = G.taskYield(Math.max(1, Math.round(P.dock.yield.qty * (0.5 + 0.5 * Math.min(1, waterN / P.dock.fullWater)))));
-      return {
+      return G.withTaskRoute({
         kind: 'work', b, tx: spot.x, ty: spot.y,
         work: G.taskWork(c, P.dock.workH), workLeft: 0, yield: { type: P.dock.yield.type, qty },
-      };
+      }, spot.route);
     }
     case 'mine': {
       const spot = G.workSpot(w, b, c.x, c.y);
@@ -1351,11 +1365,11 @@ G.makeTask = function (b, c) {
       let ironTurn = b.mineTick % P.mine.ironEvery === 0;
       if (stoneFull && !ironTurn) ironTurn = true;
       else if (ironFull && ironTurn) ironTurn = false;
-      return {
+      return G.withTaskRoute({
         kind: 'work', b, tx: spot.x, ty: spot.y,
         work: G.taskWork(c, P.mine.workH), workLeft: 0,
         yield: { type: ironTurn ? 'iron' : 'stone', qty: G.taskYield(P.mine.yield) },
-      };
+      }, spot.route);
     }
     case 'blacksmith': {
       if (G.toolLimited(b)) { b.noWork = true; b.warnText = '工具已达上限'; return null; }
@@ -1367,12 +1381,12 @@ G.makeTask = function (b, c) {
         return null;
       }
       // 1铁+2木 → 2 件工具（受教育 3）；铁匠抡锤不用工具，不吃减产
-      return {
+      return G.withTaskRoute({
         kind: 'work', b, tx: spot.x, ty: spot.y,
         work: G.taskWork(c, P.blacksmith.workH), workLeft: 0,
         consume: cons,
         yield: { type: 'tools', qty: c.educated ? P.blacksmith.eduToolsOut : P.blacksmith.toolsOut },
-      };
+      }, spot.route);
     }
     case 'hunting': {
       const R = P.hunting.radius;
@@ -1813,8 +1827,8 @@ G.siteClearSpot = function (c, b, tree) {
     if (x !== b.x - 1 && x !== b.x + b.w && y !== b.y - 1 && y !== b.y + b.h) continue;
     if (!G.tileBlocked(w, x, y)) spots.push({ x, y });
   }
-  spots.sort((a, z) => G.d2(a.x, a.y, tree.x, tree.y) - G.d2(z.x, z.y, tree.x, tree.y) || G.d2(c.x, c.y, a.x, a.y) - G.d2(c.x, c.y, z.x, z.y));
-  return spots.find(p => G.findPath(w, Math.round(c.x), Math.round(c.y), p.x, p.y)) || null;
+  for(const spot of spots){spot.building=b;spot.state=b.state;}
+  return G.routeSpot(G.findPathToAny(w,c.x,c.y,spots));
 };
 G.siteTrees = function (b) {
   const w = G.world, trees = [];
@@ -1868,6 +1882,7 @@ G.addBuilding = function (type, x, y, opt) {
   for (let j = y; j < y + def.h; j++)
     for (let i = x; i < x + def.w; i++)
       w.bgrid[j * w.N + i] = b.id;
+  G.bumpNavigation(w);
   // A solid footprint invalidates forest/field claims inside it immediately,
   // so its builders can take over real clearing. Partial cargo stays owned.
   if (!def.passable) for (const c of w.citizens) for (const task of [c.task, c.pausedTask])
@@ -1893,6 +1908,7 @@ G.finishBuilding = function (b) {
   if (b.state !== 'site' || G.siteTrees(b).length) return;
   b.state = 'ok';
   b.progress = 1;
+  G.bumpNavigation(G.world);
   // 建造工人多于正式岗位时，释放多余人员
   const def = G.BDEF[b.type];
   while (b.workers.length > def.jobs) {
@@ -1937,6 +1953,7 @@ G.removeBuilding = function (b) {
   for (let j = b.y; j < b.y + b.h; j++)
     for (let i = b.x; i < b.x + b.w; i++)
       w.bgrid[j * w.N + i] = -1;
+  G.bumpNavigation(w);
   if (G.sel && G.sel.kind === 'b' && G.sel.id === b.id) G.ui.hideInfo();
   G.ui.toast(`🚧 已拆除 ${def.name}${refund.length ? `，返还 ${refund.join(' ')}` : ''}`, 'info');
   G.scheduleJobs();
