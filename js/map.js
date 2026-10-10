@@ -496,3 +496,88 @@ G.canPlaceRoad = function (w, x, y) {
   if (w.water[i] === 1 || w.rock[i] || w.bgrid[i] >= 0 || w.road[i]) return false;
   return true;
 };
+
+/* Two-endpoint dirt-road preview. Read-only, four-neighbour connected, bounded
+ * work only on endpoint selection (never called by the render loop). */
+G.planRoad = function (w, start, end, options) {
+  options = options || {};
+  const N = w.N, valid = p => p && Number.isInteger(p.x) && Number.isInteger(p.y) && p.x >= 0 && p.y >= 0 && p.x < N && p.y < N;
+  if (!valid(start) || !valid(end)) return { ok: false, reason: '起终点必须在地图内' };
+  const usable = (x, y) => x >= 0 && y >= 0 && x < N && y < N &&
+    w.water[y * N + x] !== 1 && !w.rock[y * N + x] && w.bgrid[y * N + x] < 0;
+  if (!usable(start.x, start.y)) return { ok: false, reason: '起点被水面、建筑或矿石挡住' };
+  if (!usable(end.x, end.y)) return { ok: false, reason: '终点被水面、建筑或矿石挡住' };
+  const distance = (x, y, p) => Math.abs(x - p.x) + Math.abs(y - p.y);
+  const direct = distance(start.x, start.y, end), maxSteps = Math.ceil(direct * 1.75) + 16;
+  const maxExpanded = Math.max(1, Math.min(20000, Number.isFinite(options.maxExpanded) ? Math.floor(options.maxExpanded) : 12000));
+  let roadTiles = 0; for (const value of w.road) if (value) roadTiles++;
+  let expanded = 0, budgetExceeded = false;
+  const directions = [[1, 0], [0, 1], [-1, 0], [0, -1]];
+  function search(weighted) {
+    const scores = new Map(), parents = new Map(), steps = new Map(), closed = new Set(), heap = [];
+    let order = 0;
+    // Integer costs avoid floating tie drift; prefer deeper equal-cost prefixes.
+    const estimate = (x, y, dir) => {
+      const dx = end.x - x, dy = end.y - y, remaining = Math.abs(dx) + Math.abs(dy);
+      if (!weighted) return remaining * 100;
+      const xDir = dx > 0 ? 0 : 2, yDir = dy > 0 ? 1 : 3;
+      const turns = !remaining ? 0 : dx && dy ? (dir === xDir || dir === yDir ? 1 : 2) : dir === (dx ? xDir : yDir) ? 0 : 1;
+      return remaining * 115 - Math.min(remaining, roadTiles) * 15 + turns * 70;
+    };
+    const less = (a, b) => a.f < b.f || (a.f === b.f && (a.g > b.g || (a.g === b.g && a.order < b.order)));
+    function push(node) {
+      heap.push(node); let i = heap.length - 1;
+      while (i) { const p = (i - 1) >> 1; if (!less(node, heap[p])) break; heap[i] = heap[p]; i = p; } heap[i] = node;
+    }
+    function pop() {
+      const first = heap[0], last = heap.pop();
+      if (heap.length) { let i = 0; while (i * 2 + 1 < heap.length) {
+        let child = i * 2 + 1; if (child + 1 < heap.length && less(heap[child + 1], heap[child])) child++;
+        if (!less(heap[child], last)) break; heap[i] = heap[child]; i = child;
+      } heap[i] = last; } return first;
+    }
+    for (let dir = 0; dir < 4; dir++) {
+      const id = (start.y * N + start.x) * 4 + dir;
+      scores.set(id, 0); parents.set(id, -1); steps.set(id, 0); push({ id, g: 0, f: estimate(start.x, start.y, dir), order: order++ });
+    }
+    while (heap.length) {
+      if (expanded >= maxExpanded) { budgetExceeded = true; return null; }
+      const current = pop(), id = current.id;
+      if (closed.has(id) || scores.get(id) !== current.g) continue;
+      closed.add(id); expanded++;
+      const cell = Math.floor(id / 4), x = cell % N, y = Math.floor(cell / N), dir = id % 4;
+      if (x === end.x && y === end.y) {
+        const path = []; let at = id;
+        while (at >= 0) { const i = Math.floor(at / 4); path.push({ x: i % N, y: Math.floor(i / N) }); at = parents.get(at); }
+        return path.reverse();
+      }
+      for (let d = 0; d < 4; d++) {
+        const nx = x + directions[d][0], ny = y + directions[d][1];
+        if (!usable(nx, ny)) continue;
+        const nextStep = steps.get(id) + 1, remain = distance(nx, ny, end);
+        if (nextStep + remain > maxSteps) continue;
+        const ni = ny * N + nx, next = ni * 4 + d;
+        if (closed.has(next)) continue;
+        const cost = 100 + (weighted ? (d !== dir ? 70 : 0) + (w.road[ni] ? 0 : 15) + (w.treeIdx[ni] >= 0 ? 60 : 0) : 0);
+        const score = current.g + cost;
+        if (score >= (scores.get(next) ?? Infinity)) continue;
+        scores.set(next, score); parents.set(next, id); steps.set(next, nextStep);
+        push({ id: next, g: score, f: score + estimate(nx, ny, d), order: order++ });
+      }
+    }
+    return null;
+  }
+  // If turn/clearance weighting exhausts an admissible prefix under the length
+  // guard, a shortest-path fallback uses the same total node budget.
+  const path = search(true) || (!budgetExceeded ? search(false) : null);
+  if (!path) return { ok: false, reason: budgetExceeded ? '路线计算达到预算，请选择较近端点分段规划' : '没有连通路线，或绕行过远；请分段规划或先清障', expanded, maxSteps, budgetExceeded };
+  let turns = 0, previous = null, newTiles = 0, reusedTiles = 0;
+  const clearTrees = [];
+  for (let j = 0; j < path.length; j++) {
+    const p = path[j], i = p.y * N + p.x;
+    if (w.road[i]) reusedTiles++; else newTiles++;
+    if (w.treeIdx[i] >= 0) clearTrees.push({ x: p.x, y: p.y });
+    if (j) { const d = [p.x - path[j - 1].x, p.y - path[j - 1].y]; if (previous && (d[0] !== previous[0] || d[1] !== previous[1])) turns++; previous = d; }
+  }
+  return { ok: true, path, steps: path.length - 1, turns, newTiles, reusedTiles, clearTrees, materials: { wood: 0, stone: 0 }, expanded, maxSteps };
+};

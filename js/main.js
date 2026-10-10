@@ -42,7 +42,7 @@ G.newGame = function (seed, options) {
   G.game = G.newGameState();
   G.game.res = { wood: 80, stone: 48, iron: 0, tools: 15, food: 500, firewood: 50 };
   G.sel = null;
-  G.tool = null;
+  G.tool = null; G.cancelRoadPlan();
   G.smoke = [];
   G.flakes = null;
   if (!options.preserveSaves) {
@@ -395,7 +395,7 @@ G.applySaveData = function (d) {
   const candidate = G.prepareSaveData(d);
   G.world = candidate.world; G.game = candidate.game; G.rng = candidate.rng; G.setUid(candidate.nextUid);
   if (G._recoveryBackedUp) G.autosaveBlocked = false;
-  G.sel = null; G.tool = null; G.smoke = []; G.flakes = null; G.keys = {};
+  G.sel = null; G.tool = null; G.cancelRoadPlan(); G.smoke = []; G.flakes = null; G.keys = {};
   G.ui.hideInfo(); G.ui.setToolActive();
   document.getElementById('over').classList.add('hidden');
   // All cargo is validated and owned by the candidate; now resume its deliveries.
@@ -500,6 +500,7 @@ G.clampCam = function () {
 
 /* ---------- 工具模式 ---------- */
 G.setTool = function (t) {
+  G.cancelRoadPlan();
   if (t == null) { G.tool = null; }
   else if (t === 'demolish') G.tool = { kind: 'demolish' };
   else if (t === 'road') G.tool = { kind: 'road' };
@@ -567,6 +568,59 @@ G.paintRoad = function (x0, y0, x1, y1) {
   }
 };
 
+/* Transient, explicitly confirmed road plan. Existing marked work is never
+ * cancelled by discarding a preview; planning does not change the world. */
+G.roadPlan = null;
+G.roadGestureVersion = 0;
+G.cancelRoadPlan = function () { G.roadPlan = null; G.roadGestureVersion++; };
+G.selectRoadEndpoint = function (x, y) {
+  if (!G.world || !G.tool || G.tool.kind !== 'road' || G.hasOpenModal()) return;
+  const w = G.world, point = { x, y }, old = G.roadPlan;
+  if (!old || old.world !== w || old.end) {
+    const check = G.planRoad(w, point, point);
+    G.roadPlan = { world: w, start: point, end: null, result: check, message: check.ok ? '起点已选，请点击终点' : check.reason };
+    if (!check.ok) G.roadPlan.start = null;
+    return;
+  }
+  if (!old.start) { G.roadPlan = null; G.selectRoadEndpoint(x, y); return; }
+  const result = G.planRoad(w, old.start, point);
+  G.roadPlan = { world: w, start: old.start, end: point, result, message: result.ok ? '' : result.reason };
+};
+G.roadPlanStatus = function () {
+  const plan = G.roadPlan, w = G.world;
+  if (!plan || plan.world !== w || !plan.end || !plan.result.ok) return { ok: false, reason: plan && plan.world === w ? plan.message : '点击起点，再点击终点预览路线' };
+  const trees = [], added = [];
+  for (const p of plan.result.path) {
+    const i = p.y * w.N + p.x;
+    if (w.water[i] === 1 || w.rock[i] || w.bgrid[i] >= 0) return { ok: false, reason: '路线已被新障碍阻断，请重新选择起终点' };
+    if (w.treeIdx[i] >= 0) { trees.push(p); if (!w.marked.has(i)) added.push(p); }
+  }
+  if (w.marked.size + added.length > 300) return { ok: false, reason: '清树标记将超过300处，请等待现有任务完成或取消多余标记' };
+  return { ok: true, trees, added, plan };
+};
+G.confirmRoadPlan = function (intent) {
+  if (!G.tool || G.tool.kind !== 'road' || G.hasOpenModal()) return { ok: false };
+  const status = G.roadPlanStatus();
+  if (!status.ok) return status;
+  const w = G.world, plan = status.plan;
+  const mode = status.trees.length ? 'clear' : 'pave';
+  const treeSignature = status.trees.map(p => p.y * w.N + p.x).join(',');
+  if (intent && (intent.plan !== plan || intent.mode !== mode || intent.trees !== treeSignature))
+    return { ok: false, reason: '路线或清树需求已变化，请复查预览后重新确认' };
+  if (status.trees.length) {
+    for (const p of status.added) G.markFellAt(w, p.x, p.y);
+    plan.message = '已确认清树任务；工人清树后，再点击确认铺路；木材仍须搬运入仓。退出规划不会撤销已确认标记。';
+    return { ok: true, clearing: true, marked: status.added.length };
+  }
+  let placed = 0;
+  for (const p of plan.result.path) {
+    const i = p.y * w.N + p.x;
+    if (!w.road[i]) { w.road[i] = 1; G.markGroundDirty(p.x, p.y); placed++; }
+  }
+  G.cancelRoadPlan();
+  return { ok: true, placed };
+};
+
 /* ---------- 初始化 ---------- */
 G.init = function () {
   G.cv = document.getElementById('game');
@@ -600,22 +654,22 @@ G.init = function () {
   window.addEventListener('beforeunload', () => G.autosave());
   window.addEventListener('pagehide', () => G.autosave());
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') { resetInput(); G.autosave(); }
+    if (document.visibilityState === 'hidden') { resetInput(); G.cancelRoadPlan(); G.autosave(); }
   });
   // 定时自动存档：每 90 秒（游戏进行中）
   setInterval(() => G.autosave(), 90000);
 
   /* ----- 输入 ----- */
   let dragging = false, dragBtn = -1, dragMoved = 0, lastX = 0, lastY = 0;
-  let roadLast = null;
+  let roadTouch = null;
   let fellLast = null;
   let rockLast = null;
   function resetInput() {
     G.keys = {};
     dragging = false; dragBtn = -1; dragMoved = 0;
-    roadLast = null; fellLast = null; rockLast = null;
+    fellLast = null; rockLast = null; roadTouch = null;
   }
-  window.addEventListener('blur', resetInput);
+  window.addEventListener('blur', () => { resetInput(); roadTouch = null; G.cancelRoadPlan(); });
   document.addEventListener('focusin', e => { if (G.isInputTarget(e.target)) resetInput(); });
 
   const toLocal = (e) => {
@@ -633,12 +687,6 @@ G.init = function () {
     if (e.button === 2 && G.tool) { G.setTool(null); return; } // 右键取消工具
     dragging = true; dragBtn = e.button; dragMoved = 0;
     lastX = p.x; lastY = p.y;
-    if (e.button === 0 && G.tool && G.tool.kind === 'road') {
-      const t = G.screenToTile(p.x, p.y);
-      const tx = Math.floor(t.tx), ty = Math.floor(t.ty);
-      if (G.canPlaceRoad(G.world, tx, ty)) { G.paintRoad(tx, ty, tx, ty); roadLast = { x: tx, y: ty }; }
-      else roadLast = { x: tx, y: ty };
-    }
     if (e.button === 0 && G.tool && G.tool.kind === 'fell') {
       const t = G.screenToTile(p.x, p.y);
       const tx = Math.floor(t.tx), ty = Math.floor(t.ty);
@@ -664,12 +712,6 @@ G.init = function () {
     if (dragBtn === 2 || dragBtn === 1 || (dragBtn === 0 && !G.tool && dragMoved > 4)) {
       G.cam.x += dx; G.cam.y += dy;
       lastX = p.x; lastY = p.y;
-    } else if (dragBtn === 0 && G.tool && G.tool.kind === 'road' && roadLast) {
-      const tx = Math.floor(t.tx), ty = Math.floor(t.ty);
-      if (tx !== roadLast.x || ty !== roadLast.y) {
-        G.paintRoad(roadLast.x, roadLast.y, tx, ty);
-        roadLast = { x: tx, y: ty };
-      }
     } else if (dragBtn === 0 && G.tool && G.tool.kind === 'fell' && fellLast) {
       const tx = Math.floor(t.tx), ty = Math.floor(t.ty);
       if (tx !== fellLast.x || ty !== fellLast.y) {
@@ -699,13 +741,36 @@ G.init = function () {
         // Keep the legacy demolishAt API; this UI action only targets built objects.
         if (tx >= 0 && ty >= 0 && tx < w.N && ty < w.N && (w.bgrid[i] >= 0 || w.road[i])) G.demolishAt(tx, ty);
         G.ui.refreshHUD();
-      } else if (G.tool && (G.tool.kind === 'road' || G.tool.kind === 'quarry')) {
-        // 已在按下/拖拽时处理；采矿不能落入对象选择或拆除
+      } else if (G.tool && G.tool.kind === 'road') {
+        G.selectRoadEndpoint(tx, ty);
+      } else if (G.tool && G.tool.kind === 'quarry') {
+        // 采矿已在按下/拖拽时处理，不能落入对象选择或拆除
       } else {
         G.selectAt(tx, ty, p);
       }
     }
   });
+
+  G.cv.addEventListener('touchstart', e => {
+    if (!G.tool || G.tool.kind !== 'road') return;
+    e.preventDefault(); resetInput();
+    roadTouch = !G.hasOpenModal() && e.touches.length === 1 ? { x: e.touches[0].clientX, y: e.touches[0].clientY, world: G.world, generation: G.roadGestureVersion } : null;
+  }, { passive: false });
+  G.cv.addEventListener('touchmove', e => {
+    if (!G.tool || G.tool.kind !== 'road') return;
+    e.preventDefault();
+    if (e.touches.length !== 1 || !roadTouch || Math.abs(e.touches[0].clientX - roadTouch.x) + Math.abs(e.touches[0].clientY - roadTouch.y) > 10) roadTouch = null;
+  }, { passive: false });
+  G.cv.addEventListener('touchcancel', () => { roadTouch = null; G.cancelRoadPlan(); });
+  G.cv.addEventListener('touchend', e => {
+    if (!G.tool || G.tool.kind !== 'road') { roadTouch = null; return; }
+    e.preventDefault();
+    if (roadTouch && roadTouch.world === G.world && roadTouch.generation === G.roadGestureVersion && e.changedTouches.length === 1 && !G.hasOpenModal()) {
+      const p = toLocal(e.changedTouches[0]), t = G.screenToTile(p.x, p.y);
+      G.selectRoadEndpoint(Math.floor(t.tx), Math.floor(t.ty));
+    }
+    roadTouch = null;
+  }, { passive: false });
 
   G.cv.addEventListener('wheel', e => {
     if (G.hasOpenModal()) return;

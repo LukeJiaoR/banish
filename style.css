@@ -328,3 +328,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   .goal-controls input { width: 100px; flex: 1 1 80px; min-width: 70px; }
   .dialog .goal-controls .goal-inherit { flex-basis: 100%; }
 }
+#road-controls { background: rgba(24,18,10,.94); border: 1px solid #a0c47a; border-radius: 8px; padding: 8px 10px; font-size: 12px; line-height: 1.5; }
+#road-plan-status { white-space: pre-line; margin: 0 0 8px; }
+#road-controls button { min-height: 44px; min-width: 100px; margin: 0 6px 4px 0; }
+@media (max-width: 600px), (max-height: 620px) { #hud:has(#road-controls:not(.hidden)) #survival-guide { display: none; } }
+#hud:has(#road-controls:not(.hidden)) #toasts { left: auto; right: 12px; max-width: max(220px, calc(100vw - 490px)); z-index: 3; }

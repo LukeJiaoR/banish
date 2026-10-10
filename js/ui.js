@@ -157,6 +157,7 @@ G.ui = {
     const icImg = (n) => n ? `<img class="icimg" src="assets/icons/${n}.png" alt="" onerror="this.remove()">` : '';
     const toolTip = (t) => {
       if (t === 'demolish') return '拆除：点击建筑或道路移除；树木请用砍伐，岩石和铁矿请用采石采铁';
+      if (t === 'road') return '道路：点选起点和终点预览连通路线，确认后铺设；树木需先标记由工人清除';
       if (t === 'quarry') return '采石采铁：点击或拖拽沿线标记矿石；灰色岩石产石头，锈色铁矿产铁，散工开采后搬运入库';
       const d = G.BDEF[t];
       const cost = this.resourceCost(d.cost, false);
@@ -184,6 +185,7 @@ G.ui = {
     });
     this.initHarvestControls();
     this.initProductionGoals();
+    this.initRoadControls();
 
     // 顶栏按钮
     document.getElementById('btn-save').addEventListener('click', () => { G.saveGame(); });
@@ -211,6 +213,66 @@ G.ui = {
       if (btn) btn.classList.add('active');
     }
     this.refreshHarvestControls();
+    this.refreshRoadControls();
+  },
+
+  initRoadControls: function () {
+    const confirm = document.getElementById('road-confirm'), cancel = document.getElementById('road-cancel');
+    if (!confirm || !cancel) return;
+    let armed = null, keyHeld = false;
+    const capture = e => {
+      if (e.type === 'mousedown' && armed && armed.source === 'touchstart') return;
+      keyHeld = false;
+      armed = confirm._roadIntent ? { ...confirm._roadIntent, source: e.type } : null;
+    };
+    for (const name of (window.PointerEvent ? ['pointerdown'] : ['mousedown', 'touchstart'])) confirm.addEventListener(name, capture);
+    confirm.addEventListener('keydown', e => {
+      if (!['Enter', ' '].includes(e.key) || e.repeat) return;
+      keyHeld = true;
+      armed = confirm._roadIntent ? { ...confirm._roadIntent, source: 'keyboard' } : null;
+    });
+    confirm.addEventListener('keyup', e => { if (['Enter', ' '].includes(e.key)) keyHeld = false; });
+    confirm.addEventListener('pointercancel', () => { armed = null; keyHeld = false; });
+    confirm.addEventListener('touchcancel', () => { armed = null; keyHeld = false; });
+    window.addEventListener('blur', () => { armed = null; keyHeld = false; });
+    confirm.addEventListener('click', e => {
+      e.preventDefault(); e.stopPropagation();
+      const intent = armed || confirm._roadIntent;
+      if (!keyHeld) armed = null;
+      if (!intent) { this.refreshRoadControls(); return; }
+      const result = G.confirmRoadPlan(intent);
+      if (result.reason) this.toast(result.reason, 'warn');
+      else if (result.placed != null) this.toast(`已铺设 ${result.placed} 格土路`, 'good');
+      this.refreshRoadControls();
+    });
+    cancel.addEventListener('click', e => {
+      e.preventDefault(); e.stopPropagation();
+      if (G.hasOpenModal()) return;
+      G.cancelRoadPlan(); this.refreshRoadControls();
+    });
+  },
+  refreshRoadControls: function () {
+    const el = document.getElementById('road-controls');
+    if (!el) return;
+    const visible = G.tool && G.tool.kind === 'road' && G.world;
+    el.classList.toggle('hidden', !visible);
+    if (!visible) return;
+    const text = document.getElementById('road-plan-status'), button = document.getElementById('road-confirm');
+    if (!text || !button) return;
+    const status = G.roadPlanStatus(), plan = G.roadPlan;
+    let message = status.reason || '';
+    if (status.ok) {
+      const r = plan.result;
+      message = `路线 ${r.path.length} 格 · 新铺 ${r.newTiles} · 复用 ${r.reusedTiles} · 转弯 ${r.turns} 次
+土路材料消耗：0 · 尚需清树 ${status.trees.length} 棵`;
+      if (plan.message) message += '\n' + plan.message;
+    }
+    message += '\n点击起点和终点；确认前不修改地图。水面、建筑和矿石需绕行。Esc/右键退出。';
+    if (text.textContent !== message) text.textContent = message;
+    const waiting = status.ok && status.trees.length && !status.added.length;
+    button._roadIntent = status.ok ? { plan, mode: status.trees.length ? 'clear' : 'pave', trees: status.trees.map(p => p.y * G.world.N + p.x).join(',') } : null;
+    button.textContent = status.ok && status.trees.length ? (waiting ? '等待工人清树' : '确认标记清树') : '确认铺路';
+    button.disabled = !status.ok || !!waiting || G.hasOpenModal();
   },
 
   // Persistent buttons are separate from the text-only, frame-refreshed preview.
@@ -385,6 +447,7 @@ G.ui = {
   },
 
   refreshPlacement: function (type, x, y) {
+    if (this.refreshRoadControls) this.refreshRoadControls();
     if (this.refreshHarvestControls) this.refreshHarvestControls();
     const el = this.el.placement;
     if (!el) return null;
