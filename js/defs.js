@@ -42,45 +42,45 @@ G.BDEF = {
   },
   mine: {
     id: 'mine', name: '矿井', icon: '⛏️', w: 3, h: 3,
-    cost: { wood: 80, stone: 40, iron: 10 }, buildWork: 140, jobs: 4, passable: false,
+    cost: { wood: 80, stone: 40, iron: 10 }, buildWork: 140, jobs: 2, passable: false,
     wall: '#6f6a62', wallD: '#524e47', roof: '#4a463f',
-    desc: '深井采矿，不受地表矿藏限制：4 名工人轮流下井，每 5 趟有 1 趟采铁。石:铁产出比约 4:1，让石头/铁不再完全依赖地表矿（地表矿清得快、仍是早期最快来源）。',
+    desc: '深井采矿，2 名专业工人，每批基础产出 6 石或铁，通常每 5 趟有 1 趟铁；满仓或生产目标暂停某矿种时改采另一种。地表矿仍由散工采集，单块产量不变。',
   },
   blacksmith: {
     id: 'blacksmith', name: '铁匠铺', icon: '⚒️', w: 3, h: 3,
     cost: { wood: 42, stone: 24 }, buildWork: 120, jobs: 1, passable: false,
     wall: '#7a5a45', wallD: '#5c4334', roof: '#6b4a3a',
-    desc: '原版 Blacksmith 成本 42木+24石，1 名工人。1 铁+2 木打 2 件工具（受教育 3 件）。工具是市民干活的饭碗：每人每天磨损一点，约 2.5 年用坏一件；工具用尽时生产减半。默认备30件，达到工具上限即停工，避免把过冬木材全打成工具。',
+    desc: '1 名铁匠，基础加工 4 小时。1 铁+2 木打 2 件工具（受教育 3 件），原料配比不变。默认备30件，达到目标即停止新批次；工具用尽会降低生产。',
   },
   gatherer: {
     id: 'gatherer', name: '采集小屋', icon: '🧺', w: 2, h: 2,
-    cost: { wood: 30, stone: 12 }, buildWork: 70, jobs: 4, passable: false,
+    cost: { wood: 30, stone: 12 }, buildWork: 70, jobs: 2, passable: false,
     wall: '#7d6a48', wallD: '#615238', roof: '#5d7040',
-    desc: '原版成本 30木+12石，4 名工人。在附近森林采集，实测约 150-370 食物/工人/年（森林贴着仓库取高值，与护林同址被砍林取低值），随圈内成熟林密度浮动——护林小屋把森林砍穿会砸了这里的饭碗。必须靠近森林。',
+    desc: '2 名专业采集者，基础每趟 10 食物，受成熟林密度、工具和往返路程影响。减少占工、通常保住原四人小屋的整屋产量；护林大量采伐同一片森林仍会降低收获。',
   },
   hunting: {
     id: 'hunting', name: '猎人小屋', icon: '🏹', w: 2, h: 2,
-    cost: { wood: 44, stone: 10 }, buildWork: 80, jobs: 4, passable: false,
+    cost: { wood: 44, stone: 10 }, buildWork: 80, jobs: 2, passable: false,
     wall: '#5e6b4a', wallD: '#485238', roof: '#4d5e3e',
-    desc: '原版 Hunting Cabin 成本 44木+10石，4 名猎人。去圈内最近的成熟林狩猎鹿群（满产 5 食物/次，实测约 150 食物/猎人/年，随成熟林密度与仓库距离浮动）——森林被砍穿猎物就没了。与采集小屋的区别：猎物再生依赖成熟树，采集只要树在就行。',
+    desc: '2 名专业猎人，满林基础每趟 10 食物，受成熟林密度、工具和往返路程影响。成熟树太少会停工；与采集小屋不同，幼林不能支持狩猎。',
   },
   forester: {
     id: 'forester', name: '护林小屋', icon: '🌲', w: 2, h: 2,
-    cost: { wood: 32, stone: 12 }, buildWork: 70, jobs: 4, passable: false,
+    cost: { wood: 32, stone: 12 }, buildWork: 70, jobs: 2, passable: false,
     wall: '#6b5a3e', wallD: '#54462f', roof: '#4a6b3a',
-    desc: '原版成本 32木+12石，4 名工人。砍树取原木（未受教育 1 树=2 原木，受教育 3），砍倒即原地补种、可持续轮伐，约 40-70 原木/工人/年（受教育近翻倍；与采集/猎人同林会被摊薄）。面板可分别开关「砍伐」与「补种」：只种不砍可育林，只砍不种会清光森林。圈内成熟树存量过低时会自动停砍育林。',
+    desc: '2 名专业护林人。基础砍伐4小时、补种1.5小时；每棵树仍产2原木（受教育3），最多背8原木一批。就近连续采伐后真实送仓，原地补种生长速度不变。可分别关闭砍伐/补种；同址采集和狩猎仍受成熟林减少影响。',
   },
   woodcutter: {
     id: 'woodcutter', name: '伐木屋', icon: '🪓', w: 2, h: 2,
     cost: { wood: 24, stone: 8 }, buildWork: 70, jobs: 1, passable: false,
     wall: '#75563c', wallD: '#5b4230', roof: '#7a5230',
-    desc: '原版成本 24木+8石，1 名工人。把原木劈成柴火：1 原木 = 3 柴火（受教育 4）。工人自己去仓库背原木——建在仓库旁边效率更高。面板可设本屋燃料目标（原版 Fuel Limit）：全镇柴火库存达到目标时，本屋停止接新批次；目标不代表过冬需求。',
+    desc: '1 名工人，基础加工3.5小时。自己到仓库取2原木，劈成6柴火（受教育8），配比不变；靠近仓库和住宅更高效。全镇柴火库存达到本屋燃料目标即停止新批次；目标不代表过冬需求。',
   },
   dock: {
     id: 'dock', name: '渔码头', icon: '🎣', w: 2, h: 2,
-    cost: { wood: 30, stone: 16 }, buildWork: 90, jobs: 4, passable: false,
+    cost: { wood: 30, stone: 16 }, buildWork: 90, jobs: 2, passable: false,
     wall: '#6f5b40', wallD: '#574732', roof: '#8a5a3a',
-    desc: '原版成本 30木+16石，4 名工人，实测约 150-450 食物/工人/年，随周边水域大小与仓库距离浮动。必须紧邻水面。',
+    desc: '2 名专业渔民，满水域基础每趟8食物。减少占工、通常保住原四人码头的整屋产量；小水域、缺工具和远仓仍影响产出。必须紧邻水面。',
   },
   school: {
     id: 'school', name: '学堂', icon: '🏫', w: 3, h: 3,
@@ -105,20 +105,20 @@ G.BDEF = {
 /* 工具栏顺序 */
 G.TOOLBAR = ['fell', 'quarry', 'house', 'stonehouse', 'boarding', 'storage', 'mine', 'blacksmith', 'gatherer', 'forester', 'woodcutter', 'dock', 'hunting', 'school', 'farm', 'road', 'demolish'];
 
-/* 产出参数（workH: 每次工作小时数；目标对齐原版年产量） */
+/* 产出参数（workH: 每次工作小时数；专业岗位按本作真实运输成本校准） */
 G.PROD = {
   // gatherer/dock 产出随资源状态浮动：满产基准 qty，圈内成熟树/水域不足时按比例打折
-  gatherer:  { workH: 5, yield: { type: 'food', qty: 5 }, radius: 6, needTrees: 6, fullForest: 24 },
-  // workH 8h + 原地补种 3h = 11h/棵：赶路+砍+种+送仓刚好排进 16h 工作日，
-  // 砍一棵在原坑种一棵（可持续轮伐），采伐区锁定在护林屋周围成熟林带；
+  gatherer:  { workH: 5, yield: { type: 'food', qty: 10 }, radius: 6, needTrees: 6, fullForest: 24 },
+  // 散工 workH 8h 不变；专业砍伐4h+补种1.5h，最多8原木一批，仍需真实搬运。
+  // 砍一棵在原坑种一棵（可持续轮伐），在护林作业区内选择工人附近的可达目标；
   // minMature：圈内成熟树低于下限即停砍育林（防清穿森林、拖垮同址采集小屋）
-  forester:  { workH: 8, logsYield: 2, eduLogsYield: 3, plantH: 3, radius: 16, minMature: 15 },
-  woodcutter: { workH: 7, logsIn: 2, firewoodOut: 6, eduFirewoodPerLog: 4,
+  forester:  { workH: 8, cutWorkH: 4, logsYield: 2, eduLogsYield: 3, plantH: 1.5, haulCap: 8, radius: 16, minMature: 15 },
+  woodcutter: { workH: 3.5, logsIn: 2, firewoodOut: 6, eduFirewoodPerLog: 4,
     fuelLimit: 100, fuelStep: 50, fuelMax: 2000 }, // 燃料上限（原版 Fuel Limit）：柴火库存达到上限即停产；默认 100 ≈ 3 栋木屋一年取暖量，扩张后按面板需求提高，避免开局过量劈柴挤掉住房木材
-  dock:      { workH: 5, yield: { type: 'food', qty: 4 }, waterR: 10, fullWater: 40 },
-  mine:      { workH: 9, yield: 3, ironEvery: 5 }, // 每 5 趟 1 趟铁，其余采石（深井矿脉不枯竭）
-  blacksmith: { toolLimit: 30, toolMax: 500, workH: 8, consume: [{ type: 'iron', qty: 1 }, { type: 'wood', qty: 2 }], toolsOut: 2, eduToolsOut: 3 }, // 1铁+2木→2工具（受教育 3）
-  hunting:   { workH: 5, yield: 5, radius: 12, needTrees: 10, fullForest: 20 }, // 狩猎依赖成熟林（鹿群栖息地），猎物随森林再生
+  dock:      { workH: 5, yield: { type: 'food', qty: 8 }, waterR: 10, fullWater: 40 },
+  mine:      { workH: 9, yield: 6, ironEvery: 5 }, // 每 5 趟 1 趟铁，其余采石（深井矿脉不枯竭）
+  blacksmith: { toolLimit: 30, toolMax: 500, workH: 4, consume: [{ type: 'iron', qty: 1 }, { type: 'wood', qty: 2 }], toolsOut: 2, eduToolsOut: 3 }, // 1铁+2木→2工具（受教育 3）
+  hunting:   { workH: 5, yield: 10, radius: 12, needTrees: 10, fullForest: 20 }, // 狩猎依赖成熟林（鹿群栖息地），猎物随森林再生
   // perTile 14/格：原版 7/格但田块可放大到 15×15，本作固定 8×8，翻倍对齐原版人均产出；
   // haulCap 28：收获攒满 4 格再送一趟仓，否则 64 趟搬运会把秋收窗口耗在走路 上
   farm:      { perTile: 14, tileWorkH: 0.5, growDays: 24, haulCap: 28 },
