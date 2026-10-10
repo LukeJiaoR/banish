@@ -6,7 +6,7 @@
 window.G = {};
 
 /* 游戏版本：进反馈 payload 与结算画面——反馈可归因到数值补丁（发版时手动递增） */
-G.VERSION = '0.3.25';
+G.VERSION = '0.3.26';
 
 /* ---------- 常量 ---------- */
 G.TILE_W = 64;            // 等距菱形瓦片宽（缩放 1 时的像素）
@@ -30,7 +30,9 @@ G.RES = {
   wood:     { name: '木材', color: '#b08850', icon: '🪵', iconAsset: 'res_wood' },
   stone:    { name: '石头', color: '#b8b8b8', icon: '🪨', iconAsset: 'res_stone' },
   iron:     { name: '铁', color: '#c08a5a', icon: '🔩', iconAsset: 'res_iron' },
-  tools:    { name: '工具', color: '#cfcfcf', icon: '🛠', iconAsset: 'res_tools' },
+  tools:    { name: '铁工具', color: '#cfcfcf', icon: '🛠', iconAsset: 'res_tools' },
+  coal: { name: '煤', color: '#59606c', icon: '⬛', iconAsset: 'res_coal' },
+  steelTools: { name: '钢工具', color: '#b2cad8', icon: '⚒️', iconAsset: 'res_steelTools' },
   food:     { name: '食物', color: '#e0705a', icon: '🍖', iconAsset: 'res_food' },
   meat: { name: '肉类', color: '#c77564', icon: '🍖', iconAsset: 'res_meat' },
   vegetables: { name: '蔬菜', color: '#91aa62', icon: '🥬', iconAsset: 'res_vegetables' },
@@ -42,7 +44,7 @@ G.RES = {
   firewood: { name: '柴火', color: '#e8a33d', icon: '🔥', iconAsset: 'res_firewood' },
 };
 G.FOOD_KEYS = ['meat', 'vegetables', 'grain'];
-G.RES_KEYS = ['wood', 'stone', 'iron', 'tools', 'food', ...G.FOOD_KEYS, 'firewood', 'leather', 'wool', 'clothes', 'herbs'];
+G.RES_KEYS = ['wood', 'stone', 'iron', 'tools', 'food', ...G.FOOD_KEYS, 'firewood', 'leather', 'wool', 'clothes', 'herbs', 'coal', 'steelTools'];
 G.isFood = type => type === 'food' || G.FOOD_KEYS.includes(type);
 
 /* ---------- 随机数 ---------- */

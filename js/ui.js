@@ -56,7 +56,7 @@ G.ui = {
     if (G.fuelLimited(b)) return '暂停生产（柴火已达目标）';
     if (G.toolLimited(b)) return '暂停生产（工具已达目标）';
     if (b.type === 'woodcutter' && G.game.res.wood < G.PROD.woodcutter.logsIn) return '等待原木';
-    if (b.type === 'blacksmith' && !G.jobCanProduce(b)) return '等待铁或原木';
+    if (b.type === 'blacksmith' && !G.jobCanProduce(b)) return G.blacksmithOutput(b) === 'steelTools' ? '等待铁、原木或煤' : '等待铁或原木';
     if (b.type === 'tailor' && !G.jobCanProduce(b)) return G.game.res.clothes >= G.storageCap() ? '暂停制作（衣物仓容已满）' : b.warnText || '等待皮革或羊毛';
     if (b.type === 'farm' && !G.farmHasWork(b)) return '农闲（等待播种或收获）';
     if (b.noWork && b.warnText) return `等待：${b.warnText}`;
@@ -201,7 +201,7 @@ G.ui = {
     this.toolGroups = [
       { id: 'homes', name: '住房', icon: '🏠', hint: '安家与过冬', tools: ['house', 'stonehouse', 'boarding'] },
       { id: 'food', name: '食物生产', icon: '🌾', hint: '肉类 · 蔬菜 · 主食', tools: ['gatherer', 'hunting', 'dock', 'farm', 'orchard', 'pasture'] },
-      { id: 'industry', name: '资源与加工', icon: '⚒️', hint: '木石铁 · 柴火 · 衣物', tools: ['forester', 'woodcutter', 'mine', 'blacksmith', 'tailor'] },
+      { id: 'industry', name: '资源与加工', icon: '⚒️', hint: '木石铁煤 · 工具 · 衣物', tools: ['forester', 'woodcutter', 'stonequarry', 'mine', 'blacksmith', 'tailor'] },
       { id: 'services', name: '城镇服务', icon: '🏘️', hint: '储运 · 教育 · 医疗 · 贸易', tools: ['storage', 'school', 'herbalist', 'hospital', 'tradingpost'] },
       { id: 'land', name: '道路与采运', icon: '🛣️', hint: '修路 · 采集 · 拆除', tools: ['road', 'fell', 'quarry', 'demolish'] },
     ].map(group => ({ ...group, tools: group.tools.filter(available) })).filter(group => group.tools.length);
@@ -245,7 +245,7 @@ G.ui = {
   },
 
   toolButton: function (t) {
-    const icons = { stonehouse: 'tool_stonehouse', boarding: 'tool_boarding', mine: 'tool_mine',
+    const icons = { stonehouse: 'tool_stonehouse', boarding: 'tool_boarding', mine: 'tool_mine', stonequarry: 'tool_stonequarry',
       blacksmith: 'tool_blacksmith', hunting: 'tool_hunting', house: 'tool_house', storage: 'tool_storage',
       gatherer: 'tool_gatherer', forester: 'tool_forester', woodcutter: 'tool_woodcutter', dock: 'tool_dock',
       school: 'tool_school', herbalist: 'tool_herbalist', hospital: 'tool_hospital', farm: 'tool_farm', road: 'tool_road', demolish: 'tool_demolish' };
@@ -520,14 +520,17 @@ G.ui = {
         el.querySelector('b').textContent = Math.floor(g.res[k]);
         const cap = G.storageCap();
         const foodClass = (G.FOOD_KEYS || []).includes(k);
-        el.title = `${G.RES[k].name}：${Math.floor(g.res[k])}${k === 'tools' ? '（工具不限仓储）' : foodClass ? '（三类食物共享总食物仓容 ' + cap + '）' : ' / ' + cap}`;
+        const tool = k === 'tools' || k === 'steelTools';
+        el.title = `${G.RES[k].name}：${Math.floor(g.res[k])}${tool ? '（工具不限仓储）' : foodClass ? '（三类食物共享总食物仓容 ' + cap + '）' : ' / ' + cap}`;
         if (k === 'food' && G.FOOD_KEYS) el.title += ' · ' + G.FOOD_KEYS.map(type => `${G.RES[type].name} ${Math.floor(g.res[type] || 0)}`).join(' + ') + '（分类之和，不重复计入库存）';
         if (hauling.carry[k]) el.title += ` · 另有 ${hauling.carry[k]} 随身待入库（尚不可用）`;
-        if ((k === 'stone' || k === 'iron') && hauling.carry[k] && g.res[k] >= cap) el.title += ' · 仓满保留余矿，使用库存或建成新仓库后送仓';
+        if (['stone', 'iron', 'coal'].includes(k) && hauling.carry[k] && g.res[k] >= cap) el.title += ' · 仓满保留余矿，使用库存或建成新仓库后送仓';
         if (k === 'food' && G.world.citizens.length) el.title += ` · 可供 ${(g.res.food / (G.world.citizens.length * G.LIFE.eatPerDay)).toFixed(1)} 天（不计新产出）`;
-        if (k === 'tools') {
+        if (tool) {
           const adults = G.world.citizens.filter(c => c.adult).length;
-          if (adults) el.title += ` · 当前成人约可用 ${Math.floor(g.res.tools * G.LIFE.toolLifeDays / adults)} 天；铁匠需木材与铁矿`;
+          el.title += ` · 单件寿命 ${k === 'steelTools' ? G.LIFE.steelToolLifeDays : G.LIFE.toolLifeDays} 成人天；两类工具生产效率相同，优先磨损钢工具`;
+          if (adults) el.title += ` · 两类工具合计 ${Math.floor(G.toolStock())} 件，当前成人约可用 ${Math.floor(G.toolDaysLeft(adults))} 天（扣除已磨损，不计新产出）`;
+          el.title += k === 'steelTools' ? '；钢工具需铁、原木与煤' : '；铁工具需铁与原木';
         }
         if (k === 'clothes') {
           const unprotected = G.world.citizens.filter(c => !(c.clothingLeft > 0)).length;
@@ -669,6 +672,105 @@ G.ui = {
       refund: !b.constructionStarted && b.progress === 0 && b.workLeft >= b.totalWork ? '未开工：取消退还全部已付建材，保留树木' : '已开工：拆除退还一半已付建材，已砍树不恢复'
     };
   },
+  resourceChainInfoData: function (b) {
+    if (b.state !== 'ok' || !['mine', 'stonequarry', 'blacksmith'].includes(b.type)) return null;
+    const smith = b.type === 'blacksmith', outputs = G.productionOutputsOf(b);
+    const output = smith ? G.blacksmithOutput(b) : null;
+    const mode = b.type === 'mine' ? G.mineModeOf(b) : null;
+    const names = outputs.map(type => G.RES[type].name).join(' · ');
+    const workers = b.workers.map(id => G.world.cmap[id]).filter(Boolean);
+    const goal = G.buildingGoalStatus(b);
+    let status;
+    if (G.productionLimited(b) && goal) status = goal;
+    else if (smith && G.toolLimited(b)) status = `${G.RES[output].name}已达本屋目标，暂停新批次`;
+    else if (!G.jobCanProduce(b)) {
+      const missing = smith ? G.blacksmithRecipe(b).filter(item => G.game.res[item.type] < item.qty) : [];
+      status = smith ? '等待原料：' + (missing.map(item => `${G.RES[item.type].name}需 ${item.qty}`).join(' · ') || '铁匠暂不能接新批次')
+        : '暂停新开采：当前产物仓容已满或已达目标';
+    } else status = b.noWork && b.warnText ? `等待：${b.warnText}` : !workers.length ? '等待可用工人' : '运作中';
+    // Tasks keep their original yield across a selector change, including paused
+    // tasks. Report those snapshots rather than implying they already changed.
+    const batches = [], seen = new Set();
+    for (const c of G.world.citizens) {
+      for (const task of [c.task, c.pausedTask]) {
+        if (!task || task.b !== b || !task.yield || !G.RES[task.yield.type] || seen.has(task)) continue;
+        seen.add(task);
+        batches.push(`${G.RES[task.yield.type].name} ${task.yield.qty}`);
+      }
+      if (c.job === b.id && c.carry && (smith ? ['tools', 'steelTools'] : ['stone', 'iron', 'coal']).includes(c.carry.type))
+        batches.push(`${G.RES[c.carry.type].name} ${c.carry.qty}（待送仓）`);
+    }
+    const data = {
+      status,
+      workers: workers.map(c => c.name).join('、') || '无',
+      production: `当前生产：${names}${mode === 'legacy' ? '（旧档混采）' : ''}`,
+      stock: `${smith ? '成品' : '全镇'}库存：${(smith ? ['tools', 'steelTools'] : outputs).map(type => `${G.RES[type].name} ${Math.floor(G.game.res[type] || 0)}`).join(' · ')}`,
+      goals: goal || '全镇产量目标：未设置，继承原规则',
+      batches: '已接批次：' + (batches.length ? batches.join(' · ') : '无'),
+    };
+    if (smith) {
+      const recipe = G.blacksmithRecipe(b), p = G.PROD.blacksmith;
+      data.recipe = `每批：${recipe.map(item => `${item.qty} ${G.RES[item.type].name}`).join(' + ')} → ${p.toolsOut} ${G.RES[output].name}（受教育 ${p.eduToolsOut}）`;
+      data.inputs = '原料库存：' + recipe.map(item => `${G.RES[item.type].name} ${Math.floor(G.game.res[item.type] || 0)}`).join(' · ');
+      data.target = `本屋${G.RES[output].name}目标：${G.toolLimitOf(b)}（只看当前所选产物库存）`;
+      data.lifetime = `寿命：铁工具 ${G.LIFE.toolLifeDays} / 钢工具 ${G.LIFE.steelToolLifeDays} 成人天；生产效率相同，优先磨损钢工具。工具不限仓储。`;
+    }
+    return data;
+  },
+  resourceChainInfoMarkup: function (b, data) {
+    if (!data) return '';
+    const smith = b.type === 'blacksmith', mine = b.type === 'mine';
+    const choice = smith ? (G.blacksmithOutput(b) === 'steelTools' ? 'steel' : 'iron') : mine ? G.mineModeOf(b) : null;
+    const options = smith ? [['iron', '铁工具'], ['steel', '钢工具']]
+      : mine ? [...(b.legacyMine ? [['legacy', '旧档混采（石头 / 铁）']] : []), ['iron', '采铁'], ['coal', '采煤']] : [];
+    const field = smith ? 'tool-recipe' : 'mine-mode';
+    return `<section class="resource-chain-details" data-resource-chain="${b.type}">
+      ${choice ? `<div class="economy-form"><label for="${field}">${smith ? '铁匠配方' : '矿井开采模式'}</label>
+        <select id="${field}" aria-describedby="resource-chain-change-note">${options.map(([value, label]) => `<option value="${value}"${value === choice ? ' selected' : ''}>${label}</option>`).join('')}</select>
+        <p class="desc" id="resource-chain-change-note">${smith ? '切换后新批次使用所选配方；已接批次按原配方完成，已有随身物资继续送仓。' : '切换只影响新批次；已接开采批次和随身矿物保留，继续送仓。'}${mine && b.legacyMine ? '旧档混采不会自动切换，可在这里保留或改选。' : ''}</p></div>` : ''}
+      ${['production', 'recipe', 'inputs', 'stock'].filter(key => data[key]).map(key => `<div class="row" data-resource-chain-live="${key}">${this.escHtml(data[key])}</div>`).join('')}
+      ${smith ? `<div class="row tog-row resource-chain-target"><span data-resource-chain-live="target">${this.escHtml(data.target)}</span>
+        <button type="button" class="mini-tog" data-tl="-10" title="降低当前产物的本屋目标 10" aria-label="降低本屋工具目标 10">−</button>
+        <button type="button" class="mini-tog" data-tl="10" title="提高当前产物的本屋目标 10" aria-label="提高本屋工具目标 10">＋</button></div>` : ''}
+      <div class="row" data-resource-chain-live="goals">${this.escHtml(data.goals)}</div>
+      <div class="row" data-resource-chain-live="batches">${this.escHtml(data.batches)}</div>
+      ${smith ? `<div class="row desc" data-resource-chain-live="lifetime">${this.escHtml(data.lifetime)}</div><div class="row desc">铁工具、钢工具各有独立的全镇目标。本屋目标随当前配方生效；已接批次仍可能完成并超过目标。</div>`
+        : '<div class="row desc">无限矿源（当前原型）：不设矿量耗尽。开采后须搬运入仓才可使用；满仓余矿保留随身，腾出空间后继续送仓。</div>'}
+      ${choice ? '<p class="economy-message" data-resource-chain-message role="status" aria-live="polite"></p>' : ''}
+    </section>`;
+  },
+  refreshResourceChainInfo: function (b) {
+    const el = this.el.info;
+    if (!el.querySelector || !el.querySelector(`[data-resource-chain="${b.type}"]`)) return false;
+    const data = this.resourceChainInfoData(b);
+    if (!data) return false;
+    const nodes = {};
+    for (const key of Object.keys(data)) {
+      nodes[key] = el.querySelector(`[data-resource-chain-live="${key}"]`);
+      if (!nodes[key]) return false;
+    }
+    for (const key of Object.keys(data)) if (nodes[key].textContent !== data[key]) nodes[key].textContent = data[key];
+    // Leave a keyboard user's uncommitted choice alone during the timed tick.
+    const select = el.querySelector(b.type === 'mine' ? '#mine-mode' : '#tool-recipe');
+    if (select && document.activeElement !== select) select.value = b.type === 'mine' ? G.mineModeOf(b) : G.blacksmithOutput(b) === 'steelTools' ? 'steel' : 'iron';
+    return true;
+  },
+  initResourceChainInfo: function (b) {
+    const el = this.el.info, w = G.world;
+    if (!el.querySelector || !el.querySelector('[data-resource-chain]')) return;
+    const id = b.type === 'mine' ? 'mine-mode' : b.type === 'blacksmith' ? 'tool-recipe' : null;
+    const select = id && el.querySelector('#' + id);
+    if (!select) return;
+    select.addEventListener('change', () => {
+      if (G.world !== w || !G.sel || G.sel.kind !== 'b' || G.sel.id !== b.id || w.bmap[b.id] !== b || b.state !== 'ok' ||
+          el.querySelector('#' + id) !== select || (G.hasOpenModal && G.hasOpenModal())) return;
+      const accepted = b.type === 'mine' ? G.setMineMode(b, select.value) : G.setToolRecipe(b, select.value);
+      if (!accepted) select.value = b.type === 'mine' ? G.mineModeOf(b) : G.blacksmithOutput(b) === 'steelTools' ? 'steel' : 'iron';
+      this.refreshResourceChainInfo(b);
+      const message = el.querySelector('[data-resource-chain-message]');
+      if (message) message.textContent = accepted ? '已应用于新批次；已有批次和随身物资保留。' : '该生产选择不可用，请重新选择。';
+    });
+  },
   medicalInfoData: function (b) {
     if (!['herbalist', 'hospital'].includes(b.type) || b.state !== 'ok' || !G.medicalPatients || !G.medicalStaff) return null;
     const hospital = b.type === 'hospital', patients = G.medicalPatients(b);
@@ -772,6 +874,7 @@ G.ui = {
     // selection or a site finishing construction still gets its own full panel.
     if (sameSelection && selected.state === 'ok' && this._economyInfoState === selected.state && this.refreshEconomyInfo(selected)) return;
     if (sameSelection && selected.state === 'ok' && this._medicalInfoState === selected.state && this.refreshMedicalInfo(selected)) return;
+    if (sameSelection && selected.state === 'ok' && this._resourceChainInfoState === selected.state && this.refreshResourceChainInfo(selected)) return;
     if (sameSelection && selected.type === 'woodcutter' && this._fuelInfoState === selected.state && this.refreshFuelInfo(selected)) return;
     if (hadFocus && !force && sameSelection && selected.type !== 'woodcutter' && this._infoBuildState === selected.state) {
       // Patch changing site facts in place without stealing keyboard focus.
@@ -796,10 +899,12 @@ G.ui = {
       const fuelData = b.type === 'woodcutter' ? this.fuelInfoData(b) : null;
       const siteData = b.state === 'site' ? this.siteInfoData(b) : null;
       const medicalData = this.medicalInfoData(b);
+      const chainData = this.resourceChainInfoData(b);
       let status;
       if (fuelData) status = fuelData.status;
       else if (siteData) status = siteData.status;
       else if (medicalData) status = medicalData.status;
+      else if (chainData) status = chainData.status;
       else if (G.productionLimited(b) && G.buildingGoalStatus(b)) status = G.buildingGoalStatus(b);
       else if (b.type === 'house' || b.type === 'stonehouse') status = b.family != null ? '有人居住' : '空置';
       else if (['tradingpost', 'pasture', 'orchard'].includes(b.type)) status = this.economyStatus(b);
@@ -814,7 +919,7 @@ G.ui = {
       let workers = '';
       if (def.jobs > 0 || b.state === 'site') {
         const names = b.workers.map(id => w.cmap[id]).filter(Boolean).map(c => this.escHtml(c.name)).join('、');
-        workers = `<div class="row">${medicalData ? b.type === 'hospital' ? '医师' : '采药员' : '工人'}：<span${siteData ? ' data-site-workers' : ''}${fuelData ? ' data-fuel="workers"' : ''}${medicalData ? ' data-medical="workers"' : ''}${b.state === 'ok' && ['tradingpost', 'pasture', 'orchard'].includes(b.type) ? ' data-economy-workers' : ''}>${names || (b.state === 'site' ? '等待建筑工人' : '无')}</span></div>`;
+        workers = `<div class="row">${medicalData ? b.type === 'hospital' ? '医师' : '采药员' : '工人'}：<span${siteData ? ' data-site-workers' : ''}${fuelData ? ' data-fuel="workers"' : ''}${medicalData ? ' data-medical="workers"' : ''}${chainData ? ' data-resource-chain-live="workers"' : ''}${b.state === 'ok' && ['tradingpost', 'pasture', 'orchard'].includes(b.type) ? ' data-economy-workers' : ''}>${names || (b.state === 'site' ? '等待建筑工人' : '无')}</span></div>`;
       }
       let extra = '';
       if ((b.type === 'house' || b.type === 'stonehouse') && b.family != null) {
@@ -843,20 +948,14 @@ G.ui = {
         <div class="row" data-fuel="gap">${fuelData.gap}</div>
         <div class="row desc">目标不是取暖需求。库存达到目标只阻止本屋接新批次；调低可给建设留木，但不会预留建材。已接批次仍可能耗木，其他伐木屋按各自目标继续。住房变化和户外受冻仍须留意。</div>`;
       }
-      if (b.type === 'blacksmith') {
-        extra = `<div class="row tog-row">
-          <span>工具上限：<b>${G.toolLimitOf(b)}</b>（库存 ${Math.floor(G.game.res.tools)}）</span>
-          <button class="mini-tog" data-tl="-10" title="降低上限 10">−</button>
-          <button class="mini-tog" data-tl="10" title="提高上限 10">＋</button>
-        </div>`;
-      }
+      if (chainData) extra += this.resourceChainInfoMarkup(b, chainData);
       if (b.state === 'ok') extra += this.economyInfoMarkup(b);
       if (medicalData) extra += this.medicalInfoMarkup(b, medicalData);
       const outputs = { gatherer: ['vegetables'], hunting: ['meat', 'leather'], dock: ['meat'], farm: ['grain'], orchard: ['vegetables'], pasture: ['meat', 'wool'], tailor: ['clothes'], herbalist: ['herbs'] };
-      const produced = (outputs[b.type] || []).filter(type => G.RES[type]);
+      const produced = (chainData ? [] : outputs[b.type] || []).filter(type => G.RES[type]);
       if (produced.length) extra += `<div class="row resource-output">产出：${produced.map(type => `${this.resourceIcon(type)}${G.RES[type].name}`).join(' · ')}</div>`;
       if (b.type === 'tailor') extra += `<div class="row">原料库存：皮革 ${Math.floor(G.game.res.leather || 0)} · 羊毛 ${Math.floor(G.game.res.wool || 0)}</div><div class="row">成衣库存：${Math.floor(G.game.res.clothes || 0)}</div>`;
-      if (b.type !== 'woodcutter' && !medicalData && G.buildingGoalStatus(b)) extra += `<div class="row desc"${['tradingpost', 'pasture', 'orchard'].includes(b.type) ? ' data-economy-goals' : ''}>${this.escHtml(G.buildingGoalStatus(b))}</div>`;
+      if (b.type !== 'woodcutter' && !medicalData && !chainData && G.buildingGoalStatus(b)) extra += `<div class="row desc"${['tradingpost', 'pasture', 'orchard'].includes(b.type) ? ' data-economy-goals' : ''}>${this.escHtml(G.buildingGoalStatus(b))}</div>`;
       if (['gatherer', 'hunting', 'forester'].includes(b.type)) {
         const trees = G.treesInRadius(w, b.x, b.y, G.PROD[b.type].radius, false);
         const mature = trees.filter(t => G.treeStage(t) >= 2).length;
@@ -867,7 +966,7 @@ G.ui = {
       }
       el.innerHTML = `
         <div class="info-head"><span>${def.icon} ${def.name}</span><button id="info-close">✕</button></div>
-        <div class="row"${siteData ? ' data-site-status' : ''}${fuelData ? ' data-fuel="status"' : ''}${medicalData ? ' data-medical="status"' : ''}${b.state === 'ok' && ['tradingpost', 'pasture', 'orchard'].includes(b.type) ? ' data-economy-status' : ''}>${this.escHtml(status)}</div>
+        <div class="row"${siteData ? ' data-site-status' : ''}${fuelData ? ' data-fuel="status"' : ''}${medicalData ? ' data-medical="status"' : ''}${chainData ? ' data-resource-chain-live="status"' : ''}${b.state === 'ok' && ['tradingpost', 'pasture', 'orchard'].includes(b.type) ? ' data-economy-status' : ''}>${this.escHtml(status)}</div>
         ${workers}${extra}
         <div class="row desc">${def.desc}</div>
         <div class="row desc" data-info-refund${fuelData ? ' data-fuel="refund"' : ''}>${fuelData ? fuelData.refund : siteData ? siteData.refund : '已开工：拆除退还一半已付建材，已砍树不恢复'}</div>
@@ -875,7 +974,9 @@ G.ui = {
       if (fuelData) this._fuelInfoState = b.state;
       this._economyInfoState = b.state;
       this._medicalInfoState = b.state;
+      this._resourceChainInfoState = b.state;
       if (medicalData) this.refreshMedicalPatients(b);
+      if (chainData) this.initResourceChainInfo(b);
       if (b.state === 'ok') this.initEconomyInfo(b);
     } else {
       const c = w.cmap[G.sel.id];
@@ -1091,7 +1192,7 @@ G.ui = {
   initProductionGoals: function () {
     const rows = document.getElementById('production-goal-rows');
     rows.innerHTML = G.RES_KEYS.map(type => {
-      const step = type === 'food' || (G.FOOD_KEYS || []).includes(type) ? 100 : type === 'tools' || type === 'clothes' ? 10 : 50;
+      const step = type === 'food' || (G.FOOD_KEYS || []).includes(type) ? 100 : ['tools', 'steelTools', 'clothes'].includes(type) ? 10 : 50;
       return `<section class="production-goal-row" aria-labelledby="goal-label-${type}">
         <label id="goal-label-${type}" for="goal-input-${type}">${this.resourceIcon(type)}${type === 'food' ? '总食物（肉类 + 蔬菜 + 主食）' : G.RES[type].name}</label>
         <p id="goal-stock-${type}"></p>
@@ -1153,11 +1254,13 @@ G.ui = {
       if (!stock || !status) continue;
       const target = G.productionGoalOf(type);
       const foodClass = (G.FOOD_KEYS || []).includes(type);
-      stock.textContent = `库存 ${Math.floor(G.game.res[type])} · ${foodClass ? '与其他食物共享总仓容 ' + cap + '（总食物 ' + Math.floor(G.game.res.food) + '）' : '硬仓容 ' + (type === 'tools' ? '不限' : cap)}`;
+      const tool = type === 'tools' || type === 'steelTools';
+      stock.textContent = `库存 ${Math.floor(G.game.res[type])} · ${foodClass ? '与其他食物共享总仓容 ' + cap + '（总食物 ' + Math.floor(G.game.res.food) + '）' : '硬仓容 ' + (tool ? '不限' : cap)}`;
       status.textContent = target === null ? '未设置全镇目标，继承原规则' :
         `已应用目标 ${target} · ${target === 0 ? '关闭新自动生产' : `恢复线 ≤${G.productionResumeAt(target)} · ${G.goalPaused(type) ? '达标暂停' : '可生产'}`}`;
-      if (target !== null && type !== 'tools' && target > cap) status.textContent += '；目标高于仓容，需扩建仓库；' + (type === 'stone' || type === 'iron' ? '余矿保留随身，等待空间' : '满仓交货仍可能损失');
-      if (type === 'firewood' || type === 'tools') status.textContent += '；各屋原目标保留，实际按全镇与本屋较低值执行（见建筑详情）';
+      if (target !== null && !tool && target > cap) status.textContent += '；目标高于仓容，需扩建仓库；' + (['stone', 'iron', 'coal'].includes(type) ? '余矿保留随身，等待空间' : '满仓交货仍可能损失');
+      if (type === 'firewood' || tool) status.textContent += '；各屋原目标保留，实际按全镇与本屋较低值执行（见建筑详情）';
+      if (tool) status.textContent += '；只限制正在生产本类工具的铁匠，另一类工具有独立目标';
       if (type === 'food') status.textContent += '；总量目标与三类各自目标同时生效，总量达标会暂停食物新生产';
       if (foodClass) status.textContent += '；同时受总食物目标限制，本类达标不拦停其他食物类别';
       if ((type === 'food' || foodClass) && target !== null) status.textContent += '；已开始的整田继续播种和收获，过低目标可能断粮';
