@@ -15,7 +15,7 @@ G.RECOVERY_SAVE_KEY = G.AUTOSAVE_KEY + '_recovery';
 
 G.topModal = function () {
   // Overlay order matches the DOM stacking order (all use the same z-index).
-  return ['over', 'fb', 'errs', 'saves', 'help'].map(id => document.getElementById(id))
+  return ['over', 'fb', 'errs', 'saves', 'production-goals', 'help'].map(id => document.getElementById(id))
     .find(el => el && !el.classList.contains('hidden')) || null;
 };
 G.hasOpenModal = function () { return !!G.topModal(); };
@@ -104,6 +104,7 @@ G.serializeGame = function () {
       h: g.h, day: g.day, season: g.season, year: g.year,
       res: g.res, stats: g.stats, prevFood: g.prevFood, foodNet: g.foodNet, foodUrgent: g.foodUrgent, warned: g.warned,
       hist: g.hist, buildLog: g.buildLog, toolWear: g.toolWear,
+      productionGoals: g.productionGoals && { ...g.productionGoals }, productionPaused: g.productionPaused && { ...g.productionPaused },
     },
     roads: Array.from(w.road).flatMap((road, i) => road ? [i] : []),
     trees: w.trees.map(t => [t.i, t.x, t.y, t.b]),
@@ -117,6 +118,7 @@ G.serializeGame = function () {
       doCut: b.doCut, doPlant: b.doPlant, fuelLimit: b.fuelLimit, toolLimit: b.toolLimit,
       farm: b.farm ? b.farm.map(f => [f.sown ? 1 : 0, f.harvested ? 1 : 0]) : undefined,
       sownAll: b.sownAll, growth: b.growth, harvestDone: b.harvestDone,
+      sowingCommitted: b.sowingCommitted, productionPaused: b.productionPaused,
     })),
     families: w.families.map(f => ({ id: f.id, members: f.members, houseId: f.houseId, coupleIds: f.coupleIds })),
     citizens: w.citizens.map(c => ({
@@ -236,6 +238,19 @@ G.prepareSaveData = function (d) {
     const value = gd.res[key] === undefined && key === 'iron' ? 0 : gd.res[key] === undefined && key === 'tools' ? 10 : gd.res[key];
     g.res[key] = number(value, '资源 ' + key, 0);
   }
+  if (gd.productionGoals !== undefined) {
+    const goals = record(gd.productionGoals, '自动生产目标');
+    const paused = gd.productionPaused === undefined ? {} : record(gd.productionPaused, '生产暂停状态');
+    g.productionGoals = {}; g.productionPaused = {};
+    for (const type of Object.keys(goals)) {
+      if (!G.RES_KEYS.includes(type)) bad('生产目标资源');
+      g.productionGoals[type] = integer(goals[type], '生产目标', 0, G.PRODUCTION_GOAL_MAX);
+    }
+    for (const type of Object.keys(paused)) {
+      if (!G.RES_KEYS.includes(type) || typeof paused[type] !== 'boolean') bad('生产暂停状态');
+      if (G.productionGoalOf(type, g) !== null) g.productionPaused[type] = paused[type];
+    }
+  }
   if (gd.stats !== undefined) {
     const stats = record(gd.stats, '统计');
     g.stats.born = integer(stats.born, '出生统计'); g.stats.died = integer(stats.died, '死亡统计');
@@ -305,6 +320,8 @@ G.prepareSaveData = function (d) {
       toolLimit: bd.type === 'blacksmith' ? G.toolLimitOf(bd) : undefined,
       fuelLimit: bd.type === 'woodcutter' ? G.fuelLimitOf(bd) : undefined,
     };
+    if (bd.productionPaused !== undefined && typeof bd.productionPaused !== 'boolean') bad('本屋生产暂停状态');
+    if (['woodcutter', 'blacksmith'].includes(bd.type) && bd.productionPaused !== undefined) b.productionPaused = bd.productionPaused;
     if (bd.constructionStarted !== undefined && typeof bd.constructionStarted !== 'boolean') bad('工地开工状态');
     b.constructionStarted = bd.constructionStarted === true;
     if (bd.paidCost !== undefined) {
@@ -321,6 +338,8 @@ G.prepareSaveData = function (d) {
         return { x: x + k % b.w, y: y + Math.floor(k / b.w), sown: !!row[0], harvested: !!row[1] };
       });
       b.sownAll = !!bd.sownAll; b.harvestDone = !!bd.harvestDone;
+      if (bd.sowingCommitted !== undefined && typeof bd.sowingCommitted !== 'boolean') bad('农田本季承诺');
+      if (bd.sowingCommitted === true) b.sowingCommitted = true;
       b.growth = bd.growth === undefined ? 0 : number(bd.growth, '农田生长', 0, 1);
     }
     for (let yy = y; yy < y + b.h; yy++) for (let xx = x; xx < x + b.w; xx++) {
@@ -367,6 +386,7 @@ G.prepareSaveData = function (d) {
     }
   }
   const nextUid = d.nextUid === undefined ? 10000 : id(d.nextUid, '下一个 ID');
+  G.updateProductionGoals(g, w);
   return { world: w, game: g, nextUid: Math.max(nextUid, usedMax + 1), rng: G.makeRng((d.seed ^ 0x51f15e) >>> 0) };
 };
 
@@ -720,6 +740,7 @@ G.init = function () {
       else if (visible('fb')) G.feedback.close();
       else if (visible('errs')) G.ui.closeErrs();
       else if (visible('saves')) G.ui.closeSaves();
+      else if (visible('production-goals')) G.ui.closeProductionGoals();
       else if (visible('help')) G.ui.toggleHelp(false);
       else if (G.isEditingTarget(e.target) || G.isEditingTarget(document.activeElement)) return;
       else if (G.tool) G.setTool(null);

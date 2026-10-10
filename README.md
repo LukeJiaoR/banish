@@ -1,6 +1,8 @@
 # 归园 · 放逐小镇（Banished 复刻原型）
 
-当前版本：**0.3.13**。
+当前版本：**0.3.14**。
+
+0.3.14 增加全镇六类资源的自动生产目标，达到后暂停新生产、消耗至恢复线后继续；默认未设置并继承旧规则。库存、硬仓容和在途批次分开显示，支持存档及旧伐木屋/铁匠目标。设置不能保证生存，请保留粮柴和工具链，详见 [目标规则与失败/救回对照](docs/resource-production-goals.md)。
 
 0.3.13 修复相邻农田土壤盖住房屋屋顶：土壤先作为地面绘制，作物按单格深度与建筑/人物排序；只绘可视范围田格。生产、收获、存档和地图尺寸不变。详见 [农田遮挡验证](docs/farm-occlusion.md)。
 
@@ -79,6 +81,8 @@ python3 tools/fb_extract.py --server http://IP:8613 --token 秘密token
 | 滚轮 | 缩放；WASD / 方向键平移 |
 | 空格 | 暂停；1 / 2 / 3 = 1x / 2x / 5x 速度（原版档位） |
 | Esc | 取消工具 / 取消选择 |
+
+**资源目标**：顶栏可分别设置六种资源的全镇自动生产目标，达标停接新任务，消耗至显示的恢复线再开。0关闭新生产；“继承原规则”恢复原来的启停方式。新局和旧档默认均未设置。柴火/工具仍保留每屋旧目标，实际取全镇与本屋较低值。已接批次、手动采运和工地清场继续；已开始播种的农田按整田完成本季。目标不等于硬仓容，也不保证生存。语义和实测限制见 [资源生产目标](docs/resource-production-goals.md)。
 
 💾 保存 / 📂 读取 = localStorage 手动存档；🌱 新游戏随机地图。
 **存档管理（📂）**：面板中可查看、载入、删除「手动档」与「自动档」（含一键**清空全部存档**，带确认，不影响当前对局），显示存档时间和游戏内进度。
@@ -221,6 +225,10 @@ node tests/harvest-feedback.js
 node tests/harvest-cancellation.js
 node tests/harvest-cancel-ui.js
 node tests/fuel-budget-feedback.js
+node tests/resource-goals.js
+node tests/resource-goals-ui.js
+node tests/resource-goals-economy.js # 固定目标生存筛查（report-only，保留失败策略）
+node tests/resource-goals-recovery.js
 node tests/mineral-resource-ui.js
 node tests/placement-ux.js
 node tests/playability.js --assert

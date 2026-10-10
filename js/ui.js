@@ -43,6 +43,7 @@ G.ui = {
     if (!b) return c.age >= G.ADULT_AGE ? '散工待命' : '玩耍休息';
     if (b.state === 'site') return '等待下一项施工任务';
     if (b.type === 'school') return '教学中';
+    if (G.productionLimited(b) && G.buildingGoalStatus(b)) return G.buildingGoalStatus(b);
     if (G.fuelLimited(b)) return '暂停生产（柴火已达目标）';
     if (G.toolLimited(b)) return '暂停生产（工具已达目标）';
     if (b.type === 'woodcutter' && G.game.res.wood < G.PROD.woodcutter.logsIn) return '等待原木';
@@ -76,14 +77,15 @@ G.ui = {
     if (b.state === 'site') {
       const trees = G.siteTrees ? G.siteTrees(b).length : 0;
       status = trees ? `清理工地：还需砍 ${trees} 棵树（工人搬运入仓）` : `建造中 ${Math.floor(b.progress * 100)}%`;
-    } else if (G.fuelLimited(b)) status = '本屋暂停新批次：柴火库存已达本屋目标';
+    } else if (G.productionGoalOf('firewood') !== null && G.fuelLimited(b)) status = G.buildingGoalStatus(b);
+    else if (G.fuelLimited(b)) status = '本屋暂停新批次：柴火库存已达本屋目标';
     else if (!G.jobCanProduce(b)) status = '本屋暂无新批次：缺原木';
     // A previous limit warning can outlive its cutoff after fuel is used up.
     else if (b.warnText !== '柴火已达上限' && (b.noWork || (b.warnText && !b.workers.length)))
       status = `停工：${b.warnText || '无法工作'}`;
     else status = b.workers.length ? '运作中' : '等待可用工人';
     return {
-      target: `本屋燃料目标：${G.fuelLimitOf(b)}`,
+      target: `本屋燃料目标：${G.fuelLimitOf(b)}` + (G.productionGoalOf('firewood') !== null ? '；' + G.buildingGoalStatus(b) : ''),
       stock: `全镇库存：柴火 ${Math.floor(stock)} · 原木 ${Math.floor(G.game.res.wood)}`,
       heat: this.heatDemandText(heat),
       gap: stock < need ? `柴火库存比${heat.winter ? '本冬后续' : '整冬'}取暖估算少约 ${Math.ceil(need - stock)}。` : '取暖估算会随住房入住情况变化。',
@@ -181,6 +183,7 @@ G.ui = {
       });
     });
     this.initHarvestControls();
+    this.initProductionGoals();
 
     // 顶栏按钮
     document.getElementById('btn-save').addEventListener('click', () => { G.saveGame(); });
@@ -282,6 +285,7 @@ G.ui = {
     if (!G.world) return;
     const g = G.game;
     this.refreshGuide();
+    this.refreshProductionGoals();
     const hauling = G.harvestFeedback();
     for (const k of G.RES_KEYS) {
       const el = document.getElementById('res-' + k);
@@ -453,6 +457,7 @@ G.ui = {
       let status;
       if (fuelData) status = fuelData.status;
       else if (siteData) status = siteData.status;
+      else if (G.productionLimited(b) && G.buildingGoalStatus(b)) status = G.buildingGoalStatus(b);
       else if (b.type === 'house' || b.type === 'stonehouse') status = b.family != null ? '有人居住' : '空置';
       else if (b.type === 'boarding') status = `入住 ${G.boardingFamilies(w, b).length} / ${G.LIFE.boardingCap} 家`;
       else if (b.type === 'farm') {
@@ -501,6 +506,7 @@ G.ui = {
           <button class="mini-tog" data-tl="10" title="提高上限 10">＋</button>
         </div>`;
       }
+      if (b.type !== 'woodcutter' && G.buildingGoalStatus(b)) extra += `<div class="row desc">${this.escHtml(G.buildingGoalStatus(b))}</div>`;
       if (['gatherer', 'hunting', 'forester'].includes(b.type)) {
         const trees = G.treesInRadius(w, b.x, b.y, G.PROD[b.type].radius, false);
         const mature = trees.filter(t => G.treeStage(t) >= 2).length;
@@ -539,14 +545,20 @@ G.ui = {
       const bb = w.bmap[G.sel.id];
       if (!bb) return;
       if (btn.dataset.tl) {
-        bb.toolLimit = G.clamp(G.toolLimitOf(bb) + Number(btn.dataset.tl), 0, G.PROD.blacksmith.toolMax);
+        const old = G.toolLimitOf(bb);
+        bb.toolLimit = G.clamp(old + Number(btn.dataset.tl), 0, G.PROD.blacksmith.toolMax);
+        if (bb.toolLimit !== old) delete bb.productionPaused;
+        G.updateProductionGoals();
         bb.noWork = false;
         this.renderInfo(true);
         return;
       }
       if (btn.dataset.fl) { // 伐木屋燃料上限 ±50
         const P = G.PROD.woodcutter;
-        bb.fuelLimit = G.clamp(G.fuelLimitOf(bb) + Number(btn.dataset.fl), 0, P.fuelMax);
+        const old = G.fuelLimitOf(bb);
+        bb.fuelLimit = G.clamp(old + Number(btn.dataset.fl), 0, P.fuelMax);
+        if (bb.fuelLimit !== old) delete bb.productionPaused;
+        G.updateProductionGoals();
         bb.noWork = false; // 清掉停工标记，下次派活时按新上限重新评估
         this.renderInfo(true);
         return;
@@ -572,6 +584,81 @@ G.ui = {
     if (G.sel && !this.el.info.classList.contains('hidden')) {
       this.infoT -= dt;
       if (this.infoT <= 0) { this.infoT = 0.5; this.renderInfo(); }
+    }
+  },
+
+  // Rows are built once. Refresh never replaces an input or changes a draft.
+  initProductionGoals: function () {
+    const rows = document.getElementById('production-goal-rows');
+    rows.innerHTML = G.RES_KEYS.map(type => {
+      const step = type === 'food' ? 100 : type === 'tools' ? 10 : 50;
+      return `<section class="production-goal-row" aria-labelledby="goal-label-${type}">
+        <label id="goal-label-${type}" for="goal-input-${type}">${this.resourceIcon(type)}${G.RES[type].name}</label>
+        <p id="goal-stock-${type}"></p>
+        <div class="goal-controls"><button type="button" data-goal="${type}" data-step="${-step}" aria-label="减少${G.RES[type].name}目标${step}">−${step}</button>
+        <input id="goal-input-${type}" type="number" inputmode="numeric" min="0" max="${G.PRODUCTION_GOAL_MAX}" step="1" placeholder="未设置" aria-describedby="goal-status-${type}">
+        <button type="button" data-goal="${type}" data-step="${step}" aria-label="增加${G.RES[type].name}目标${step}">＋${step}</button>
+        <button type="button" data-goal="${type}" data-apply="true">应用</button>
+        <button type="button" class="goal-inherit" data-goal="${type}" data-inherit="true">继承原规则</button></div>
+        <p id="goal-status-${type}"></p></section>`;
+    }).join('');
+    rows.querySelectorAll('button').forEach(button => button.addEventListener('click', () => {
+      const type = button.dataset.goal, input = document.getElementById('goal-input-' + type);
+      if (!button.dataset.inherit && input.validity && input.validity.badInput) {
+        document.getElementById('production-goals-message').textContent = '请输入有效数字，或完整清空以继承原规则'; return;
+      }
+      if (button.dataset.inherit) {
+        G.setProductionGoal(type, null); input.value = '';
+        document.getElementById('production-goals-message').textContent = `${G.RES[type].name}已继承原规则`;
+      } else if (button.dataset.step) {
+        const current = input.value.trim() === '' ? (G.productionGoalOf(type) ?? Math.ceil(G.game.res[type])) : Number(input.value);
+        if (!Number.isFinite(current)) { document.getElementById('production-goals-message').textContent = '请输入有限整数'; return; }
+        input.value = String(G.clamp(Math.round(current) + Number(button.dataset.step), 0, G.PRODUCTION_GOAL_MAX));
+        document.getElementById('production-goals-message').textContent = '数值尚未应用，点击“应用”生效';
+      } else {
+        const value = input.value.trim() === '' ? null : Number(input.value);
+        if (!G.setProductionGoal(type, value)) {
+          document.getElementById('production-goals-message').textContent = `请输入0至${G.PRODUCTION_GOAL_MAX}的整数，或清空以继承原规则`; return;
+        }
+        document.getElementById('production-goals-message').textContent = `${G.RES[type].name}目标已应用`;
+      }
+      this.refreshProductionGoals();
+      if (G.sel) this.renderInfo(true);
+    }));
+    document.getElementById('btn-production-goals').addEventListener('click', () => this.showProductionGoals());
+    document.getElementById('production-goals-close').addEventListener('click', () => this.closeProductionGoals());
+  },
+  showProductionGoals: function () {
+    const modal = document.getElementById('production-goals');
+    if (!modal.classList.contains('hidden')) return;
+    if (G.hasOpenModal && G.hasOpenModal()) return;
+    this._productionGoalsPaused = G.game.paused; G.game.paused = true;
+    for (const type of G.RES_KEYS) document.getElementById('goal-input-' + type).value = G.productionGoalOf(type) ?? '';
+    document.getElementById('production-goals-message').textContent = '';
+    modal.classList.remove('hidden'); this.refreshProductionGoals(); this.enterDialog('production-goals'); this.refreshHUD();
+  },
+  closeProductionGoals: function () {
+    const modal = document.getElementById('production-goals');
+    if (modal.classList.contains('hidden')) return;
+    modal.classList.add('hidden');
+    if (!G.game.over) G.game.paused = !!this._productionGoalsPaused;
+    this.leaveDialog('production-goals'); this.refreshHUD();
+  },
+  refreshProductionGoals: function () {
+    const modal = document.getElementById('production-goals');
+    if (!modal || modal.classList.contains('hidden')) return;
+    const cap = G.storageCap();
+    for (const type of G.RES_KEYS) {
+      const stock = document.getElementById('goal-stock-' + type), status = document.getElementById('goal-status-' + type);
+      if (!stock || !status) continue;
+      const target = G.productionGoalOf(type);
+      stock.textContent = `库存 ${Math.floor(G.game.res[type])} · 硬仓容 ${type === 'tools' ? '不限' : cap}`;
+      status.textContent = target === null ? '未设置全镇目标，继承原规则' :
+        `已应用目标 ${target} · ${target === 0 ? '关闭新自动生产' : `恢复线 ≤${G.productionResumeAt(target)} · ${G.goalPaused(type) ? '达标暂停' : '可生产'}`}`;
+      if (target !== null && type !== 'tools' && target > cap) status.textContent += '；目标高于仓容，需扩建仓库；满仓交货仍可能损失';
+      if (type === 'firewood' || type === 'tools') status.textContent += '；各屋原目标保留，实际按全镇与本屋较低值执行（见建筑详情）';
+      if (type === 'food' && target !== null) status.textContent += '；已开始的整田继续播种和收获，过低目标可能断粮';
+      if (type === 'firewood' && target !== null) status.textContent += '；过低目标可能挨冻';
     }
   },
 
