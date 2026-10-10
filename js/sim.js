@@ -886,7 +886,8 @@ G.requestTask = function (c) {
       c.state = 'idle'; c.wanderT = 2; return; // 其余树已有人砍，不能提前建造。
     }
     if (b.workLeft <= 0) { G.finishBuilding(b); c.state = 'idle'; return; }
-    const spot = G.workSpot(w, b, c.x, c.y) || { x: b.x, y: b.y };
+    const spot = G.workSpot(w, b, c.x, c.y, true);
+    if (!spot) { c.state = 'idle'; c.wanderT = 2; return; }
     c.task = {
       kind: 'build', b, tx: spot.x, ty: spot.y,
       work: Math.min(G.taskWork(c, G.PROD.builderChunk), b.workLeft),
