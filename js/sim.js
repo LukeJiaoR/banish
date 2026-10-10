@@ -575,6 +575,17 @@ G.goHome = function (c) {
   if (d > G.LIFE.campDist) { c.path = null; c.state = 'rest'; c.camped = true; return; }
   const spot = G.workSpot(G.world, h, c.x, c.y);
   const p = G.findPath(G.world, Math.round(c.x), Math.round(c.y), spot ? spot.x : h.x, spot ? spot.y : h.y);
+  // A nearby home can require a long detour around water or buildings. For a
+  // suspended job, reuse the route already found rather than restarting the same
+  // unfinished commute every morning. No new path search or cross-day cache.
+  if (c.pausedTask && p && p.length) {
+    let distance = 0, previous = c;
+    for (const point of p) {
+      distance += G.dist(previous.x, previous.y, point.x, point.y);
+      if (distance > G.LIFE.campDist) { c.path = null; c.state = 'rest'; c.camped = true; return; }
+      previous = point;
+    }
+  }
   if (p && p.length) { c.path = p; c.pi = 0; c.state = 'walk'; c.walkKind = 'home'; c.camped = false; }
   else if (p) { c.path = null; c.state = 'rest'; c.camped = false; } // 已站在家门口：算回家了（空路径 ≠ 找不到路）
   else { c.path = null; c.state = 'rest'; c.camped = true; }        // 真找不到路也只能露宿
