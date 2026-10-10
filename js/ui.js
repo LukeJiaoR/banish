@@ -408,6 +408,14 @@ G.ui = {
     G.sel = null;
     this.el.info.classList.add('hidden');
   },
+  siteInfoData: function (b) {
+    const w = G.world, trees = G.siteTrees ? G.siteTrees(b).length : 0;
+    return {
+      status: trees ? `清理工地：还需砍 ${trees} 棵树（工人搬运入仓）` : `建造中 ${Math.floor(b.progress * 100)}%`,
+      workers: b.workers.map(id => w.cmap[id]).filter(Boolean).map(c => c.name).join('、') || '等待建筑工人',
+      refund: !b.constructionStarted && b.progress === 0 && b.workLeft >= b.totalWork ? '未开工：取消退还全部已付建材，保留树木' : '已开工：拆除退还一半已付建材，已砍树不恢复'
+    };
+  },
   renderInfo: function (force) {
     if (!G.sel) return;
     const w = G.world, el = this.el.info;
@@ -420,21 +428,31 @@ G.ui = {
     // Update only fuel text, never replace this panel's focused buttons. A new
     // selection or a site finishing construction still gets its own full panel.
     if (sameSelection && selected.type === 'woodcutter' && this._fuelInfoState === selected.state && this.refreshFuelInfo(selected)) return;
-    if (hadFocus && !force && sameSelection && selected.type !== 'woodcutter') return;
-    const focusSelector = hadFocus ? (active.id ? '#' + active.id : active.dataset.tl ? '[data-tl="' + active.dataset.tl + '"]' : active.dataset.fl ? '[data-fl="' + active.dataset.fl + '"]' : active.dataset.k ? '[data-k="' + active.dataset.k + '"]' : null) : null;
+    if (hadFocus && !force && sameSelection && selected.type !== 'woodcutter' && this._infoBuildState === selected.state) {
+      // Patch changing site facts in place without stealing keyboard focus.
+      if (G.sel.kind === 'b' && selected.state === 'site') {
+        const data = this.siteInfoData(selected);
+        for (const [key, selector] of [['status', '[data-site-status]'], ['workers', '[data-site-workers]'], ['refund', '[data-info-refund]']]) {
+          const node = el.querySelector(selector);
+          if (node) node.textContent = data[key];
+        }
+      }
+      return;
+    }
+    const destructiveActionChanged = sameSelection && this._infoBuildState === 'site' && selected.state !== 'site' && active && active.id === 'info-demolish';
+    const focusSelector = destructiveActionChanged ? '#info-close' : hadFocus ? (active.id ? '#' + active.id : active.dataset.tl ? '[data-tl="' + active.dataset.tl + '"]' : active.dataset.fl ? '[data-fl="' + active.dataset.fl + '"]' : active.dataset.k ? '[data-k="' + active.dataset.k + '"]' : null) : null;
     this._infoWorld = w;
     this._infoSelection = selected;
+    this._infoBuildState = selected.state;
     if (G.sel.kind === 'b') {
       const b = w.bmap[G.sel.id];
       if (!b) { this.hideInfo(); return; }
       const def = G.BDEF[b.type];
       const fuelData = b.type === 'woodcutter' ? this.fuelInfoData(b) : null;
+      const siteData = b.state === 'site' ? this.siteInfoData(b) : null;
       let status;
       if (fuelData) status = fuelData.status;
-      else if (b.state === 'site') {
-        const trees = G.siteTrees ? G.siteTrees(b).length : 0;
-        status = trees ? `清理工地：还需砍 ${trees} 棵树（工人搬运入仓）` : `建造中 ${Math.floor(b.progress * 100)}%`;
-      }
+      else if (siteData) status = siteData.status;
       else if (b.type === 'house' || b.type === 'stonehouse') status = b.family != null ? '有人居住' : '空置';
       else if (b.type === 'boarding') status = `入住 ${G.boardingFamilies(w, b).length} / ${G.LIFE.boardingCap} 家`;
       else if (b.type === 'farm') {
@@ -447,7 +465,7 @@ G.ui = {
       let workers = '';
       if (def.jobs > 0 || b.state === 'site') {
         const names = b.workers.map(id => w.cmap[id]).filter(Boolean).map(c => this.escHtml(c.name)).join('、');
-        workers = `<div class="row">工人：<span${fuelData ? ' data-fuel="workers"' : ''}>${names || (b.state === 'site' ? '等待建筑工人' : '无')}</span></div>`;
+        workers = `<div class="row">工人：<span${siteData ? ' data-site-workers' : ''}${fuelData ? ' data-fuel="workers"' : ''}>${names || (b.state === 'site' ? '等待建筑工人' : '无')}</span></div>`;
       }
       let extra = '';
       if ((b.type === 'house' || b.type === 'stonehouse') && b.family != null) {
@@ -493,10 +511,10 @@ G.ui = {
       }
       el.innerHTML = `
         <div class="info-head"><span>${def.icon} ${def.name}</span><button id="info-close">✕</button></div>
-        <div class="row"${fuelData ? ' data-fuel="status"' : ''}>${this.escHtml(status)}</div>
+        <div class="row"${siteData ? ' data-site-status' : ''}${fuelData ? ' data-fuel="status"' : ''}>${this.escHtml(status)}</div>
         ${workers}${extra}
         <div class="row desc">${def.desc}</div>
-        <div class="row desc"${fuelData ? ' data-fuel="refund"' : ''}>${fuelData ? fuelData.refund : b.state === 'site' && !b.constructionStarted && b.progress === 0 && b.workLeft >= b.totalWork ? '未开工：取消退还全部已付建材，保留树木' : '已开工：拆除退还一半已付建材，已砍树不恢复'}</div>
+        <div class="row desc" data-info-refund${fuelData ? ' data-fuel="refund"' : ''}>${fuelData ? fuelData.refund : siteData ? siteData.refund : '已开工：拆除退还一半已付建材，已砍树不恢复'}</div>
         <button id="info-demolish" class="danger">${b.state === 'site' ? '取消工地' : '拆除'}</button>`;
       if (fuelData) this._fuelInfoState = b.state;
     } else {
@@ -539,9 +557,14 @@ G.ui = {
     }));
     if (focusSelector && el.querySelector) { const next = el.querySelector(focusSelector); if (next) next.focus(); }
     const dem = document.getElementById('info-demolish');
+    const renderedState = selected.state;
     if (dem) dem.addEventListener('click', () => {
-      const b = w.bmap[G.sel.id];
-      if (b) G.removeBuilding(b);
+      // A stale cancel-site button must never remove a newly completed building.
+      if (!G.sel || G.sel.kind !== 'b' || G.world !== w || w.bmap[G.sel.id] !== selected || selected.state !== renderedState) {
+        this.renderInfo();
+        return;
+      }
+      G.removeBuilding(selected);
     });
   },
   /* 定时刷新打开的面板 */
