@@ -133,7 +133,7 @@ G.BUILD_SPR_W = {
   house: 1.16, stonehouse: 1.12, boarding: 1.04, storage: 1.03, mine: 1.12,
   gatherer: 1.10, forester: 1.06, woodcutter: 1.12, dock: 1.0,
   school: 1.06, blacksmith: 1.06, hunting: 1.08, site_2x2: 1.0, site_3x3: 1.0,
-  tailor: 1.04, tradingpost: 0.80,
+  tailor: 1.04, tradingpost: 0.875,
 };
 /* 精灵内烟囱的横向位置（相对精灵宽度，负=偏左），用于挂炊烟粒子 */
 G.BUILD_CHIMNEY_X = { house: -0.30, stonehouse: 0.02, boarding: -0.32 };
@@ -378,7 +378,9 @@ G.drawBuilding = function (ctx, b, time) {
 
   // 建筑精灵：脚点 = 占地菱形最下角，宽度 = 占地菱形宽 × 出格系数
   const sprW = (b.w + b.h) * 32 * (G.BUILD_SPR_W[b.type] || 1.08);
-  const spr = G.sprDraw(ctx, b.type, B[0], B[1], { w: sprW });
+  // 贸易站按原图50%显示；补偿底角下方3px透明余量，让石基脚点贴合占地底角。
+  const sprFootY = B[1] + (b.type === 'tradingpost' ? 1.5 : 0);
+  const spr = G.sprDraw(ctx, b.type, B[0], sprFootY, { w: sprW });
   if (spr) {
     if (def.chimney) { // 挂烟囱粒子锚点（精灵内烟囱横向位置见 BUILD_CHIMNEY_X）
       b._chimney = [B[0] + spr[0] * (G.BUILD_CHIMNEY_X[b.type] || -0.30), B[1] - spr[1] * 0.58];
