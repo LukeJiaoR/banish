@@ -13,12 +13,21 @@ G.groundDirty = new Set();  // 只变了道路/岩石的瓦片：局部重绘，
 G.smoke = [];
 G.flakes = null;
 
-/* 地面缓存允许的最大精度：地图越大，缓存画布越大，需要降低采样率以控制在画布上限内 */
+/* 初建、缩放和换图共用同一预算；约束实际向上取整后的整数像素，而非仅浮点面积。 */
+G.groundCacheSize = function (requestedScale) {
+  const N = G.world.N, fullW = N * 64 + 80, fullH = N * 32 + 80;
+  let scale = Math.min(requestedScale, 1, Math.sqrt(G.CACHE_MAX_PX / (fullW * fullH)));
+  let width = Math.ceil(fullW * scale), height = Math.ceil(fullH * scale);
+  if (width * height > G.CACHE_MAX_PX) {
+    // 保留原高度的预算，缩减取整带来的少量宽度；避开浮点乘法在整数边界向上取整。
+    scale = Math.min(scale, Math.floor(G.CACHE_MAX_PX / height) / fullW) * (1 - Number.EPSILON);
+    width = Math.ceil(fullW * scale); height = Math.ceil(fullH * scale);
+  }
+  return { scale, width, height };
+};
+
 G.maxGroundScale = function () {
-  const w = G.world;
-  if (!w) return 1;
-  const full = (w.N * 64 + 80) * (w.N * 32 + 80);
-  return Math.min(1, Math.sqrt(G.CACHE_MAX_PX / full));
+  return G.world ? G.groundCacheSize(1).scale : 1;
 };
 
 /* 夜色浓度（0-1）：20 点入夜 → 22 点全暗 → 4 点最暗 → 6 点天亮 */
@@ -216,13 +225,17 @@ G.drawGroundTile = function (c, w, pal, x, y) {
 };
 
 G.buildGround = function () {
-  const w = G.world, N = w.N, s = G.groundScale;
-  const partial = !G.needGround && !!G._gcv && G.groundDirty.size > 0;
+  const w = G.world, N = w.N;
+  const { scale: s, width: gw, height: gh } = G.groundCacheSize(G.groundScale);
+  const sameSize = G._gcv && G._gcv.width === gw && G._gcv.height === gh;
+  const partial = !G.needGround && sameSize && G._groundWorld === w &&
+    G._groundScale === s && G.groundDirty.size > 0;
+  G.groundScale = s;
   G.groundOX = N * 32 + 40;
   G.groundOY = 40;
-  const gw = Math.ceil((N * 64 + 80) * s), gh = Math.ceil((N * 32 + 80) * s);
   if (!G._gcv) G._gcv = document.createElement('canvas');
-  if (G._gcv.width !== gw || G._gcv.height !== gh) { G._gcv.width = gw; G._gcv.height = gh; }
+  // 先缩窄再改高度，避免换图时「新宽度 × 旧高度」的临时分配也突破预算。
+  if (!sameSize) { G._gcv.width = 1; G._gcv.height = gh; G._gcv.width = gw; }
   const c = G._gcv.getContext('2d');
   c.setTransform(s, 0, 0, s, G.groundOX * s, G.groundOY * s);
   const pal = G.PAL[G.game.season];
@@ -254,6 +267,8 @@ G.buildGround = function () {
   }
   G.groundDirty.clear();
   G.needGround = false;
+  G._groundWorld = w;
+  G._groundScale = s;
 };
 
 /* ---------- 树 ---------- */
@@ -670,7 +685,7 @@ G.drawFoodForestBounds = function (ctx) {
 G.frame = function (dtReal) {
   const cv = G.cv, ctx = G.ctx;
   G.updateParticles(dtReal);
-  if (G.needGround || G.groundDirty.size) G.buildGround();
+  if (G.needGround || G.groundDirty.size || G._groundWorld !== G.world || G._groundScale !== G.groundScale) G.buildGround();
 
   ctx.setTransform(G.dpr, 0, 0, G.dpr, 0, 0);
   ctx.fillStyle = '#14181d';
@@ -898,11 +913,11 @@ G.frame = function (dtReal) {
 
   // 地面缓存清晰度：缩放稳定后按当前倍率重建（受画布像素上限约束，控制内存）
   const gcap = G.maxGroundScale();
-  const tgt = G.clamp(z, 0.55, gcap);
+  const tgt = Math.min(Math.max(z, 0.55), gcap);
   if (Math.abs(tgt - G.groundScale) > 0.12 && !G._gsTimer) {
     G._gsTimer = setTimeout(() => {
       G._gsTimer = null;
-      G.groundScale = G.clamp(G.cam.z, 0.55, G.maxGroundScale());
+      G.groundScale = Math.min(Math.max(G.cam.z, 0.55), G.maxGroundScale());
       G.needGround = true;
     }, 250);
   } else if (Math.abs(tgt - G.groundScale) <= 0.12 && G._gsTimer) {
