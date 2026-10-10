@@ -140,8 +140,8 @@ G.endDay = function () {
   // ---- 无效岗位释放工人 ----
   for (const b of w.buildings) {
     if (b.noWork && b.state === 'ok' && b.workers.length) {
-      for (const id of b.workers) { const c = w.cmap[id]; if (c) { c.job = null; c.task = null; c.state = 'idle'; } }
-      b.workers = [];
+      for (const id of b.workers) { const c = w.cmap[id]; if (c && !G.goalCommitment(c)) { c.job = null; c.task = null; c.state = 'idle'; } }
+      b.workers = b.workers.filter(id => w.cmap[id] && w.cmap[id].job === b.id);
     }
     b.noWork = false;
   }
@@ -670,10 +670,120 @@ G.startHaul = function (c) {
 
 /* 燃料上限（原版 Wood Cutter 的 Fuel Limit）：柴火库存达到上限即停产；旧档/测试无该字段时用默认值 */
 G.fuelLimitOf = function (b) { return Number.isFinite(b.fuelLimit) ? G.clamp(b.fuelLimit, 0, G.PROD.woodcutter.fuelMax) : G.PROD.woodcutter.fuelLimit; };
-G.fuelLimited = function (b) { return b.type === 'woodcutter' && G.game.res.firewood >= G.fuelLimitOf(b); };
+G.fuelLimited = function (b) { return b.type === 'woodcutter' && (G.productionGoalOf('firewood') === null ? G.game.res.firewood >= G.fuelLimitOf(b) : G.goalPaused('firewood', b)); };
 G.toolLimitOf = function (b) { return Number.isFinite(b.toolLimit) ? G.clamp(b.toolLimit, 0, G.PROD.blacksmith.toolMax) : G.PROD.blacksmith.toolLimit; };
-G.toolLimited = function (b) { return b.type === 'blacksmith' && G.game.res.tools >= G.toolLimitOf(b); };
-G.productionLimited = function (b) { return G.fuelLimited(b) || G.toolLimited(b); };
+G.toolLimited = function (b) { return b.type === 'blacksmith' && (G.productionGoalOf('tools') === null ? G.game.res.tools >= G.toolLimitOf(b) : G.goalPaused('tools', b)); };
+
+/* Optional automatic-production goals. Unset means the exact legacy rules.
+ * Hysteresis changes at deliveries and the normal 2h scheduler, never in UI reads. */
+G.PRODUCTION_GOAL_MAX = 1000000;
+G.PRODUCTION_OUTPUTS = { woodcutter: ['firewood'], blacksmith: ['tools'], forester: ['wood'], mine: ['stone', 'iron'], gatherer: ['food'], dock: ['food'], hunting: ['food'], farm: ['food'] };
+G.productionGoalOf = function (type, game) {
+  const goals = (game || G.game).productionGoals;
+  return goals && Object.prototype.hasOwnProperty.call(goals, type) && Number.isFinite(goals[type]) ? goals[type] : null;
+};
+G.productionResumeAt = function (target) { return Math.max(0, target - Math.min(100, Math.max(1, Math.ceil(target * 0.1)))); };
+G.effectiveProductionGoal = function (type, b, game) {
+  const target = G.productionGoalOf(type, game);
+  if (target === null) return null;
+  const local = b && b.type === 'woodcutter' && type === 'firewood' ? G.fuelLimitOf(b)
+    : b && b.type === 'blacksmith' && type === 'tools' ? G.toolLimitOf(b) : Infinity;
+  return Math.min(target, local);
+};
+G.nextGoalPause = function (stock, target, paused) {
+  if (target === 0 || stock >= target) return true;
+  if (stock <= G.productionResumeAt(target)) return false;
+  return paused === true;
+};
+G.updateProductionGoals = function (game, world) {
+  const g = game || G.game, w = world || G.world;
+  if (!g.productionGoals) return;
+  g.productionPaused = g.productionPaused || {};
+  for (const type of G.RES_KEYS) {
+    const target = G.productionGoalOf(type, g);
+    if (target === null) { delete g.productionPaused[type]; continue; }
+    g.productionPaused[type] = G.nextGoalPause(g.res[type], target, g.productionPaused[type]);
+  }
+  for (const b of w.buildings) {
+    const type = b.type === 'woodcutter' ? 'firewood' : b.type === 'blacksmith' ? 'tools' : null;
+    if (!type) continue;
+    const target = G.effectiveProductionGoal(type, b, g);
+    if (target === null) delete b.productionPaused;
+    else b.productionPaused = G.nextGoalPause(g.res[type], target, typeof b.productionPaused === 'boolean' ? b.productionPaused : g.productionPaused[type]);
+  }
+};
+G.goalPaused = function (type, b) {
+  if (G.productionGoalOf(type) === null) return false;
+  if (b && ((b.type === 'woodcutter' && type === 'firewood') || (b.type === 'blacksmith' && type === 'tools'))) return b.productionPaused === true || !!(G.game.productionPaused && G.game.productionPaused[type]);
+  return !!(G.game.productionPaused && G.game.productionPaused[type]);
+};
+G.farmSeasonCommitted = function (b) {
+  return !!(b.sowingCommitted || b.sownAll || (b.farm && b.farm.some(f => f.sown)));
+};
+G.setProductionGoal = function (type, value) {
+  if (!G.RES_KEYS.includes(type) || (value !== null && (!Number.isInteger(value) || value < 0 || value > G.PRODUCTION_GOAL_MAX))) return false;
+  const g = G.game;
+  const previous = G.productionGoalOf(type);
+  if (previous === value) return true;
+  g.productionGoals = g.productionGoals || {}; g.productionPaused = g.productionPaused || {};
+  // A not-yet-finished first sow task is already a seasonal commitment.
+  if (type === 'food' && value !== null) for (const b of G.world.buildings)
+    if (b.type === 'farm' && (G.farmSeasonCommitted(b) ||
+      G.world.citizens.some(c => [c.task, c.pausedTask].some(t => t && t.b === b && t.kind === 'sow')))) b.sowingCommitted = true;
+  if (value === null) delete g.productionGoals[type]; else g.productionGoals[type] = value;
+  delete g.productionPaused[type];
+  for (const b of G.world.buildings) if ((type === 'firewood' && b.type === 'woodcutter') || (type === 'tools' && b.type === 'blacksmith')) {
+    const local = type === 'firewood' ? G.fuelLimitOf(b) : G.toolLimitOf(b);
+    const oldEffective = previous === null ? null : Math.min(previous, local);
+    if (oldEffective !== G.effectiveProductionGoal(type, b)) delete b.productionPaused;
+  }
+  G.updateProductionGoals();
+  if (!Object.keys(g.productionGoals).length) { delete g.productionGoals; delete g.productionPaused; }
+  g.schedT = 0; // Normal scheduler, no task cancellation in the setting action.
+  return true;
+};
+G.hasProductionGoal = function (b) {
+  const types = G.PRODUCTION_OUTPUTS[b.type] || [];
+  return types.some(type => G.productionGoalOf(type) !== null);
+};
+G.productionLimited = function (b) {
+  if (b.state !== 'ok') return false; // Construction and manual clearing never stop.
+  if (G.fuelLimited(b) || G.toolLimited(b)) return true;
+  if (['gatherer', 'dock', 'hunting'].includes(b.type)) return G.goalPaused('food');
+  if (b.type === 'farm') return G.goalPaused('food') && !G.farmSeasonCommitted(b);
+  if (b.type === 'forester') return G.goalPaused('wood') && !b.doPlant;
+  if (b.type === 'mine' && (G.productionGoalOf('stone') !== null || G.productionGoalOf('iron') !== null)) return (G.goalPaused('stone') || G.game.res.stone >= G.storageCap()) &&
+    (G.goalPaused('iron') || G.game.res.iron >= G.storageCap());
+  return false;
+};
+G.buildingGoalStatus = function (b) {
+  if (b.state !== 'ok') return '';
+  const types = G.PRODUCTION_OUTPUTS[b.type] || [];
+  const configured = types.filter(type => G.productionGoalOf(type) !== null);
+  if (!configured.length) return '';
+  if (b.type === 'farm' && G.farmSeasonCommitted(b)) return '本季已开始：继续播完和收获，目标仅限制未开始的新一季';
+  return configured.map(type => {
+    const target = G.effectiveProductionGoal(type, b), local = ['woodcutter', 'blacksmith'].includes(b.type);
+    const source = local ? `（全镇 ${G.productionGoalOf(type)} 与本屋 ${type === 'firewood' ? G.fuelLimitOf(b) : G.toolLimitOf(b)} 取较低值）` : '（全镇）';
+    const state = G.goalPaused(type, b) ? (target === 0 ? '已关闭新生产' : `暂停新生产，库存≤${G.productionResumeAt(target)}恢复`)
+      : type !== 'tools' && G.game.res[type] >= G.storageCap() ? '硬仓容已满' : '可接新生产';
+    return `${G.RES[type].name}目标 ${target}${source}：${state}${b.type === 'forester' && G.goalPaused(type) && b.doPlant ? '；仍可补种育林' : ''}`;
+  }).join('；');
+};
+// Only configured automatic jobs gain completion protection. Never change the
+// unset baseline, teachers, manual tasks, or construction scheduling here.
+G.goalCommitment = function (c) {
+  const b = G.world.bmap[c.job];
+  if (!b || b.state !== 'ok') return false;
+  const outputs = G.PRODUCTION_OUTPUTS[b.type] || [];
+  const paused = type => outputs.includes(type) && G.goalPaused(type, b);
+  if (c.carry && paused(c.carry.type)) return true;
+  return [c.task, c.pausedTask].some(task => {
+    if (!task || task.b !== b) return false;
+    const type = task.yield ? task.yield.type : ({ chop: 'wood', firewood: 'firewood', sow: 'food', harvest: 'food' })[task.kind];
+    return !!type && paused(type);
+  });
+};
 
 /* 仓储上限：每座（建成的）仓库 +STORAGE_CAP，至少按 1 座计 */
 G.storageCap = function () {
@@ -684,7 +794,7 @@ G.storageCap = function () {
 /* 入库：受仓储上限约束，满仓部分丢弃并提示（工具随身小件不受限） */
 G.deposit = function (type, qty) {
   const g = G.game;
-  if (type === 'tools') { g.res.tools += qty; return qty; }
+  if (type === 'tools') { g.res.tools += qty; G.updateProductionGoals(); return qty; }
   const space = Math.max(0, G.storageCap() - g.res[type]);
   const got = Math.min(qty, space);
   g.res[type] += got;
@@ -692,6 +802,7 @@ G.deposit = function (type, qty) {
     g.warned.storageFull = true;
     G.ui.toast('⚠ 仓库满了，多出的资源只能丢弃——再建一座仓库吧', 'warn');
   }
+  G.updateProductionGoals();
   return got;
 };
 
@@ -932,6 +1043,9 @@ G.recordProduction = function (b, type, qty) {
 /* 按建筑类型生成任务 */
 G.makeTask = function (b, c) {
   const P = G.PROD, g = G.game, w = G.world;
+  if (b.state === 'ok' && G.productionLimited(b) && !['woodcutter', 'blacksmith'].includes(b.type)) {
+    b.warnText = G.buildingGoalStatus(b); return null;
+  }
   switch (b.type) {
     case 'woodcutter': {
       if (G.fuelLimited(b)) { // 燃料上限：库存够用时自动停工（原版 Fuel Limit）
@@ -969,7 +1083,7 @@ G.makeTask = function (b, c) {
         const spot = G.nearestPlantSpot(w, b.x, b.y, R, claimed);
         return spot ? { kind: 'plant', b, tx: spot.x, ty: spot.y, work: G.taskWork(c, P.forester.plantH), workLeft: 0 } : null;
       };
-      if (b.doCut) { // 砍伐成熟树（面板可开关，原版 Forester 的 Cut 选项）
+      if (b.doCut && !G.goalPaused('wood')) { // 砍伐成熟树（面板可开关，原版 Forester 的 Cut 选项）
         const trees = G.treesInRadius(w, b.x, b.y, R, true).filter(t => w.bgrid[t.i] < 0);
         // 成熟树存量低于下限就停砍育林：防止清穿森林（也会拖垮同址采集小屋），等补种长回来
         if (trees.length > P.forester.minMature) {
@@ -1032,7 +1146,7 @@ G.makeTask = function (b, c) {
       if (!spot) return null;
       // 满仓不白挖：石铁都到仓储上限就停工；只有一项满仓时改为专采另一项
       const cap = G.storageCap();
-      const stoneFull = g.res.stone >= cap, ironFull = g.res.iron >= cap;
+      const stoneFull = g.res.stone >= cap || G.goalPaused('stone'), ironFull = g.res.iron >= cap || G.goalPaused('iron');
       if (stoneFull && ironFull) {
         b.noWork = true; b.warnText = '仓库已满';
         return null;
@@ -1096,10 +1210,11 @@ G.makeTask = function (b, c) {
         if (c2 !== c && t2 && t2.b === b && c2.job === b.id && (t2.kind === 'sow' || t2.kind === 'harvest'))
           claimed.add(t2.ti);
       // 播种（春）
-      if (!b.sownAll && (g.season === 0 || g.season === 1)) {
+      if (!b.sownAll && (g.season === 0 || g.season === 1) && (!G.goalPaused('food') || G.farmSeasonCommitted(b))) {
         const ti = b.farm.findIndex((f, i) => !f.sown && !claimed.has(i));
         if (ti >= 0) {
           const f = b.farm[ti];
+          if (G.productionGoalOf('food') !== null) b.sowingCommitted = true;
           return { kind: 'sow', b, ti, tx: f.x, ty: f.y, work: G.taskWork(c, P2.tileWorkH), workLeft: 0 };
         }
       }
@@ -1211,7 +1326,19 @@ G.completeTask = function (c) {
 
 G.resetFarm = function (b) {
   for (const f of b.farm) { f.sown = false; f.harvested = false; }
-  b.sownAll = false; b.growth = 0; b.harvestDone = false;
+  b.sownAll = false; b.growth = 0; b.harvestDone = false; delete b.sowingCommitted;
+  // A commitment belongs to this crop season, not next year's empty field.
+  // Expire old crop work only in the opt-in path; harvested cargo remains owned.
+  if (G.productionGoalOf('food') !== null) for (const c of G.world.citizens) {
+    const expired = t => t && t.b === b && (t.kind === 'sow' || t.kind === 'harvest');
+    if (expired(c.task)) {
+      c.task = null;
+      if (c.state === 'work' || (c.state === 'walk' && c.walkKind === 'task')) {
+        c.path = null; c.pi = 0; c.walkKind = ''; c.state = 'idle'; c.wanderT = 0.5;
+      }
+    }
+    if (expired(c.pausedTask)) c.pausedTask = null;
+  }
 };
 
 /* ================= 职业调度 ================= */
@@ -1256,19 +1383,19 @@ G.pickSchool = function (counts) {
  * 人手最多的非粮食岗 → 粮食富余岗（人数 > 按人口测算的需求） */
 G.pickMarkDonor = function (w, harvestSeason, foodJobs, needFood) {
   const staffed = w.buildings.filter(b => b.state === 'ok' && G.BDEF[b.type].jobs > 0 && b.workers.length > 0);
-  const adultsOf = (b) => b.workers.map(id => w.cmap[id]).filter(c => c && !c.dead && c.adult);
+  const adultsOf = (b) => b.workers.map(id => w.cmap[id]).filter(c => c && !c.dead && c.adult && !G.goalCommitment(c));
   for (const b of staffed) {
     const xs = adultsOf(b);
     if (xs.length > G.BDEF[b.type].jobs) return xs[0]; // 超员
   }
   for (const b of staffed)
-    if (G.productionLimited(b)) return adultsOf(b)[0];
+    if (G.productionLimited(b)) { const c = adultsOf(b)[0]; if (c) return c; }
   const cap = G.storageCap();
   for (const b of staffed)
-    if (b.type === 'mine' && G.game.res.stone >= cap && G.game.res.iron >= cap) return adultsOf(b)[0];
+    if (b.type === 'mine' && G.game.res.stone >= cap && G.game.res.iron >= cap) { const c = adultsOf(b)[0]; if (c) return c; }
   if (!harvestSeason)
     for (const b of staffed)
-      if (b.type === 'farm' && b.sownAll) return adultsOf(b)[0]; // 已播完种的农田；播种进行中不抽（否则秋收窗口顺延）
+      if (b.type === 'farm' && b.sownAll) { const c = adultsOf(b)[0]; if (c) return c; } // 已播完种的农田；播种进行中不抽（否则秋收窗口顺延）
   let best = null, bestN = 1;
   for (const b of staffed) {
     if (b.type === 'school' || foodJobs.includes(b.type)) continue;
@@ -1285,7 +1412,7 @@ G.pickMarkDonor = function (w, harvestSeason, foodJobs, needFood) {
 
 G.farmHasWork = function (b) {
   const season = G.game.season;
-  return (!b.sownAll && (season === 0 || season === 1)) ||
+  return (!b.sownAll && (season === 0 || season === 1) && (!G.goalPaused('food') || G.farmSeasonCommitted(b))) ||
     (b.sownAll && b.growth >= 1 && season === 2 && !b.harvestDone);
 };
 
@@ -1296,25 +1423,26 @@ G.jobCanProduce = function (b) {
   if (b.type === 'farm') return G.farmHasWork(b);
   if (b.type === 'woodcutter') return r.wood >= p.woodcutter.logsIn;
   if (b.type === 'blacksmith') return p.blacksmith.consume.every(c => r[c.type] >= c.qty);
-  if (b.type === 'forester') return (b.doCut && G.treesInRadius(w, b.x, b.y, p.forester.radius, true).length > p.forester.minMature) ||
+  if (b.type === 'forester') return (b.doCut && !G.goalPaused('wood') && G.treesInRadius(w, b.x, b.y, p.forester.radius, true).length > p.forester.minMature) ||
     (b.doPlant && !!G.nearestPlantSpot(w, b.x, b.y, p.forester.radius));
   if (b.type === 'gatherer') return G.treesInRadius(w, b.x, b.y, p.gatherer.radius, false).length >= p.gatherer.needTrees;
   if (b.type === 'hunting') return G.treesInRadius(w, b.x, b.y, p.hunting.radius, true).length >= p.hunting.needTrees;
-  if (b.type === 'mine') return r.stone < G.storageCap() || r.iron < G.storageCap();
+  if (b.type === 'mine') return (!G.goalPaused('stone') && r.stone < G.storageCap()) || (!G.goalPaused('iron') && r.iron < G.storageCap());
   return true;
 };
 
 G.scheduleJobs = function () {
   const w = G.world;
+  G.updateProductionGoals();
   for (const b of w.buildings) {
     // 在重新探测岗位前先释放确实没活的闲人；旧逻辑每2h清旗，导致每日释放永远看不到它。
-    if (b.noWork) for (const id of b.workers.slice()) {
+    if (b.noWork || (G.hasProductionGoal(b) && G.productionLimited(b))) for (const id of b.workers.slice()) {
       const c = w.cmap[id];
-      if (c && !c.task && !c.pausedTask && c.state !== 'haul') G.releaseWorker(c);
+      if (c && !c.task && !c.pausedTask && !G.goalCommitment(c) && c.state !== 'haul') G.releaseWorker(c);
     }
     b.noWork = false;
     if (b.type === 'farm' && b.state === 'ok' && !G.farmHasWork(b))
-      for (const id of b.workers.slice()) { const c = w.cmap[id]; if (c) G.releaseWorker(c); }
+      for (const id of b.workers.slice()) { const c = w.cmap[id]; if (c && !G.goalCommitment(c)) G.releaseWorker(c); }
   }
   const jobless = () => w.citizens.filter(c => !c.dead && c.adult && c.job == null);
   // 「砍伐」/「清除岩石」标记需要散工处理：预留 1-2 名无业成人（不够则稍后从闲余岗位抽调）
@@ -1332,7 +1460,7 @@ G.scheduleJobs = function () {
   if (G.game.res.food < foodLow) G.game.foodUrgent = true;
   else if (G.game.res.food > foodRecovered) G.game.foodUrgent = false; // 滞回，避免在阈值附近反复打断工地
   const needFood = Math.ceil(dailyFood / (G.game.foodUrgent ? 4 : 8));
-  const isFood = b => b && b.state === 'ok' && FOOD_JOBS.includes(b.type) && (b.type !== 'farm' || G.farmHasWork(b));
+  const isFood = b => b && b.state === 'ok' && !G.productionLimited(b) && FOOD_JOBS.includes(b.type) && (b.type !== 'farm' || G.farmHasWork(b));
   const foodCount = () => w.citizens.filter(c => c.adult && !c.dead && isFood(w.bmap[c.job])).length;
   if (G.game.foodUrgent) {
     // 已占满的工地也必须能回补粮岗；只保护尚可工作的食物建筑，不空留人。
@@ -1349,7 +1477,7 @@ G.scheduleJobs = function () {
         if (!c) {
           const donors = w.citizens.filter(c2 => {
             const job = w.bmap[c2.job];
-            if (!c2.adult || c2.dead || !job || isFood(job) || job.type === 'school') return false;
+            if (!c2.adult || c2.dead || G.goalCommitment(c2) || !job || isFood(job) || job.type === 'school') return false;
             if (job.type === 'farm' && !job.sownAll && job.workers.length <= 1) return false;
             return job.type !== 'woodcutter' || job.state === 'site' || job.workers.length > 1;
           }).sort((a, z) => (w.bmap[a.job].state === 'site' ? 0 : 1) - (w.bmap[z.job].state === 'site' ? 0 : 1));
@@ -1385,7 +1513,7 @@ G.scheduleJobs = function () {
       let c = free.length > wantLabor ? G.pickNearest(free, b) : null;
       if (!c) {
         const busyAll = w.citizens.filter(ci => {
-          if (ci.dead || !ci.adult || ci.job == null) return false;
+          if (ci.dead || !ci.adult || ci.job == null || G.goalCommitment(ci)) return false;
           const jb = w.bmap[ci.job];
           return jb && jb.state === 'ok' && G.BDEF[jb.type].jobs > 0 && jb.type !== 'school'
             && !(jb.type === 'farm' && !jb.sownAll && (G.game.season === 0 || G.game.season === 1) && jb.workers.length <= 1); // 教师不抽调
@@ -1431,16 +1559,15 @@ G.scheduleJobs = function () {
   for (const b of targets) {
     if (jobless().length > wantLabor) break; // 只有非预留散工才由第二优先处理；标记散工不能阻断再平衡
     // 从供体岗位抽人：优先抽当下正闲置的那个（别的工人还在干活）
+    const available = x => x.workers.some(id => { const c = w.cmap[id]; return c && !G.goalCommitment(c); });
     const give = (x) => {
-      let idx = x.workers.length - 1;
-      const lazyIdx = x.workers.findIndex(id => { const c = w.cmap[id]; return c && c.state === 'idle' && !c.task; });
-      if (lazyIdx >= 0) idx = lazyIdx;
-      const c = w.cmap[x.workers[idx]];
+      const eligible = x.workers.map(id => w.cmap[id]).filter(c => c && !G.goalCommitment(c));
+      const c = eligible.find(c => c.state === 'idle' && !c.task) || eligible[eligible.length - 1];
       if (c) { G.releaseWorker(c); G.assignWorker(b, c); }
     };
     // 供体 1：非收获季且已播完种的农田（播种进行中不抽，否则秋收窗口顺延）
     if (!harvestSeason) {
-      const farm = w.buildings.find(x => x.type === 'farm' && x.state === 'ok' && x.sownAll && x.workers.length > 0);
+      const farm = w.buildings.find(x => x.type === 'farm' && x.state === 'ok' && x.sownAll && x.workers.length > 0 && available(x));
       if (farm) { give(farm); return; }
     }
     // 供体 2：有闲置工人的岗位（工人正闲着就是临时富余；粮食岗至少留 1 人。
@@ -1449,23 +1576,23 @@ G.scheduleJobs = function () {
     const lazy = w.buildings.find(x => x !== b && x.state === 'ok' && G.BDEF[x.type].jobs > 0 && x.workers.length > 0
       && x.type !== 'school' // 教师不外借，保证学堂开学
       && (!FOOD_SET.includes(x.type) || (x.workers.length > 1 && (FOOD_JOBS.includes(b.type) || foodWorkerCount() > needFood)))
-      && x.workers.some(id => { const c = w.cmap[id]; return c && c.state === 'idle' && !c.task; }));
+      && x.workers.some(id => { const c = w.cmap[id]; return c && c.state === 'idle' && !c.task && !G.goalCommitment(c); }));
     if (lazy) { give(lazy); return; }
     // 关键空岗不能永远等粮工碰巧idle：采集任务完工会直接接下一趟，正常忙碌不是不可抽调。
     if (b.workers.length === 0 && ['woodcutter', 'blacksmith', 'farm', 'forester'].includes(b.type) && foodWorkerCount() > needFood) {
-      const surplus = w.buildings.find(x => x !== b && x.state === 'ok' && FOOD_JOBS.includes(x.type) && x.workers.length > 1);
+      const surplus = w.buildings.find(x => x !== b && x.state === 'ok' && FOOD_JOBS.includes(x.type) && x.workers.length > 1 && available(x));
       if (surplus) { give(surplus); return; }
     }
     // 供体 3：伐木屋缺人且木材有富余 → 护林屋（>1 人）抽一人锯柴
     if (b.type === 'woodcutter' && G.game.res.wood > 10 && !G.fuelLimited(b)) {
-      const forester = w.buildings.find(x => x.type === 'forester' && x.state === 'ok' && x.workers.length > 1);
+      const forester = w.buildings.find(x => x.type === 'forester' && x.state === 'ok' && x.workers.length > 1 && available(x));
       if (forester) { give(forester); return; }
     }
     // 供体 4：秋收窗口宝贵 → 从伐木/护林抽人抢收
     if (harvestSeason && b.type === 'farm') {
       const winterNeed = w.buildings.reduce((n, x) => n + (G.isOccupiedHome(w, x) ? G.BDEF[x.type].warmWoodPerYear : 0), 0);
-      const d = w.buildings.find(x => x.state === 'ok' && x.type === 'forester' && x.workers.length > 0) ||
-        w.buildings.find(x => x.state === 'ok' && x.type === 'woodcutter' && x.workers.length > 0 && G.game.res.firewood >= winterNeed);
+      const d = w.buildings.find(x => x.state === 'ok' && x.type === 'forester' && x.workers.length > 0 && available(x)) ||
+        w.buildings.find(x => x.state === 'ok' && x.type === 'woodcutter' && x.workers.length > 0 && G.game.res.firewood >= winterNeed && available(x));
       if (d) { give(d); return; }
     }
   }

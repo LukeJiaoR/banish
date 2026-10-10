@@ -17,6 +17,7 @@
     <div id="speed"></div>
     <div id="sys">
       <button id="btn-err" title="脚本错误记录" class="hidden">⚠</button>
+      <button id="btn-production-goals" title="全镇自动生产目标">资源目标</button>
       <button id="btn-save" title="保存到手动档">💾</button>
       <button id="btn-load" title="存档管理：载入 / 删除">📂</button>
       <button id="btn-new" title="新游戏">🌱</button>
@@ -70,6 +71,17 @@
         <li>⚠️ 中难度开局：5 个家庭无家可归，只有一辆储物车（木80 石48 食500 柴50）。未开工取消全退已付建材；开工后拆除退一半。占地树木由工人清场搬运，取消保留未砍树</li>
       </ul>
       <button id="help-close">开始游戏</button>
+    </div>
+  </div>
+
+  <div id="production-goals" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="production-goals-title">
+    <div class="dialog production-goals-dialog">
+      <h2 id="production-goals-title">自动生产目标</h2>
+      <p>库存达标后暂停新生产，消耗到恢复线再开工。0关闭新生产；未设置则继承原规则。目标不会增加仓储容量，也不保证够吃或够过冬。</p>
+      <div id="production-goal-rows"></div>
+      <p>已接批次和在途货物继续完成；手动采运标记、工地清场不受限制。已开始播种的农田继续播完和收获，目标仅限制未开始的新一季。护林木材达标仍可补种。</p>
+      <p id="production-goals-message" role="status" aria-live="polite"></p>
+      <button id="production-goals-close">完成</button>
     </div>
   </div>
 
