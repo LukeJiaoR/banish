@@ -38,7 +38,7 @@ G.ui = {
       if (c.task && c.task.kind === 'firewood' && c.task.phase === 'fetch') return '前往仓库取原木';
       return '前往工作点';
     }
-    if (c.carry) return '等待送仓（需可达仓库）';
+    if (c.carry) return G.cargoWaitReason(c) || '等待送仓（需可达仓库）';
     if (c.student) return '就读中';
     if (!b) return c.age >= G.ADULT_AGE ? '散工待命' : '玩耍休息';
     if (b.state === 'site') return '等待下一项施工任务';
@@ -417,6 +417,7 @@ G.ui = {
         const cap = G.storageCap();
         el.title = `${G.RES[k].name}：${Math.floor(g.res[k])}${k === 'tools' ? '（工具不限仓储）' : ' / ' + cap}`;
         if (hauling.carry[k]) el.title += ` · 另有 ${hauling.carry[k]} 随身待入库（尚不可用）`;
+        if ((k === 'stone' || k === 'iron') && hauling.carry[k] && g.res[k] >= cap) el.title += ' · 仓满保留余矿，使用库存或建成新仓库后送仓';
         if (k === 'food' && G.world.citizens.length) el.title += ` · 可供 ${(g.res.food / (G.world.citizens.length * G.LIFE.eatPerDay)).toFixed(1)} 天（不计新产出）`;
         if (k === 'tools') {
           const adults = G.world.citizens.filter(c => c.adult).length;
@@ -494,6 +495,8 @@ G.ui = {
       else lines.push('指向地块没有可采矿石；本工具只标记岩石和铁矿。');
     }
     if (cargo) lines.push(`随身待入库：${cargo}；搬运 ${h.haulers} 人 / 待送 ${h.waitingCarriers} 人（不计入库存）。`);
+    if (h.blockedMineralCarriers) lines.push(`${h.blockedMineralCarriers} 人仓满带矿等待空间；使用石铁库存或建成新仓库后继续送仓。`);
+    if (h.blockedMineralMarks) lines.push(`${h.blockedMineralMarks} 处矿石因该资源仓满暂不接新开采；标记保留，另一未满矿种仍可采。`);
     if (h.reason) lines.push(h.reason);
     const check = G.world.markReachability;
     if (check && h.total && Number.isFinite(check.day) && Number.isFinite(check.h) && check.unreachable > 0)
@@ -781,7 +784,7 @@ G.ui = {
       stock.textContent = `库存 ${Math.floor(G.game.res[type])} · 硬仓容 ${type === 'tools' ? '不限' : cap}`;
       status.textContent = target === null ? '未设置全镇目标，继承原规则' :
         `已应用目标 ${target} · ${target === 0 ? '关闭新自动生产' : `恢复线 ≤${G.productionResumeAt(target)} · ${G.goalPaused(type) ? '达标暂停' : '可生产'}`}`;
-      if (target !== null && type !== 'tools' && target > cap) status.textContent += '；目标高于仓容，需扩建仓库；满仓交货仍可能损失';
+      if (target !== null && type !== 'tools' && target > cap) status.textContent += '；目标高于仓容，需扩建仓库；' + (type === 'stone' || type === 'iron' ? '余矿保留随身，等待空间' : '满仓交货仍可能损失');
       if (type === 'firewood' || type === 'tools') status.textContent += '；各屋原目标保留，实际按全镇与本屋较低值执行（见建筑详情）';
       if (type === 'food' && target !== null) status.textContent += '；已开始的整田继续播种和收获，过低目标可能断粮';
       if (type === 'firewood' && target !== null) status.textContent += '；过低目标可能挨冻';
@@ -1031,7 +1034,9 @@ G.harvestFeedback = function () {
   const rocks = new Set([...(w.markedRocks || [])].filter(i => w.rock && w.rock[i]));
   const active = new Set(), paused = new Set();
   const h = { trees: trees.size, rocks: rocks.size, total: trees.size + rocks.size, active: 0, paused: 0, queued: 0,
-    laborers: 0, haulers: 0, waitingCarriers: 0, carry: {}, reason: '' };
+    laborers: 0, haulers: 0, waitingCarriers: 0, blockedMineralCarriers: 0, blockedMineralMarks: 0, carry: {}, reason: '' };
+  const cap = G.storageCap();
+  for (const i of rocks) if (G.game.res[w.rock[i] === 2 ? 'iron' : 'stone'] >= cap) h.blockedMineralMarks++;
   for (const k of G.RES_KEYS) h.carry[k] = 0;
   let adults = 0, builders = 0, foodWorkers = 0, otherWorkers = 0;
   const claim = t => {
@@ -1058,6 +1063,7 @@ G.harvestFeedback = function () {
     }
     if (c.carry && G.RES_KEYS.includes(c.carry.type) && Number.isFinite(c.carry.qty) && c.carry.qty > 0) {
       h.carry[c.carry.type] += c.carry.qty;
+      if (G.isMineralCargo(c) && G.game.res[c.carry.type] >= cap && c.state !== 'haul') h.blockedMineralCarriers++;
       if (c.state === 'haul') h.haulers++;
       else h.waitingCarriers++;
     }
@@ -1066,6 +1072,7 @@ G.harvestFeedback = function () {
   h.active = active.size; h.paused = paused.size;
   h.queued = Math.max(0, h.total - h.active - h.paused);
   if (h.total && G.isRestTime()) h.reason = '夜间休息，已认领任务天亮继续。';
+  else if (h.total && h.blockedMineralMarks === h.total && !h.active && !h.paused) h.reason = '石铁仓位已满，标记等待空间；使用库存或建成新仓库后继续。';
   else if (h.queued && !h.active && !h.paused) {
     if (!adults) h.reason = '暂无可工作的成人。';
     else if (!h.laborers) h.reason = `暂无散工：工地 ${builders} 人 · 食物岗 ${foodWorkers} 人 · 其他 ${otherWorkers} 人。${G.game.foodUrgent ? '粮食偏紧时优先保粮。' : '减少并行工地可减轻争用。'}`;

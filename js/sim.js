@@ -649,8 +649,56 @@ G.storageRoute = function (x, y) {
   return null;
 };
 
+/* Limited minerals retain one ordinary carried batch when a warehouse rejects
+ * part of a delivery. Other resource delivery policy is intentionally unchanged. */
+G.isMineralCargo = function (c) { return !!c.carry && (c.carry.type === 'stone' || c.carry.type === 'iron'); };
+G.mineralStorageSpace = function (type) { return Math.max(0, G.storageCap() - G.game.res[type]); };
+// Ordinary in-flight minerals remain eligible as before; only an already
+// blocked delivery cannot count as available labour or occupy a productive slot.
+G.mineralDeliveryBlocked = function (c) {
+  return G.isMineralCargo(c) && c.haulPending && c.state !== 'haul' &&
+    (c.haulWait === 'route' || (c.haulWait === 'space' && G.mineralStorageSpace(c.carry.type) <= 0));
+};
+G.waitForMineralStorage = function (c, reason) {
+  c.haulWait = reason; c.task = null; c.path = null; c.pi = 0; c.haulTo = null;
+  c.state = 'waitStorage'; c.wanderT = 2;
+};
+G.warnMineralStorage = function () {
+  if (G.game.warned.mineralStorageFull) return;
+  G.game.warned.mineralStorageFull = true;
+  G.ui.toast('⚠ 石铁仓位已满，余矿由市民随身保留；使用库存或建成新仓库后继续送仓', 'warn');
+};
+G.cargoWaitReason = function (c) {
+  if (!G.isMineralCargo(c) || !c.haulPending || c.state === 'haul') return '';
+  if (G.mineralStorageSpace(c.carry.type) <= 0) return '仓满，带矿等待空间（使用库存或新建仓库）';
+  return c.haulWait === 'route' ? '带矿等待可达仓库' : '带矿等待送仓';
+};
+G.finishMineralHaul = function (c) {
+  c.carry.qty -= G.deposit(c.carry.type, c.carry.qty);
+  if (c.carry.qty > 0) { G.warnMineralStorage(); G.waitForMineralStorage(c, 'space'); return; }
+  c.carry = null; c.haulPending = false; c.haulWait = ''; c.haulTo = null;
+  G.requestTask(c);
+};
+G.startMineralHaul = function (c) {
+  c.haulPending = true;
+  if (G.mineralStorageSpace(c.carry.type) <= 0) { G.warnMineralStorage(); G.waitForMineralStorage(c, 'space'); return; }
+  if (!G.nearestStorage(c.x, c.y)) { G.finishMineralHaul(c); return; } // legacy no-warehouse save
+  const route = G.storageRoute(c.x, c.y);
+  if (!route) { G.waitForMineralStorage(c, 'route'); return; }
+  c.haulWait = ''; c.haulTo = route.storage.id; c.path = route.path; c.pi = 0; c.task = null;
+  if (!c.path.length) G.finishMineralHaul(c);
+  else c.state = 'haul';
+};
+/* Full minerals remain marked in the ground, without reserving food workers. */
+G.availableRockMarks = function (w) {
+  const cap = G.storageCap(), r = G.game.res;
+  if (r.stone < cap && r.iron < cap) return w.markedRocks;
+  return new Set([...(w.markedRocks || [])].filter(i => w.rock[i] === 2 ? r.iron < cap : r.stone < cap));
+};
+
 /* 开始搬运去仓库 */
 G.startHaul = function (c) {
+  if (G.isMineralCargo(c)) { G.startMineralHaul(c); return; }
   if (!G.nearestStorage(c.x, c.y)) { // 兼容旧的无仓存档：仍受仓储上限约束
     G.deposit(c.carry.type, c.carry.qty);
     c.carry = null;
@@ -798,7 +846,7 @@ G.deposit = function (type, qty) {
   const space = Math.max(0, G.storageCap() - g.res[type]);
   const got = Math.min(qty, space);
   g.res[type] += got;
-  if (got < qty && !g.warned.storageFull) {
+  if (got < qty && type !== 'stone' && type !== 'iron' && !g.warned.storageFull) {
     g.warned.storageFull = true;
     G.ui.toast('⚠ 仓库满了，多出的资源只能丢弃——再建一座仓库吧', 'warn');
   }
@@ -854,6 +902,10 @@ G.stepCitizen = function (c, dtH) {
     if (c.state === 'rest') return;
   }
   switch (c.state) {
+    case 'waitStorage':
+      c.wanderT -= dtH;
+      if (c.wanderT <= 0) G.startHaul(c);
+      return;
     case 'walk':
     case 'haul': {
       if (!c.path || c.pi >= c.path.length) { G.arrive(c); return; }
@@ -892,6 +944,12 @@ G.stepCitizen = function (c, dtH) {
 G.arrive = function (c) {
   c.path = null;
   if (c.state === 'haul') {
+    if (G.isMineralCargo(c)) {
+      const storage = G.world.bmap[c.haulTo];
+      if (!storage || storage.state !== 'ok') G.startMineralHaul(c);
+      else G.finishMineralHaul(c);
+      return;
+    }
     if (c.carry) {
       G.deposit(c.carry.type, c.carry.qty);
       c.carry = null;
@@ -967,7 +1025,8 @@ G.requestTask = function (c) {
     const claimedR = new Set();
     for (const c2 of w.citizens) for (const t2 of [c2.task, c2.pausedTask])
       if (c2 !== c && t2 && t2.kind === 'clearrock') claimedR.add(t2.ty * w.N + t2.tx);
-    const mr = G.pickMarkedRock(w, c.x, c.y, claimedR);
+    const availableRocks = G.availableRockMarks(w);
+    const mr = G.pickMarkedRock(availableRocks === w.markedRocks ? w : { ...w, markedRocks: availableRocks }, c.x, c.y, claimedR);
     if (mr) {
       c.task = { kind: 'clearrock', b: null, tx: mr.x, ty: mr.y, rock: mr.rock, work: G.taskWork(c, G.ROCK_WORK), workLeft: 0 };
       G.sendTo(c, mr.x, mr.y);
@@ -1383,7 +1442,7 @@ G.pickSchool = function (counts) {
  * 人手最多的非粮食岗 → 粮食富余岗（人数 > 按人口测算的需求） */
 G.pickMarkDonor = function (w, harvestSeason, foodJobs, needFood) {
   const staffed = w.buildings.filter(b => b.state === 'ok' && G.BDEF[b.type].jobs > 0 && b.workers.length > 0);
-  const adultsOf = (b) => b.workers.map(id => w.cmap[id]).filter(c => c && !c.dead && c.adult && !G.goalCommitment(c));
+  const adultsOf = (b) => b.workers.map(id => w.cmap[id]).filter(c => c && !c.dead && c.adult && !G.goalCommitment(c) && !G.mineralDeliveryBlocked(c));
   for (const b of staffed) {
     const xs = adultsOf(b);
     if (xs.length > G.BDEF[b.type].jobs) return xs[0]; // 超员
@@ -1434,6 +1493,9 @@ G.jobCanProduce = function (b) {
 G.scheduleJobs = function () {
   const w = G.world;
   G.updateProductionGoals();
+  // A held mineral batch is not a free pair of hands. Free only an empty job
+  // slot; releaseWorker preserves cargo and retries the same bounded delivery.
+  for (const c of w.citizens) if (!c.dead && c.job != null && !c.task && !c.pausedTask && G.mineralDeliveryBlocked(c)) G.releaseWorker(c);
   for (const b of w.buildings) {
     // 在重新探测岗位前先释放确实没活的闲人；旧逻辑每2h清旗，导致每日释放永远看不到它。
     if (b.noWork || (G.hasProductionGoal(b) && G.productionLimited(b))) for (const id of b.workers.slice()) {
@@ -1444,9 +1506,11 @@ G.scheduleJobs = function () {
     if (b.type === 'farm' && b.state === 'ok' && !G.farmHasWork(b))
       for (const id of b.workers.slice()) { const c = w.cmap[id]; if (c && !G.goalCommitment(c)) G.releaseWorker(c); }
   }
-  const jobless = () => w.citizens.filter(c => !c.dead && c.adult && c.job == null);
+  const jobless = () => w.citizens.filter(c => !c.dead && c.adult && c.job == null && !G.mineralDeliveryBlocked(c));
   // 「砍伐」/「清除岩石」标记需要散工处理：预留 1-2 名无业成人（不够则稍后从闲余岗位抽调）
-  w.markReachability = Object.assign(G.reachableMarks(w), { day: G.game.day, h: G.game.h,
+  const availableRocks = G.availableRockMarks(w);
+  w.markReachability = Object.assign(G.reachableMarks(availableRocks === w.markedRocks ? w : { ...w, markedRocks: availableRocks }), { day: G.game.day, h: G.game.h,
+    storageBlocked: (w.markedRocks ? w.markedRocks.size : 0) - (availableRocks ? availableRocks.size : 0),
     total: (w.marked ? w.marked.size : 0) + (w.markedRocks ? w.markedRocks.size : 0) });
   const markCount = w.markReachability.count;
   const wantLabor = markCount > 0 ? Math.min(2, Math.ceil(markCount / 2)) : 0;
