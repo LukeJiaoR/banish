@@ -437,19 +437,20 @@ G.nearestPlantSpot = function (w, cx, cy, r, claimed) {
       }
   return null;
 };
-/* 建筑（或工地）旁的可站立点：离 (fx,fy) 最近 */
-G.workSpot = function (w, b, fx, fy) {
-  let best = null, bd = Infinity;
+/* 建筑（或工地）旁的可站立点：离 (fx,fy) 最近。
+ * 施工须检查可达性：最近的边缘可能被水面和相邻建筑隔成封闭口袋。 */
+G.workSpot = function (w, b, fx, fy, reachable = false) {
+  const spots = [];
   for (let j = b.y - 1; j <= b.y + b.h; j++)
     for (let i = b.x - 1; i <= b.x + b.w; i++) {
       const edge = (i < b.x || i >= b.x + b.w || j < b.y || j >= b.y + b.h);
       if (!edge) continue;
       if (i < 0 || j < 0 || i >= w.N || j >= w.N) continue;
       if (G.tileBlocked(w, i, j)) continue;
-      const d = G.d2(i, j, fx, fy);
-      if (d < bd) { bd = d; best = { x: i, y: j }; }
+      spots.push({ x: i, y: j });
     }
-  return best;
+  spots.sort((a, z) => G.d2(a.x, a.y, fx, fy) - G.d2(z.x, z.y, fx, fy));
+  return (reachable ? spots.find(p => G.findPath(w, Math.round(fx), Math.round(fy), p.x, p.y)) : spots[0]) || null;
 };
 
 /* ---------- 放置判定 ---------- */

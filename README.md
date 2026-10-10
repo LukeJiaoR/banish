@@ -1,6 +1,6 @@
 # 归园 · 放逐小镇（Banished 复刻原型）
 
-当前版本：**0.3.10**。
+当前版本：**0.3.11**。
 
 一个零依赖、纯前端可玩的《放逐之城》(Banished) 风格城市建造游戏原型。
 等距视角、市民 AI、四季轮转、食物/木材/石头/柴火经济，以原版 Banished 为经济参考，并按本作地图、搬运与自动调度实测校准。
@@ -49,6 +49,8 @@ python3 tools/fb_extract.py --server http://IP:8613 --token 秘密token
 注意：file:// 或接口不可用时，前端自动降级为「复制反馈内容手动发给开发者」，不会丢反馈。
 
 ## 本轮体验修复
+
+0.3.11 修复施工反复选择不可达工地边缘、忽略另一侧可达入口导致长期停工的问题；原工时与已付材料保留。详见 [施工入口修复](docs/building-completion.md)。
 
 0.3.10 将草地改为连续低对比纹理，秋季水面保持蓝色；修正人物朝向、货物镜像和屋内休息显示，区分正常待命与缺料等状态。详见 [地表呈现](docs/terrain-presentation.md)与[人物呈现](docs/citizen-presentation.md)。尚未完成真实手机触控与性能验收。
 
@@ -208,6 +210,7 @@ node tests/hauling.js
 node tests/ui_economy.js
 node tests/save-input-regressions.js
 node tests/family-clearing-regressions.js
+node tests/building-completion.js
 node tests/boarding-regressions.js
 node tests/marked-reachability.js
 node tests/harvest-feedback.js
