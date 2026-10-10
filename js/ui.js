@@ -20,6 +20,38 @@ G.ui = {
       : `${G.RES[type].name}×${cost[type]}`).join(' ') || '免费';
   },
 
+  // Read-only citizen feedback. Idle is a scheduler state, not proof of a deadlock.
+  citizenStatus: function (c) {
+    const b = c.job != null ? G.world.bmap[c.job] : null;
+    if (c.state === 'rest') {
+      if (G.citizenIndoorHome && G.citizenIndoorHome(c)) return '屋内休息';
+      return G.homeOf(c) ? '户外休息（未入屋）' : '露宿（无住房）';
+    }
+    if (c.state === 'work') {
+      const labels = { clearSite: '清理工地', chop: '砍伐', clearrock: '清矿', build: '建造中', sow: '播种', harvest: '收获', plant: '补种', firewood: '加工柴火' };
+      return c.task ? (labels[c.task.kind] || '工作中') : '等待下一项任务';
+    }
+    if (c.state === 'walk' || c.state === 'haul') {
+      if (c.carry) return `搬运${G.RES[c.carry.type].name}（${c.state === 'haul' ? '送仓' : '途中'}）`;
+      if (c.walkKind === 'home') return '回家途中';
+      if (c.walkKind === 'wander') return '闲逛';
+      if (c.task && c.task.kind === 'firewood' && c.task.phase === 'fetch') return '前往仓库取原木';
+      return '前往工作点';
+    }
+    if (c.carry) return '等待送仓（需可达仓库）';
+    if (c.student) return '就读中';
+    if (!b) return c.age >= G.ADULT_AGE ? '散工待命' : '玩耍休息';
+    if (b.state === 'site') return '等待下一项施工任务';
+    if (b.type === 'school') return '教学中';
+    if (G.fuelLimited(b)) return '暂停生产（柴火已达目标）';
+    if (G.toolLimited(b)) return '暂停生产（工具已达目标）';
+    if (b.type === 'woodcutter' && G.game.res.wood < G.PROD.woodcutter.logsIn) return '等待原木';
+    if (b.type === 'blacksmith' && !G.jobCanProduce(b)) return '等待铁或原木';
+    if (b.type === 'farm' && !G.farmHasWork(b)) return '农闲（等待播种或收获）';
+    if (b.noWork && b.warnText) return `等待：${b.warnText}`;
+    return '等待下一项任务';
+  },
+
   // Read-only estimate at the current occupancy. endDay has already charged the
   // current winter day, so only later daily deductions belong in futureWinter.
   // Keep demand unrounded for stock comparisons; only displayed totals round up.
@@ -470,11 +502,7 @@ G.ui = {
     } else {
       const c = w.cmap[G.sel.id];
       if (!c) { this.hideInfo(); return; }
-      let status = '闲逛';
-      if (c.state === 'rest') status = '睡觉';
-      else if (c.state === 'work') status = c.task ? (c.task.kind === 'clearSite' ? '清理工地' : c.task.kind === 'chop' ? '砍伐' : c.task.kind === 'clearrock' ? '清矿' : c.task.kind === 'build' ? '建造中' : c.task.kind === 'sow' ? '播种' : c.task.kind === 'harvest' ? '收获' : '工作中') : '工作中';
-      else if (c.state === 'walk' || c.state === 'haul') status = c.carry ? `搬运${G.RES[c.carry.type].name}` : (c.walkKind === 'home' ? '回家' : '赶路');
-      else if (c.carry) status = '等待送仓';
+      const status = this.citizenStatus(c);
       const jobB = c.job != null ? w.bmap[c.job] : null;
       const jobName = jobB ? G.BDEF[jobB.type].name : (c.student ? '学堂学生' : (c.adult ? '无业' : '儿童'));
       const fam = G.familyOf(c);

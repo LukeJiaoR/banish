@@ -798,8 +798,10 @@ G.selectAt = function (tx, ty, p) {
   }
   // bgrid 指向已不存在的建筑（异常残留）时按空地处理
   // 找附近的市民（屏幕距离）
-  let best = null, bd = 18 * 18;
+  let best = null, bd = 18 * 18, citizenHomes = null;
   for (const c of w.citizens) {
+    if (c.state === 'rest' && c.camped === false && !citizenHomes && G.citizenHomeLookup) citizenHomes = G.citizenHomeLookup(w);
+    if (G.citizenIndoorHome && G.citizenIndoorHome(c, citizenHomes)) continue;
     const [sx, sy] = G.T2S(c.x, c.y);
     const px = sx * G.cam.z + G.cam.x - p.x;
     const py = (sy + 16) * G.cam.z + G.cam.y - p.y;

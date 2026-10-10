@@ -34,6 +34,7 @@ G.SPRITE_SIZES = {
 (function () {
   if (typeof Image === 'undefined') return; // node 测试环境：无渲染，保持回退路径
   const SHEET = {
+    'terrain-v2': ['meadow_spring', 'meadow_summer', 'meadow_autumn', 'meadow_winter', 'water_open'],
     tiles: ['grass_spring', 'grass_summer', 'grass_autumn', 'grass_winter',
       'sand_spring', 'sand_summer', 'sand_autumn', 'sand_winter',
       'water_spring', 'water_summer', 'water_summer_b', 'water_autumn', 'water_winter',
@@ -62,7 +63,7 @@ G.SPRITE_SIZES = {
       const im = new Image();
       im.onload = () => {
         G.SPR.map.set(n, im);
-        if (dir === 'tiles' || n === 'res_iron') G.needGround = true; // 地表纹理到位后重建地面缓存
+        if (dir === 'tiles' || dir === 'terrain-v2' || n === 'res_iron') G.needGround = true; // 地表纹理到位后重建地面缓存
         if (--pending === 0) G.SPR.ready = true;
       };
       im.onerror = () => {
