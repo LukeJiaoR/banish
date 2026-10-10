@@ -405,10 +405,11 @@ G.drawBuilding = function (ctx, b, time) {
   }
 };
 
-G.drawFarm = function (ctx, b) {
+G.drawFarmGround = function (ctx, b, bounds) {
   const pal = G.PAL[G.game.season];
   const soilTex = pal.snow ? 'farm_soil_snow' : 'farm_soil';
   for (const f of b.farm) {
+    if (bounds && (f.x < bounds.tx0 || f.x > bounds.tx1 || f.y < bounds.ty0 || f.y > bounds.ty1)) continue;
     const [sx, sy] = G.T2S(f.x, f.y);
     if (!G.fillTexDiamond(ctx, soilTex, sx, sy, f.harvested ? '#5c452c' : null, f.harvested ? 0.25 : 0)) {
       G.diamondPath(ctx, sx, sy);
@@ -418,21 +419,29 @@ G.drawFarm = function (ctx, b) {
       ctx.lineWidth = 0.5;
       ctx.stroke();
     }
-    if (f.sown && !f.harvested) {
-      const g = b.growth;
-      const stage = g >= 1 ? 'crop_ripe' : g >= 0.66 ? 'crop_stage2' : g >= 0.33 ? 'crop_stage1' : 'crop_stage0';
-      if (G.sprDraw(ctx, stage, sx, sy + 26)) continue;
-      const cropCol = g >= 1 ? (G.game.season === 2 ? '#d8b23a' : '#c8a83a') : G.lerpColor('#5d8a3a', '#c2a13a', g);
-      const rr = 1 + g * 1.6;
-      ctx.fillStyle = cropCol;
-      for (let k = 0; k < 4; k++) {
-        const dx = (k % 2 ? 10 : -10), dy = (k < 2 ? -5 : 5) + 16;
-        ctx.beginPath();
-        ctx.arc(sx + dx, sy + dy - rr, rr, 0, Math.PI * 2);
-        ctx.fill();
-      }
+  }
+};
+G.drawFarmCrop = function (ctx, b, f) {
+  const [sx, sy] = G.T2S(f.x, f.y);
+  if (f.sown && !f.harvested) {
+    const g = b.growth;
+    const stage = g >= 1 ? 'crop_ripe' : g >= 0.66 ? 'crop_stage2' : g >= 0.33 ? 'crop_stage1' : 'crop_stage0';
+    if (G.sprDraw(ctx, stage, sx, sy + 26)) return;
+    const cropCol = g >= 1 ? (G.game.season === 2 ? '#d8b23a' : '#c8a83a') : G.lerpColor('#5d8a3a', '#c2a13a', g);
+    const rr = 1 + g * 1.6;
+    ctx.fillStyle = cropCol;
+    for (let k = 0; k < 4; k++) {
+      const dx = (k % 2 ? 10 : -10), dy = (k < 2 ? -5 : 5) + 16;
+      ctx.beginPath();
+      ctx.arc(sx + dx, sy + dy - rr, rr, 0, Math.PI * 2);
+      ctx.fill();
     }
   }
+};
+// Direct-draw compatibility; the main frame separates soil and per-cell crops.
+G.drawFarm = function (ctx, b) {
+  G.drawFarmGround(ctx, b);
+  for (const f of b.farm) G.drawFarmCrop(ctx, b, f);
 };
 
 G.drawDock = function (ctx, b) {
@@ -675,6 +684,20 @@ G.frame = function (dtReal) {
     G._gcv.width / G.groundScale, G._gcv.height / G.groundScale);
 
   const w = G.world;
+  // 可视瓦片范围
+  const W = cv.clientWidth, H = cv.clientHeight;
+  const corners = [G.screenToTile(0, 0), G.screenToTile(W, 0), G.screenToTile(0, H), G.screenToTile(W, H)];
+  let tx0 = 1e9, ty0 = 1e9, tx1 = -1e9, ty1 = -1e9;
+  for (const c of corners) {
+    tx0 = Math.min(tx0, c.tx); tx1 = Math.max(tx1, c.tx);
+    ty0 = Math.min(ty0, c.ty); ty1 = Math.max(ty1, c.ty);
+  }
+  tx0 = Math.max(0, Math.floor(tx0) - 2); ty0 = Math.max(0, Math.floor(ty0) - 2);
+  tx1 = Math.min(G.world.N - 1, Math.ceil(tx1) + 2); ty1 = Math.min(G.world.N - 1, Math.ceil(ty1) + 4);
+
+  // All farm soil is ground, never a tall object sorted by the field's far corner.
+  for (const b of w.buildings) if (b.type === 'farm') G.drawFarmGround(ctx, b, { tx0, ty0, tx1, ty1 });
+
   const harvesting = G.tool && (G.tool.kind === 'fell' || G.tool.kind === 'quarry');
   if (harvesting) G.drawFoodForestBounds(ctx);
 
@@ -724,17 +747,6 @@ G.frame = function (dtReal) {
     ctx.fill();
   }
 
-  // 可视瓦片范围
-  const W = cv.clientWidth, H = cv.clientHeight;
-  const corners = [G.screenToTile(0, 0), G.screenToTile(W, 0), G.screenToTile(0, H), G.screenToTile(W, H)];
-  let tx0 = 1e9, ty0 = 1e9, tx1 = -1e9, ty1 = -1e9;
-  for (const c of corners) {
-    tx0 = Math.min(tx0, c.tx); tx1 = Math.max(tx1, c.tx);
-    ty0 = Math.min(ty0, c.ty); ty1 = Math.max(ty1, c.ty);
-  }
-  tx0 = Math.max(0, Math.floor(tx0) - 2); ty0 = Math.max(0, Math.floor(ty0) - 2);
-  tx1 = Math.min(G.world.N - 1, Math.ceil(tx1) + 2); ty1 = Math.min(G.world.N - 1, Math.ceil(ty1) + 4);
-
   const items = [];
   // 树
   for (let y = ty0; y <= ty1; y++)
@@ -744,6 +756,11 @@ G.frame = function (dtReal) {
       if (w.rock[y * w.N + x] && w.markedRocks && w.markedRocks.has(y * w.N + x))
         items.push({ d: x + y + 0.02, k: 3, x, y });
     }
+  // Farm crops are individual upright cells; soil was already painted below all objects.
+  for (const b of w.buildings) if (b.type === 'farm') for (const f of b.farm) {
+    if (f.sown && !f.harvested && f.x >= tx0 && f.x <= tx1 && f.y >= ty0 && f.y <= ty1)
+      items.push({ d: f.x + f.y + 1, k: 4, b, f });
+  }
   // 建筑
   for (const b of w.buildings) {
     const cx = b.x + b.w / 2, cy = b.y + b.h / 2;
@@ -777,8 +794,10 @@ G.frame = function (dtReal) {
       ctx.lineWidth = 1.5;
       ctx.stroke();
     }
+    else if (it.k === 4) G.drawFarmCrop(ctx, it.b, it.f);
     else if (it.k === 1) {
-      G.drawBuilding(ctx, it.b, now);
+      // Farm ground/crops were split above; keep its building-level badges.
+      if (it.b.type !== 'farm') G.drawBuilding(ctx, it.b, now);
       // Cold homes get a distinct snowflake; no-work warning remains separate.
       if (G.isWinter() && it.b.unheated && it.b.state === 'ok') {
         const T = G.T2S(it.b.x + it.b.w / 2, it.b.y);
