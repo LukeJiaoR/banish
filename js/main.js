@@ -42,7 +42,7 @@ G.newGame = function (seed, options) {
   G.game = G.newGameState();
   G.game.res = { wood: 80, stone: 48, iron: 0, tools: 15, food: 500, firewood: 50 };
   G.sel = null;
-  G.tool = null; G.cancelRoadPlan();
+  G.tool = null; G.cancelRoadPlan(); G.cancelHarvestPlan();
   G.smoke = [];
   G.flakes = null;
   if (!options.preserveSaves) {
@@ -395,7 +395,7 @@ G.applySaveData = function (d) {
   const candidate = G.prepareSaveData(d);
   G.world = candidate.world; G.game = candidate.game; G.rng = candidate.rng; G.setUid(candidate.nextUid);
   if (G._recoveryBackedUp) G.autosaveBlocked = false;
-  G.sel = null; G.tool = null; G.cancelRoadPlan(); G.smoke = []; G.flakes = null; G.keys = {};
+  G.sel = null; G.tool = null; G.cancelRoadPlan(); G.cancelHarvestPlan(); G.smoke = []; G.flakes = null; G.keys = {};
   G.ui.hideInfo(); G.ui.setToolActive();
   document.getElementById('over').classList.add('hidden');
   // All cargo is validated and owned by the candidate; now resume its deliveries.
@@ -500,7 +500,7 @@ G.clampCam = function () {
 
 /* ---------- 工具模式 ---------- */
 G.setTool = function (t) {
-  G.cancelRoadPlan();
+  G.cancelRoadPlan(); G.cancelHarvestPlan();
   if (t == null) { G.tool = null; }
   else if (t === 'demolish') G.tool = { kind: 'demolish' };
   else if (t === 'road') G.tool = { kind: 'road' };
@@ -621,6 +621,66 @@ G.confirmRoadPlan = function (intent) {
   return { ok: true, placed };
 };
 
+/* Range previews are transient and hold original tree identities, never jobs or
+ * inventory. Enumerate only when a corner/drag is committed, not while moving. */
+G.harvestPlan = null;
+G.harvestGestureVersion = 0;
+G.cancelHarvestPlan = function () { G.harvestPlan = null; G.harvestGestureVersion++; };
+G.harvestPoint = function (x, y) {
+  const w = G.world;
+  return w && Number.isFinite(x) && Number.isFinite(y) ? { x: G.clamp(Math.floor(x), 0, w.N - 1), y: G.clamp(Math.floor(y), 0, w.N - 1) } : null;
+};
+G.beginHarvestRange = function (x, y) {
+  if (!G.tool || !['fell', 'quarry'].includes(G.tool.kind) || G.hasOpenModal()) return;
+  const p = G.harvestPoint(x, y); if (!p) return;
+  G.harvestPlan = { world: G.world, kind: G.tool.kind, start: p, end: p, frozen: false };
+};
+G.finishHarvestRange = function (x, y, awaitingSecond = false) {
+  const p = G.harvestPlan, w = G.world, end = G.harvestPoint(x, y);
+  if (!p || p.world !== w || !end || !G.tool || p.kind !== G.tool.kind || G.hasOpenModal()) return;
+  const bounds = { x0: Math.min(p.start.x, end.x), y0: Math.min(p.start.y, end.y), x1: Math.max(p.start.x, end.x), y1: Math.max(p.start.y, end.y) };
+  const targets = []; let total = 0;
+  for (let y = bounds.y0; y <= bounds.y1; y++) for (let x = bounds.x0; x <= bounds.x1; x++) {
+    const i = y * w.N + x, tree = p.kind === 'fell' && w.treeIdx[i] >= 0 ? w.trees[w.treeIdx[i]] : null;
+    const rock = p.kind === 'quarry' ? w.rock[i] : 0;
+    if (!tree && !rock) continue;
+    total++;
+    // At most 300 existing + 300 new marks can ever fit; bound retained memory.
+    if (targets.length < 601) targets.push({ i, tree, rock });
+  }
+  G.harvestPlan = { ...p, end, bounds, targets, total, frozen: true, awaitingSecond };
+};
+G.selectHarvestCorner = function (x, y) {
+  const p = G.harvestPlan;
+  if (p && p.world === G.world && G.tool && p.kind === G.tool.kind && p.awaitingSecond) G.finishHarvestRange(x, y);
+  else { G.beginHarvestRange(x, y); G.finishHarvestRange(x, y, true); }
+};
+G.harvestRangeStatus = function () {
+  const p = G.harvestPlan, w = G.world;
+  if (!p || p.world !== w || !G.tool || p.kind !== G.tool.kind || !p.frozen)
+    return { ok: false, reason: p && !p.frozen ? '拖动范围，松开后查看目标并确认' : '鼠标拖出矩形；手机点两个角。确认前不会下达采集任务。' };
+  if (p.total > 600) return { ok: false, reason: '范围内目标过多，请缩小范围；每类最多排队300处。' };
+  const marks = p.kind === 'fell' ? w.marked : w.markedRocks, valid = [], added = [];
+  const counts = { wood: 0, stone: 0, iron: 0 };
+  for (const t of p.targets) {
+    if (t.tree ? (w.treeIdx[t.i] < 0 || w.trees[w.treeIdx[t.i]] !== t.tree) : w.rock[t.i] !== t.rock) continue;
+    valid.push(t); counts[t.tree ? 'wood' : t.rock === 2 ? 'iron' : 'stone']++;
+    if (!marks.has(t.i)) added.push(t);
+  }
+  const signature = valid.map(t => t.i + ':' + (marks.has(t.i) ? 1 : 0)).join(',');
+  const reason = !valid.length ? '范围内已无对应资源，请重选。' : marks.size + added.length > 300 ? '新增标记会超过300处，请缩小范围、等任务完成或取消多余标记。' : '';
+  return { ok: !reason, reason, plan: p, valid, added, counts, existing: valid.length - added.length, signature };
+};
+G.confirmHarvestRange = function (intent) {
+  if (G.hasOpenModal()) return { ok: false };
+  const s = G.harvestRangeStatus(); if (!s.ok) return s;
+  if (intent && (intent.plan !== s.plan || intent.signature !== s.signature)) return { ok: false, reason: '范围或目标已变化，请复查后重新确认。' };
+  const w = G.world, mark = s.plan.kind === 'fell' ? G.markFellAt : G.markRockAt;
+  for (const t of s.added) mark(w, t.i % w.N, Math.floor(t.i / w.N));
+  G.cancelHarvestPlan();
+  return { ok: true, marked: s.added.length };
+};
+
 /* ---------- 初始化 ---------- */
 G.init = function () {
   G.cv = document.getElementById('game');
@@ -654,22 +714,21 @@ G.init = function () {
   window.addEventListener('beforeunload', () => G.autosave());
   window.addEventListener('pagehide', () => G.autosave());
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') { resetInput(); G.cancelRoadPlan(); G.autosave(); }
+    if (document.visibilityState === 'hidden') { resetInput(); G.cancelRoadPlan(); G.cancelHarvestPlan(); G.autosave(); }
   });
   // 定时自动存档：每 90 秒（游戏进行中）
   setInterval(() => G.autosave(), 90000);
 
   /* ----- 输入 ----- */
   let dragging = false, dragBtn = -1, dragMoved = 0, lastX = 0, lastY = 0;
-  let roadTouch = null;
-  let fellLast = null;
-  let rockLast = null;
+  let roadTouch = null, harvestTouch = null;
   function resetInput() {
+    if (G.harvestPlan && !G.harvestPlan.frozen) G.cancelHarvestPlan();
     G.keys = {};
     dragging = false; dragBtn = -1; dragMoved = 0;
-    fellLast = null; rockLast = null; roadTouch = null;
+    roadTouch = null; harvestTouch = null;
   }
-  window.addEventListener('blur', () => { resetInput(); roadTouch = null; G.cancelRoadPlan(); });
+  window.addEventListener('blur', () => { resetInput(); roadTouch = null; G.cancelRoadPlan(); G.cancelHarvestPlan(); });
   document.addEventListener('focusin', e => { if (G.isInputTarget(e.target)) resetInput(); });
 
   const toLocal = (e) => {
@@ -687,17 +746,9 @@ G.init = function () {
     if (e.button === 2 && G.tool) { G.setTool(null); return; } // 右键取消工具
     dragging = true; dragBtn = e.button; dragMoved = 0;
     lastX = p.x; lastY = p.y;
-    if (e.button === 0 && G.tool && G.tool.kind === 'fell') {
+    if (e.button === 0 && G.tool && ['fell', 'quarry'].includes(G.tool.kind)) {
       const t = G.screenToTile(p.x, p.y);
-      const tx = Math.floor(t.tx), ty = Math.floor(t.ty);
-      G.markFellAt(G.world, tx, ty);
-      fellLast = { x: tx, y: ty };
-    }
-    if (e.button === 0 && G.tool && G.tool.kind === 'quarry') {
-      const t = G.screenToTile(p.x, p.y);
-      const tx = Math.floor(t.tx), ty = Math.floor(t.ty);
-      G.markRockAt(G.world, tx, ty); // 只标记矿石，不删除建筑、道路或树木
-      rockLast = { x: tx, y: ty };
+      G.beginHarvestRange(t.tx, t.ty);
     }
   });
 
@@ -712,18 +763,9 @@ G.init = function () {
     if (dragBtn === 2 || dragBtn === 1 || (dragBtn === 0 && !G.tool && dragMoved > 4)) {
       G.cam.x += dx; G.cam.y += dy;
       lastX = p.x; lastY = p.y;
-    } else if (dragBtn === 0 && G.tool && G.tool.kind === 'fell' && fellLast) {
-      const tx = Math.floor(t.tx), ty = Math.floor(t.ty);
-      if (tx !== fellLast.x || ty !== fellLast.y) {
-        G.paintFell(fellLast.x, fellLast.y, tx, ty);
-        fellLast = { x: tx, y: ty };
-      }
-    } else if (dragBtn === 0 && G.tool && G.tool.kind === 'quarry' && rockLast) {
-      const tx = Math.floor(t.tx), ty = Math.floor(t.ty);
-      if (tx !== rockLast.x || ty !== rockLast.y) {
-        G.paintRockLine(rockLast.x, rockLast.y, tx, ty);
-        rockLast = { x: tx, y: ty };
-      }
+    } else if (dragBtn === 0 && G.tool && ['fell', 'quarry'].includes(G.tool.kind)) {
+      const plan = G.harvestPlan;
+      if (plan && !plan.frozen && plan.world === G.world && plan.kind === G.tool.kind) plan.end = G.harvestPoint(t.tx, t.ty);
     }
   });
 
@@ -734,6 +776,10 @@ G.init = function () {
     const p = toLocal(e);
     const t = G.screenToTile(p.x, p.y);
     const tx = Math.floor(t.tx), ty = Math.floor(t.ty);
+    if (e.button === 0 && G.tool && ['fell', 'quarry'].includes(G.tool.kind)) {
+      if (G.harvestPlan && !G.harvestPlan.frozen) G.finishHarvestRange(tx, ty);
+      return;
+    }
     if (e.button === 0 && dragMoved <= 4) {
       if (G.tool && G.tool.kind === 'build') G.tryPlace(tx, ty);
       else if (G.tool && G.tool.kind === 'demolish') {
@@ -751,6 +797,27 @@ G.init = function () {
     }
   });
 
+  const harvesting = () => G.tool && ['fell', 'quarry'].includes(G.tool.kind);
+  G.cv.addEventListener('touchstart', e => {
+    if (!harvesting()) return;
+    e.preventDefault(); resetInput();
+    harvestTouch = !G.hasOpenModal() && e.touches.length === 1 ? { x: e.touches[0].clientX, y: e.touches[0].clientY, world: G.world, generation: G.harvestGestureVersion } : null;
+  }, { passive: false });
+  G.cv.addEventListener('touchmove', e => {
+    if (!harvesting()) return;
+    e.preventDefault();
+    if (!harvestTouch || e.touches.length !== 1 || Math.abs(e.touches[0].clientX - harvestTouch.x) + Math.abs(e.touches[0].clientY - harvestTouch.y) > 10) harvestTouch = null;
+  }, { passive: false });
+  G.cv.addEventListener('touchend', e => {
+    if (!harvesting()) { harvestTouch = null; return; }
+    e.preventDefault();
+    if (harvestTouch && harvestTouch.world === G.world && harvestTouch.generation === G.harvestGestureVersion && !G.hasOpenModal() && e.changedTouches.length === 1) {
+      const p = toLocal(e.changedTouches[0]), t = G.screenToTile(p.x, p.y);
+      G.selectHarvestCorner(t.tx, t.ty);
+    }
+    harvestTouch = null;
+  }, { passive: false });
+
   G.cv.addEventListener('touchstart', e => {
     if (!G.tool || G.tool.kind !== 'road') return;
     e.preventDefault(); resetInput();
@@ -761,7 +828,7 @@ G.init = function () {
     e.preventDefault();
     if (e.touches.length !== 1 || !roadTouch || Math.abs(e.touches[0].clientX - roadTouch.x) + Math.abs(e.touches[0].clientY - roadTouch.y) > 10) roadTouch = null;
   }, { passive: false });
-  G.cv.addEventListener('touchcancel', () => { roadTouch = null; G.cancelRoadPlan(); });
+  G.cv.addEventListener('touchcancel', () => { roadTouch = null; harvestTouch = null; G.cancelRoadPlan(); G.cancelHarvestPlan(); });
   G.cv.addEventListener('touchend', e => {
     if (!G.tool || G.tool.kind !== 'road') { roadTouch = null; return; }
     e.preventDefault();

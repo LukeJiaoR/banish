@@ -76,7 +76,7 @@ function fixture() {
   doc.getElementById('game').parentNode = doc;
   G.ui.el = { toolbar, placement, harvestCancel: controls, cancelTrees: trees, cancelRocks: rocks, cancelStatus: status,
     help: doc.getElementById('help'), info: doc.getElementById('info') };
-  Object.assign(G.ui, { init() { this.initHarvestControls(); }, toast() {}, refreshHUD() {}, hideInfo() { G.sel = null; }, tickInfo() {} });
+  Object.assign(G.ui, { init() { this.initHarvestControls(); this.initHarvestRangeControls(); }, toast() {}, refreshHUD() {}, hideInfo() { G.sel = null; }, tickInfo() {} });
   G.feedback = { init() {}, close() { doc.getElementById('fb').classList.add('hidden'); } };
   G.T2S = () => [0, 0]; G.cam = { x: 0, y: 0, z: 1 }; G.groundDirty = new Set(); G.markGroundDirty = () => {};
   G.autosave = () => {}; G.frame = () => {}; G.screenToTile = (x, y) => ({ tx: x, ty: y });
@@ -250,7 +250,7 @@ test('canvas drags stop on the harvest panel and never resume when the pointer r
     G.cv.emit('mousedown', { button, clientX: 12, clientY: 12 });
     G.cv.emit('mousemove', { button, clientX: 20, clientY: 20 });
     G.cv.emit('mouseup', { button, clientX: 20, clientY: 20 });
-    if (tool) assert.ok(actions.length > initial.length);
+    if (tool) { assert.equal(actions.length, initial.length); assert.ok(G.harvestPlan && G.harvestPlan.frozen); }
     else assert.notEqual(JSON.stringify(G.cam), camera);
   }
 });
@@ -293,7 +293,7 @@ test('dedicated mineral clicks distinguish stone and iron and only mark, never g
   const f = fixture(), { G } = f, w = G.world;
   const a = emptyTile(G, 20, 20), b = emptyTile(G, 21, 20); w.rock[a] = 1; w.rock[b] = 2;
   const before = JSON.stringify(G.game.res); G.setTool('quarry');
-  canvasClick(G, 20, 20); canvasClick(G, 21, 20); canvasClick(G, 20, 20);
+  for (const x of [20, 21, 20]) { canvasClick(G, x, 20); assert.ok(G.harvestPlan.frozen); G.confirmHarvestRange(); }
   assert.equal(G.tool.kind, 'quarry'); assert.equal(w.markedRocks.size, 2);
   assert.equal(w.rock[a], 1); assert.equal(w.rock[b], 2); assert.equal(JSON.stringify(G.game.res), before);
   G.hover = { tx: 20, ty: 20 }; G.ui.refreshHarvest(); assert.match(f.placement.textContent, /岩石 → 石头/);
@@ -308,7 +308,7 @@ test('mineral input marks run through real mining and hauling to exactly one dep
     for (let i = 0; i < w.rock.length; i++) if (w.rock[i] === value) candidates.push(i);
     candidates.sort((a, b) => G.d2(a % w.N, Math.floor(a / w.N), c.x, c.y) - G.d2(b % w.N, Math.floor(b / w.N), c.x, c.y));
     const i = candidates.find(i => G.findPath(w, Math.round(c.x), Math.round(c.y), i % w.N, Math.floor(i / w.N)));
-    assert.notEqual(i, undefined); canvasClick(G, i % w.N, Math.floor(i / w.N));
+    assert.notEqual(i, undefined); canvasClick(G, i % w.N, Math.floor(i / w.N)); G.confirmHarvestRange();
   }
   assert.equal(w.markedRocks.size, 2);
   let steps = 0;
@@ -316,13 +316,14 @@ test('mineral input marks run through real mining and hauling to exactly one dep
   assert.equal(w.markedRocks.size, 0); assert.equal(G.game.res.stone, before.stone + 10); assert.equal(G.game.res.iron, before.iron + 10);
   assert.equal(w.citizens.filter(c => c.carry).length, 0);
 });
-test('mineral drag marks both minerals and preserves trees and roads along the line', () => {
+test('confirmed mineral range marks both minerals and preserves trees and roads', () => {
   const { G } = fixture(), w = G.world;
   for (let x = 20; x <= 24; x++) emptyTile(G, x, 20);
   w.rock[20 * w.N + 20] = 1; w.rock[20 * w.N + 24] = 2;
   G.addTree(w, 21, 20, -200); w.road[20 * w.N + 22] = 1;
   G.setTool('quarry'); G.cv.emit('mousedown', { clientX: 20, clientY: 20 });
   G.cv.emit('mousemove', { clientX: 24, clientY: 20 }); G.cv.emit('mouseup', { clientX: 24, clientY: 20 });
+  assert.equal(w.markedRocks.size, 0); assert.equal(G.confirmHarvestRange().marked, 2);
   assert.equal(w.markedRocks.size, 2); assert.ok(w.treeIdx[20 * w.N + 21] >= 0);
   assert.equal(w.road[20 * w.N + 22], 1); assert.equal(w.marked.size, 0);
 });
@@ -356,7 +357,7 @@ test('mineral marking is blocked by dialogs and toolbar interruption ends the ol
   f.toolbar.querySelector('[data-tool="demolish"]').focus(); G.setTool('demolish');
   const store = w.buildings[0]; let deleted = 0; G.demolishAt = () => deleted++;
   G.cv.emit('mouseup', { clientX: store.x, clientY: store.y }); assert.equal(deleted, 0);
-  assert.equal(w.markedRocks.size, 1); assert.equal(w.rock[i], 1);
+  assert.equal(w.markedRocks.size, 0); assert.equal(w.rock[i], 1); assert.equal(G.harvestPlan, null);
 });
 
 console.log(`Harvest cancellation UI: ${passed} passed, ${failed} failed (DOM/event fixtures and static CSS only).`);

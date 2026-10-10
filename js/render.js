@@ -740,6 +740,24 @@ G.frame = function (dtReal) {
     ctx.fill();
   }
 
+  if (harvesting && G.harvestPlan && G.harvestPlan.world === w && G.harvestPlan.kind === G.tool.kind) {
+    const p = G.harvestPlan, a = p.start, b = p.end;
+    const x0 = Math.min(a.x, b.x), y0 = Math.min(a.y, b.y), x1 = Math.max(a.x, b.x), y1 = Math.max(a.y, b.y);
+    ctx.save(); ctx.beginPath();
+    // Four outside diamond vertices enclose the complete inclusive rectangle.
+    const corners = [[x0, y0], [x1 + 1, y0], [x1 + 1, y1 + 1], [x0, y1 + 1]];
+    corners.forEach(([x, y], i) => { const [sx, sy] = G.T2S(x, y); if (i) ctx.lineTo(sx, sy); else ctx.moveTo(sx, sy); });
+    ctx.closePath(); ctx.fillStyle = 'rgba(235,180,65,.08)'; ctx.fill();
+    ctx.strokeStyle = '#ffd17a'; ctx.lineWidth = 2 / G.cam.z; ctx.stroke(); ctx.restore();
+    if (p.frozen) for (const t of p.targets) {
+      const x = t.i % w.N, y = Math.floor(t.i / w.N);
+      if (x < tx0 || x > tx1 || y < ty0 || y > ty1) continue;
+      if (t.tree ? w.treeIdx[t.i] < 0 || w.trees[w.treeIdx[t.i]] !== t.tree : w.rock[t.i] !== t.rock) continue;
+      const [sx, sy] = G.T2S(x, y); G.diamondPath(ctx, sx, sy);
+      ctx.fillStyle = (t.tree ? w.marked : w.markedRocks).has(t.i) ? 'rgba(110,190,230,.55)' : 'rgba(235,180,65,.55)'; ctx.fill();
+    }
+  }
+
   if (G.tool && G.tool.kind === 'road' && G.roadPlan && G.roadPlan.world === w) {
     const plan = G.roadPlan, route = plan.result.ok ? plan.result.path : plan.start ? [plan.start] : [];
     for (const p of route) {
