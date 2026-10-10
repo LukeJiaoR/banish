@@ -3,6 +3,7 @@
  * Canvas calls are inspected, not a browser-layout or eight-direction art test.
  */
 'use strict';
+// The tiny fake ground image is deliberately warm; cache allocation is tested separately.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -130,7 +131,7 @@ test('main frame builds at most one home index and never updates off-screen peop
   const offscreen=citizen({x:29,y:29,state:'walk',path:[{x:28,y:29}],pi:0});
   G.cv={clientWidth:640,clientHeight:480}; G.ctx=new Proxy({}, {get:()=>()=>{},set:()=>true});
   const [sx,sy]=G.T2S(a.x,a.y);G.cam={x:320-sx,y:240-sy,z:1};G.dpr=1;
-  G._gcv={width:1,height:1};G.groundScale=1;G.needGround=false;G.groundDirty.clear();G.hover={tx:-1,ty:-1};G.tool=null;
+  G._gcv={width:1,height:1};G.groundScale=1;G._groundWorld=G.world;G._groundScale=G.groundScale;G.needGround=false;G.groundDirty.clear();G.hover={tx:-1,ty:-1};G.tool=null;
   const lookup=G.citizenHomeLookup,readHome=G.homeOf,refresh=G.ui.refreshPlacement;let indexes=0;
   G.citizenHomeLookup=w=>{indexes++;return lookup(w);};G.homeOf=()=>{throw Error('frame must use one index');};G.ui.refreshPlacement=()=>{};
   const before=JSON.stringify(offscreen);G.frame(0);
