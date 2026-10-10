@@ -37,7 +37,7 @@ G.genWorld = function (seed, options) {
     cmap: {},
     families: [],
     marked: new Set(),  // 「砍伐」工具标记的树（散工来砍）
-    markedRocks: new Set(), // 「拆除」工具标记的岩石/铁矿（散工来清除入库）
+    markedRocks: new Set(), // 「采石采铁」工具标记的岩石/铁矿（散工来清除入库）
     start: { x: N >> 1, y: N >> 1 },
   };
 
@@ -229,7 +229,7 @@ G.pickMarkedTree = function (w, x, y, claimed) {
   }
   return best;
 };
-/* 「拆除」工具：标记一块岩石/铁矿，空闲散工前来清除（石头/铁入库） */
+/* 「采石采铁」工具：标记一块岩石/铁矿，空闲散工前来清除（石头/铁入库） */
 G.markRockAt = function (w, x, y) {
   if (x < 0 || y < 0 || x >= w.N || y >= w.N) return;
   const i = y * w.N + x;
@@ -462,7 +462,7 @@ G.canPlace = function (w, type, ox, oy) {
     for (let i = ox; i < ox + def.w; i++) {
       const t = j * N + i;
       if (w.water[t] === 1) return { ok: false, reason: '不能建在水上' };
-      if (w.rock[t]) return { ok: false, reason: '地面有岩石，需先用拆除工具标记清除' };
+      if (w.rock[t]) return { ok: false, reason: '地面有岩石，需先用采石采铁工具标记清除' };
       if (w.bgrid[t] >= 0) return { ok: false, reason: '与其他建筑重叠' };
     }
   // 等距视觉间距：脚印不重叠还不够——新建筑的前墙脚线（南缘）若落在已有建筑的
