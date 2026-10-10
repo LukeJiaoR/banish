@@ -28,6 +28,7 @@ G.genWorld = function (seed, options) {
     rock: new Uint8Array(N * N),
     rockCleared: [],
     road: new Uint8Array(N * N),
+    roadCount: 0, // maintained only by setRoad; absent on foreign fixtures means unknown
     bgrid: new Int32Array(N * N).fill(-1),   // 建筑占位（存建筑 id）
     treeIdx: new Int32Array(N * N).fill(-1), // 树（存 trees 数组下标）
     trees: [],
@@ -224,6 +225,9 @@ G.pickMarkedTree = function (w, x, y, claimed) {
     const idx = w.treeIdx[i];
     if (idx < 0) continue;
     const tx = i % w.N, ty = (i / w.N) | 0;
+    // A solid construction site owns its covered trees; do not let findPath's
+    // general blocked-target fallback hide a farther valid manual mark.
+    if (G.tileBlocked(w, tx, ty)) continue;
     const d = G.d2(x, y, tx, ty);
     if (d < bd && G.findPath(w, Math.round(x), Math.round(y), tx, ty)) { bd = d; best = { x: tx, y: ty, tree: w.trees[idx] }; }
   }
@@ -324,8 +328,49 @@ G.onRoad = function (w, x, y) {
   return w.road[y * w.N + x] === 1;
 };
 
+// All normal road writes go through this helper. Unknown maps keep the
+// conservative road-speed lower bound rather than guessing a cached count.
+G.setRoad = function (w, x, y, present) {
+  const i = y * w.N + x, next = present ? 1 : 0, previous = w.road[i] ? 1 : 0;
+  if (next === previous) return;
+  w.road[i] = next;
+  if (Number.isInteger(w.roadCount)) {
+    w.roadCount += next - previous;
+    // Half-tile expansion matches round(position) surface boundaries. Removing
+    // roads may leave a wider box: that only weakens, never raises, the bound.
+    if (next) {
+      const b = w.roadBounds;
+      w.roadBounds = b ? { minX: Math.min(b.minX, x - .5), maxX: Math.max(b.maxX, x + .5), minY: Math.min(b.minY, y - .5), maxY: Math.max(b.maxY, y + .5) }
+        : { minX: x - .5, maxX: x + .5, minY: y - .5, maxY: y + .5 };
+    }
+  }
+};
+
 /* A* 寻路（8 向，禁止穿角；二叉堆开表，路面加速） */
-const PF_DIRS = [[1, 0, 1], [-1, 0, 1], [0, 1, 1], [0, -1, 1], [1, 1, 1.42], [1, -1, 1.42], [-1, 1, 1.42], [-1, -1, 1.42]];
+const PF_DIRS = [[1, 0, 1], [-1, 0, 1], [0, 1, 1], [0, -1, 1], [1, 1, Math.SQRT2], [1, -1, Math.SQRT2], [-1, 1, Math.SQRT2], [-1, -1, Math.SQRT2]];
+
+// Center-to-center motion spends half an edge on each endpoint surface.
+// Winter/cargo are uniform speed multipliers and do not change route ranking.
+G.travelEdgeHours = function (w, sx, sy, tx, ty) {
+  const v = G.TRAVEL_SPEED;
+  return Math.hypot(tx - sx, ty - sy) * 0.5 *
+    (1 / (w.road[sy * w.N + sx] ? v.road : v.field) + 1 / (w.road[ty * w.N + tx] ? v.road : v.field));
+};
+G.travelGridDistance = function (dx, dy) {
+  dx = Math.abs(dx); dy = Math.abs(dy);
+  return Math.max(dx, dy) + (Math.SQRT2 - 1) * Math.min(dx, dy);
+};
+G.roadExitDistance = function (w, x, y) {
+  const b = w.roadBounds;
+  if (!Number.isInteger(w.roadCount) || !b) return 0;
+  return G.travelGridDistance(Math.max(b.minX - x, 0, x - b.maxX), Math.max(b.minY - y, 0, y - b.maxY));
+};
+G.travelLowerBound = function (dx, dy, fastest = Math.max(G.TRAVEL_SPEED.road, G.TRAVEL_SPEED.field), fieldTail = 0) {
+  const distance = G.travelGridDistance(dx, dy), field = G.TRAVEL_SPEED.field;
+  // Either never use a road, or eventually leave the road envelope. Taking the
+  // minimum also protects short all-field routes outside that envelope.
+  return Math.min(distance / field, distance / fastest + fieldTail * (1 / field - 1 / fastest));
+};
 
 G.findPath = function (w, sx, sy, tx, ty) {
   sx |= 0; sy |= 0; tx |= 0; ty |= 0;
@@ -372,8 +417,10 @@ G.findPath = function (w, sx, sy, tx, ty) {
     }
     return top;
   };
+  const fastest = w.roadCount === 0 ? G.TRAVEL_SPEED.field : Math.max(G.TRAVEL_SPEED.road, G.TRAVEL_SPEED.field);
+  const fieldTail = G.roadExitDistance(w, tx, ty);
   const start = sy * N + sx, goal = ty * N + tx;
-  pf.g[start] = 0; pf.f[start] = Math.hypot(tx - sx, ty - sy); pf.from[start] = -1; pf.gen[start] = gen;
+  pf.g[start] = 0; pf.f[start] = G.travelLowerBound(tx - sx, ty - sy, fastest, fieldTail); pf.from[start] = -1; pf.gen[start] = gen;
   push(start);
   let iter = 0, found = false;
   while (hn > 0) {
@@ -392,11 +439,11 @@ G.findPath = function (w, sx, sy, tx, ty) {
       }
       const ni = ny * N + nx;
       if (pf.closed[ni] === gen) continue;
-      const ng = pf.g[cur] + base * (w.road[ni] ? 0.615 : 1); // 0.615 = 野地/路面实际速度比（1.6/2.6），与 sim 的 moveSpeed 保持一致
+      const ng = pf.g[cur] + base * 0.5 * (1 / (w.road[cur] ? G.TRAVEL_SPEED.road : G.TRAVEL_SPEED.field) + 1 / (w.road[ni] ? G.TRAVEL_SPEED.road : G.TRAVEL_SPEED.field));
       if (pf.gen[ni] !== gen || ng < pf.g[ni]) {
         pf.gen[ni] = gen;
         pf.g[ni] = ng;
-        pf.f[ni] = ng + Math.hypot(tx - nx, ty - ny);
+        pf.f[ni] = ng + G.travelLowerBound(tx - nx, ty - ny, fastest, fieldTail);
         pf.from[ni] = cur;
         push(ni);
       }
