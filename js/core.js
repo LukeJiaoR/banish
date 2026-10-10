@@ -6,7 +6,7 @@
 window.G = {};
 
 /* 游戏版本：进反馈 payload 与结算画面——反馈可归因到数值补丁（发版时手动递增） */
-G.VERSION = '0.3.8';
+G.VERSION = '0.3.9';
 
 /* ---------- 常量 ---------- */
 G.TILE_W = 64;            // 等距菱形瓦片宽（缩放 1 时的像素）
@@ -26,12 +26,12 @@ G.OLD_AGE = 70;           // 自然死亡概率开始上升（原版多在 70~85
 
 /* 资源（数值对齐原版 Banished） */
 G.RES = {
-  wood:     { name: '木材', color: '#b08850', icon: '🪵' },
-  stone:    { name: '石头', color: '#b8b8b8', icon: '🪨' },
-  iron:     { name: '铁', color: '#c08a5a', icon: '🔩' },
-  tools:    { name: '工具', color: '#cfcfcf', icon: '🛠' },
-  food:     { name: '食物', color: '#e0705a', icon: '🍖' },
-  firewood: { name: '柴火', color: '#e8a33d', icon: '🔥' },
+  wood:     { name: '木材', color: '#b08850', icon: '🪵', iconAsset: 'res_wood' },
+  stone:    { name: '石头', color: '#b8b8b8', icon: '🪨', iconAsset: 'res_stone' },
+  iron:     { name: '铁', color: '#c08a5a', icon: '🔩', iconAsset: 'res_iron' },
+  tools:    { name: '工具', color: '#cfcfcf', icon: '🛠', iconAsset: 'res_tools' },
+  food:     { name: '食物', color: '#e0705a', icon: '🍖', iconAsset: 'res_food' },
+  firewood: { name: '柴火', color: '#e8a33d', icon: '🔥', iconAsset: 'res_firewood' },
 };
 G.RES_KEYS = ['wood', 'stone', 'iron', 'tools', 'food', 'firewood'];
 

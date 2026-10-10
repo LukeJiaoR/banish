@@ -103,7 +103,7 @@ G.BDEF = {
 };
 
 /* 工具栏顺序 */
-G.TOOLBAR = ['house', 'stonehouse', 'boarding', 'storage', 'mine', 'blacksmith', 'gatherer', 'forester', 'woodcutter', 'dock', 'hunting', 'school', 'farm', 'road', 'fell', 'demolish'];
+G.TOOLBAR = ['fell', 'quarry', 'house', 'stonehouse', 'boarding', 'storage', 'mine', 'blacksmith', 'gatherer', 'forester', 'woodcutter', 'dock', 'hunting', 'school', 'farm', 'road', 'demolish'];
 
 /* 产出参数（workH: 每次工作小时数；目标对齐原版年产量） */
 G.PROD = {
@@ -159,7 +159,7 @@ G.TREE_MATURE = 100;
 G.TREE_LOGS = 2;          // 1 棵树 = 2 原木（原版未受教育；受教育护林/散工砍出 3 原木）
 G.TREE_SPREAD_CHANCE = 0.8; // 非冬季每天自播概率（附近空地长一棵幼苗）——全图每年约新增 25-30 棵；杯水车薪但聊胜于无，规模造林还是得靠护林屋补种
 
-/* 岩石：用「拆除」工具标记后由散工清除，每格得石头/铁（原版地表岩石与铁矿是初期石头、铁的来源） */
+/* 岩石：用「采石采铁」工具标记后由散工清除，每格得石头/铁（原版地表岩石与铁矿是初期石头、铁的来源） */
 G.ROCK_STONE = 10;
 G.ROCK_IRON = 10;
 G.ROCK_WORK = 6;          // 清除一块岩石所需工时（游戏小时）

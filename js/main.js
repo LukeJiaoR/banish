@@ -6,7 +6,7 @@
 G.cv = null;
 G.ctx = null;
 G.dpr = 1;
-G.tool = null;                 // null | {kind:'build',type} | {kind:'road'} | {kind:'demolish'}
+G.tool = null;                 // null | {kind:'build',type} | {kind:'road'|'fell'|'quarry'|'demolish'}
 G.hover = { tx: -1, ty: -1 };
 G.sel = null;
 G.keys = {};
@@ -484,6 +484,7 @@ G.setTool = function (t) {
   else if (t === 'demolish') G.tool = { kind: 'demolish' };
   else if (t === 'road') G.tool = { kind: 'road' };
   else if (t === 'fell') G.tool = { kind: 'fell' };
+  else if (t === 'quarry') G.tool = { kind: 'quarry' };
   else G.tool = { kind: 'build', type: t };
   G.ui.setToolActive();
 };
@@ -503,7 +504,7 @@ G.paintFell = function (x0, y0, x1, y1) {
   }
 };
 
-/* 「拆除」工具拖拽：沿线给岩石做清除标记（与砍伐同款沿线画法；只标岩石，不删建筑） */
+/* 「采石采铁」工具拖拽：沿线给岩石做清除标记（与砍伐同款沿线画法；只标岩石，不删建筑） */
 G.paintRockLine = function (x0, y0, x1, y1) {
   const w = G.world;
   const dx = Math.abs(x1 - x0), dy = Math.abs(y1 - y0);
@@ -624,10 +625,10 @@ G.init = function () {
       G.markFellAt(G.world, tx, ty);
       fellLast = { x: tx, y: ty };
     }
-    if (e.button === 0 && G.tool && G.tool.kind === 'demolish') {
+    if (e.button === 0 && G.tool && G.tool.kind === 'quarry') {
       const t = G.screenToTile(p.x, p.y);
       const tx = Math.floor(t.tx), ty = Math.floor(t.ty);
-      G.markRockAt(G.world, tx, ty); // 点击岩石即标记；建筑/树木/道路的删除仍在 mouseup 单击判定
+      G.markRockAt(G.world, tx, ty); // 只标记矿石，不删除建筑、道路或树木
       rockLast = { x: tx, y: ty };
     }
   });
@@ -655,7 +656,7 @@ G.init = function () {
         G.paintFell(fellLast.x, fellLast.y, tx, ty);
         fellLast = { x: tx, y: ty };
       }
-    } else if (dragBtn === 0 && G.tool && G.tool.kind === 'demolish' && rockLast) {
+    } else if (dragBtn === 0 && G.tool && G.tool.kind === 'quarry' && rockLast) {
       const tx = Math.floor(t.tx), ty = Math.floor(t.ty);
       if (tx !== rockLast.x || ty !== rockLast.y) {
         G.paintRockLine(rockLast.x, rockLast.y, tx, ty);
@@ -674,10 +675,12 @@ G.init = function () {
     if (e.button === 0 && dragMoved <= 4) {
       if (G.tool && G.tool.kind === 'build') G.tryPlace(tx, ty);
       else if (G.tool && G.tool.kind === 'demolish') {
-        if (tx >= 0 && ty >= 0 && tx < G.MAP && ty < G.MAP) G.demolishAt(tx, ty);
+        const w = G.world, i = ty * w.N + tx;
+        // Keep the legacy demolishAt API; this UI action only targets built objects.
+        if (tx >= 0 && ty >= 0 && tx < w.N && ty < w.N && (w.bgrid[i] >= 0 || w.road[i])) G.demolishAt(tx, ty);
         G.ui.refreshHUD();
-      } else if (G.tool && G.tool.kind === 'road') {
-        // 已在拖拽中铺完
+      } else if (G.tool && (G.tool.kind === 'road' || G.tool.kind === 'quarry')) {
+        // 已在按下/拖拽时处理；采矿不能落入对象选择或拆除
       } else {
         G.selectAt(tx, ty, p);
       }

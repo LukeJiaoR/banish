@@ -7,6 +7,19 @@ G.ui = {
   el: {},
   infoT: 0,
 
+  // Every stock display and HTML building cost uses the same resource registry.
+  // Emoji are a shared image-load fallback only; text tooltips spell out names.
+  resourceIcon: function (type) {
+    const r = G.RES[type];
+    return `<span class="res-icon" role="img" aria-label="${r.name}" title="${r.name}"><span aria-hidden="true">${r.icon}</span><img src="assets/icons/${r.iconAsset}.png" alt="" onerror="this.remove()"></span>`;
+  },
+
+  resourceCost: function (cost, html) {
+    return Object.keys(cost).map(type => html
+      ? `<span class="res-cost">${this.resourceIcon(type)}<span>${cost[type]}</span></span>`
+      : `${G.RES[type].name}×${cost[type]}`).join(' ') || '免费';
+  },
+
   // Read-only estimate at the current occupancy. endDay has already charged the
   // current winter day, so only later daily deductions belong in futureWinter.
   // Keep demand unrounded for stock comparisons; only displayed totals round up.
@@ -77,7 +90,7 @@ G.ui = {
 
     // 资源栏
     this.el.resRow.innerHTML = G.RES_KEYS.map(k =>
-      `<span class="res" id="res-${k}" title="${G.RES[k].name}"><span class="res-icon">${G.RES[k].icon}<img src="assets/icons/res_${k}.png" alt="" onerror="this.remove()"></span><b>0</b>${k === 'food' ? '<i id="net-food"></i>' : ''}</span>`
+      `<span class="res" id="res-${k}" title="${G.RES[k].name}">${this.resourceIcon(k)}<b>0</b>${k === 'food' ? '<i id="net-food"></i>' : ''}</span>`
     ).join('');
 
     // 速度按钮（原版：暂停 / 1x / 2x / 5x）
@@ -109,19 +122,22 @@ G.ui = {
     };
     const icImg = (n) => n ? `<img class="icimg" src="assets/icons/${n}.png" alt="" onerror="this.remove()">` : '';
     const toolTip = (t) => {
-      if (t === 'demolish') return '拆除：点击建筑 / 树木 / 道路移除；点击或拖拽沿线标记岩石/铁矿，空闲市民会前来采集入库';
+      if (t === 'demolish') return '拆除：点击建筑或道路移除；树木请用砍伐，岩石和铁矿请用采石采铁';
+      if (t === 'quarry') return '采石采铁：点击或拖拽沿线标记矿石；灰色岩石产石头，锈色铁矿产铁，散工开采后搬运入库';
       const d = G.BDEF[t];
-      const cost = Object.keys(d.cost).map(k => `${G.RES[k].icon}×${d.cost[k]}`).join(' ') || '免费';
+      const cost = this.resourceCost(d.cost, false);
       const jobs = d.jobs ? ` · 岗位×${d.jobs}` : '';
       return `${d.name}（${cost}${jobs}）— ${d.desc}`;
     };
     this.el.toolbar.innerHTML = G.TOOLBAR.map(t => {
       if (t === 'demolish')
         return `<button class="tb" data-tool="demolish" title="${toolTip(t)}"><span class="ic">🚫${icImg(TOOL_ICONS.demolish)}</span><span class="lb">拆除</span></button>`;
+      if (t === 'quarry')
+        return `<button class="tb" data-tool="quarry" title="${toolTip(t)}"><span class="ic" aria-hidden="true">⛏</span><span class="lb">采石采铁</span><span class="cost">灰石 · 锈铁</span></button>`;
       if (t === 'fell')
         return `<button class="tb" data-tool="fell" title="标记砍伐：点击或拖拽沿线标记树木，散工前来砍倒再搬运入库；未受教育 2 原木、受教育 3 原木"><span class="ic">🪚</span><span class="lb">砍伐</span><span class="cost">免费</span></button>`;
       const d = G.BDEF[t];
-      const cost = Object.keys(d.cost).map(k => `${G.RES[k].icon}${d.cost[k]}`).join(' ') || '免费';
+      const cost = this.resourceCost(d.cost, true);
       return `<button class="tb" data-tool="${t}" title="${toolTip(t)}"><span class="ic">${d.icon}${icImg(TOOL_ICONS[t])}</span><span class="lb">${d.name}</span><span class="cost">${cost}</span></button>`;
     }).join('');
     this.el.toolbar.querySelectorAll('button').forEach(btn => {
@@ -169,7 +185,7 @@ G.ui = {
       btn.addEventListener('click', e => {
         e.preventDefault();
         e.stopPropagation();
-        if (!G.world || !G.tool || !['fell', 'demolish'].includes(G.tool.kind) ||
+        if (!G.world || !G.tool || !['fell', 'quarry'].includes(G.tool.kind) ||
             (G.hasOpenModal && G.hasOpenModal())) return;
         const marks = kind === 'trees' ? G.world.marked : G.world.markedRocks;
         // Read live state, not the previous animation frame's count.
@@ -187,7 +203,7 @@ G.ui = {
   refreshHarvestControls: function () {
     const el = this.el.harvestCancel;
     if (!el) return;
-    const visible = !!G.world && !!G.tool && ['fell', 'demolish'].includes(G.tool.kind);
+    const visible = !!G.world && !!G.tool && ['fell', 'quarry'].includes(G.tool.kind);
     if (!visible) {
       // Escape or a tool switch must not leave keyboard focus in a hidden group.
       if (el.contains(document.activeElement)) {
@@ -308,9 +324,15 @@ G.ui = {
     this._placementKey = null;
     const h = G.harvestFeedback(), fell = G.tool.kind === 'fell';
     const cargo = G.RES_KEYS.filter(k => h.carry[k]).map(k => `${G.RES[k].name} ${h.carry[k]}`).join(' · ');
-    const lines = [fell ? '砍伐：点击或拖拽沿线标记树木' : '清矿：点击或拖拽沿线标记岩石；单击建筑仍会拆除',
+    const lines = [fell ? '砍伐：点击或拖拽沿线标记树木' : '采石采铁：点击或拖拽沿线标记；灰色岩石产石头，锈色铁矿产铁',
       `标记：树 ${h.trees} · 矿 ${h.rocks}；待领 ${h.queued} · 执行 ${h.active}（含赶路） · 夜间保留 ${h.paused}`,
       `散工 ${h.laborers} 人（含执行、搬运）；每 2 游戏小时自动调度。`];
+    if (!fell) {
+      const { tx, ty } = G.hover, w = G.world;
+      const mineral = tx >= 0 && ty >= 0 && tx < w.N && ty < w.N ? w.rock[ty * w.N + tx] : 0;
+      if (mineral) lines.push(`指向：${mineral === 2 ? '铁矿 → 铁' : '岩石 → 石头'}；开采后搬运入库。`);
+      else lines.push('指向地块没有可采矿石；本工具只标记岩石和铁矿。');
+    }
     if (cargo) lines.push(`随身待入库：${cargo}；搬运 ${h.haulers} 人 / 待送 ${h.waitingCarriers} 人（不计入库存）。`);
     if (h.reason) lines.push(h.reason);
     const check = G.world.markReachability;

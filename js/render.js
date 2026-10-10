@@ -603,7 +603,7 @@ G.frame = function (dtReal) {
     G._gcv.width / G.groundScale, G._gcv.height / G.groundScale);
 
   const w = G.world;
-  const harvesting = G.tool && (G.tool.kind === 'fell' || G.tool.kind === 'demolish');
+  const harvesting = G.tool && (G.tool.kind === 'fell' || G.tool.kind === 'quarry');
   if (harvesting) G.drawFoodForestBounds(ctx);
 
   // 建造幽灵：贴着地面画、在建筑之前——后面的建筑/树会正确把它挡住，
@@ -636,7 +636,15 @@ G.frame = function (dtReal) {
     else G.ui.refreshPlacement(null);
   }
 
-  // 道路工具悬停（同样贴地）
+  // 矿石与道路工具悬停（同样贴地）
+  if (G.tool && G.tool.kind === 'quarry' && G.hover.tx >= 0 && G.hover.ty >= 0 && G.hover.tx < w.N && G.hover.ty < w.N) {
+    const mineral = w.rock[G.hover.ty * w.N + G.hover.tx];
+    const [sx, sy] = G.T2S(G.hover.tx, G.hover.ty);
+    G.diamondPath(ctx, sx, sy);
+    ctx.fillStyle = mineral ? 'rgba(120,230,140,0.4)' : 'rgba(230,90,80,0.25)';
+    ctx.fill();
+  }
+
   if (G.tool && G.tool.kind === 'road' && G.hover.tx >= 0) {
     const [sx, sy] = G.T2S(G.hover.tx, G.hover.ty);
     G.diamondPath(ctx, sx, sy);
