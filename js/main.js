@@ -571,8 +571,9 @@ G.paintRoad = function (x0, y0, x1, y1) {
 /* Transient, explicitly confirmed road plan. Existing marked work is never
  * cancelled by discarding a preview; planning does not change the world. */
 G.roadPlan = null;
+G.roadDrag = null;
 G.roadGestureVersion = 0;
-G.cancelRoadPlan = function () { G.roadPlan = null; G.roadGestureVersion++; };
+G.cancelRoadPlan = function () { G.roadPlan = null; G.roadDrag = null; G.roadGestureVersion++; };
 G.selectRoadEndpoint = function (x, y) {
   if (!G.world || !G.tool || G.tool.kind !== 'road' || G.hasOpenModal()) return;
   const w = G.world, point = { x, y }, old = G.roadPlan;
@@ -587,6 +588,7 @@ G.selectRoadEndpoint = function (x, y) {
   G.roadPlan = { world: w, start: old.start, end: point, result, message: result.ok ? '' : result.reason };
 };
 G.roadPlanStatus = function () {
+  if (G.roadDrag && G.roadDrag.world === G.world) return { ok: false, reason: '正在选择终点；松开后计算路线，再确认铺路。虚线仅表示起终点方向。' };
   const plan = G.roadPlan, w = G.world;
   if (!plan || plan.world !== w || !plan.end || !plan.result.ok) return { ok: false, reason: plan && plan.world === w ? plan.message : '点击起点，再点击终点预览路线' };
   const trees = [], added = [];
@@ -720,13 +722,13 @@ G.init = function () {
   setInterval(() => G.autosave(), 90000);
 
   /* ----- 输入 ----- */
-  let dragging = false, dragBtn = -1, dragMoved = 0, lastX = 0, lastY = 0;
-  let roadTouch = null, harvestTouch = null;
+  let dragging = false, dragBtn = -1, dragMoved = 0, lastX = 0, lastY = 0, pressX = 0, pressY = 0;
+  let roadTouch = null, harvestTouch = null, roadMouse = null;
   function resetInput() {
     if (G.harvestPlan && !G.harvestPlan.frozen) G.cancelHarvestPlan();
     G.keys = {};
     dragging = false; dragBtn = -1; dragMoved = 0;
-    roadTouch = null; harvestTouch = null;
+    roadTouch = null; harvestTouch = null; roadMouse = null; G.roadDrag = null;
   }
   window.addEventListener('blur', () => { resetInput(); roadTouch = null; G.cancelRoadPlan(); G.cancelHarvestPlan(); });
   document.addEventListener('focusin', e => { if (G.isInputTarget(e.target)) resetInput(); });
@@ -745,7 +747,12 @@ G.init = function () {
     const p = toLocal(e);
     if (e.button === 2 && G.tool) { G.setTool(null); return; } // 右键取消工具
     dragging = true; dragBtn = e.button; dragMoved = 0;
-    lastX = p.x; lastY = p.y;
+    lastX = pressX = p.x; lastY = pressY = p.y;
+    roadMouse = null;
+    if (e.button === 0 && G.tool && G.tool.kind === 'road') {
+      const t = G.screenToTile(p.x, p.y);
+      roadMouse = { start: { x: Math.floor(t.tx), y: Math.floor(t.ty) }, world: G.world, generation: G.roadGestureVersion };
+    }
     if (e.button === 0 && G.tool && ['fell', 'quarry'].includes(G.tool.kind)) {
       const t = G.screenToTile(p.x, p.y);
       G.beginHarvestRange(t.tx, t.ty);
@@ -759,10 +766,14 @@ G.init = function () {
     G.hover = { tx: Math.floor(t.tx), ty: Math.floor(t.ty) };
     if (!dragging) return;
     const dx = p.x - lastX, dy = p.y - lastY;
-    dragMoved += Math.abs(dx) + Math.abs(dy);
+    // Maximum displacement, not repeated distance from an unchanged lastX/Y.
+    dragMoved = Math.max(dragMoved, Math.abs(p.x - pressX) + Math.abs(p.y - pressY));
     if (dragBtn === 2 || dragBtn === 1 || (dragBtn === 0 && !G.tool && dragMoved > 4)) {
       G.cam.x += dx; G.cam.y += dy;
       lastX = p.x; lastY = p.y;
+    } else if (dragBtn === 0 && G.tool && G.tool.kind === 'road' && roadMouse && roadMouse.world === G.world && roadMouse.generation === G.roadGestureVersion && dragMoved > 4) {
+      G.roadPlan = null;
+      G.roadDrag = { world: G.world, start: roadMouse.start, end: { x: Math.floor(t.tx), y: Math.floor(t.ty) } };
     } else if (dragBtn === 0 && G.tool && ['fell', 'quarry'].includes(G.tool.kind)) {
       const plan = G.harvestPlan;
       if (plan && !plan.frozen && plan.world === G.world && plan.kind === G.tool.kind) plan.end = G.harvestPoint(t.tx, t.ty);
@@ -776,6 +787,18 @@ G.init = function () {
     const p = toLocal(e);
     const t = G.screenToTile(p.x, p.y);
     const tx = Math.floor(t.tx), ty = Math.floor(t.ty);
+    dragMoved = Math.max(dragMoved, Math.abs(p.x - pressX) + Math.abs(p.y - pressY));
+    if (e.button === 0 && G.tool && G.tool.kind === 'road') {
+      const gesture = roadMouse; roadMouse = null; G.roadDrag = null;
+      if (!gesture || gesture.world !== G.world || gesture.generation !== G.roadGestureVersion) return;
+      if (dragMoved > 4) {
+        G.roadPlan = null;
+        G.selectRoadEndpoint(gesture.start.x, gesture.start.y);
+        // Invalid starts remain a visible error, not a silent new end-as-start.
+        if (G.roadPlan && G.roadPlan.start) G.selectRoadEndpoint(tx, ty);
+      } else G.selectRoadEndpoint(tx, ty);
+      return;
+    }
     if (e.button === 0 && G.tool && ['fell', 'quarry'].includes(G.tool.kind)) {
       if (G.harvestPlan && !G.harvestPlan.frozen) G.finishHarvestRange(tx, ty);
       return;

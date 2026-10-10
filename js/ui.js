@@ -157,7 +157,7 @@ G.ui = {
     const icImg = (n) => n ? `<img class="icimg" src="assets/icons/${n}.png" alt="" onerror="this.remove()">` : '';
     const toolTip = (t) => {
       if (t === 'demolish') return '拆除：点击建筑或道路移除；树木请用砍伐，岩石和铁矿请用采石采铁';
-      if (t === 'road') return '道路：点选起点和终点预览连通路线，确认后铺设；树木需先标记由工人清除';
+      if (t === 'road') return '道路：点选或鼠标拖出起终点预览连通路线，确认后铺设；树木需先标记由工人清除';
       if (t === 'quarry') return '采石采铁：框选预览并确认矿石；灰色岩石产石头，锈色铁矿产铁，散工开采后搬运入库';
       const d = G.BDEF[t];
       const cost = this.resourceCost(d.cost, false);
@@ -328,7 +328,7 @@ G.ui = {
 土路材料消耗：0 · 尚需清树 ${status.trees.length} 棵`;
       if (plan.message) message += '\n' + plan.message;
     }
-    message += '\n点击起点和终点；确认前不修改地图。水面、建筑和矿石需绕行。Esc/右键退出。';
+    message += '\n点选起终点，或鼠标拖出起终点、松开预览；再确认铺路。水面、建筑和矿石需绕行。Esc/右键退出。';
     if (text.textContent !== message) text.textContent = message;
     const waiting = status.ok && status.trees.length && !status.added.length;
     button._roadIntent = status.ok ? { plan, mode: status.trees.length ? 'clear' : 'pave', trees: status.trees.map(p => p.y * G.world.N + p.x).join(',') } : null;

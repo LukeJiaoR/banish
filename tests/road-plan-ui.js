@@ -106,8 +106,14 @@ test('mouse endpoints preview only; confirm button paves and cannot click throug
   const f=roadFixture(),{G,doc}=f;f.tap(3,3);assert.equal(G.roadPlan.end,null);f.tap(8,3);assert.equal(G.world.road.some(Boolean),false);
   G.ui.refreshRoadControls();const button=doc.getElementById('road-confirm');assert.equal(button.disabled,false);f.click(button);assert.equal(G.world.road[3*G.world.N+5],1);assert.equal(G.roadPlan,null);
 });
-test('drag motion never paints old Bresenham road or chooses an endpoint',()=>{
-  const{G,doc}=roadFixture(),cv=doc.getElementById('game');cv.emit('mousedown',{clientX:3,clientY:3});cv.emit('mousemove',{clientX:20,clientY:3});cv.emit('mouseup',{clientX:20,clientY:3});assert.equal(G.roadPlan,null);assert.equal(G.world.road.some(Boolean),false);
+test('mouse drag previews endpoints cheaply then computes a route on release without paving',()=>{
+ const f=roadFixture(),{G,doc}=f,cv=doc.getElementById('game');let calls=0;const plan=G.planRoad;G.planRoad=(...a)=>{calls++;return plan(...a);};
+ cv.emit('mousedown',{clientX:3,clientY:3});
+ for(let x=4;x<=20;x++)cv.emit('mousemove',{clientX:x,clientY:3});
+ assert.equal(calls,0);assert(G.roadDrag);assert.equal(G.roadPlan,null);assert.equal(G.world.road.some(Boolean),false);
+ G.ui.refreshRoadControls();assert.equal(doc.getElementById('road-confirm').disabled,true);
+ cv.emit('mouseup',{clientX:20,clientY:3});assert.equal(G.roadDrag,null);assert.equal(calls,2);assert.equal(G.roadPlan.end.x,20);assert.equal(G.world.road.some(Boolean),false);
+ G.ui.refreshRoadControls();f.click(doc.getElementById('road-confirm'));assert.equal(G.world.road[3*G.world.N+12],1);
 });
 test('native one-finger touch endpoints preview without hover or synthetic mouse',()=>{
   const{G,doc}=roadFixture(),cv=doc.getElementById('game');for(const x of [3,8]){const t={clientX:x,clientY:3};const e=cv.emit('touchstart',{touches:[t]});assert.equal(e.defaultPrevented,true);cv.emit('touchend',{changedTouches:[t]});}assert.equal(G.roadPlan.result.steps,5);assert.equal(G.world.road.some(Boolean),false);
@@ -139,5 +145,34 @@ test('late touchend from a previous tool generation cannot create a new road sta
 });
 test('native pointerdown captures the same confirmation intent as legacy mouse input',()=>{
  const f=roadFixture(true),{G,doc}=f,i=3*G.world.N+5;G.world.treeIdx[i]=7;f.tap(3,3);f.tap(8,3);G.ui.refreshRoadControls();const b=doc.getElementById('road-confirm');b.emit('pointerdown',{pointerType:'touch'});G.world.treeIdx[i]=-1;G.ui.refreshRoadControls();b.emit('pointerup',{pointerType:'touch'});b.emit('click');assert.equal(G.world.road.some(Boolean),false);
+});
+test('small repeated pointer jitter still selects road endpoints',()=>{
+ const f=roadFixture(),{G,doc}=f,cv=doc.getElementById('game');
+ cv.emit('mousedown',{clientX:3,clientY:3});
+ for(let i=0;i<8;i++) cv.emit('mousemove',{clientX:3.5,clientY:3});
+ cv.emit('mouseup',{clientX:3.5,clientY:3});
+ assert(G.roadPlan && G.roadPlan.start, 'subpixel jitter must not discard a click');
+ cv.emit('mousedown',{clientX:8,clientY:3});
+ for(let i=0;i<12;i++) cv.emit('mousemove',{clientX:8.5,clientY:3});
+ cv.emit('mouseup',{clientX:8.5,clientY:3});
+ assert(G.roadPlan.end, 'repeated small move events must not discard endpoint');
+ G.ui.refreshRoadControls();f.click(doc.getElementById('road-confirm'));
+ assert.equal(G.world.road[3*G.world.N+5],1);
+});
+test('drag interruption, stale tool generation and world changes cannot complete a route',()=>{
+ for(const interrupt of ['blur','tool','world','panel']){
+  const f=roadFixture(),{G,doc,ctx,panel}=f,cv=doc.getElementById('game');
+  cv.emit('mousedown',{clientX:3,clientY:3});cv.emit('mousemove',{clientX:12,clientY:3});assert(G.roadDrag);
+  if(interrupt==='blur')ctx.emit('blur');
+  if(interrupt==='tool'){G.setTool('fell');G.setTool('road');}
+  if(interrupt==='world')G.newGame(1);
+  if(interrupt==='panel')ctx.emit('mousemove',{clientX:12,clientY:3,target:panel});
+  cv.emit('mouseup',{clientX:15,clientY:3});assert.equal(G.roadPlan,null,interrupt);assert.equal(G.roadDrag,null,interrupt);
+ }
+});
+test('middle button pans camera without road planning; invalid drag start stays an error',()=>{
+ const{G,doc}=roadFixture(),cv=doc.getElementById('game'),x=G.cam.x;
+ cv.emit('mousedown',{button:1,clientX:3,clientY:3});cv.emit('mousemove',{clientX:20,clientY:3});cv.emit('mouseup',{button:1,clientX:20,clientY:3});assert.equal(G.cam.x,x+17);assert.equal(G.roadPlan,null);
+ G.world.water[3*G.world.N+3]=1;cv.emit('mousedown',{clientX:3,clientY:3});cv.emit('mousemove',{clientX:20,clientY:3});cv.emit('mouseup',{clientX:20,clientY:3});assert.equal(G.roadPlan.start,null);assert.equal(G.roadPlanStatus().ok,false);assert.equal(G.world.road.some(Boolean),false);
 });
 console.log(`Road plan UI: ${passed} passed (DOM/event fixtures, not real browser/mobile acceptance)`);
