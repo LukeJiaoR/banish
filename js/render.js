@@ -740,10 +740,23 @@ G.frame = function (dtReal) {
     ctx.fill();
   }
 
+  if (G.tool && G.tool.kind === 'road' && G.roadPlan && G.roadPlan.world === w) {
+    const plan = G.roadPlan, route = plan.result.ok ? plan.result.path : plan.start ? [plan.start] : [];
+    for (const p of route) {
+      const [sx, sy] = G.T2S(p.x, p.y), i = p.y * w.N + p.x;
+      const px = sx * G.cam.z + G.cam.x, py = sy * G.cam.z + G.cam.y;
+      if (px < -40 * G.cam.z || px > cv.clientWidth + 40 * G.cam.z || py < -20 * G.cam.z || py > cv.clientHeight + 20 * G.cam.z) continue;
+      G.diamondPath(ctx, sx, sy);
+      ctx.fillStyle = w.water[i] === 1 || w.rock[i] || w.bgrid[i] >= 0 ? 'rgba(230,90,80,.6)' : w.treeIdx[i] >= 0 ? 'rgba(235,180,65,.6)' : 'rgba(120,230,140,.5)';
+      ctx.fill();
+    }
+  }
+
   if (G.tool && G.tool.kind === 'road' && G.hover.tx >= 0) {
     const [sx, sy] = G.T2S(G.hover.tx, G.hover.ty);
     G.diamondPath(ctx, sx, sy);
-    ctx.fillStyle = G.canPlaceRoad(w, G.hover.tx, G.hover.ty) ? 'rgba(120,230,140,0.4)' : 'rgba(230,90,80,0.4)';
+    const hx = G.hover.tx, hy = G.hover.ty, hi = hy * w.N + hx;
+    ctx.fillStyle = hx >= 0 && hy >= 0 && hx < w.N && hy < w.N && w.water[hi] !== 1 && !w.rock[hi] && w.bgrid[hi] < 0 ? 'rgba(120,230,140,0.4)' : 'rgba(230,90,80,0.4)';
     ctx.fill();
   }
 

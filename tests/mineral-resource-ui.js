@@ -6,6 +6,9 @@ const path = require('node:path');
 const root = path.resolve(process.argv[2] || path.join(__dirname, '..'));
 const { loadGame } = require('./helpers/playability');
 const G = loadGame(root); global.G = G; global.window = global;
+// UI initialization also registers window lifecycle listeners. This markup-only
+// fixture supplies the browser API; event behavior is covered by road-plan-ui.
+global.addEventListener = () => {};
 require(path.join(root, 'js/ui.js'));
 const elements = new Map();
 global.document = { getElementById(id) {
