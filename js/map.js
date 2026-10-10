@@ -564,24 +564,24 @@ G.canPlace = function (w, type, ox, oy) {
   // 等距视觉间距：脚印不重叠还不够——新建筑的前墙脚线（南缘）若落在已有建筑的
   // 屋顶投影内，画出来会像“盖在已有建筑上”；反向（新屋顶挡住旧前墙）同理。
   // 屋顶高约 28px ≈ 0.875 格，恰好盖住紧贴北/西侧一格内的墙脚。农田是平的，不参与。
-  if (type !== 'farm') {
+  if (!['farm', 'pasture', 'orchard'].includes(type)) {
     const foot = oy + def.h;
     for (const b of w.buildings) {
-      if (b.type === 'farm') continue;
+      if (['farm', 'pasture', 'orchard'].includes(b.type)) continue;
       if (foot >= b.y && foot < b.y + b.h && ox < b.x + b.w && ox + def.w >= b.x)
         return { ok: false, reason: '与其他建筑贴得太近：会叠在它后面' };
       if (b.y + b.h >= oy && b.y + b.h < oy + def.h && b.x < ox + def.w && b.x + b.w >= ox)
         return { ok: false, reason: '与其他建筑贴得太近：会挡住它' };
     }
   }
-  if (type === 'dock') {
+  if (type === 'dock' || type === 'tradingpost') {
     for (let j = oy - 1; j <= oy + def.h; j++)
       for (let i = ox - 1; i <= ox + def.w; i++) {
         if (i >= ox && i < ox + def.w && j >= oy && j < oy + def.h) continue;
         if (i < 0 || j < 0 || i >= N || j >= N) continue;
         if (w.water[j * N + i] === 1) hasWater = true;
       }
-    if (!hasWater) return { ok: false, reason: '码头必须紧邻水面' };
+    if (!hasWater) return { ok: false, reason: '码头/贸易站必须紧邻水面' };
   }
   return { ok: true };
 };

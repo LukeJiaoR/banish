@@ -337,3 +337,82 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 #harvest-range-controls { background: rgba(24,18,10,.94); border: 1px solid #d5b16c; border-radius: 8px; padding: 8px 10px; font-size: 12px; line-height: 1.5; margin-bottom: 6px; }
 #harvest-range-status { white-space: pre-line; margin-bottom: 6px; }
 #harvest-range-controls button { min-height: 44px; min-width: 100px; margin: 0 6px 4px 0; }
+
+/* Grouped town management. Panels follow actual HUD/toolbar height as stocks grow. */
+#hud { --hud-height: 86px; --toolbar-height: 151px; }
+#res-row { flex: 1 1 100%; flex-wrap: wrap; gap: 5px 16px; }
+.resource-group { display: flex; flex-wrap: wrap; align-items: center; gap: 5px 11px; }
+.food-resources { padding-right: 12px; border-right: 1px solid rgba(216,178,90,.3); }
+.res { gap: 3px; white-space: nowrap; }
+.res b { min-width: 22px; }
+.res-label { color: #cabd9d; font-size: 11px; }
+.res-total { padding: 3px 6px; border: 1px solid rgba(216,178,90,.38); border-radius: 6px; background: rgba(99,73,31,.35); }
+.res-total .res-label { color: #ffe3a8; }
+#date, #pop { white-space: nowrap; }
+#toolbar { display: flex; flex-direction: column; gap: 6px; width: max-content; max-width: min(760px, calc(100vw - 24px)); overflow: visible; }
+.toolbar-heading { display: flex; align-items: center; gap: 10px; min-height: 29px; }
+#toolbar-path { flex: 1; color: #ead2a0; font-size: 12px; }
+.toolbar-nav { min-height: 30px; border: 1px solid #8c7347; border-radius: 5px; padding: 4px 9px; background: #423320; color: #ffe7b1; font: inherit; font-size: 12px; cursor: pointer; white-space: nowrap; }
+.toolbar-nav:hover { background: #614825; border-color: #d8b25a; }
+#toolbar-cancel { border-color: #ae7250; color: #ffd2b8; }
+.toolbar-items { display: flex; gap: 6px; width: 100%; max-width: 100%; overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; padding: 2px; scrollbar-width: thin; scrollbar-color: #b79b64 #302619; }
+#toolbar .tb { min-width: 88px; min-height: 72px; padding: 6px 7px; }
+#toolbar .tb-category { min-width: 126px; }
+#toolbar .tb-category .cost { font-size: 10px; }
+#toolbar-state { color: #c6b79a; font-size: 11px; line-height: 1.5; min-height: 17px; max-width: 730px; }
+#survival-guide { top: calc(var(--hud-height) + 10px); }
+#info { top: calc(var(--hud-height) + 10px); width: 280px; max-height: calc(100vh - var(--hud-height) - var(--toolbar-height) - 46px); }
+#placement-panel { bottom: calc(var(--toolbar-height) + 24px); max-height: calc(100vh - var(--hud-height) - var(--toolbar-height) - 48px); }
+#toasts { bottom: calc(var(--toolbar-height) + 24px); }
+.resource-output { display: flex; align-items: center; flex-wrap: wrap; gap: 3px; }
+.resource-output .res-icon { width: 18px; height: 18px; }
+@media (max-width: 760px) {
+  #topbar { gap: 5px 10px; }
+  #res-row { gap: 4px 10px; }
+  .resource-group { gap: 4px 8px; }
+  #speed { margin-left: 0; }
+  #sys { margin-left: auto; }
+  #survival-guide { width: min(420px, calc(100vw - 314px)); }
+  #toolbar .tb-category { min-width: 106px; }
+  #toolbar .tb-category .cost { max-width: 94px; white-space: normal; text-align: center; }
+}
+@media (max-width: 600px) {
+  #topbar { padding: 6px 8px; font-size: 11px; }
+  .food-resources { padding-right: 0; border: 0; }
+  .res-icon { width: 20px; height: 20px; }
+  .res-label { font-size: 10px; }
+  .res b { min-width: 18px; }
+  .resource-group { gap: 3px 9px; }
+  .materials-resources .res-label { display: none; }
+  #pop small { font-size: 10px; }
+  #speed button, #sys button { min-height: 30px; padding: 4px 7px; }
+  #sys #btn-production-goals { font-size: 11px; }
+  #toolbar { bottom: 6px; max-width: calc(100vw - 12px); padding: 6px; gap: 4px; }
+  #toolbar-path { font-size: 11px; }
+  .toolbar-heading { gap: 6px; }
+  .toolbar-nav { min-height: 40px; padding: 5px 8px; }
+  #toolbar .tb { min-width: 86px; }
+  #toolbar-state { max-width: calc(100vw - 30px); }
+  #survival-guide { width: calc(100vw - 24px); font-size: 11px; }
+  #info { width: min(300px, calc(100vw - 24px)); top: calc(var(--hud-height) + 10px); max-height: calc(100vh - var(--hud-height) - var(--toolbar-height) - 34px); }
+  #hud:has(#info:not(.hidden)) #survival-guide { display: none; }
+  #placement-panel { bottom: calc(var(--toolbar-height) + 16px); }
+}
+
+/* Compact real-economy controls in the selected-building panel. */
+.economy-details { margin-top: 8px; padding-top: 5px; border-top: 1px solid rgba(216,178,90,.3); }
+.economy-details p, .trade-inventory p { white-space: pre-line; }
+.economy-form { margin: 9px 0; padding: 9px; background: rgba(77,59,31,.25); border: 1px solid rgba(216,178,90,.25); border-radius: 6px; }
+.economy-form h3 { font-size: 12px; color: #ffd98a; margin-bottom: 6px; }
+.economy-form label { display: block; color: #d8c5a0; margin-top: 5px; font-size: 11px; }
+.economy-form select, .economy-form input { width: 100%; min-height: 34px; padding: 4px 6px; border: 1px solid #816940; border-radius: 4px; background: #282015; color: #f4e5c3; font: inherit; }
+.economy-form select option { background: #282015; color: #f4e5c3; }
+.economy-form button { min-height: 34px; margin-top: 7px; padding: 5px 8px; border: 1px solid #a98c4f; border-radius: 5px; background: #5b4525; color: #ffe4a0; font: inherit; cursor: pointer; }
+.economy-actions { display: flex; flex-wrap: wrap; gap: 5px; }
+.economy-form button:disabled { opacity: .5; cursor: default; }
+.economy-message { color: #e6ca85; margin-top: 6px; }
+.trade-quote { border-left: 2px solid #c7a35b; padding-left: 7px; margin-top: 8px; color: #f4ddb0; }
+.trade-inventory { margin: 6px 0; padding: 6px; border: 1px dashed #79643e; border-radius: 5px; }
+.trade-inventory summary { cursor: pointer; color: #e5c88c; }
+.trade-inventory p { padding-top: 6px; font-size: 11px; }
+@media (max-width: 600px) { .economy-form select, .economy-form input, .economy-form button { min-height: 42px; font-size: 13px; } }
