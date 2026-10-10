@@ -21,16 +21,28 @@
       "name": "tradingpost",
       "file": "assets/buildings/tradingpost.png",
       "width": 512,
-      "height": 512,
+      "height": 402,
       "sourceCrop": {
-        "left": 71,
-        "top": 59,
-        "width": 1142,
-        "height": 1142
+        "left": 165,
+        "top": 120,
+        "width": 1106,
+        "height": 921
       },
       "anchor": "bottom-center",
       "transparentPadding": 2,
-      "prompt": "Original production game sprite, warm hand-painted isometric medieval settlement, high-quality detailed storybook timber and stone materials, crisp readable silhouette, soft warm sun from upper left, 2:1 diamond ground perspective, front door facing lower-left, all details contained in one isolated asset. Genuine transparent alpha background, no backdrop, no cast shadow beyond the tiny contact area, no text, no letters, no labels, no watermark, no border, no adjacent objects or duplicate sprite. Centered tightly but keep 3% transparent clearance at every image edge, the lowest ground contact centered horizontally. NOT a scene, no surrounding landscape, no cut-off elements. Clean solid painted surfaces with fully opaque interiors and antialiased edges only. A small rural trading post building: broad timber merchant hall on a compact stone-and-plank platform, weathered blue-slate gabled roof, muted striped ochre canvas market awning on the front, neatly stacked wooden crates and two barrels under awning, small balance scale on counter, simple pennant attached to the hall, no people or boats. Near-square footprint. Readable generous front entrance and goods make this clearly a trading post."
+      "prompt": "Use case: style-transfer. Asset type: one original transparent PNG building sprite for a warm, hand-painted isometric medieval frontier town game. Input image 1 is the trading-post edit target; images 2, 3 and 4 are the existing storage barn, blacksmith and cottage STYLE references. Redesign only the trading post to visually belong to this humble rural settlement. Replace the ornate two-storey blue-roof merchant shop with a squat SINGLE-STOREY practical timber trading warehouse and small open-front loading shelter. Match the reference assets' chunky timber proportions, warm weathered brown wood, muted gray-brown stone blocks, broad readable painted shapes, soft upper-left lighting, crisp small-scale game silhouette, equal-sided 2:1 dimetric footprint and roof angles. Roof is a simple low gable of desaturated dark brown wooden shingles, with NO blue slate, dormer, chimney, gold trim, finial, flag, banner, heraldry or hanging sign. A modest plain unstriped oatmeal linen awning covers only a small front counter with a simple dark iron balance scale. Stacked wooden cargo crates, two ordinary barrels, bundled burlap sacks and a short coil of rope identify its trading use. Keep these as a compact orderly group on a narrow timber loading deck supported by a low rough-stone sill; all of the deck and goods fit the near-square footprint. No extending pier and no extra scenic ground. Front doorway faces lower-left, darker side wall faces lower-right. Ground diamond lowest front corner exactly on the image's horizontal center for bottom-center game anchoring. Lower and wider proportions than the old target, visually around the storage barn's roof height when game-scaled. Opaque painted object interiors, antialiasing only at clean edges. Genuine transparent alpha background and 3 percent clear margin all around. NO ground tile, water, people, plants, scenic backdrop, labels, text, watermark, duplicate objects, isolated specks, color fringes, baked drop shadow or cropped elements. Return just the newly redesigned trading-post building, never a sheet or comparison.",
+      "sourcePadding": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 70
+      },
+      "anchorNote": "Source ground-contact center x=753; 70 transparent pixels added at right before resizing to center the foundation contact, without repainting or distorting the generated sprite.",
+      "revision": "2026-10-10: humble single-storey timber cargo warehouse, dark brown shingles and plain linen shelter; replaces blue-gold two-storey merchant shop.",
+      "refinements": [
+        "Use case: precise-object-edit. This image is the new original trading-post sprite for a 2:1 isometric game. Preserve its existing warm hand-painted rural art style and humble single-storey timber cargo warehouse design: weathered dark brown shingle gable roof, warm wood beams, low gray stone sill, small plain oatmeal linen awning, cargo crates, sacks, two barrels, simple balance scale and rope. Make only the perspective/footprint correction so the sprite snaps cleanly to a square 4-by-4 tile footprint: give the base a clearly symmetric 2:1 diamond projection with equal left and right footprint edges (26.565 degrees to horizontal); move the lowest front foundation corner to exactly the HORIZONTAL CENTER of the whole building image. The front corner dividing the doorway face on the left and the awning/cargo face on the right must run through the horizontal center. Both walls recede equally left and right. Keep the building low and practical and ensure the full stone-and-plank base stays within this diamond. The building should be approximately 1.25 times as wide as tall. Soft warm light from upper-left. Do not add objects or ornament. Genuine transparent alpha background with full opaque object interiors and clean antialias edges only, no halo, no shadows, no specks. Include 3 percent clear space all around the complete uncut sprite. No text, flags, blue roof, gold trim, landscape, grass, water, floor tile or people.",
+        "Use case: precise-object-edit. Edit target: the provided newly designed original rural trading-post game sprite. Preserve this exact building, every cargo object, its low single-storey shape, framing, position, isometric perspective, warm brown wood and neutral dark brown shingle palette. Make ONE cleanup: remove the unnatural thin bright red vertical streak visible immediately outside the leftmost wooden wall below the left roof eave. Also eliminate any tiny detached red/orange stray pixels or colored transparency fringes around the silhouette. Those pixels should become truly transparent, with normal clean antialiased wood/stone edges. Do not redraw or reshape any legitimate building feature. Preserve genuine alpha transparency, fully opaque building interiors, and the current clear margin. Do not add any background, shadow, ground, lettering, people or objects. Return the same full sprite with only the described stray-edge cleanup."
+      ]
     },
     {
       "name": "pasture",
