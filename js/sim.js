@@ -7,7 +7,8 @@ G.newGameState = function () {
   return {
     h: 6, day: 0, season: 0, year: 1,
     speed: 1, paused: false,
-    res: { wood: 80, stone: 48, iron: 0, tools: 15, food: 500, meat: 0, vegetables: 0, grain: 500, leather: 0, wool: 0, clothes: 0, firewood: 50 }, // 开局（原版中难度 5 家庭，工具 15 件≈第一轮磨损周期）；存粮较原版加厚：15 人 6 天食物跑道撑不到第一座采集屋建成
+    res: { wood: 80, stone: 48, iron: 0, tools: 15, food: 500, meat: 0, vegetables: 0, grain: 500, leather: 0, wool: 0, clothes: 0, herbs: 0, firewood: 50 }, // 开局（原版中难度 5 家庭，工具 15 件≈第一轮磨损周期）；存粮较原版加厚：15 人 6 天食物跑道撑不到第一座采集屋建成
+    healthStartDay: 0,
     schedT: 1,
     over: false,
     stats: { born: 0, died: 0, deadReasons: {} },
@@ -84,6 +85,8 @@ G.endDay = function () {
     c.happiness = Math.max(1, Math.min(5, 2 + (c.dietScore || 1) - Math.min(2, c.hunger / 3)));
   }
 
+
+  G.advanceHealth();
 
   const winter = g.season === 3;
   // ---- 工具磨损：每个成人每天磨损 1/toolLifeDays 把；用尽则全员生产减半 ----
@@ -489,7 +492,7 @@ G.spawnCitizen = function (opt) {
     student: false, educated: false, school: null,
     state: 'idle', walkKind: '', path: null, pi: 0, camped: false,
     wanderT: G.rng() * 3,
-    hunger: 0, cold: 0, clothingLeft: 0, dietVariety: 0, dietScore: 1, happiness: 3,
+    hunger: 0, cold: 0, clothingLeft: 0, dietVariety: 0, dietScore: 1, happiness: 3, health: 4, sickDays: 0, immunityDays: 0, herbCooldown: 0, careHours: 0,
     animT: G.rng() * 10,
     dead: false,
   };
@@ -565,7 +568,7 @@ G.wander = function (c) {
  * perimeter. Never turn the former into work at a nearby arbitrary doorway. */
 G.physicalTaskEndpoint = function (t) {
   return !!t && (['chop', 'clearrock', 'plant', 'sow', 'harvest'].includes(t.kind) ||
-    (t.kind === 'work' && t.b && ['gatherer', 'hunting'].includes(t.b.type)));
+    (t.kind === 'work' && t.b && ['gatherer', 'hunting', 'herbalist'].includes(t.b.type)));
 };
 G.dropBlockedTask = function (c, t) {
   if (c.pausedTask === t) c.pausedTask = null;
@@ -579,6 +582,7 @@ G.alternateTaskEndpoint = function (c, t) {
   if (!t || G.physicalTaskEndpoint(t) || !t.b || G.world.bmap[t.b.id] !== t.b) return null;
   if (['build','clearSite'].includes(t.kind) ? t.b.state !== 'site' : t.b.state !== 'ok') return null;
   if (t.kind === 'clearSite' && (!t.tree || G.world.trees[G.world.treeIdx[t.tree.i]] !== t.tree)) return null;
+  if (['care', 'clinic'].includes(t.kind)) return G.workSpot(G.world, t.b, c.x, c.y, true);
   if (t.kind === 'clearSite') return G.siteClearSpot(c, t.b, t.tree);
   if (['firewood', 'trade'].includes(t.kind) && t.phase === 'fetch') return G.storageRoute(c.x, c.y)?.spot || null;
   if (t.kind === 'build' || t.kind === 'firewood' || t.kind === 'trade' ||
@@ -603,7 +607,7 @@ G.routeCanReuse = function (route, c, tx, ty) {
 G.sendTo = function (c, tx, ty, planned = null) {
   let route=planned||(c.task&&c.task.dispatchRoute);
   if(c.task) delete c.task.dispatchRoute;
-  const buildingTask=c.task && (['build','clearSite','firewood','trade'].includes(c.task.kind) || (c.task.kind==='work' && c.task.b && ['dock','mine','blacksmith','pasture','orchard'].includes(c.task.b.type)));
+  const buildingTask=c.task && (['build','clearSite','firewood','trade','care','clinic'].includes(c.task.kind) || (c.task.kind==='work' && c.task.b && ['dock','mine','blacksmith','pasture','orchard'].includes(c.task.b.type)));
   if((route && !G.routeCanReuse(route,c,tx,ty)) || (!route && buildingTask)) {
     const spot=G.alternateTaskEndpoint(c,c.task);
     if(!spot){if(c.task)G.dropBlockedTask(c,c.task);c.path=null;c.state='idle';c.wanderT=.5;return false;}
@@ -788,7 +792,7 @@ G.toolLimited = function (b) { return b.type === 'blacksmith' && (G.productionGo
 /* Optional automatic-production goals. Unset means the exact legacy rules.
  * Hysteresis changes at deliveries and the normal 2h scheduler, never in UI reads. */
 G.PRODUCTION_GOAL_MAX = 1000000;
-G.PRODUCTION_OUTPUTS = { woodcutter: ['firewood'], blacksmith: ['tools'], forester: ['wood'], mine: ['stone', 'iron'], gatherer: ['food', 'vegetables'], dock: ['food', 'meat'], hunting: ['food', 'meat', 'leather'], farm: ['food', 'grain'], tailor: ['clothes'], pasture: ['food', 'meat', 'wool'], orchard: ['food', 'vegetables'] };
+G.PRODUCTION_OUTPUTS = { woodcutter: ['firewood'], blacksmith: ['tools'], forester: ['wood'], mine: ['stone', 'iron'], gatherer: ['food', 'vegetables'], dock: ['food', 'meat'], hunting: ['food', 'meat', 'leather'], farm: ['food', 'grain'], tailor: ['clothes'], pasture: ['food', 'meat', 'wool'], orchard: ['food', 'vegetables'], herbalist: ['herbs'] };
 G.productionGoalOf = function (type, game) {
   const goals = (game || G.game).productionGoals;
   return goals && Object.prototype.hasOwnProperty.call(goals, type) && Number.isFinite(goals[type]) ? goals[type] : null;
@@ -886,7 +890,9 @@ G.buildingGoalStatus = function (b) {
 // Only configured automatic jobs gain completion protection. Never change the
 // unset baseline, teachers, manual tasks, or construction scheduling here.
 G.goalCommitment = function (c) {
+  if (c.task && c.task.kind === 'care') return true;
   const b = G.world.bmap[c.job];
+  if (b && b.type === 'hospital' && !G.isSick(c) && G.world.citizens.some(G.isSick)) return true;
   if (!b || b.state !== 'ok') return false;
   const outputs = G.PRODUCTION_OUTPUTS[b.type] || [];
   const paused = type => outputs.includes(type) && G.goalPaused(type, b);
@@ -962,6 +968,7 @@ G.firewoodFetchDone = function (c, t) {
  * 速率常量为「处于该状态每满 24 小时」的量，按实际小时数折算；非冬季持续回暖清零 */
 G.coldStep = function (c, dtH) {
   if (!G.isWinter()) { c.cold = 0; return; }
+  if (G.inMedicalCare(c)) { c.cold = Math.max(0, c.cold - dtH * G.LIFE.warmRecover / 24); return; }
   const childMul = c.age < G.ADULT_AGE ? G.LIFE.coldChildMul : 1;
   if (c.state === 'rest' && !c.camped) {
     const home = G.homeOf(c);
@@ -1002,13 +1009,14 @@ G.detourCitizen = function (c, dtH) {
     if (G.physicalTaskEndpoint(t)) { G.dropBlockedTask(c, t); return; }
     if (t) {
       const spot = G.alternateTaskEndpoint(c, t);
-      if (!spot) return;
+      if (!spot) { if (t.kind === 'care') G.cancelMedicalCare(c); return; }
       goal = spot; t.tx = spot.x; t.ty = spot.y;
     } else if (c.walkKind === 'wander') { c.path = null; c.state = 'idle'; c.wanderT = 2; return; }
     else return;
   }
   const path = G.routeCanReuse(goal.route,c,goal.x,goal.y) ? goal.route.path : G.findPath(G.world, Math.round(c.x), Math.round(c.y), goal.x, goal.y);
   if (!path) {
+    if (c.task && c.task.kind === 'care') { G.cancelMedicalCare(c); return; }
     if (c.state === 'haul' && G.isMineralCargo(c)) { c.haulPending = true; G.waitForMineralStorage(c, 'route'); }
     return;
   }
@@ -1021,6 +1029,9 @@ G.detourCitizen = function (c, dtH) {
 G.stepCitizen = function (c, dtH) {
   if (c.dead) return;
   G.coldStep(c, dtH);
+  c.careRetryH = Math.max(0, (c.careRetryH || 0) - dtH);
+  if (c.task && c.task.kind === 'care' && !G.validCareTask(c)) G.cancelMedicalCare(c);
+  if (c.task && c.task.kind === 'care' && c.state === 'work') { G.stepMedicalCare(c, dtH); return; }
   if (c.state === 'rest') {
     if (!G.isRestTime()) {
       c.state = 'idle';
@@ -1029,7 +1040,7 @@ G.stepCitizen = function (c, dtH) {
     return;
   }
   // 深夜：回家睡觉（正在搬货的先送完这趟）
-  if (G.isRestTime() && c.state !== 'haul' && !(c.state === 'walk' && c.walkKind === 'home')) {
+  if (G.isRestTime() && !(c.task && c.task.kind === 'care') && c.state !== 'haul' && !(c.state === 'walk' && c.walkKind === 'home')) {
     G.goHome(c);
     if (c.state === 'rest') return;
   }
@@ -1059,7 +1070,7 @@ G.stepCitizen = function (c, dtH) {
     case 'work': {
       if (!c.task) { c.state = 'idle'; return; }
       if (c.task.b && c.task.b.state === 'site') c.task.b.constructionStarted = true;
-      c.task.workLeft -= dtH;
+      c.task.workLeft -= dtH / G.healthWorkMul(c);
       c.animT += dtH * 12;
       if (c.task.workLeft <= 0) G.completeTask(c);
       return;
@@ -1069,7 +1080,7 @@ G.stepCitizen = function (c, dtH) {
       if (c.wanderT <= 0) {
         c.wanderT = 2 + G.rng() * 5;
         if (c.age >= G.ADULT_AGE) G.requestTask(c); // 有岗位的接活；无业散工顺路处理「砍伐」标记
-        else G.wander(c);
+        else if (!G.tryMedicalCare(c)) G.wander(c);
       }
     }
   }
@@ -1136,6 +1147,7 @@ G.cancelResourceMarks = function (kind) {
 
 G.requestTask = function (c) {
   c.task = null;
+  if (!c.carry && G.tryMedicalCare(c)) return;
   if (G.isRestTime()) { G.goHome(c); return; } // 深夜不接受新任务
   const w = G.world;
   const b = c.job != null ? w.bmap[c.job] : null;
@@ -1278,10 +1290,12 @@ G.foodForestCanWork = function (b) {
 /* 按建筑类型生成任务 */
 G.makeTask = function (b, c) {
   const P = G.PROD, g = G.game, w = G.world;
-  if (b.state === 'ok' && G.productionLimited(b) && !['woodcutter', 'blacksmith'].includes(b.type)) {
+  if (b.state === 'ok' && G.productionLimited(b) && !['woodcutter', 'blacksmith', 'herbalist'].includes(b.type)) {
     b.warnText = G.buildingGoalStatus(b); return null;
   }
   switch (b.type) {
+    case 'herbalist': return G.makeHerbalistTask(b, c);
+    case 'hospital': return G.makeClinicTask(b, c);
     case 'woodcutter': {
       if (G.fuelLimited(b)) { // 燃料上限：库存够用时自动停工（原版 Fuel Limit）
         b.noWork = true; b.warnText = '柴火已达上限';
@@ -1511,6 +1525,7 @@ G.completeTask = function (c) {
   if (!t) { G.requestTask(c); return; }
   const b = t.b;
   switch (t.kind) {
+    case 'clinic': break;
     case 'build': {
       if (b && b.state === 'site') {
         b.workLeft -= t.work;
@@ -1634,6 +1649,7 @@ G.releaseWorker = function (c) {
 };
 
 G.assignWorker = function (b, c) {
+  if (b.type === 'hospital' && b.state === 'ok' && G.isSick(c)) return;
   c.job = b.id;
   b.workers.push(c.id);
   G.requestTask(c);
@@ -1699,6 +1715,8 @@ G.farmHasWork = function (b) {
 /* 纯读的派工前置检查，避免为缺料/停用岗位取消正在干活的粮工。 */
 G.jobCanProduce = function (b) {
   const w = G.world, r = G.game.res, p = G.PROD;
+  if (b.type === 'hospital') return G.world.citizens.some(G.isSick);
+  if (b.type === 'herbalist') return true; // A staffed hut also provides preventive care when gathering pauses.
   if (G.productionLimited(b)) return false;
   if (b.type === 'farm') return G.farmHasWork(b);
   if (b.type === 'woodcutter') return r.wood >= p.woodcutter.logsIn;
@@ -1730,7 +1748,7 @@ G.scheduleJobs = function () {
     if (b.type === 'farm' && b.state === 'ok' && !G.farmHasWork(b))
       for (const id of b.workers.slice()) { const c = w.cmap[id]; if (c && !G.goalCommitment(c)) G.releaseWorker(c); }
   }
-  const jobless = () => w.citizens.filter(c => !c.dead && c.adult && c.job == null && !G.mineralDeliveryBlocked(c));
+  const jobless = () => w.citizens.filter(c => !c.dead && c.adult && c.job == null && !G.goalCommitment(c) && !G.mineralDeliveryBlocked(c));
   // 「砍伐」/「清除岩石」标记需要散工处理：预留 1-2 名无业成人（不够则稍后从闲余岗位抽调）
   const availableRocks = G.availableRockMarks(w);
   w.markReachability = Object.assign(G.reachableMarks(availableRocks === w.markedRocks ? w : { ...w, markedRocks: availableRocks }), { day: G.game.day, h: G.game.h,
@@ -1827,10 +1845,10 @@ G.scheduleJobs = function () {
     if (b.state !== 'ok') continue;
     const def = G.BDEF[b.type];
     if (!def.jobs || !G.jobCanProduce(b)) continue;
-    if (G.productionLimited(b)) continue; // 柴火/工具达到上限的岗位不拉人，空闲者留给「砍伐」标记
+    if (b.type !== 'herbalist' && G.productionLimited(b)) continue; // 柴火/工具达到上限的岗位不拉人，空闲者留给「砍伐」标记
     let guard = 0;
     while (b.workers.length < def.jobs && guard++ < 6) {
-      const pool = jobless();
+      const pool = jobless().filter(c => b.type !== 'hospital' || !G.isSick(c));
       if (wantLabor && pool.length <= wantLabor) break;
       const c = G.pickNearest(pool, b);
       if (!c) break;
@@ -1847,11 +1865,12 @@ G.scheduleJobs = function () {
     .filter(b => b.state === 'ok' && G.BDEF[b.type].jobs > 0 && b.workers.length < G.BDEF[b.type].jobs && !b.noWork && G.jobCanProduce(b))
     .sort((a, b2) => (a.type === 'woodcutter' ? -1 : b2.type === 'woodcutter' ? 1 : 0));
   for (const b of targets) {
-    if (jobless().length > wantLabor) break; // 只有非预留散工才由第二优先处理；标记散工不能阻断再平衡
+    const eligibleForTarget = c => c && !G.goalCommitment(c) && (b.type !== 'hospital' || !G.isSick(c));
+    if (jobless().filter(eligibleForTarget).length > wantLabor) break; // 不能任医师的病人不能挡住健康接班人。
     // 从供体岗位抽人：优先抽当下正闲置的那个（别的工人还在干活）
-    const available = x => x.workers.some(id => { const c = w.cmap[id]; return c && !G.goalCommitment(c); });
+    const available = x => x.workers.some(id => eligibleForTarget(w.cmap[id]));
     const give = (x) => {
-      const eligible = x.workers.map(id => w.cmap[id]).filter(c => c && !G.goalCommitment(c));
+      const eligible = x.workers.map(id => w.cmap[id]).filter(eligibleForTarget);
       const c = eligible.find(c => c.state === 'idle' && !c.task) || eligible[eligible.length - 1];
       if (c) { G.releaseWorker(c); G.assignWorker(b, c); }
     };
@@ -1866,7 +1885,7 @@ G.scheduleJobs = function () {
     const lazy = w.buildings.find(x => x !== b && x.state === 'ok' && G.BDEF[x.type].jobs > 0 && x.workers.length > 0
       && x.type !== 'school' // 教师不外借，保证学堂开学
       && (!FOOD_SET.includes(x.type) || (x.workers.length > 1 && (FOOD_JOBS.includes(b.type) || foodWorkerCount() > needFood)))
-      && x.workers.some(id => { const c = w.cmap[id]; return c && c.state === 'idle' && !c.task && !G.goalCommitment(c); }));
+      && x.workers.some(id => { const c = w.cmap[id]; return eligibleForTarget(c) && c.state === 'idle' && !c.task; }));
     if (lazy) { give(lazy); return; }
     // 关键空岗不能永远等粮工碰巧idle：采集任务完工会直接接下一趟，正常忙碌不是不可抽调。
     if (b.workers.length === 0 && ['woodcutter', 'blacksmith', 'farm', 'forester'].includes(b.type) && foodWorkerCount() > needFood) {
@@ -2004,6 +2023,7 @@ G.removeBuilding = function (b) {
     const c = w.cmap[id];
     if (c) { c.job = null; c.task = null; c.pausedTask = null; c.path = null; c.state = 'idle'; }
   }
+  for (const c of w.citizens) if (c.task && c.task.kind === 'care' && c.task.b === b) G.cancelMedicalCare(c);
   // 尚未开工的规划全额撤销；已经劳动/建成的建筑拆除返还一半。
   const def = G.BDEF[b.type];
   const paid = b.paidCost || def.cost; // 旧档没有付款快照，沿用历史建材成本。
@@ -2048,7 +2068,7 @@ G.demolishAt = function (tx, ty) {
 /* Town development: explicit inventories and worker trips, not global free production. */
 G.TRADE_CAPACITY = 2000;
 G.tradeStored = b => Object.values(b.tradeInventory || {}).reduce((n,q) => n + q, 0);
-G.TRADE_VALUES = {wood:2,stone:7,iron:5,tools:8,firewood:4,meat:1,vegetables:1,grain:1,leather:10,wool:5,clothes:15};
+G.TRADE_VALUES = {wood:2,stone:7,iron:5,tools:8,firewood:4,meat:1,vegetables:1,grain:1,leather:10,wool:5,clothes:15,herbs:4};
 G.TRADE_GOODS = {sheep:{name:'羊',price:600,stock:4},orchardSeed:{name:'果树种子',price:2500,stock:1},grain:{name:'主食',price:1,stock:400},iron:{name:'铁',price:5,stock:100},leather:{name:'皮革',price:10,stock:80}};
 G.ensureEconomyBuilding = function(b) {
   if(b.type==='tradingpost'){b.tradeInventory=b.tradeInventory||{};b.tradeTargets=b.tradeTargets||{};if(!Number.isFinite(b.nextMerchantDay))b.nextMerchantDay=G.game.day+G.SEASON_DAYS;}
@@ -2140,4 +2160,143 @@ G.completeEconomyWork = function(c,t){
     if(b.animals>b.animalTarget&&!G.goalPaused('meat')){b.animals--;c.carry={type:'meat',qty:24};}
     else if(b.woolReady>=1&&!G.goalPaused('wool')){const qty=Math.min(8,Math.floor(b.woolReady));b.woolReady-=qty;c.carry={type:'wool',qty};}
   }else if(t.economy==='orchard'&&G.game.season===2&&b.orchardAge>=G.YEAR_DAYS*4&&b.orchardYield>0){const qty=Math.min(20,b.orchardYield);b.orchardYield-=qty;c.carry={type:'vegetables',qty};}
+};
+
+/* Health is separate from happiness. Rates/capacity are small-town adaptations;
+ * the first illness is deliberately nonlethal and reversible during playtesting. */
+G.HEALTH = { hospitalBeds: 8, herbVisitors: 2, hospitalHours: 24, herbHours: 3,
+  herbRecovery: 0.5, naturalRecoveryDays: 8, immunityDays: 12, herbCooldownDays: 4 };
+G.healthOf = c => G.clamp(Number.isFinite(c.health) ? c.health : 4, 0, 5);
+G.isSick = c => !!c && !c.dead && c.sickDays > 0;
+G.healthWorkMul = c => (1 + Math.max(0, 3 - G.healthOf(c)) * 0.08) * (G.isSick(c) ? 1.5 : 1);
+G.medicalPatients = b => G.world.citizens.filter(c => !c.dead && c.task && c.task.kind === 'care' && c.task.b === b);
+G.medicalStaff = function (b) {
+  if (!b || G.world.bmap[b.id] !== b || b.state !== 'ok') return false;
+  return b.workers.some(id => {
+    const c = G.world.cmap[id];
+    if (!c || c.dead || G.isSick(c) || c.job !== b.id || (c.task && c.task.kind === 'care')) return false;
+    return b.type === 'herbalist' || (c.state === 'work' && c.task && c.task.kind === 'clinic' && c.task.b === b && G.atMedicalDoor(c, b));
+  });
+};
+G.atMedicalDoor = (c, b) => c.x >= b.x - 1 && c.x <= b.x + b.w && c.y >= b.y - 1 && c.y <= b.y + b.h &&
+  (c.x < b.x || c.x >= b.x + b.w || c.y < b.y || c.y >= b.y + b.h) && !G.tileBlocked(G.world, Math.round(c.x), Math.round(c.y));
+G.validCareTask = function (c) {
+  const t = c.task, b = t && t.b;
+  return !!(t && t.kind === 'care' && b && G.world.bmap[b.id] === b && b.state === 'ok' &&
+    (t.careType === 'hospital' ? b.type === 'hospital' && G.isSick(c) : b.type === 'herbalist' && !G.isSick(c)));
+};
+G.inMedicalCare = c => G.validCareTask(c) && c.state === 'work' && (!c.path || c.path.length === 0) && !c.carry && G.atMedicalDoor(c, c.task.b);
+G.cancelMedicalCare = function (c) {
+  c.task = null; c.path = null; c.pi = 0; c.walkKind = ''; c.state = 'idle'; c.wanderT = 1; c.careRetryH = 4;
+};
+G.recoverCitizen = function (c) { c.sickDays = 0; c.careHours = 0; c.immunityDays = G.HEALTH.immunityDays; };
+G.medicalStatus = function (c) {
+  if (c.task && c.task.kind === 'care') {
+    if (c.state !== 'work') return c.task.careType === 'hospital' ? '前往诊所' : '前往采药屋保健';
+    if (!G.medicalStaff(c.task.b)) return '等待医师到岗';
+    return c.task.careType === 'hospital' ? `住院照料 ${Math.floor(c.careHours || 0)} / ${G.HEALTH.hospitalHours} 小时` : '服用草药保健';
+  }
+  if (G.isSick(c)) return `季节热病第 ${c.sickDays} 天 · 寻找有医师且可达的诊所`;
+  if (G.healthOf(c) < 3.8 && !(c.herbCooldown > 0)) return (G.game.res.herbs || 0) < 1 ? '健康偏低：缺草药，需成熟林与采药员' : '健康偏低：需可达且有人值守的采药屋';
+  return c.herbCooldown > 0 ? '草药保健后休养' : '健康稳定';
+};
+G.healthSummary = function () {
+  const cs = G.world.citizens.filter(c => !c.dead);
+  return { average: cs.length ? cs.reduce((n,c) => n + G.healthOf(c), 0) / cs.length : 0,
+    sick: cs.filter(G.isSick).length, treated: cs.filter(c => G.inMedicalCare(c) && c.task.careType === 'hospital').length,
+    herbs: G.game.res.herbs || 0 };
+};
+G.tryMedicalCare = function (c) {
+  if (c.dead || c.carry || c.careRetryH > 0) return false;
+  const sick = G.isSick(c), type = sick ? 'hospital' : 'herbalist';
+  if (!sick && (G.healthOf(c) >= 3.8 || c.herbCooldown > 0 || (G.game.res.herbs || 0) < 1 || G.isRestTime())) return false;
+  // A clinic worker never abandons their own service to "treat themselves".
+  // Another hut may treat them; ill physicians leave the workforce below.
+  const candidates = G.world.buildings.filter(b => b.type === type && b.state === 'ok' && b.id !== c.job && G.medicalStaff(b) &&
+    G.medicalPatients(b).length < (sick ? G.HEALTH.hospitalBeds : G.HEALTH.herbVisitors))
+    .sort((a,b) => G.d2(c.x,c.y,a.x,a.y) - G.d2(c.x,c.y,b.x,b.y));
+  for (const b of candidates) {
+    const spot = G.workSpot(G.world, b, c.x, c.y, true);
+    if (!spot) continue;
+    c.task = { kind: 'care', careType: sick ? 'hospital' : 'herbs', b, tx: spot.x, ty: spot.y,
+      work: sick ? G.HEALTH.hospitalHours : G.HEALTH.herbHours, workLeft: sick ? G.HEALTH.hospitalHours : G.HEALTH.herbHours, waitingH: 0 };
+    if (G.sendTo(c, spot.x, spot.y, spot.route)) return true;
+  }
+  c.careRetryH = 4;
+  return false;
+};
+G.stepMedicalCare = function (c, dtH) {
+  const t = c.task;
+  if (!G.inMedicalCare(c)) { G.cancelMedicalCare(c); return; }
+  if (!G.medicalStaff(t.b)) {
+    t.waitingH = (t.waitingH || 0) + dtH;
+    // Overnight rest is allowed; a closed/staffless clinic cannot trap a citizen.
+    if (t.waitingH >= 12) G.cancelMedicalCare(c);
+    return;
+  }
+  t.waitingH = 0;
+  if (t.careType === 'hospital') {
+    c.careHours = Math.min(G.HEALTH.hospitalHours, (c.careHours || 0) + dtH);
+    if (c.careHours < G.HEALTH.hospitalHours) return;
+    G.recoverCitizen(c); G.ui.toast(`⚕ ${c.name} 经诊所照料康复`, 'good');
+  } else {
+    if ((G.game.res.herbs || 0) < 1) { G.cancelMedicalCare(c); return; }
+    t.workLeft -= dtH;
+    if (t.workLeft > 0) return;
+    G.game.res.herbs--; c.health = Math.min(5, G.healthOf(c) + G.HEALTH.herbRecovery); c.herbCooldown = G.HEALTH.herbCooldownDays;
+  }
+  G.cancelMedicalCare(c); G.requestTask(c);
+};
+G.makeClinicTask = function (b, c) {
+  if (G.isSick(c)) { b.noWork = true; b.warnText = '医师患病，等待健康医师接班'; return null; }
+  if (b.type === 'hospital' && !G.world.citizens.some(G.isSick)) { b.noWork = true; b.warnText = '暂无病人，医师可参加其他劳动'; return null; }
+  const spot = G.workSpot(G.world, b, c.x, c.y, true);
+  if (!spot) { b.noWork = true; b.warnText = '医疗入口不可达'; return null; }
+  return G.withTaskRoute({kind:'clinic', b, tx:spot.x, ty:spot.y, work:4, workLeft:0}, spot.route);
+};
+G.makeHerbalistTask = function (b, c) {
+  const p = G.PROD.herbalist, w = G.world;
+  const trees = G.treesInRadius(w, b.x, b.y, p.radius, true).filter(t => !G.tileBlocked(w,t.x,t.y));
+  if (G.goalPaused('herbs') || (G.game.res.herbs || 0) >= G.storageCap() || trees.length < p.needTrees) {
+    b.warnText = trees.length < p.needTrees ? '成熟林不足，仍可用库存草药保健' : '采药暂停，仍提供草药保健';
+    return G.makeClinicTask(b,c);
+  }
+  // One multi-target routing pass chooses a physically reachable mature tree.
+  const route = G.findPathToAny(w,c.x,c.y,trees.map(t => ({x:t.x,y:t.y})));
+  if (!route) { b.warnText = '成熟林不可达，仍提供草药保健'; return G.makeClinicTask(b,c); }
+  const qty = G.taskYield(Math.max(1,Math.round(p.yield*Math.min(1,trees.length/p.fullForest))));
+  return G.withTaskRoute({kind:'work',b,tx:route.target.x,ty:route.target.y,work:G.taskWork(c,p.workH),workLeft:0,yield:{type:'herbs',qty}},route);
+};
+G.advanceHealth = function () {
+  const g = G.game, cs = G.world.citizens.filter(c => !c.dead), sickAtStart = cs.filter(G.isSick);
+  for (const c of cs) {
+    c.health = G.clamp(G.healthOf(c) + ((c.dietScore || 1) - 2)*0.025 - Math.min(2,c.hunger || 0)*0.08 - Math.min(3,c.cold || 0)*0.01, 1, 5);
+    c.herbCooldown = Math.max(0,(c.herbCooldown || 0)-1);
+    c.immunityDays = Math.max(0,(c.immunityDays || 0)-1);
+    if (G.isSick(c)) {
+      c.sickDays++;
+      if (c.sickDays >= G.HEALTH.naturalRecoveryDays) { G.recoverCitizen(c); if (c.task && c.task.kind === 'care') G.cancelMedicalCare(c); }
+      else if (G.world.bmap[c.job]?.type === 'hospital') G.releaseWorker(c);
+    }
+  }
+  // One-year grace applies both to new towns and imported pre-health saves.
+  // Snapshot exposure prevents newly infected people infecting others this tick.
+  if (g.day - (g.healthStartDay || 0) >= G.YEAR_DAYS) {
+    let newCases = 0;
+    const active = sickAtStart.filter(c => G.isSick(c) && !G.inMedicalCare(c));
+    const ceiling = Math.max(1,Math.ceil(cs.length*0.2));
+    const currentSick = cs.filter(G.isSick).length;
+    for (const c of cs) {
+      if (newCases >= 1 || currentSick + newCases >= ceiling) break;
+      if (G.isSick(c) || c.immunityDays > 0) continue;
+      const exposed = active.some(other => other !== c && G.d2(c.x,c.y,other.x,other.y) <= 9);
+      const p = exposed ? 0.04 + (5-G.healthOf(c))*0.012 : g.day%7===0 ? 0.002 + (5-G.healthOf(c))*0.0015 : 0;
+      if (p>0 && G.chance(p)) { c.sickDays=1; c.careHours=0; newCases++; }
+    }
+    if (newCases && !g.warned.illness) { g.warned.illness=true; G.ui.toast('⚠ 季节热病出现：患病会拖慢劳动。诊所医师能加速康复；草药与三类饮食有助预防。本批热病不会直接致死。','warn'); }
+  }
+  if (!cs.some(G.isSick)) g.warned.illness=false;
+  const summary = G.healthSummary();
+  if (summary.average < 3.5 && !g.warned.healthLow) { g.warned.healthLow=true; G.ui.toast('🌿 镇民健康正在下降：补齐肉类、蔬菜、主食，并让采药员在成熟林旁采药、为居民保健。','warn'); }
+  if (summary.average > 4) g.warned.healthLow=false;
 };

@@ -28,7 +28,7 @@ G.SPRITE_SIZES = {
   child_walk_0: { h: 12.5 }, child_walk_1: { h: 12.5 }, child_walk_2: { h: 12.5 }, child_walk_3: { h: 12.5 },
   child_idle: { h: 12.5 },
   carry_wood: { w: 10 }, carry_stone: { w: 10 }, carry_food: { w: 10 }, carry_firewood: { w: 10 },
-  carry_iron: { w: 10 }, carry_tools: { w: 10 },
+  carry_iron: { w: 10 }, carry_tools: { w: 10 }, carry_herbs: { w: 10 },
   alert: { h: 15 },
 };
 
@@ -46,7 +46,7 @@ G.SPRITE_SIZES = {
       'crop_stage0', 'crop_stage1', 'crop_stage2', 'crop_ripe', 'crop_dead', 'sheep', 'orchard_leafy'],
     buildings: ['house', 'stonehouse', 'boarding', 'storage', 'mine', 'gatherer',
       'forester', 'woodcutter', 'dock', 'school', 'blacksmith', 'hunting',
-      'tailor', 'tradingpost', 'pasture', 'orchard', 'site_2x2', 'site_3x3'],
+      'tailor', 'tradingpost', 'pasture', 'orchard', 'herbalist', 'hospital', 'site_2x2', 'site_3x3'],
     citizens: ['adult_walk_0', 'adult_walk_1', 'adult_walk_2', 'adult_walk_3',
       'adult_work_0', 'adult_work_1',
       'adult_carry_walk_0', 'adult_carry_walk_1', 'adult_carry_walk_2', 'adult_carry_walk_3',
@@ -54,10 +54,10 @@ G.SPRITE_SIZES = {
       'child_walk_0', 'child_walk_1', 'child_walk_2', 'child_walk_3', 'child_idle',
       'carry_wood', 'carry_stone', 'carry_food', 'carry_firewood', 'carry_iron', 'carry_tools'],
     icons: ['res_wood', 'res_stone', 'res_food', 'res_firewood', 'res_iron', 'res_tools',
-      'res_meat', 'res_vegetables', 'res_grain', 'res_leather', 'res_wool', 'res_clothes',
+      'res_meat', 'res_vegetables', 'res_grain', 'res_leather', 'res_wool', 'res_clothes', 'res_herbs',
       'tool_stonehouse', 'tool_boarding', 'tool_mine', 'tool_blacksmith', 'tool_hunting',
       'tool_house', 'tool_storage', 'tool_gatherer', 'tool_forester', 'tool_woodcutter',
-      'tool_dock', 'tool_school', 'tool_farm', 'tool_road', 'tool_demolish', 'alert'],
+      'tool_dock', 'tool_school', 'tool_herbalist', 'tool_hospital', 'tool_farm', 'tool_road', 'tool_demolish', 'alert'],
   };
   let pending = 0;
   for (const dir of Object.keys(SHEET))
@@ -67,7 +67,7 @@ G.SPRITE_SIZES = {
       im.onload = () => {
         G.SPR.map.set(n, im);
         // Resource and carried-goods art share the same tiny PNG, without duplicate requests.
-        if (['res_meat', 'res_vegetables', 'res_grain', 'res_leather', 'res_wool', 'res_clothes'].includes(n))
+        if (['res_meat', 'res_vegetables', 'res_grain', 'res_leather', 'res_wool', 'res_clothes', 'res_herbs'].includes(n))
           G.SPR.map.set('carry_' + n.slice(4), im);
         if (dir === 'tiles' || dir === 'terrain-v2' || n === 'res_iron') G.needGround = true; // 地表纹理到位后重建地面缓存
         if (--pending === 0) G.SPR.ready = true;

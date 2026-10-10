@@ -349,6 +349,9 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .res-total { padding: 3px 6px; border: 1px solid rgba(216,178,90,.38); border-radius: 6px; background: rgba(99,73,31,.35); }
 .res-total .res-label { color: #ffe3a8; }
 #date, #pop { white-space: nowrap; }
+#pop { display: flex; align-items: center; flex-wrap: wrap; gap: 3px 5px; white-space: normal; }
+.town-health { display: inline-block; color: #b9d3a7; border-left: 1px solid rgba(216,178,90,.3); padding-left: 8px; margin-left: 3px; font-size: 11px; white-space: nowrap; }
+.town-health.warn-txt { color: #efb3a2; }
 #toolbar { display: flex; flex-direction: column; gap: 6px; width: max-content; max-width: min(760px, calc(100vw - 24px)); overflow: visible; }
 .toolbar-heading { display: flex; align-items: center; gap: 10px; min-height: 29px; }
 #toolbar-path { flex: 1; color: #ead2a0; font-size: 12px; }

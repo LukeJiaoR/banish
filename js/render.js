@@ -133,7 +133,7 @@ G.BUILD_SPR_W = {
   house: 1.16, stonehouse: 1.12, boarding: 1.04, storage: 1.03, mine: 1.12,
   gatherer: 1.10, forester: 1.06, woodcutter: 1.12, dock: 1.0,
   school: 1.06, blacksmith: 1.06, hunting: 1.08, site_2x2: 1.0, site_3x3: 1.0,
-  tailor: 1.04, tradingpost: 0.875,
+  tailor: 1.04, tradingpost: 0.875, herbalist: 1.25, hospital: 7 / 6,
 };
 /* 精灵内烟囱的横向位置（相对精灵宽度，负=偏左），用于挂炊烟粒子 */
 G.BUILD_CHIMNEY_X = { house: -0.30, stonehouse: 0.02, boarding: -0.32 };
@@ -636,7 +636,7 @@ G.citizenFacing = function (c, workTarget) {
 };
 
 G.drawCitizen = function (ctx, c, time, homes) {
-  if (G.citizenIndoorHome(c, homes)) return;
+  if (G.citizenIndoorHome(c, homes) || (G.inMedicalCare && G.inMedicalCare(c))) return;
   const [sx0, sy0] = G.T2S(c.x, c.y);
   const sy = sy0 + 16;
   const child = c.age < G.ADULT_AGE;
@@ -691,6 +691,9 @@ G.drawCitizen = function (ctx, c, time, homes) {
     ctx.beginPath();
     ctx.ellipse(sx, sy, 5.5 * s, 2.8 * s, 0, 0, Math.PI * 2);
     ctx.stroke();
+  }
+  if (G.isSick && G.isSick(c)) {
+    ctx.save(); ctx.fillStyle = '#b86655'; ctx.beginPath(); ctx.arc(sx, sy - (child ? 19 : 24), 3, 0, Math.PI * 2); ctx.fill(); ctx.restore();
   }
   // Only sustained danger gets a badge, so normal winter exposure stays quiet.
   const cold = c.cold >= G.LIFE.coldDays * 0.5;

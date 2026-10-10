@@ -1002,7 +1002,7 @@ G.markGroundDirty = G.markGroundDirty || (() => {}); // render.js 未加载时�
   check('预备：领到收获任务', !!t && t.kind === 'harvest');
   c.task = t; c.state = 'work'; t.workLeft = 0;
   G.completeTask(c);
-  check('收第 1 格 → 背 14 食物继续收（不立即送仓）', c.carry && c.carry.type === 'food' && c.carry.qty === 14 && g.res.food === 0 && !!c.task);
+  check('收第 1 格 → 背 14 主食继续收（不立即送仓）', c.carry && c.carry.type === 'grain' && c.carry.qty === 14 && g.res.food === 0 && !!c.task);
   G.completeTask(c); // c.task 已由 requestTask 指到下一格
   check('背满 28 → 起程送仓', c.carry && c.carry.qty === 28 && c.state === 'haul' && g.res.food === 0);
   G.arrive(c);
@@ -1230,7 +1230,7 @@ G.markGroundDirty = G.markGroundDirty || (() => {}); // render.js 未加载时�
   seedMatureTrees(w, 5, 5, 20); // 圈内成熟树达满产基准
   b.noWork = false;
   t = G.makeTask(b, c);
-  check('密林狩猎满产10食物', t && t.kind === 'work' && t.yield.type === 'food' && t.yield.qty === 10);
+  check('密林狩猎满产10肉类', t && t.kind === 'work' && t.yield.type === 'meat' && t.yield.qty === 10);
   g.res.tools = 0;
   b.noWork = false;
   t = G.makeTask(b, c);

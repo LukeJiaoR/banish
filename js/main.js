@@ -103,7 +103,7 @@ G.serializeGame = function () {
       v: G.VERSION,
       h: g.h, day: g.day, season: g.season, year: g.year,
       res: g.res, stats: g.stats, prevFood: g.prevFood, foodNet: g.foodNet, foodUrgent: g.foodUrgent, warned: g.warned,
-      hist: g.hist, buildLog: g.buildLog, toolWear: g.toolWear, unlocks: g.unlocks, livestock: g.livestock,
+      hist: g.hist, buildLog: g.buildLog, toolWear: g.toolWear, healthStartDay: g.healthStartDay, unlocks: g.unlocks, livestock: g.livestock,
       productionGoals: g.productionGoals && { ...g.productionGoals }, productionPaused: g.productionPaused && { ...g.productionPaused },
     },
     roads: Array.from(w.road).flatMap((road, i) => road ? [i] : []),
@@ -129,7 +129,7 @@ G.serializeGame = function () {
       x: c.x, y: c.y, familyId: c.familyId, job: c.job,
       partnerId: c.partnerId, parentIds: c.parentIds, grandparentIds: c.grandparentIds, ancestorIds: c.ancestorIds, birthFamilyId: c.birthFamilyId,
       student: c.student ? 1 : 0, educated: c.educated ? 1 : 0, school: c.school != null ? c.school : null,
-      hunger: c.hunger, cold: c.cold, clothingLeft: c.clothingLeft, dietVariety: c.dietVariety, dietScore: c.dietScore, happiness: c.happiness, camped: c.camped ? 1 : 0, carry: c.carry,
+      hunger: c.hunger, cold: c.cold, clothingLeft: c.clothingLeft, dietVariety: c.dietVariety, dietScore: c.dietScore, happiness: c.happiness, health: c.health, sickDays: c.sickDays, immunityDays: c.immunityDays, herbCooldown: c.herbCooldown, careHours: c.careHours, camped: c.camped ? 1 : 0, carry: c.carry,
     })),
     nextUid: G._peekUid(),
   };
@@ -238,7 +238,7 @@ G.prepareSaveData = function (d) {
   g.day = integer(gd.day, '天数'); g.season = integer(gd.season, '季节', 0, 3); g.year = integer(gd.year, '年份', 1);
   record(gd.res, '资源');
   for (const key of G.RES_KEYS) {
-    const value = gd.res[key] === undefined && ['iron', ...G.FOOD_KEYS, 'leather', 'wool', 'clothes'].includes(key) ? 0 : gd.res[key] === undefined && key === 'tools' ? 10 : gd.res[key];
+    const value = gd.res[key] === undefined && ['iron', ...G.FOOD_KEYS, 'leather', 'wool', 'clothes', 'herbs'].includes(key) ? 0 : gd.res[key] === undefined && key === 'tools' ? 10 : gd.res[key];
     g.res[key] = number(value, '资源 ' + key, 0);
   }
   const hasFoodClasses = G.FOOD_KEYS.some(k => gd.res[k] !== undefined);
@@ -268,6 +268,7 @@ G.prepareSaveData = function (d) {
   }
   if (gd.prevFood !== undefined) g.prevFood = number(gd.prevFood, '昨日食物', 0);
   if (gd.foodNet !== undefined) g.foodNet = number(gd.foodNet, '食物变化');
+  g.healthStartDay = gd.healthStartDay === undefined ? g.day : integer(gd.healthStartDay, '健康机制启用日', 0, g.day);
   g.toolWear = Number.isFinite(gd.toolWear) && gd.toolWear >= 0 ? gd.toolWear : 0;
   g.warned = gd.warned === undefined ? {} : clone(record(gd.warned, '提醒状态'));
   g.hist = clone(optionalArray(gd.hist, '历史记录'));
@@ -417,6 +418,11 @@ G.prepareSaveData = function (d) {
       dietVariety: cd.dietVariety === undefined ? 0 : integer(cd.dietVariety, '饮食种类', 0, 3),
       dietScore: cd.dietScore === undefined ? 1 : number(cd.dietScore, '饮食多样性', 0, 3),
       happiness: cd.happiness === undefined ? 3 : number(cd.happiness, '幸福度', 1, 5),
+      health: cd.health === undefined ? 4 : number(cd.health, '健康', 0, 5),
+      sickDays: cd.sickDays === undefined ? 0 : integer(cd.sickDays, '患病天数', 0, 8),
+      immunityDays: cd.immunityDays === undefined ? 0 : integer(cd.immunityDays, '免疫天数', 0, 12),
+      herbCooldown: cd.herbCooldown === undefined ? 0 : integer(cd.herbCooldown, '草药保健间隔', 0, 4),
+      careHours: cd.careHours === undefined ? 0 : number(cd.careHours, '医师已照料小时', 0, 24),
     };
     w.citizens.push(c); w.cmap[c.id] = c;
   }
@@ -1033,7 +1039,7 @@ G.selectAt = function (tx, ty, p) {
   let best = null, bd = 18 * 18, citizenHomes = null;
   for (const c of w.citizens) {
     if (c.state === 'rest' && c.camped === false && !citizenHomes && G.citizenHomeLookup) citizenHomes = G.citizenHomeLookup(w);
-    if (G.citizenIndoorHome && G.citizenIndoorHome(c, citizenHomes)) continue;
+    if ((G.citizenIndoorHome && G.citizenIndoorHome(c, citizenHomes)) || G.inMedicalCare(c)) continue;
     const [sx, sy] = G.T2S(c.x, c.y);
     const px = sx * G.cam.z + G.cam.x - p.x;
     const py = (sy + 16) * G.cam.z + G.cam.y - p.y;
