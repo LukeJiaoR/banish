@@ -1,6 +1,6 @@
 # 归园 · 放逐小镇（Banished 复刻原型）
 
-当前版本：**0.3.9**。
+当前版本：**0.3.10**。
 
 一个零依赖、纯前端可玩的《放逐之城》(Banished) 风格城市建造游戏原型。
 等距视角、市民 AI、四季轮转、食物/木材/石头/柴火经济，以原版 Banished 为经济参考，并按本作地图、搬运与自动调度实测校准。
@@ -49,6 +49,8 @@ python3 tools/fb_extract.py --server http://IP:8613 --token 秘密token
 注意：file:// 或接口不可用时，前端自动降级为「复制反馈内容手动发给开发者」，不会丢反馈。
 
 ## 本轮体验修复
+
+0.3.10 将草地改为连续低对比纹理，秋季水面保持蓝色；修正人物朝向、货物镜像和屋内休息显示，区分正常待命与缺料等状态。详见 [地表呈现](docs/terrain-presentation.md)与[人物呈现](docs/citizen-presentation.md)。尚未完成真实手机触控与性能验收。
 
 0.3.9 新增独立「采石采铁」入口，资源栏与建造成本统一图标，拆除保留建筑/道路而不误删天然物；详见 [矿石工具与资源图标](docs/mineral-tool-icons.md)。
 
@@ -162,7 +164,7 @@ art/            AI 生成的精灵整图（切图源文件，见 docs/art-assets
 assets/         切出的精灵单件 PNG（地表纹理 / 树木岩石 / 建筑 / 人物帧 / 图标）
 ```
 
-零依赖纯 Canvas 2D，`file://` 双击即玩。美术为 AI 生成的手绘风精灵图（四季地表纹理、建筑、人物行走/劳作帧等 93 张），基础素材由 `tools/slice_assets.py` 从 `art/` 整图切出；0.3.3 补齐铁匠铺、猎人小屋、铁矿/工具图标及搬运素材（[新增美术说明](docs/art-assets/README.md)）；替换美术只需重新生成整图并重跑切图脚本，规格与风格提示词见 `docs/art-assets.md`。
+零依赖纯 Canvas 2D，`file://` 双击即玩。美术为 AI 生成的手绘风精灵图（四季地表纹理、建筑、人物行走/劳作帧等 98 张），基础素材由 `tools/slice_assets.py` 从 `art/` 整图切出；0.3.3 补齐铁匠铺、猎人小屋、铁矿/工具图标及搬运素材（[新增美术说明](docs/art-assets/README.md)）；替换美术只需重新生成整图并重跑切图脚本，规格与风格提示词见 `docs/art-assets.md`。
 
 ## 已验证
 
@@ -216,6 +218,8 @@ node tests/mineral-resource-ui.js
 node tests/placement-ux.js
 node tests/playability.js --assert
 node tests/art_assets.js
+node tests/citizen-presentation.js
+node tests/terrain-presentation.js
 python3 tests/art_assets.py
 ```
 

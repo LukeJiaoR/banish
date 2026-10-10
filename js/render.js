@@ -95,6 +95,30 @@ G.fillTexDiamond = function (c, name, sx, sy, tint, tintA) {
   return true;
 };
 
+/* Continuous world-anchored terrain. One texture covers eight tiles per axis;
+ * tile boundaries never restart the picture or introduce a decorative outline.
+ * Patterns are local to their Canvas context and invalidated when the image loads. */
+G.terrainPatterns = new WeakMap();
+G.fillTerrainSurface = function (c, name, x, y) {
+  const im = G.SPR.get(name);
+  if (!im || !im.width || !c.createPattern || !c.transform) return false;
+  let entries = G.terrainPatterns.get(c);
+  if (!entries) { entries = new Map(); G.terrainPatterns.set(c, entries); }
+  let cached = entries.get(name);
+  if (!cached || cached.image !== im) {
+    cached = { image: im, pattern: c.createPattern(im, 'repeat') };
+    entries.set(name, cached);
+  }
+  if (!cached.pattern) return false;
+  c.save();
+  c.transform(0.5, 0.25, -0.5, 0.25, 0, 0);
+  c.fillStyle = cached.pattern;
+  // Tiny overlap avoids subpixel cracks at low ground-cache resolutions.
+  c.fillRect(x * 64 - 0.5, y * 64 - 0.5, 65, 65);
+  c.restore();
+  return true;
+};
+
 /* 建筑精灵按占地菱形的宽度比例缩放（图里自带栅栏/台阶等出格装饰） */
 G.BUILD_SPR_W = {
   house: 1.16, stonehouse: 1.12, boarding: 1.04, storage: 1.03, mine: 1.12,
@@ -117,9 +141,11 @@ G.drawGroundTile = function (c, w, pal, x, y) {
   const [sx, sy] = G.T2S(x, y);
   const tex = G.TEX_SEASON[G.game.season];
   if (w.water[i] === 1) {
-    if (G.fillTexDiamond(c, 'water_' + tex, sx, sy)) {
-      // 第二变体打破平铺感（仅夏季，避免冬天混入未结冰水面）
-      if (G.game.season === 1 && (x + y) % 4 === 1) G.fillTexDiamond(c, 'water_summer_b', sx, sy);
+    // Open water stays blue through autumn; only winter selects ice material.
+    if (G.game.season !== 3 && G.fillTerrainSurface(c, 'water_open', x, y)) {
+      // Continuous water pattern; no checkerboard seasonal variants.
+    } else if (G.fillTexDiamond(c, G.game.season === 3 ? 'water_winter' : 'water_spring', sx, sy)) {
+      // Existing blue/ice texture remains a safe asynchronous-loading fallback.
     } else {
       G.diamondPath(c, sx, sy);
       c.fillStyle = pal.water;
@@ -149,7 +175,9 @@ G.drawGroundTile = function (c, w, pal, x, y) {
   else col = h < 0.33 ? pal.grassAlt : (h > 0.8 ? pal.grassDark : pal.grass);
   if (w.road[i]) { col = h < 0.5 ? pal.road : pal.roadAlt; texName = 'road_' + tex; }
   // 纹理优先；平色只作为变体淡染与纹理缺失时的回退
-  if (G.fillTexDiamond(c, texName, sx, sy, col, w.road[i] || w.water[i] === 2 ? 0 : 0.14)) {
+  if (!w.road[i] && w.water[i] !== 2 && G.fillTerrainSurface(c, 'meadow_' + tex, x, y)) {
+    // Natural meadow is not outlined/tinted one tile at a time.
+  } else if (G.fillTexDiamond(c, texName, sx, sy, col, w.road[i] || w.water[i] === 2 ? 0 : 0.14)) {
     c.strokeStyle = 'rgba(0,0,0,0.05)';
     c.lineWidth = 1;
     G.diamondPath(c, sx, sy);
@@ -456,52 +484,97 @@ G.lerpColor = (function () {
 })();
 
 /* ---------- 市民 ---------- */
-G.drawCitizen = function (ctx, c, time) {
-  const [sx, sy0] = G.T2S(c.x, c.y);
+/* sim 的入屋约定是：到达住房周边可站立格，rest 且非露宿。
+ * 只在确实到达有效住房时隐藏室内居民；无房、远岗、失效路径仍在室外。 */
+// 每帧/每次点击最多建一次索引，避免 C 位居民各自扫描 F 个家庭。
+G.citizenHomeLookup = function (w) {
+  const homes = new Map();
+  for (const f of w.families) if (f.houseId != null) homes.set(f.id, w.bmap[f.houseId]);
+  return homes;
+};
+
+G.citizenIndoorHome = function (c, homes) {
+  if (c.state !== 'rest' || c.camped !== false || (c.path && c.path.length)) return null;
+  const h = homes ? homes.get(c.familyId) : G.homeOf(c);
+  if (!h || h.state !== 'ok' || !(G.BDEF[h.type].isHome || h.type === 'boarding')) return null;
+  const dx = Math.max(h.x - c.x, 0, c.x - (h.x + h.w - 1));
+  const dy = Math.max(h.y - c.y, 0, c.y - (h.y + h.h - 1));
+  return dx <= 1.01 && dy <= 1.01 ? h : null;
+};
+
+/* 劳作面向实际树/田格或邻接建筑，不能沿用赶路时朝向而背对工地。 */
+G.citizenWorkTarget = function (c) {
+  const t = c.state === 'work' && c.task;
+  if (!t) return null;
+  if (t.tree) return t.tree;
+  if (t.b && (t.kind === 'build' || t.kind === 'firewood' || t.b.type === 'dock' || t.b.type === 'mine' || t.b.type === 'blacksmith'))
+    return { x: t.b.x + (t.b.w - 1) / 2, y: t.b.y + (t.b.h - 1) / 2 };
+  return { x: t.tx, y: t.ty };
+};
+
+G.citizenFacing = function (c, workTarget) {
+  const sx = (c.x - c.y) * 32;
+  const walking = c.state === 'walk' || c.state === 'haul';
+  let target = walking && c.path && c.path[c.pi];
+  if (!target) target = workTarget === undefined ? G.citizenWorkTarget(c) : workTarget;
+  const dx = target ? (target.x - c.x - target.y + c.y) * 32 :
+    (c._psx == null ? 0 : sx - c._psx);
+  if (dx > 0.03) c._fx = 1;
+  else if (dx < -0.03) c._fx = -1;
+  c._psx = sx;
+  return c._fx === -1 ? -1 : 1; // 现有 PNG 朝右；真正的八向帧尚未提供。
+};
+
+G.drawCitizen = function (ctx, c, time, homes) {
+  if (G.citizenIndoorHome(c, homes)) return;
+  const [sx0, sy0] = G.T2S(c.x, c.y);
   const sy = sy0 + 16;
   const child = c.age < G.ADULT_AGE;
   const s = child ? 0.72 : 1;
   const walking = c.state === 'walk' || c.state === 'haul';
-  const bob = walking ? Math.abs(Math.sin(c.animT)) * 1.2 : (c.state === 'work' ? Math.abs(Math.sin(c.animT)) * 0.8 : 0);
-  const resting = c.state === 'rest';
-  // 朝向：按屏幕位移翻转（素材默认朝左）
-  if (c._psx != null) {
-    const dxs = sx - c._psx;
-    if (dxs > 0.03) c._fx = 1;
-    else if (dxs < -0.03) c._fx = -1;
-  }
-  c._psx = sx;
-  if (resting) ctx.globalAlpha = 0.55; // 睡觉中的市民淡显
-  // 阴影
+  const working = c.state === 'work';
+  const bob = walking ? Math.abs(Math.sin(c.animT)) * 1.2 : (working ? Math.abs(Math.sin(c.animT)) * 0.6 : 0);
+  const target = G.citizenWorkTarget(c);
+  const facing = G.citizenFacing(c, target), flip = facing < 0;
+  // 砍树/采集的模拟脚点与资源同格；画在资源旁，避免工具和身体压在树干中。
+  const atTarget = target && G.d2(target.x, target.y, c.x, c.y) < 0.01;
+  const sx = sx0 - (atTarget ? facing * 4 * s : 0);
+  // 阴影；露宿者保持可见，不用透明度伪装成入屋。
   ctx.fillStyle = 'rgba(0,0,0,0.25)';
   ctx.beginPath();
   ctx.ellipse(sx, sy, 3.4 * s, 1.7 * s, 0, 0, Math.PI * 2);
   ctx.fill();
-  // 身体：精灵帧优先（行走 4 帧 / 劳作 2 帧 / 站立），缺失回退程序化小人
   const f = Math.floor(c.animT / 1.5);
-  let frame;
+  let frame, fallback;
   if (child) frame = walking ? 'child_walk_' + (f % 4) : 'child_idle';
-  else if (walking) frame = 'adult_walk_' + (f % 4);
-  else if (c.state === 'work') frame = 'adult_work_' + (f % 2);
-  else frame = 'adult_idle';
-  if (!G.sprDraw(ctx, frame, sx, sy, { flip: c._fx === 1 })) {
-    // 身体
+  else if (working) {
+    // 旧两张“work”图其实是挥工具与抱筐两种姿态，交替播放会整个人跳变。
+    const t = c.task;
+    const basket = t && (t.kind === 'sow' || t.kind === 'harvest' || t.kind === 'plant' || (t.yield && t.yield.type === 'food'));
+    frame = basket ? 'adult_work_1' : 'adult_work_0';
+    fallback = 'adult_idle';
+  } else if (c.carry) {
+    frame = walking ? 'adult_carry_walk_' + (f % 4) : 'adult_carry_idle';
+    fallback = walking ? 'adult_walk_' + (f % 4) : 'adult_idle';
+  } else frame = walking ? 'adult_walk_' + (f % 4) : 'adult_idle';
+  const bodyY = sy - (working ? bob : 0);
+  if (!G.sprDraw(ctx, frame, sx, bodyY, { flip }) &&
+      !(fallback && G.sprDraw(ctx, fallback, sx, bodyY, { flip }))) {
     ctx.fillStyle = child ? '#a3703f' : '#6e4a33';
     ctx.fillRect(sx - 1.7 * s, sy - 7.5 * s - bob, 3.4 * s, 5.2 * s);
-    // 头
     ctx.fillStyle = '#d8a37a';
     ctx.beginPath();
     ctx.arc(sx, sy - 8.6 * s - bob, 1.8 * s, 0, Math.PI * 2);
     ctx.fill();
   }
-  // 携带物
+  // 携带物跟随抱持侧镜像；专用帧缺失时仍保持正常小人和资源回退。
   if (c.carry) {
-    if (!G.sprDraw(ctx, 'carry_' + c.carry.type, sx + 3.2 * s, sy - 4 * s, { w: 10 * s })) {
+    const cx = sx + facing * 3.2 * s;
+    if (!G.sprDraw(ctx, 'carry_' + c.carry.type, cx, bodyY - 4 * s, { w: 10 * s, flip })) {
       ctx.fillStyle = G.RES[c.carry.type].color;
-      ctx.fillRect(sx + 1.6 * s, sy - 5.4 * s - bob, 2.6, 2.6);
+      ctx.fillRect(cx - 1.3, sy - 5.4 * s - bob, 2.6, 2.6);
     }
   }
-  // 选中圈
   if (G.sel && G.sel.kind === 'c' && G.sel.id === c.id) {
     ctx.strokeStyle = 'rgba(255,235,170,0.9)';
     ctx.lineWidth = 1.2;
@@ -509,7 +582,6 @@ G.drawCitizen = function (ctx, c, time) {
     ctx.ellipse(sx, sy, 5.5 * s, 2.8 * s, 0, 0, Math.PI * 2);
     ctx.stroke();
   }
-  if (resting) ctx.globalAlpha = 1;
   // Only sustained danger gets a badge, so normal winter exposure stays quiet.
   const cold = c.cold >= G.LIFE.coldDays * 0.5;
   const hungry = c.hunger >= G.LIFE.starveDays * 0.5;
@@ -678,9 +750,11 @@ G.frame = function (dtReal) {
     if (cx < tx0 - 3 || cx > tx1 + 3 || cy < ty0 - 3 || cy > ty1 + 3) continue;
     items.push({ d: b.x + b.y + b.w + b.h - 2 - 0.5, k: 1, b });
   }
-  // 市民
+  // 市民：只为屏内的休息者构建住房索引，不触碰离屏人物状态。
+  let citizenHomes = null;
   for (const c of w.citizens) {
     if (c.x < tx0 - 1 || c.x > tx1 + 1 || c.y < ty0 - 1 || c.y > ty1 + 1) continue;
+    if (c.state === 'rest' && c.camped === false && !citizenHomes) citizenHomes = G.citizenHomeLookup(w);
     items.push({ d: c.x + c.y + 0.01, k: 2, c });
   }
   items.sort((a, b) => a.d - b.d);
@@ -720,7 +794,7 @@ G.frame = function (dtReal) {
           ctx.fillText('⚠', T[0], T[1] - 30);
         }
       }
-    } else G.drawCitizen(ctx, it.c, now);
+    } else G.drawCitizen(ctx, it.c, now, citizenHomes);
   }
 
   // 悬停瓦片
