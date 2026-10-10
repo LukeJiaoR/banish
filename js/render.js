@@ -133,6 +133,7 @@ G.BUILD_SPR_W = {
   house: 1.16, stonehouse: 1.12, boarding: 1.04, storage: 1.03, mine: 1.12,
   gatherer: 1.10, forester: 1.06, woodcutter: 1.12, dock: 1.0,
   school: 1.06, blacksmith: 1.06, hunting: 1.08, site_2x2: 1.0, site_3x3: 1.0,
+  tailor: 1.04, tradingpost: 1.03,
 };
 /* 精灵内烟囱的横向位置（相对精灵宽度，负=偏左），用于挂炊烟粒子 */
 G.BUILD_CHIMNEY_X = { house: -0.30, stonehouse: 0.02, boarding: -0.32 };
@@ -365,6 +366,16 @@ G.drawBuilding = function (ctx, b, time) {
     return;
   }
 
+  // Direct-draw compatibility. The main frame sorts field props individually below.
+  if (b.type === 'orchard' || b.type === 'pasture') {
+    G.drawEconomyFieldGround(ctx, b);
+    const parts = [];
+    G.addEconomyFieldParts(parts, b);
+    parts.sort((a, c) => a.d - c.d);
+    for (const part of parts) G.drawEconomyFieldPart(ctx, part, time);
+    return;
+  }
+
   // 建筑精灵：脚点 = 占地菱形最下角，宽度 = 占地菱形宽 × 出格系数
   const sprW = (b.w + b.h) * 32 * (G.BUILD_SPR_W[b.type] || 1.08);
   const spr = G.sprDraw(ctx, b.type, B[0], B[1], { w: sprW });
@@ -457,6 +468,79 @@ G.drawFarmCrop = function (ctx, b, f) {
 G.drawFarm = function (ctx, b) {
   G.drawFarmGround(ctx, b);
   for (const f of b.farm) G.drawFarmCrop(ctx, b, f);
+};
+
+/* 果园/牧场不能是一张铺满 6×6 的“大建筑图”：地面在底层，
+ * 羊、果树、棚屋和每段围栏各自按脚点排序，不让草地盖到邻屋。 */
+G.drawEconomyFieldGround = function (ctx, b, bounds) {
+  const snow = G.PAL[G.game.season].snow;
+  for (let y = b.y; y < b.y + b.h; y++) for (let x = b.x; x < b.x + b.w; x++) {
+    if (bounds && (x < bounds.tx0 || x > bounds.tx1 || y < bounds.ty0 || y > bounds.ty1)) continue;
+    const [sx, sy] = G.T2S(x, y);
+    G.diamondPath(ctx, sx, sy);
+    ctx.fillStyle = snow ? 'rgba(225,226,208,.14)' : b.type === 'orchard'
+      ? ((x - b.x) % 2 ? 'rgba(133,96,52,.15)' : 'rgba(107,84,43,.08)')
+      : 'rgba(144,158,80,.14)';
+    ctx.fill();
+  }
+};
+
+G.addEconomyFieldParts = function (items, b, bounds) {
+  const add = part => {
+    if (bounds && (part.x < bounds.tx0 - 2 || part.x > bounds.tx1 + 2 || part.y < bounds.ty0 - 2 || part.y > bounds.ty1 + 2)) return;
+    items.push({ ...part, b, k: 5, d: part.x + part.y + (part.kind === 'fence' ? 0.025 : 0.01) });
+  };
+  const x0 = b.x + 0.12, y0 = b.y + 0.12, x1 = b.x + b.w - 0.12, y1 = b.y + b.h - 0.12;
+  const fence = (ax, ay, bx, by) => add({ kind: 'fence', x: (ax + bx) / 2, y: (ay + by) / 2, ax, ay, bx, by });
+  for (let i = 0; i < b.w; i++) {
+    const a = x0 + i * (x1 - x0) / b.w, c = x0 + (i + 1) * (x1 - x0) / b.w;
+    fence(a, y0, c, y0);
+    if (i !== Math.floor(b.w / 2)) fence(a, y1, c, y1); // Open gate for the field's workers.
+  }
+  for (let i = 0; i < b.h; i++) {
+    const a = y0 + i * (y1 - y0) / b.h, c = y0 + (i + 1) * (y1 - y0) / b.h;
+    fence(x0, a, x0, c); fence(x1, a, x1, c);
+  }
+  if (b.type === 'orchard') {
+    for (let y = 1; y < b.h; y += 2) for (let x = 1; x < b.w; x += 2)
+      add({ kind: 'fruitTree', x: b.x + x, y: b.y + y });
+  } else {
+    add({ kind: 'sheepShelter', x: b.x + 2.1, y: b.y + 2.1 });
+    const spots = [[3.2, 1.2], [4.7, 1.6], [2.8, 2.7], [4.5, 3.1], [1.2, 3.2], [1.5, 4.7],
+      [3.1, 4.8], [4.8, 4.8], [2.2, 3.9], [3.8, 4], [4, 2], [0.9, 4.2]];
+    const count = Math.min(spots.length, Math.max(0, Math.floor(b.animals || 0)));
+    for (let i = 0; i < count; i++) add({ kind: 'sheep', x: b.x + spots[i][0], y: b.y + spots[i][1], n: i });
+  }
+};
+
+G.drawEconomyFieldPart = function (ctx, p) {
+  const [sx, sy] = G.T2S(p.x, p.y);
+  if (p.kind === 'fence') {
+    const a = G.T2S(p.ax, p.ay), b = G.T2S(p.bx, p.by);
+    ctx.save(); ctx.lineCap = 'round';
+    for (const h of [4, 9]) {
+      ctx.strokeStyle = '#735538'; ctx.lineWidth = 2.4;
+      ctx.beginPath(); ctx.moveTo(a[0], a[1] - h); ctx.lineTo(b[0], b[1] - h); ctx.stroke();
+      ctx.strokeStyle = '#ba9460'; ctx.lineWidth = 0.8;
+      ctx.beginPath(); ctx.moveTo(a[0], a[1] - h - 0.6); ctx.lineTo(b[0], b[1] - h - 0.6); ctx.stroke();
+    }
+    ctx.strokeStyle = '#85613e'; ctx.lineWidth = 3.2;
+    ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(a[0], a[1] - 12); ctx.moveTo(b[0], b[1]); ctx.lineTo(b[0], b[1] - 12); ctx.stroke();
+    ctx.fillStyle = '#d0ad75'; ctx.fillRect(a[0] - 1.4, a[1] - 12.6, 2.8, 1.5); ctx.fillRect(b[0] - 1.4, b[1] - 12.6, 2.8, 1.5);
+    ctx.restore(); return;
+  }
+  if (p.kind === 'sheepShelter') {
+    G.sprDraw(ctx, 'pasture', sx, sy, { w: 112 }); return;
+  }
+  if (p.kind === 'sheep') {
+    G.sprDraw(ctx, 'sheep', sx, sy, { w: 24, flip: p.n % 3 === 1 }); return;
+  }
+  if (p.kind === 'fruitTree') {
+    const growth = Math.max(0, Math.min(1, (p.b.orchardAge || 0) / (G.YEAR_DAYS * 4)));
+    const fruit = growth >= 1 && G.game.season === 2 && p.b.orchardYield > 0;
+    // Small new trees have no misleading harvest-ready fruit; the ripe sprite appears in autumn.
+    G.sprDraw(ctx, fruit ? 'orchard' : 'orchard_leafy', sx, sy, { w: 24 + 28 * growth });
+  }
 };
 
 G.drawDock = function (ctx, b) {
@@ -574,7 +658,7 @@ G.drawCitizen = function (ctx, c, time, homes) {
   else if (working) {
     // 旧两张“work”图其实是挥工具与抱筐两种姿态，交替播放会整个人跳变。
     const t = c.task;
-    const basket = t && (t.kind === 'sow' || t.kind === 'harvest' || t.kind === 'plant' || (t.yield && t.yield.type === 'food'));
+    const basket = t && (t.kind === 'sow' || t.kind === 'harvest' || t.kind === 'plant' || (t.yield && G.isFood(t.yield.type)));
     frame = basket ? 'adult_work_1' : 'adult_work_0';
     fallback = 'adult_idle';
   } else if (c.carry) {
@@ -712,6 +796,8 @@ G.frame = function (dtReal) {
 
   // All farm soil is ground, never a tall object sorted by the field's far corner.
   for (const b of w.buildings) if (b.type === 'farm') G.drawFarmGround(ctx, b, { tx0, ty0, tx1, ty1 });
+  for (const b of w.buildings) if (b.state === 'ok' && (b.type === 'pasture' || b.type === 'orchard'))
+    G.drawEconomyFieldGround(ctx, b, { tx0, ty0, tx1, ty1 });
 
   const harvesting = G.tool && (G.tool.kind === 'fell' || G.tool.kind === 'quarry');
   if (harvesting) G.drawFoodForestBounds(ctx);
@@ -814,6 +900,8 @@ G.frame = function (dtReal) {
     if (f.sown && !f.harvested && f.x >= tx0 && f.x <= tx1 && f.y >= ty0 && f.y <= ty1)
       items.push({ d: f.x + f.y + 1, k: 4, b, f });
   }
+  for (const b of w.buildings) if (b.state === 'ok' && (b.type === 'pasture' || b.type === 'orchard'))
+    G.addEconomyFieldParts(items, b, { tx0, ty0, tx1, ty1 });
   // 建筑
   for (const b of w.buildings) {
     const cx = b.x + b.w / 2, cy = b.y + b.h / 2;
@@ -848,9 +936,11 @@ G.frame = function (dtReal) {
       ctx.stroke();
     }
     else if (it.k === 4) G.drawFarmCrop(ctx, it.b, it.f);
+    else if (it.k === 5) G.drawEconomyFieldPart(ctx, it);
     else if (it.k === 1) {
       // Farm ground/crops were split above; keep its building-level badges.
-      if (it.b.type !== 'farm') G.drawBuilding(ctx, it.b, now);
+      if (it.b.type !== 'farm' && !(it.b.state === 'ok' && (it.b.type === 'pasture' || it.b.type === 'orchard')))
+        G.drawBuilding(ctx, it.b, now);
       // Cold homes get a distinct snowflake; no-work warning remains separate.
       if (G.isWinter() && it.b.unheated && it.b.state === 'ok') {
         const T = G.T2S(it.b.x + it.b.w / 2, it.b.y);

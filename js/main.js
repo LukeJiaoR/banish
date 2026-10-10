@@ -40,7 +40,6 @@ G.newGame = function (seed, options) {
   // 原版「中等」难度开局：5 个家庭（无房），一辆储物车（仓库）
   // 资源：木 80 / 石 48 / 食 500 / 柴 50 / 工具 15（≈第一轮磨损周期，之后靠铁匠铺）
   G.game = G.newGameState();
-  G.game.res = { wood: 80, stone: 48, iron: 0, tools: 15, food: 500, firewood: 50 };
   G.sel = null;
   G.tool = null; G.cancelRoadPlan(); G.cancelHarvestPlan();
   G.smoke = [];
@@ -97,13 +96,14 @@ G.newGame = function (seed, options) {
  * 尚未保存 RNG 当前位置及市民正在进行/挂起的任务，读档不是确定性逐步回放。 */
 G.serializeGame = function () {
   const w = G.world, g = G.game;
+  G.reconcileFood(g);
   return {
     v: 1, seed: w.seed, N: w.N, mapVersion: w.mapVersion || 0, // N：地图尺寸（旧档跨尺寸迁移裸索引用）
     game: {
       v: G.VERSION,
       h: g.h, day: g.day, season: g.season, year: g.year,
       res: g.res, stats: g.stats, prevFood: g.prevFood, foodNet: g.foodNet, foodUrgent: g.foodUrgent, warned: g.warned,
-      hist: g.hist, buildLog: g.buildLog, toolWear: g.toolWear,
+      hist: g.hist, buildLog: g.buildLog, toolWear: g.toolWear, unlocks: g.unlocks, livestock: g.livestock,
       productionGoals: g.productionGoals && { ...g.productionGoals }, productionPaused: g.productionPaused && { ...g.productionPaused },
     },
     roads: Array.from(w.road).flatMap((road, i) => road ? [i] : []),
@@ -119,6 +119,9 @@ G.serializeGame = function () {
       farm: b.farm ? b.farm.map(f => [f.sown ? 1 : 0, f.harvested ? 1 : 0]) : undefined,
       sownAll: b.sownAll, growth: b.growth, harvestDone: b.harvestDone,
       sowingCommitted: b.sowingCommitted, productionPaused: b.productionPaused,
+      tradeInventory: b.tradeInventory, tradeTargets: b.tradeTargets, merchant: b.merchant, nextMerchantDay: b.nextMerchantDay,
+      animals: b.animals, animalGrowth: b.animalGrowth, animalTarget: b.animalTarget, woolReady: b.woolReady,
+      orchardAge: b.orchardAge, orchardYield: b.orchardYield, orchardSeason: b.orchardSeason, tendedDay: b.tendedDay,
     })),
     families: w.families.map(f => ({ id: f.id, members: f.members, houseId: f.houseId, coupleIds: f.coupleIds })),
     citizens: w.citizens.map(c => ({
@@ -126,7 +129,7 @@ G.serializeGame = function () {
       x: c.x, y: c.y, familyId: c.familyId, job: c.job,
       partnerId: c.partnerId, parentIds: c.parentIds, grandparentIds: c.grandparentIds, ancestorIds: c.ancestorIds, birthFamilyId: c.birthFamilyId,
       student: c.student ? 1 : 0, educated: c.educated ? 1 : 0, school: c.school != null ? c.school : null,
-      hunger: c.hunger, cold: c.cold, camped: c.camped ? 1 : 0, carry: c.carry,
+      hunger: c.hunger, cold: c.cold, clothingLeft: c.clothingLeft, dietVariety: c.dietVariety, dietScore: c.dietScore, happiness: c.happiness, camped: c.camped ? 1 : 0, carry: c.carry,
     })),
     nextUid: G._peekUid(),
   };
@@ -235,9 +238,14 @@ G.prepareSaveData = function (d) {
   g.day = integer(gd.day, '天数'); g.season = integer(gd.season, '季节', 0, 3); g.year = integer(gd.year, '年份', 1);
   record(gd.res, '资源');
   for (const key of G.RES_KEYS) {
-    const value = gd.res[key] === undefined && key === 'iron' ? 0 : gd.res[key] === undefined && key === 'tools' ? 10 : gd.res[key];
+    const value = gd.res[key] === undefined && ['iron', ...G.FOOD_KEYS, 'leather', 'wool', 'clothes'].includes(key) ? 0 : gd.res[key] === undefined && key === 'tools' ? 10 : gd.res[key];
     g.res[key] = number(value, '资源 ' + key, 0);
   }
+  const hasFoodClasses = G.FOOD_KEYS.some(k => gd.res[k] !== undefined);
+  if (hasFoodClasses && Math.abs(G.FOOD_KEYS.reduce((n,k) => n + g.res[k], 0) - g.res.food) > 0.00001) bad('食物分类合计');
+  if (!hasFoodClasses) g.res.grain = g.res.food; // legacy stock is preserved once
+  if (gd.unlocks !== undefined) {record(gd.unlocks,'产业解锁');if(typeof gd.unlocks.orchard !== 'boolean')bad('果树种子解锁');g.unlocks={orchard:gd.unlocks.orchard};}
+  if (gd.livestock !== undefined) {record(gd.livestock,'待安置牲畜');g.livestock={sheep:integer(gd.livestock.sheep,'待安置羊',0,1000000)};}
   if (gd.productionGoals !== undefined) {
     const goals = record(gd.productionGoals, '自动生产目标');
     const paused = gd.productionPaused === undefined ? {} : record(gd.productionPaused, '生产暂停状态');
@@ -320,6 +328,30 @@ G.prepareSaveData = function (d) {
       toolLimit: bd.type === 'blacksmith' ? G.toolLimitOf(bd) : undefined,
       fuelLimit: bd.type === 'woodcutter' ? G.fuelLimitOf(bd) : undefined,
     };
+    if (bd.type === 'tradingpost') {
+      for(const field of ['tradeInventory','tradeTargets']){
+        b[field]={};if(bd[field]!==undefined){record(bd[field],field);for(const key of Object.keys(bd[field])){
+          if(!Object.hasOwn(G.TRADE_VALUES,key))bad('贸易资源');b[field][key]=number(bd[field][key],field,0,field==='tradeTargets'?2000:1000000);
+        }}
+      }
+      if(G.tradeStored(b)>G.TRADE_CAPACITY+1e-6)bad('贸易库存超容量');
+      b.nextMerchantDay=bd.nextMerchantDay===undefined?g.day+G.SEASON_DAYS:integer(bd.nextMerchantDay,'商船下次到访',0);
+      if(bd.merchant!=null){record(bd.merchant,'商船');record(bd.merchant.stock,'商船货物');b.merchant={leaveDay:integer(bd.merchant.leaveDay,'商船离港',0),stock:{}};
+        for(const key of Object.keys(bd.merchant.stock)){if(!Object.hasOwn(G.TRADE_GOODS,key))bad('商船货物种类');b.merchant.stock[key]=integer(bd.merchant.stock[key],'商船库存',0,G.TRADE_GOODS[key].stock);}
+      }
+    }
+    if(bd.type==='pasture'){
+      b.animals=bd.animals===undefined?0:integer(bd.animals,'羊数',0,12);
+      b.animalTarget=bd.animalTarget===undefined?8:integer(bd.animalTarget,'保留羊数',2,12);
+      b.animalGrowth=bd.animalGrowth===undefined?0:number(bd.animalGrowth,'繁殖进度',0,1);
+      b.woolReady=bd.woolReady===undefined?0:number(bd.woolReady,'待剪羊毛',0,48);
+    }
+    if(bd.type==='orchard'){
+      b.orchardAge=bd.orchardAge===undefined?0:integer(bd.orchardAge,'果树树龄',0,G.YEAR_DAYS*4);
+      b.orchardYield=bd.orchardYield===undefined?0:number(bd.orchardYield,'待收果实',0,180);
+      if(bd.orchardSeason!==undefined)b.orchardSeason=integer(bd.orchardSeason,'果树产季',1);
+    }
+    if(bd.tendedDay!==undefined)b.tendedDay=integer(bd.tendedDay,'最近照料日',0,g.day);
     if (bd.productionPaused !== undefined && typeof bd.productionPaused !== 'boolean') bad('本屋生产暂停状态');
     if (['woodcutter', 'blacksmith'].includes(bd.type) && bd.productionPaused !== undefined) b.productionPaused = bd.productionPaused;
     if (bd.constructionStarted !== undefined && typeof bd.constructionStarted !== 'boolean') bad('工地开工状态');
@@ -358,7 +390,15 @@ G.prepareSaveData = function (d) {
     let carry = null;
     if (cd.carry != null) {
       record(cd.carry, '随身资源'); if (!G.RES_KEYS.includes(cd.carry.type)) bad('随身资源类型');
-      carry = { type: cd.carry.type, qty: number(cd.carry.qty, '随身资源数量', 0) };
+      carry = { type: cd.carry.type === 'food' ? 'grain' : cd.carry.type, qty: number(cd.carry.qty, '随身资源数量', 0) };
+      if (cd.carry.extra !== undefined) {
+        if(cd.carry.type!=='meat')bad('副产物携带类型');
+        record(cd.carry.extra, '随身副产物'); carry.extra = {};
+        for (const type of Object.keys(cd.carry.extra)) {
+          if (!['leather', 'wool'].includes(type)) bad('副产物种类');
+          carry.extra[type] = number(cd.carry.extra[type], '副产物数量', 0);
+        }
+      }
     }
     const c = {
       id: uniqueId(cd.id, '市民 ID'), name: cd.name, sex: cd.sex, age: number(cd.age, '年龄', 0), adult: !!cd.adult,
@@ -373,6 +413,10 @@ G.prepareSaveData = function (d) {
       task: null, pausedTask: null, carry, state: 'idle', walkKind: '', path: null, pi: 0, camped: !!cd.camped,
       wanderT: 0, hunger: cd.hunger === undefined ? 0 : number(cd.hunger, '饥饿', 0),
       cold: cd.cold === undefined ? 0 : number(cd.cold, '寒冷', 0), animT: 0, dead: false,
+      clothingLeft: cd.clothingLeft === undefined ? 0 : number(cd.clothingLeft, '衣物耐久天数', 0, G.YEAR_DAYS),
+      dietVariety: cd.dietVariety === undefined ? 0 : integer(cd.dietVariety, '饮食种类', 0, 3),
+      dietScore: cd.dietScore === undefined ? 1 : number(cd.dietScore, '饮食多样性', 0, 3),
+      happiness: cd.happiness === undefined ? 3 : number(cd.happiness, '幸福度', 1, 5),
     };
     w.citizens.push(c); w.cmap[c.id] = c;
   }

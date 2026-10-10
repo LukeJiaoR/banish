@@ -7,11 +7,12 @@ G.newGameState = function () {
   return {
     h: 6, day: 0, season: 0, year: 1,
     speed: 1, paused: false,
-    res: { wood: 80, stone: 48, iron: 0, tools: 15, food: 500, firewood: 50 }, // 开局（原版中难度 5 家庭，工具 15 件≈第一轮磨损周期）；存粮较原版加厚：15 人 6 天食物跑道撑不到第一座采集屋建成
+    res: { wood: 80, stone: 48, iron: 0, tools: 15, food: 500, meat: 0, vegetables: 0, grain: 500, leather: 0, wool: 0, clothes: 0, firewood: 50 }, // 开局（原版中难度 5 家庭，工具 15 件≈第一轮磨损周期）；存粮较原版加厚：15 人 6 天食物跑道撑不到第一座采集屋建成
     schedT: 1,
     over: false,
     stats: { born: 0, died: 0, deadReasons: {} },
     prevFood: 200,
+    unlocks: { orchard: false }, livestock: { sheep: 0 },
     foodNet: 0,
     foodUrgent: false,
     warned: {},
@@ -54,6 +55,8 @@ G.endDay = function () {
   g.year = Math.floor(g.day / G.YEAR_DAYS) + 1;
   if (g.season !== oldSeason) G.onSeasonChange(oldSeason, g.season);
 
+  G.advanceTownEconomy();
+
   // ---- 农田生长 ----
   for (const b of w.buildings) {
     if (b.type === 'farm' && b.state === 'ok' && b.sownAll && b.growth < 1 && g.season !== 3)
@@ -69,13 +72,18 @@ G.endDay = function () {
   // ---- 进食 / 受冻 / 年龄 / 死亡 ----
   // 原版：每人每年吃 100 食物（儿童相同），粮食不足时儿童与在读学生优先
   const eat = G.LIFE.eatPerYear / G.YEAR_DAYS;
-  let food = g.res.food;
+  G.reconcileFood(g);
   const sorted = w.citizens.slice().sort((a, b) => (a.age >= G.ADULT_AGE && !a.student ? 1 : 0) - (b.age >= G.ADULT_AGE && !b.student ? 1 : 0));
   for (const c of sorted) {
-    if (food >= eat) { food -= eat; c.hunger = 0; }
-    else c.hunger++;
+    if (g.res.food >= eat) {
+      const meal = G.consumeFood(eat); c.hunger = 0; c.dietVariety = meal.length;
+      c.dietScore = (c.dietScore ?? 1) * 0.9 + meal.length * 0.1;
+    } else { c.hunger++; c.dietVariety = 0; }
+    c.clothingLeft = Math.max(0, (c.clothingLeft || 0) - 1);
+    if (c.clothingLeft <= 0 && g.res.clothes >= 1) { g.res.clothes--; c.clothingLeft = G.YEAR_DAYS; }
+    c.happiness = Math.max(1, Math.min(5, 2 + (c.dietScore || 1) - Math.min(2, c.hunger / 3)));
   }
-  g.res.food = food;
+
 
   const winter = g.season === 3;
   // ---- 工具磨损：每个成人每天磨损 1/toolLifeDays 把；用尽则全员生产减半 ----
@@ -481,7 +489,7 @@ G.spawnCitizen = function (opt) {
     student: false, educated: false, school: null,
     state: 'idle', walkKind: '', path: null, pi: 0, camped: false,
     wanderT: G.rng() * 3,
-    hunger: 0, cold: 0,
+    hunger: 0, cold: 0, clothingLeft: 0, dietVariety: 0, dietScore: 1, happiness: 3,
     animT: G.rng() * 10,
     dead: false,
   };
@@ -572,9 +580,9 @@ G.alternateTaskEndpoint = function (c, t) {
   if (['build','clearSite'].includes(t.kind) ? t.b.state !== 'site' : t.b.state !== 'ok') return null;
   if (t.kind === 'clearSite' && (!t.tree || G.world.trees[G.world.treeIdx[t.tree.i]] !== t.tree)) return null;
   if (t.kind === 'clearSite') return G.siteClearSpot(c, t.b, t.tree);
-  if (t.kind === 'firewood' && t.phase === 'fetch') return G.storageRoute(c.x, c.y)?.spot || null;
-  if (t.kind === 'build' || t.kind === 'firewood' ||
-      (t.kind === 'work' && ['dock', 'mine', 'blacksmith'].includes(t.b.type)))
+  if (['firewood', 'trade'].includes(t.kind) && t.phase === 'fetch') return G.storageRoute(c.x, c.y)?.spot || null;
+  if (t.kind === 'build' || t.kind === 'firewood' || t.kind === 'trade' ||
+      (t.kind === 'work' && ['dock', 'mine', 'blacksmith', 'pasture', 'orchard'].includes(t.b.type)))
     return G.workSpot(G.world, t.b, c.x, c.y, true);
   return null;
 };
@@ -595,7 +603,7 @@ G.routeCanReuse = function (route, c, tx, ty) {
 G.sendTo = function (c, tx, ty, planned = null) {
   let route=planned||(c.task&&c.task.dispatchRoute);
   if(c.task) delete c.task.dispatchRoute;
-  const buildingTask=c.task && (['build','clearSite','firewood'].includes(c.task.kind) || (c.task.kind==='work' && c.task.b && ['dock','mine','blacksmith'].includes(c.task.b.type)));
+  const buildingTask=c.task && (['build','clearSite','firewood','trade'].includes(c.task.kind) || (c.task.kind==='work' && c.task.b && ['dock','mine','blacksmith','pasture','orchard'].includes(c.task.b.type)));
   if((route && !G.routeCanReuse(route,c,tx,ty)) || (!route && buildingTask)) {
     const spot=G.alternateTaskEndpoint(c,c.task);
     if(!spot){if(c.task)G.dropBlockedTask(c,c.task);c.path=null;c.state='idle';c.wanderT=.5;return false;}
@@ -729,7 +737,7 @@ G.cargoWaitReason = function (c) {
   return c.haulWait === 'route' ? '带矿等待可达仓库' : '带矿等待送仓';
 };
 G.finishMineralHaul = function (c) {
-  c.carry.qty -= G.deposit(c.carry.type, c.carry.qty);
+  c.carry.qty -= G.depositCargo(c.carry);
   if (c.carry.qty > 0) { G.warnMineralStorage(); G.waitForMineralStorage(c, 'space'); return; }
   c.carry = null; c.haulPending = false; c.haulWait = ''; c.haulTo = null;
   G.requestTask(c);
@@ -755,7 +763,7 @@ G.availableRockMarks = function (w) {
 G.startHaul = function (c) {
   if (G.isMineralCargo(c)) { G.startMineralHaul(c); return; }
   if (!G.nearestStorage(c.x, c.y)) { // 兼容旧的无仓存档：仍受仓储上限约束
-    G.deposit(c.carry.type, c.carry.qty);
+    G.depositCargo(c.carry);
     c.carry = null;
     G.requestTask(c);
     return;
@@ -765,7 +773,7 @@ G.startHaul = function (c) {
   c.haulTo = route.storage.id;
   c.path = route.path; c.pi = 0; c.task = null;
   if (!c.path.length) {
-    G.deposit(c.carry.type, c.carry.qty);
+    G.depositCargo(c.carry);
     c.carry = null;
     G.requestTask(c);
   } else c.state = 'haul';
@@ -780,7 +788,7 @@ G.toolLimited = function (b) { return b.type === 'blacksmith' && (G.productionGo
 /* Optional automatic-production goals. Unset means the exact legacy rules.
  * Hysteresis changes at deliveries and the normal 2h scheduler, never in UI reads. */
 G.PRODUCTION_GOAL_MAX = 1000000;
-G.PRODUCTION_OUTPUTS = { woodcutter: ['firewood'], blacksmith: ['tools'], forester: ['wood'], mine: ['stone', 'iron'], gatherer: ['food'], dock: ['food'], hunting: ['food'], farm: ['food'] };
+G.PRODUCTION_OUTPUTS = { woodcutter: ['firewood'], blacksmith: ['tools'], forester: ['wood'], mine: ['stone', 'iron'], gatherer: ['food', 'vegetables'], dock: ['food', 'meat'], hunting: ['food', 'meat', 'leather'], farm: ['food', 'grain'], tailor: ['clothes'], pasture: ['food', 'meat', 'wool'], orchard: ['food', 'vegetables'] };
 G.productionGoalOf = function (type, game) {
   const goals = (game || G.game).productionGoals;
   return goals && Object.prototype.hasOwnProperty.call(goals, type) && Number.isFinite(goals[type]) ? goals[type] : null;
@@ -816,6 +824,7 @@ G.updateProductionGoals = function (game, world) {
   }
 };
 G.goalPaused = function (type, b) {
+  if (G.FOOD_KEYS.includes(type) && G.goalPaused('food')) return true;
   if (G.productionGoalOf(type) === null) return false;
   if (b && ((b.type === 'woodcutter' && type === 'firewood') || (b.type === 'blacksmith' && type === 'tools'))) return b.productionPaused === true || !!(G.game.productionPaused && G.game.productionPaused[type]);
   return !!(G.game.productionPaused && G.game.productionPaused[type]);
@@ -830,7 +839,7 @@ G.setProductionGoal = function (type, value) {
   if (previous === value) return true;
   g.productionGoals = g.productionGoals || {}; g.productionPaused = g.productionPaused || {};
   // A not-yet-finished first sow task is already a seasonal commitment.
-  if (type === 'food' && value !== null) for (const b of G.world.buildings)
+  if ((type === 'food' || type === 'grain') && value !== null) for (const b of G.world.buildings)
     if (b.type === 'farm' && (G.farmSeasonCommitted(b) ||
       G.world.citizens.some(c => [c.task, c.pausedTask].some(t => t && t.b === b && t.kind === 'sow')))) b.sowingCommitted = true;
   if (value === null) delete g.productionGoals[type]; else g.productionGoals[type] = value;
@@ -852,8 +861,9 @@ G.hasProductionGoal = function (b) {
 G.productionLimited = function (b) {
   if (b.state !== 'ok') return false; // Construction and manual clearing never stop.
   if (G.fuelLimited(b) || G.toolLimited(b)) return true;
-  if (['gatherer', 'dock', 'hunting'].includes(b.type)) return G.goalPaused('food');
-  if (b.type === 'farm') return G.goalPaused('food') && !G.farmSeasonCommitted(b);
+  if (['gatherer', 'dock', 'hunting'].includes(b.type)) return G.goalPaused(b.type === 'gatherer' ? 'vegetables' : 'meat');
+  if (b.type === 'tailor') return G.goalPaused('clothes');
+  if (b.type === 'farm') return G.goalPaused('grain') && !G.farmSeasonCommitted(b);
   if (b.type === 'forester') return G.goalPaused('wood') && !b.doPlant;
   if (b.type === 'mine' && (G.productionGoalOf('stone') !== null || G.productionGoalOf('iron') !== null)) return (G.goalPaused('stone') || G.game.res.stone >= G.storageCap()) &&
     (G.goalPaused('iron') || G.game.res.iron >= G.storageCap());
@@ -883,7 +893,7 @@ G.goalCommitment = function (c) {
   if (c.carry && paused(c.carry.type)) return true;
   return [c.task, c.pausedTask].some(task => {
     if (!task || task.b !== b) return false;
-    const type = task.yield ? task.yield.type : ({ chop: 'wood', firewood: 'firewood', sow: 'food', harvest: 'food' })[task.kind];
+    const type = task.yield ? task.yield.type : ({ chop: 'wood', firewood: 'firewood', sow: 'grain', harvest: 'grain' })[task.kind];
     return !!type && paused(type);
   });
 };
@@ -894,19 +904,44 @@ G.storageCap = function () {
   return G.STORAGE_CAP * Math.max(1, n);
 };
 
-/* 入库：受仓储上限约束，满仓部分丢弃并提示（工具随身小件不受限） */
+/* Food categories share the existing total food capacity. The total stays a
+ * compatibility summary for scheduling and old saves, never a fourth food. */
+G.reconcileFood = function (game) {
+  const g = game || G.game, r = g.res;
+  for (const k of G.FOOD_KEYS) if (!Number.isFinite(r[k])) r[k] = 0;
+  const sum = G.FOOD_KEYS.reduce((n,k) => n + r[k], 0), total = Math.max(0, Number(r.food) || 0);
+  if (Math.abs(sum - total) > 1e-7) {
+    if (total > sum) r.grain += total - sum; // legacy unclassified stock
+    else if (sum > 0) for (const k of G.FOOD_KEYS) r[k] *= total / sum;
+  }
+  r.food = G.FOOD_KEYS.reduce((n,k) => n + r[k], 0);
+};
+G.consumeFood = function (qty) {
+  G.reconcileFood(); const r = G.game.res, eaten = new Set(); let left = Math.min(qty, r.food);
+  // Share a meal across available groups, then fill deficits from what remains.
+  for (let pass = 0; pass < 3 && left > 1e-9; pass++) {
+    const keys = G.FOOD_KEYS.filter(k => r[k] > 1e-9), portion = left / keys.length;
+    for (const k of keys) { const take = Math.min(r[k], portion); r[k] -= take; left -= take; if (take > 0) eaten.add(k); }
+  }
+  r.food = G.FOOD_KEYS.reduce((n,k) => n + r[k], 0); return [...eaten];
+};
+G.depositCargo = function (cargo) {
+  const accepted = G.deposit(cargo.type, cargo.qty);
+  if (cargo.extra) { for (const [type, qty] of Object.entries(cargo.extra)) G.deposit(type, qty); delete cargo.extra; }
+  return accepted;
+};
 G.deposit = function (type, qty) {
   const g = G.game;
-  if (type === 'tools') { g.res.tools += qty; G.updateProductionGoals(); return qty; }
-  const space = Math.max(0, G.storageCap() - g.res[type]);
-  const got = Math.min(qty, space);
-  g.res[type] += got;
+  if (type === 'food') type = 'grain'; // old carried food retains its quantity
+  if (G.FOOD_KEYS.includes(type)) G.reconcileFood();
+  const stock = G.FOOD_KEYS.includes(type) ? g.res.food : g.res[type];
+  const space = type === 'tools' ? Infinity : Math.max(0, G.storageCap() - stock);
+  const got = Math.min(qty, space); g.res[type] = (g.res[type] || 0) + got;
+  if (G.FOOD_KEYS.includes(type)) g.res.food += got;
   if (got < qty && type !== 'stone' && type !== 'iron' && !g.warned.storageFull) {
-    g.warned.storageFull = true;
-    G.ui.toast('⚠ 仓库满了，多出的资源只能丢弃——再建一座仓库吧', 'warn');
+    g.warned.storageFull = true; G.ui.toast('⚠ 仓库满了，多出的资源只能丢弃——再建一座仓库吧', 'warn');
   }
-  G.updateProductionGoals();
-  return got;
+  G.updateProductionGoals(); return got;
 };
 
 /* 背料到达仓库：转入回屋加工段。返回 false = 仓库没料（白跑） */
@@ -936,7 +971,7 @@ G.coldStep = function (c, dtH) {
       return;
     }
   }
-  c.cold += dtH * G.LIFE.coldOutdoor / 24 * childMul;
+  c.cold += dtH * G.LIFE.coldOutdoor / 24 * childMul * (c.clothingLeft > 0 ? 0.6 : 1);
 };
 
 /* Validate only the next segment after dispatch, including diagonal side
@@ -1050,7 +1085,7 @@ G.arrive = function (c) {
       return;
     }
     if (c.carry) {
-      G.deposit(c.carry.type, c.carry.qty);
+      G.depositCargo(c.carry);
       c.carry = null;
     }
     G.requestTask(c);
@@ -1105,7 +1140,7 @@ G.requestTask = function (c) {
   const w = G.world;
   const b = c.job != null ? w.bmap[c.job] : null;
   // 换岗/任务中断后先交货；农田未满批可继续收割，找不到下一格时也必须交货。
-  const partialFarm = b && b.type === 'farm' && b.state === 'ok' && c.carry && c.carry.type === 'food' && c.carry.qty < G.PROD.farm.haulCap;
+  const partialFarm = b && b.type === 'farm' && b.state === 'ok' && c.carry && c.carry.type === 'grain' && c.carry.qty < G.PROD.farm.haulCap;
   const partialForester = b && b.type === 'forester' && b.state === 'ok' && b.doCut && !G.goalPaused('wood') && c.carry && c.carry.type === 'wood' && c.carry.qty + G.taskYield(G.taskLogYield(c)) <= G.PROD.forester.haulCap;
   if (c.carry && !partialFarm && !partialForester) {
     G.startHaul(c); return;
@@ -1371,6 +1406,32 @@ G.makeTask = function (b, c) {
         yield: { type: ironTurn ? 'iron' : 'stone', qty: G.taskYield(P.mine.yield) },
       }, spot.route);
     }
+    case 'tradingpost': return G.makeTradeTask(b,c);
+    case 'pasture': {
+      G.ensureEconomyBuilding(b);
+      if (!b.animals) { b.noWork=true; b.warnText='需购买羊并移入牧场'; return null; }
+      const spot=G.workSpot(w,b,c.x,c.y); if(!spot)return null;
+      return G.withTaskRoute({kind:'work',b,tx:spot.x,ty:spot.y,work:G.taskWork(c,8),workLeft:0,economy:'pasture'},spot.route);
+    }
+    case 'orchard': {
+      G.ensureEconomyBuilding(b);
+      if (!g.unlocks.orchard) {b.noWork=true;b.warnText='需贸易购买果树种子';return null;}
+      if (b.orchardAge < G.YEAR_DAYS*4 && b.tendedDay===g.day) { b.noWork=true; b.warnText='今日照料完成，等待果树长成'; return null; }
+      if (b.orchardAge >= G.YEAR_DAYS*4 && (!b.orchardYield || g.season!==2)) { b.noWork=true; b.warnText='等待秋季果实'; return null; }
+      if (G.goalPaused('vegetables') && b.orchardAge>=G.YEAR_DAYS*4) return null;
+      const spot=G.workSpot(w,b,c.x,c.y);if(!spot)return null;
+      return G.withTaskRoute({kind:'work',b,tx:spot.x,ty:spot.y,work:G.taskWork(c,6),workLeft:0,economy:'orchard'},spot.route);
+    }
+    case 'tailor': {
+      if (g.res.clothes >= G.storageCap()) { b.noWork=true; b.warnText='衣物仓容已满'; return null; }
+      const material = g.res.leather >= 2 ? 'leather' : g.res.wool >= 2 ? 'wool' : null;
+      if (!material) { b.noWork = true; b.warnText = '缺皮革或羊毛（每件需2）'; return null; }
+      const route = G.storageRoute(c.x, c.y);
+      if (!route) { b.noWork = true; b.warnText = '仓库不可达'; return null; }
+      return G.withTaskRoute({ kind: 'firewood', b, tx: route.spot.x, ty: route.spot.y, phase: 'fetch',
+        work: G.taskWork(c, 8), workLeft: 0, consume: {type: material, qty: 2},
+        yield: {type: 'clothes', qty: c.educated ? 2 : 1} }, route.spot.route);
+    }
     case 'blacksmith': {
       if (G.toolLimited(b)) { b.noWork = true; b.warnText = '工具已达上限'; return null; }
       const spot = G.workSpot(w, b, c.x, c.y);
@@ -1408,7 +1469,8 @@ G.makeTask = function (b, c) {
       if (!best) { b.noWork = true; b.warnText = '猎场目标被工地覆盖，需先清场'; return null; }
       return {
         kind: 'work', b, tx: best.x, ty: best.y,
-        work: G.taskWork(c, P.hunting.workH), workLeft: 0, yield: { type: 'food', qty },
+        work: G.taskWork(c, P.hunting.workH), workLeft: 0, yield: { type: 'meat', qty },
+        extra: G.goalPaused('leather') ? null : { leather: c.educated ? 2 : 1 },
       };
     }
     case 'farm': {
@@ -1421,11 +1483,11 @@ G.makeTask = function (b, c) {
         if (c2 !== c && t2 && t2.b === b && c2.job === b.id && (t2.kind === 'sow' || t2.kind === 'harvest'))
           claimed.add(t2.ti);
       // 播种（春）
-      if (!b.sownAll && (g.season === 0 || g.season === 1) && (!G.goalPaused('food') || G.farmSeasonCommitted(b))) {
+      if (!b.sownAll && (g.season === 0 || g.season === 1) && (!G.goalPaused('grain') || G.farmSeasonCommitted(b))) {
         const ti = b.farm.findIndex((f, i) => !f.sown && !claimed.has(i));
         if (ti >= 0) {
           const f = b.farm[ti];
-          if (G.productionGoalOf('food') !== null) b.sowingCommitted = true;
+          if (G.productionGoalOf('food') !== null || G.productionGoalOf('grain') !== null) b.sowingCommitted = true;
           return { kind: 'sow', b, ti, tx: f.x, ty: f.y, work: G.taskWork(c, P2.tileWorkH), workLeft: 0 };
         }
       }
@@ -1493,13 +1555,17 @@ G.completeTask = function (c) {
       }
       break;
     }
+    case 'trade': { G.completeTradeTask(c,t); return; }
     case 'work': {
+      if (t.economy) { G.completeEconomyWork(c,t); break; }
       if (t.consume) {
         const cons = Array.isArray(t.consume) ? t.consume : [t.consume];
         if (cons.some(c2 => G.game.res[c2.type] < c2.qty)) break; // 材料在干活的这几个小时里被同行用掉，本次白干
         for (const c2 of cons) G.game.res[c2.type] -= c2.qty;
       }
-      if (t.yield) c.carry = { type: t.yield.type, qty: t.yield.qty };
+      if (t.yield) { c.carry = { type: t.yield.type, qty: t.yield.qty };
+        if (t.extra) c.carry.extra = { ...t.extra };
+      }
       break;
     }
     case 'firewood': {
@@ -1510,7 +1576,7 @@ G.completeTask = function (c) {
       }
       if (G.game.res[t.consume.type] < t.consume.qty) break; // 加工期间料被挪用，这趟白干
       G.game.res[t.consume.type] -= t.consume.qty;
-      c.carry = { type: 'firewood', qty: t.yield.qty };
+      c.carry = { type: t.yield.type, qty: t.yield.qty };
       break;
     }
     case 'sow': {
@@ -1525,8 +1591,8 @@ G.completeTask = function (c) {
         t.b.farm[t.ti].harvested = true;
         // 攒批搬运：收获累计到 haulCap 才送一趟仓库
         const P = G.PROD.farm;
-        if (c.carry && c.carry.type === 'food') c.carry.qty = Math.min(P.haulCap, c.carry.qty + G.taskYield(P.perTile));
-        else c.carry = { type: 'food', qty: G.taskYield(P.perTile) };
+        if (c.carry && c.carry.type === 'grain') c.carry.qty = Math.min(P.haulCap, c.carry.qty + G.taskYield(P.perTile));
+        else c.carry = { type: 'grain', qty: G.taskYield(P.perTile) };
         if (b.farm.every(f => f.harvested)) b.harvestDone = true;
         // 还没背满且田里没收完：继续收下一格
         if (c.carry.qty < P.haulCap && !b.harvestDone) { G.requestTask(c); return; }
@@ -1543,7 +1609,7 @@ G.resetFarm = function (b) {
   b.sownAll = false; b.growth = 0; b.harvestDone = false; delete b.sowingCommitted;
   // A commitment belongs to this crop season, not next year's empty field.
   // Expire old crop work only in the opt-in path; harvested cargo remains owned.
-  if (G.productionGoalOf('food') !== null) for (const c of G.world.citizens) {
+  if (G.productionGoalOf('food') !== null || G.productionGoalOf('grain') !== null) for (const c of G.world.citizens) {
     const expired = t => t && t.b === b && (t.kind === 'sow' || t.kind === 'harvest');
     if (expired(c.task)) {
       c.task = null;
@@ -1626,7 +1692,7 @@ G.pickMarkDonor = function (w, harvestSeason, foodJobs, needFood) {
 
 G.farmHasWork = function (b) {
   const season = G.game.season;
-  return (!b.sownAll && (season === 0 || season === 1) && (!G.goalPaused('food') || G.farmSeasonCommitted(b))) ||
+  return (!b.sownAll && (season === 0 || season === 1) && (!G.goalPaused('grain') || G.farmSeasonCommitted(b))) ||
     (b.sownAll && b.growth >= 1 && season === 2 && !b.harvestDone);
 };
 
@@ -1636,6 +1702,10 @@ G.jobCanProduce = function (b) {
   if (G.productionLimited(b)) return false;
   if (b.type === 'farm') return G.farmHasWork(b);
   if (b.type === 'woodcutter') return r.wood >= p.woodcutter.logsIn;
+  if (b.type === 'tradingpost') return G.tradeHasWork(b);
+  if (b.type === 'pasture') return (b.animals || 0)>0;
+  if (b.type === 'orchard') return G.game.unlocks.orchard && ((b.orchardAge || 0)<G.YEAR_DAYS*4 ? b.tendedDay!==G.game.day : (b.orchardYield || 0)>0 && G.game.season===2);
+  if (b.type === 'tailor') return r.clothes < G.storageCap() && (r.leather >= 2 || r.wool >= 2);
   if (b.type === 'blacksmith') return p.blacksmith.consume.every(c => r[c.type] >= c.qty);
   if (b.type === 'forester') return (b.doCut && !G.goalPaused('wood') && G.treesInRadius(w, b.x, b.y, p.forester.radius, true).length > p.forester.minMature) ||
     (b.doPlant && !!G.nearestPlantSpot(w, b.x, b.y, p.forester.radius));
@@ -1924,6 +1994,8 @@ G.finishBuilding = function (b) {
 
 G.removeBuilding = function (b) {
   const w = G.world;
+  if (b.type === 'tradingpost' && Object.values(b.tradeInventory || {}).some(q => q > 0)) { G.ui.toast('先把待售目标设0，搬空贸易库存再拆除','warn'); return; }
+  if (b.type === 'pasture' && b.animals) { G.game.livestock.sheep += b.animals; b.animals = 0; }
   if (b.type === 'storage') {
     const left = w.buildings.filter(x => x.type === 'storage').length;
     if (left <= 1) { G.ui.toast('不能拆除最后一座仓库', 'warn'); return; }
@@ -1971,4 +2043,101 @@ G.demolishAt = function (tx, ty) {
   if (w.road[i]) { G.setRoad(w, tx, ty, false); G.markGroundDirty(tx, ty); return; }
   if (w.treeIdx[i] >= 0) { G.removeTree(w, tx, ty); return; }
   if (w.rock[i]) { G.markRockAt(w, tx, ty); return; } // 岩石改为标记后由散工清除（资源入库需劳动）
+};
+
+/* Town development: explicit inventories and worker trips, not global free production. */
+G.TRADE_CAPACITY = 2000;
+G.tradeStored = b => Object.values(b.tradeInventory || {}).reduce((n,q) => n + q, 0);
+G.TRADE_VALUES = {wood:2,stone:7,iron:5,tools:8,firewood:4,meat:1,vegetables:1,grain:1,leather:10,wool:5,clothes:15};
+G.TRADE_GOODS = {sheep:{name:'羊',price:600,stock:4},orchardSeed:{name:'果树种子',price:2500,stock:1},grain:{name:'主食',price:1,stock:400},iron:{name:'铁',price:5,stock:100},leather:{name:'皮革',price:10,stock:80}};
+G.ensureEconomyBuilding = function(b) {
+  if(b.type==='tradingpost'){b.tradeInventory=b.tradeInventory||{};b.tradeTargets=b.tradeTargets||{};if(!Number.isFinite(b.nextMerchantDay))b.nextMerchantDay=G.game.day+G.SEASON_DAYS;}
+  if(b.type==='pasture'){b.animals=b.animals||0;b.animalGrowth=b.animalGrowth||0;b.woolReady=b.woolReady||0;if(!Number.isFinite(b.animalTarget))b.animalTarget=8;}
+  if(b.type==='orchard'){b.orchardAge=b.orchardAge||0;b.orchardYield=b.orchardYield||0;}
+};
+G.withdrawResource = function(type,qty){
+  if(!Number.isFinite(qty)||qty<=0)return 0;
+  if(G.isFood(type))G.reconcileFood();
+  if(type==='food')type='grain';
+  const r=G.game.res,n=Math.min(qty,r[type]||0);r[type]-=n;if(G.FOOD_KEYS.includes(type))r.food-=n;return n;
+};
+G.setTradeTarget = function(b,type,qty){
+  if(G.world.bmap[b.id]!==b||b.type!=='tradingpost'||!Object.hasOwn(G.TRADE_VALUES,type)||!Number.isInteger(qty)||qty<0||qty>2000)return false;
+  G.ensureEconomyBuilding(b);b.tradeTargets[type]=qty;G.game.schedT=0;return true;
+};
+G.tradeHasWork = function(b){
+  G.ensureEconomyBuilding(b);return Object.keys(G.TRADE_VALUES).some(k=>(b.tradeInventory[k]||0)>(b.tradeTargets[k]||0)||((b.tradeInventory[k]||0)<(b.tradeTargets[k]||0)&&G.game.res[k]>0&&G.tradeStored(b)<G.TRADE_CAPACITY));
+};
+G.makeTradeTask = function(b,c){
+  G.ensureEconomyBuilding(b);
+  for(const type of Object.keys(G.TRADE_VALUES)){
+    const stock=b.tradeInventory[type]||0,target=b.tradeTargets[type]||0;
+    const returning=stock>target;
+    if(!returning&&!(stock<target&&G.game.res[type]>0&&G.tradeStored(b)<G.TRADE_CAPACITY))continue;
+    const route=returning?null:G.storageRoute(c.x,c.y),spot=returning?G.workSpot(G.world,b,c.x,c.y):route&&route.spot;
+    if(!spot){b.noWork=true;b.warnText='搬运路线不可达';return null;}
+    return G.withTaskRoute({kind:'trade',b,tx:spot.x,ty:spot.y,phase:returning?'return':'fetch',resource:type,work:0.25,workLeft:0},spot.route);
+  }
+  b.noWork=true;b.warnText='待售库存已达目标';return null;
+};
+G.completeTradeTask = function(c,t){
+  const b=t.b;if(G.world.bmap[b.id]!==b||b.state!=='ok'){G.requestTask(c);return;}
+  G.ensureEconomyBuilding(b);const type=t.resource;
+  if(t.phase==='fetch'){
+    const room=Math.min(Math.max(0,(b.tradeTargets[type]||0)-(b.tradeInventory[type]||0)),Math.max(0,G.TRADE_CAPACITY-G.tradeStored(b)));
+    const spot=G.workSpot(G.world,b,c.x,c.y);if(!spot){G.requestTask(c);return;}
+    const qty=G.withdrawResource(type,Math.min(20,room));if(!qty){G.requestTask(c);return;}
+    c.carry={type,qty};t.phase='deliver';t.tx=spot.x;t.ty=spot.y;t.workLeft=t.work;c.task=t;
+    G.sendTo(c,t.tx,t.ty,spot.route);return;
+  }
+  if(t.phase==='deliver'&&c.carry){b.tradeInventory[c.carry.type]=(b.tradeInventory[c.carry.type]||0)+c.carry.qty;c.carry=null;}
+  if(t.phase==='return'){
+    const qty=Math.min(20,Math.max(0,(b.tradeInventory[type]||0)-(b.tradeTargets[type]||0)));
+    if(qty){b.tradeInventory[type]-=qty;c.carry={type,qty};G.startHaul(c);return;}
+  }
+  G.requestTask(c);
+};
+G.executeTrade = function(b,good,qty,payment){
+  if(G.world.bmap[b.id]!==b||b.type!=='tradingpost'||b.state!=='ok'||!b.merchant||b.merchant.leaveDay<=G.game.day)return {ok:false,reason:'没有停靠商人'};
+  const offer=Object.hasOwn(G.TRADE_GOODS,good)?G.TRADE_GOODS[good]:null,value=Object.hasOwn(G.TRADE_VALUES,payment)?G.TRADE_VALUES[payment]:0;
+  if(!offer||!value||!Number.isInteger(qty)||qty<=0||qty>(b.merchant.stock[good]||0))return {ok:false,reason:'交易数量或货物无效'};
+  if(good==='orchardSeed'&&(qty!==1||G.game.unlocks.orchard))return {ok:false,reason:'果树种子已永久解锁'};
+  const cost=Math.ceil(offer.price*qty/value);if((b.tradeInventory[payment]||0)<cost)return {ok:false,reason:'待售库存不足，请先让商人搬入'};
+  if(good!=='sheep'&&good!=='orchardSeed'&&G.tradeStored(b)-cost+qty>G.TRADE_CAPACITY)return {ok:false,reason:'贸易站库存容量不足（共2000）'};
+  b.tradeInventory[payment]-=cost;b.merchant.stock[good]-=qty;
+  if(good==='sheep')G.game.livestock.sheep+=qty;
+  else if(good==='orchardSeed')G.game.unlocks.orchard=true;
+  else b.tradeInventory[good]=(b.tradeInventory[good]||0)+qty;
+  G.game.schedT=0;return {ok:true,paid:cost};
+};
+G.stockPasture = function(b,qty){
+  if(G.world.bmap[b.id]!==b||b.type!=='pasture'||b.state!=='ok'||!Number.isInteger(qty)||qty<=0)return false;
+  G.ensureEconomyBuilding(b);if(qty>G.game.livestock.sheep||b.animals+qty>12)return false;
+  G.game.livestock.sheep-=qty;b.animals+=qty;G.game.schedT=0;return true;
+};
+G.setPastureTarget = function(b,qty){if(G.world.bmap[b.id]!==b||b.type!=='pasture'||!Number.isInteger(qty)||qty<2||qty>12)return false;b.animalTarget=qty;return true;};
+G.advanceTownEconomy = function(){
+  const g=G.game;g.unlocks=g.unlocks||{orchard:false};g.livestock=g.livestock||{sheep:0};
+  for(const b of G.world.buildings){if(b.state!=='ok')continue;G.ensureEconomyBuilding(b);
+    if(b.type==='tradingpost'){
+      if(b.merchant&&g.day>=b.merchant.leaveDay){b.merchant=null;b.nextMerchantDay=g.day+G.YEAR_DAYS-G.SEASON_DAYS;}
+      if(!b.merchant&&g.day>=b.nextMerchantDay){b.merchant={leaveDay:g.day+G.SEASON_DAYS,stock:Object.fromEntries(Object.entries(G.TRADE_GOODS).map(([k,v])=>[k,v.stock]))};G.ui.toast('⛵ 商船已到贸易站，可换物资、羊和果树种子','good');}
+    }
+    if(b.type==='pasture'&&b.animals>0&&b.tendedDay>=g.day-2){
+      if(b.animals>=2)b.animalGrowth+=b.animals/(G.YEAR_DAYS*2);while(b.animalGrowth>=1&&b.animals<12){b.animals++;b.animalGrowth--;}
+      b.animalGrowth=Math.min(1,b.animalGrowth);b.woolReady=Math.min(48,b.woolReady+b.animals/G.SEASON_DAYS);
+    }
+    if(b.type==='orchard'&&g.unlocks.orchard){
+      if(b.orchardAge<G.YEAR_DAYS*4&&b.tendedDay>=g.day-2)b.orchardAge++;
+      if(g.season===2&&b.orchardAge>=G.YEAR_DAYS*4&&b.orchardSeason!==g.year){b.orchardYield=180;b.orchardSeason=g.year;}
+      if(g.season===3)b.orchardYield=0;
+    }
+  }
+};
+G.completeEconomyWork = function(c,t){
+  const b=t.b;if(G.world.bmap[b.id]!==b||b.state!=='ok')return;G.ensureEconomyBuilding(b);b.tendedDay=G.game.day;
+  if(t.economy==='pasture'){
+    if(b.animals>b.animalTarget&&!G.goalPaused('meat')){b.animals--;c.carry={type:'meat',qty:24};}
+    else if(b.woolReady>=1&&!G.goalPaused('wool')){const qty=Math.min(8,Math.floor(b.woolReady));b.woolReady-=qty;c.carry={type:'wool',qty};}
+  }else if(t.economy==='orchard'&&G.game.season===2&&b.orchardAge>=G.YEAR_DAYS*4&&b.orchardYield>0){const qty=Math.min(20,b.orchardYield);b.orchardYield-=qty;c.carry={type:'vegetables',qty};}
 };

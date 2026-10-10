@@ -1,0 +1,186 @@
+{
+  "license": "Original artwork generated for this project. No game or wiki artwork used.",
+  "method": "Built-in image generation, one independent asset per image; transparent PNGs cropped to visible bounds and sized for game use with Sharp. Original alpha retained with a two-pixel transparent guard. Orchard leafy sprite edited from the original fruit tree with the built-in image tool.",
+  "assets": [
+    {
+      "name": "tailor",
+      "file": "assets/buildings/tailor.png",
+      "width": 512,
+      "height": 540,
+      "sourceCrop": {
+        "left": 111,
+        "top": 0,
+        "width": 1093,
+        "height": 1154
+      },
+      "anchor": "bottom-center",
+      "transparentPadding": 2,
+      "prompt": "Original production game sprite, warm hand-painted isometric medieval settlement, high-quality detailed storybook timber and stone materials, crisp readable silhouette, soft warm sun from upper left, 2:1 diamond ground perspective, front door facing lower-left, all details contained in one isolated asset. Genuine transparent alpha background, no backdrop, no cast shadow beyond the tiny contact area, no text, no letters, no labels, no watermark, no border, no adjacent objects or duplicate sprite. Centered tightly but keep 3% transparent clearance at every image edge, the lowest ground contact centered horizontally. NOT a scene, no surrounding landscape, no cut-off elements. Clean solid painted surfaces with fully opaque interiors and antialiased edges only. A compact tailor's workshop building: honey-brown timber beams, beige plaster walls, warm muted burgundy terracotta gabled roof, large bright workshop windows, short stone doorstep, a clearly visible tan linen tunic displayed beside the entrance, two rolled bolts of indigo and ochre cloth, a small basket of cream wool. Footprint near-square, shown as three-quarter isometric building, entire building including roof intact. Keep it charming and distinct from a blacksmith; no furnace, no smoke."
+    },
+    {
+      "name": "tradingpost",
+      "file": "assets/buildings/tradingpost.png",
+      "width": 512,
+      "height": 512,
+      "sourceCrop": {
+        "left": 71,
+        "top": 59,
+        "width": 1142,
+        "height": 1142
+      },
+      "anchor": "bottom-center",
+      "transparentPadding": 2,
+      "prompt": "Original production game sprite, warm hand-painted isometric medieval settlement, high-quality detailed storybook timber and stone materials, crisp readable silhouette, soft warm sun from upper left, 2:1 diamond ground perspective, front door facing lower-left, all details contained in one isolated asset. Genuine transparent alpha background, no backdrop, no cast shadow beyond the tiny contact area, no text, no letters, no labels, no watermark, no border, no adjacent objects or duplicate sprite. Centered tightly but keep 3% transparent clearance at every image edge, the lowest ground contact centered horizontally. NOT a scene, no surrounding landscape, no cut-off elements. Clean solid painted surfaces with fully opaque interiors and antialiased edges only. A small rural trading post building: broad timber merchant hall on a compact stone-and-plank platform, weathered blue-slate gabled roof, muted striped ochre canvas market awning on the front, neatly stacked wooden crates and two barrels under awning, small balance scale on counter, simple pennant attached to the hall, no people or boats. Near-square footprint. Readable generous front entrance and goods make this clearly a trading post."
+    },
+    {
+      "name": "pasture",
+      "file": "assets/buildings/pasture.png",
+      "width": 512,
+      "height": 475,
+      "sourceCrop": {
+        "left": 148,
+        "top": 57,
+        "width": 1108,
+        "height": 1027
+      },
+      "anchor": "bottom-center",
+      "transparentPadding": 2,
+      "prompt": "Original production game sprite, warm hand-painted isometric medieval settlement, high-quality detailed storybook timber and stone materials, crisp readable silhouette, soft warm sun from upper left, 2:1 diamond ground perspective, front door facing lower-left, all details contained in one isolated asset. Genuine transparent alpha background, no backdrop, no cast shadow beyond the tiny contact area, no text, no letters, no labels, no watermark, no border, no adjacent objects or duplicate sprite. Centered tightly but keep 3% transparent clearance at every image edge, the lowest ground contact centered horizontally. NOT a scene, no surrounding landscape, no cut-off elements. Clean solid painted surfaces with fully opaque interiors and antialiased edges only. A compact open-front sheep shelter building for a pasture: honey-brown timber posts, rustic warm brown shingle gabled roof, small hayloft, clean straw bed visible through the open front, a wooden hay manger beside its front corner, a folded wool sack and two wooden buckets. No sheep or animals, no fences, no broad grass tile. Just the small shelter and its narrow stone-and-straw foundation, near-square footprint. This is a standalone small building sprite to be placed inside a larger pasture."
+    },
+    {
+      "name": "orchard",
+      "file": "assets/buildings/orchard.png",
+      "width": 128,
+      "height": 120,
+      "sourceCrop": {
+        "left": 245,
+        "top": 25,
+        "width": 1043,
+        "height": 974
+      },
+      "anchor": "bottom-center",
+      "transparentPadding": 2,
+      "prompt": "Original production game sprite, warm hand-painted isometric medieval settlement, high-quality detailed storybook timber and stone materials, crisp readable silhouette, soft warm sun from upper left, 2:1 diamond ground perspective, front door facing lower-left, all details contained in one isolated asset. Genuine transparent alpha background, no backdrop, no cast shadow beyond the tiny contact area, no text, no letters, no labels, no watermark, no border, no adjacent objects or duplicate sprite. Centered tightly but keep 3% transparent clearance at every image edge, the lowest ground contact centered horizontally. NOT a scene, no surrounding landscape, no cut-off elements. Clean solid painted surfaces with fully opaque interiors and antialiased edges only. One mature orchard apple tree game prop, compact rounded foliage crown in sage and warm green, visible sturdy twisting brown trunk, small but clearly visible ripe red and golden apples distributed through crown, a few exposed roots at base. Not pine or conifer. No pot, no basket, no fence, no surrounding soil or lawn tile; isolated full upright fruit tree. Ground contact centered horizontally. Broad crown with gentle painterly detail, tree must read immediately as a fruit orchard tree at small sprite scale."
+    },
+    {
+      "name": "sheep",
+      "file": "assets/props/sheep.png",
+      "width": 96,
+      "height": 88,
+      "sourceCrop": {
+        "left": 322,
+        "top": 105,
+        "width": 892,
+        "height": 817
+      },
+      "anchor": "bottom-center",
+      "transparentPadding": 2,
+      "prompt": "Original production game sprite, warm hand-painted isometric medieval settlement, high-quality detailed storybook timber and stone materials, crisp readable silhouette, soft warm sun from upper left, 2:1 diamond ground perspective, front door facing lower-left, all details contained in one isolated asset. Genuine transparent alpha background, no backdrop, no cast shadow beyond the tiny contact area, no text, no letters, no labels, no watermark, no border, no adjacent objects or duplicate sprite. Centered tightly but keep 3% transparent clearance at every image edge, the lowest ground contact centered horizontally. NOT a scene, no surrounding landscape, no cut-off elements. Clean solid painted surfaces with fully opaque interiors and antialiased edges only. One charming wool sheep game prop seen from isometric three-quarter side, looking to lower-left: thick puffy cream fleece in rounded curls, gray-brown small face, two ears, four short dark hooves. Entire sheep only, no ground tile, no rope, no accessories. Compact natural proportions, pleasantly stylized, clear silhouette at very small game scale."
+    },
+    {
+      "name": "orchard_leafy",
+      "file": "assets/props/orchard_leafy.png",
+      "width": 128,
+      "height": 120,
+      "sourceCrop": {
+        "left": 235,
+        "top": 11,
+        "width": 1063,
+        "height": 991
+      },
+      "anchor": "bottom-center",
+      "transparentPadding": 2,
+      "prompt": "Edit target: the provided original game apple-tree sprite. Remove EVERY apple and fruit from this tree, replacing each fruit position with matching leaves and small branches. Keep the exact same tree trunk, canopy outline, illustration style, lighting, whole-tree proportions, perspective, and clean transparent background. No fruit, no flowers, no added background, no glow or halo. Result is the identical healthy leafy orchard tree before it bears fruit, isolated on genuine transparency, retaining a small clear margin. Preserve opaque painted tree interiors and clean alpha edges."
+    },
+    {
+      "name": "res_meat",
+      "file": "assets/icons/res_meat.png",
+      "width": 64,
+      "height": 64,
+      "sourceCrop": {
+        "left": 37,
+        "top": 161,
+        "width": 1192,
+        "height": 946
+      },
+      "anchor": "bottom-center",
+      "transparentPadding": 2,
+      "prompt": "Create ONE original inventory icon for a warm hand-painted medieval town-building game. Genuine transparent alpha background. Crisp compact hand-painted storybook illustration, warm upper-left light, dark subtle contour for legibility at 24 pixels, softly textured fully opaque surfaces, isometric three-quarter perspective. Large centered single isolated object, 6% transparent margin, no backdrop, no glow, no cast shadow, no frame, no text, no label, no watermark, no extra scattered objects. Square image. Complete unclipped object. One cooked meat haunch with warm chestnut-red meat, small ivory bone handle, slight appetizing golden highlight. No blood, no gore."
+    },
+    {
+      "name": "res_vegetables",
+      "file": "assets/icons/res_vegetables.png",
+      "width": 64,
+      "height": 64,
+      "sourceCrop": {
+        "left": 46,
+        "top": 119,
+        "width": 1182,
+        "height": 1051
+      },
+      "anchor": "bottom-center",
+      "transparentPadding": 2,
+      "prompt": "Create ONE original inventory icon for a warm hand-painted medieval town-building game. Genuine transparent alpha background. Crisp compact hand-painted storybook illustration, warm upper-left light, dark subtle contour for legibility at 24 pixels, softly textured fully opaque surfaces, isometric three-quarter perspective. Large centered single isolated object, 6% transparent margin, no backdrop, no glow, no cast shadow, no frame, no text, no label, no watermark, no extra scattered objects. Square image. Complete unclipped object. A tightly grouped small produce bundle: one warm-green cabbage with layered leaves and one orange carrot with a short leafy top leaning against it. The vegetables overlap as a single compact connected icon, no basket."
+    },
+    {
+      "name": "res_grain",
+      "file": "assets/icons/res_grain.png",
+      "width": 64,
+      "height": 64,
+      "sourceCrop": {
+        "left": 167,
+        "top": 47,
+        "width": 1040,
+        "height": 1159
+      },
+      "anchor": "bottom-center",
+      "transparentPadding": 2,
+      "prompt": "Create ONE original inventory icon for a warm hand-painted medieval town-building game. Genuine transparent alpha background. Crisp compact hand-painted storybook illustration, warm upper-left light, dark subtle contour for legibility at 24 pixels, softly textured fully opaque surfaces, isometric three-quarter perspective. Large centered single isolated object, 6% transparent margin, no backdrop, no glow, no cast shadow, no frame, no text, no label, no watermark, no extra scattered objects. Square image. Complete unclipped object. A small tied bundle of golden ripe wheat ears, three plump seed heads and short stems tied by a simple brown cord, compact diagonal arrangement."
+    },
+    {
+      "name": "res_leather",
+      "file": "assets/icons/res_leather.png",
+      "width": 64,
+      "height": 64,
+      "sourceCrop": {
+        "left": 30,
+        "top": 94,
+        "width": 1202,
+        "height": 1066
+      },
+      "anchor": "bottom-center",
+      "transparentPadding": 2,
+      "prompt": "Create ONE original inventory icon for a warm hand-painted medieval town-building game. Genuine transparent alpha background. Crisp compact hand-painted storybook illustration, warm upper-left light, dark subtle contour for legibility at 24 pixels, softly textured fully opaque surfaces, isometric three-quarter perspective. Large centered single isolated object, 6% transparent margin, no backdrop, no glow, no cast shadow, no frame, no text, no label, no watermark, no extra scattered objects. Square image. Complete unclipped object. One folded piece of warm caramel-brown tanned leather hide, irregular hide shape and a visible folded corner, neat contrasting stitched edge, soft cream inner edge. Clearly leather rather than wood or cloth."
+    },
+    {
+      "name": "res_wool",
+      "file": "assets/icons/res_wool.png",
+      "width": 64,
+      "height": 64,
+      "sourceCrop": {
+        "left": 83,
+        "top": 106,
+        "width": 1120,
+        "height": 1061
+      },
+      "anchor": "bottom-center",
+      "transparentPadding": 2,
+      "prompt": "Create ONE original inventory icon for a warm hand-painted medieval town-building game. Genuine transparent alpha background. Crisp compact hand-painted storybook illustration, warm upper-left light, dark subtle contour for legibility at 24 pixels, softly textured fully opaque surfaces, isometric three-quarter perspective. Large centered single isolated object, 6% transparent margin, no backdrop, no glow, no cast shadow, no frame, no text, no label, no watermark, no extra scattered objects. Square image. Complete unclipped object. One large cream-colored wound ball of natural sheep wool yarn, thick ivory strands visibly wrapped over the ball, a short curled yarn end attached to it. Rounded woolly shape, no knitting needles."
+    },
+    {
+      "name": "res_clothes",
+      "file": "assets/icons/res_clothes.png",
+      "width": 64,
+      "height": 64,
+      "sourceCrop": {
+        "left": 30,
+        "top": 41,
+        "width": 1194,
+        "height": 1175
+      },
+      "anchor": "bottom-center",
+      "transparentPadding": 2,
+      "prompt": "Create ONE original inventory icon for a warm hand-painted medieval town-building game. Genuine transparent alpha background. Crisp compact hand-painted storybook illustration, warm upper-left light, dark subtle contour for legibility at 24 pixels, softly textured fully opaque surfaces, isometric three-quarter perspective. Large centered single isolated object, 6% transparent margin, no backdrop, no glow, no cast shadow, no frame, no text, no label, no watermark, no extra scattered objects. Square image. Complete unclipped object. One rustic warm teal-green wool tunic with tan leather belt and cream folded collar, short full sleeves, complete garment displayed flat in three-quarter view. Compact simple warm winter clothing, no hanger, no mannequin, no person."
+    }
+  ]
+}
