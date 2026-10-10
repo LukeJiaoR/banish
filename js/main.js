@@ -295,7 +295,7 @@ G.prepareSaveData = function (d) {
   }
   for (const i of optionalArray(d.marked, '砍伐标记')) { const t = gridIndex(i, '砍伐索引'); if (t !== null) w.marked.add(t); }
   for (const i of optionalArray(d.markedRocks, '采矿标记')) { const t = gridIndex(i, '采矿索引'); if (t !== null && w.rock[t]) w.markedRocks.add(t); }
-  for (const i of optionalArray(d.roads, '道路')) { const t = gridIndex(i, '道路索引'); if (t !== null) w.road[t] = 1; }
+  for (const i of optionalArray(d.roads, '道路')) { const t = gridIndex(i, '道路索引'); if (t !== null) G.setRoad(w, t % w.N, Math.floor(t / w.N), true); }
 
   const used = new Set(); let usedMax = 0;
   const uniqueId = (value, field) => {
@@ -570,7 +570,7 @@ G.paintRoad = function (x0, y0, x1, y1) {
   while (true) {
     if (G.canPlaceRoad(w, x, y)) {
       if (w.treeIdx[y * w.N + x] >= 0) G.removeTree(w, x, y);
-      w.road[y * w.N + x] = 1;
+      G.setRoad(w, x, y, true);
       G.markGroundDirty(x, y);
     }
     if (x === x1 && y === y1) break;
@@ -629,7 +629,7 @@ G.confirmRoadPlan = function (intent) {
   let placed = 0;
   for (const p of plan.result.path) {
     const i = p.y * w.N + p.x;
-    if (!w.road[i]) { w.road[i] = 1; G.markGroundDirty(p.x, p.y); placed++; }
+    if (!w.road[i]) { G.setRoad(w, p.x, p.y, true); G.markGroundDirty(p.x, p.y); placed++; }
   }
   G.cancelRoadPlan();
   return { ok: true, placed };

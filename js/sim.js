@@ -525,7 +525,7 @@ G.killCitizen = function (c, why) {
 G.moveSpeed = function (c) {
   const w = G.world;
   const road = G.onRoad(w, Math.round(c.x), Math.round(c.y));
-  let v = road ? 2.6 : 1.6;
+  let v = road ? G.TRAVEL_SPEED.road : G.TRAVEL_SPEED.field;
   if (G.isWinter()) v *= 0.75;
   if (c.carry) v *= 0.9;
   return v;
@@ -553,13 +553,43 @@ G.wander = function (c) {
   }
 };
 
+/* A forest/field task owns a physical tile; a factory task owns a building
+ * perimeter. Never turn the former into work at a nearby arbitrary doorway. */
+G.physicalTaskEndpoint = function (t) {
+  return !!t && (['chop', 'clearrock', 'plant', 'sow', 'harvest'].includes(t.kind) ||
+    (t.kind === 'work' && t.b && ['gatherer', 'hunting'].includes(t.b.type)));
+};
+G.dropBlockedTask = function (c, t) {
+  if (c.pausedTask === t) c.pausedTask = null;
+  if (c.task !== t) return;
+  c.task = null;
+  if (c.state === 'work' || (c.state === 'walk' && c.walkKind === 'task')) {
+    c.path = null; c.pi = 0; c.state = 'idle'; c.walkKind = ''; c.wanderT = .5;
+  }
+};
+G.alternateTaskEndpoint = function (c, t) {
+  if (!t || G.physicalTaskEndpoint(t) || !t.b || G.world.bmap[t.b.id] !== t.b) return null;
+  if (t.kind === 'clearSite') return G.siteClearSpot(c, t.b, t.tree);
+  if (t.kind === 'firewood' && t.phase === 'fetch') return G.storageRoute(c.x, c.y)?.spot || null;
+  if (t.kind === 'build' || t.kind === 'firewood' ||
+      (t.kind === 'work' && ['dock', 'mine', 'blacksmith'].includes(t.b.type)))
+    return G.workSpot(G.world, t.b, c.x, c.y, true);
+  return null;
+};
+
 /* 发送市民去任务点 */
 G.sendTo = function (c, tx, ty) {
+  if (G.tileBlocked(G.world, tx, ty)) {
+    const spot = G.alternateTaskEndpoint(c, c.task);
+    if (!spot) { if (c.task) G.dropBlockedTask(c, c.task); c.state = 'idle'; c.path = null; c.wanderT = .5; return false; }
+    tx = spot.x; ty = spot.y; c.task.tx = tx; c.task.ty = ty;
+  }
   const p = G.findPath(G.world, Math.round(c.x), Math.round(c.y), tx, ty);
-  if (!p) { c.state = 'idle'; c.task = null; return; }
+  if (!p) { c.state = 'idle'; c.task = null; return false; }
   c.path = p; c.pi = 0;
   if (p.length === 0) { c.state = 'work'; if (c.task && !(c.task.workLeft > 0)) c.task.workLeft = c.task.work; }
   else { c.state = 'walk'; c.walkKind = 'task'; }
+  return true;
 };
 
 /* 回家睡觉（无房者就地睡）。没干完的活先挂起，天亮接着干——
@@ -625,8 +655,7 @@ G.resumeTask = function (c) {
   if (!ok) return false;
   c.task = t;
   c.state = 'idle';
-  G.sendTo(c, t.tx, t.ty); // sendTo/arrive 只在 workLeft 为 0 时才重置满工时
-  return true;
+  return G.sendTo(c, t.tx, t.ty); // preserve remaining work only at a real endpoint
 };
 
 /* 最近的可用仓库 */
@@ -896,6 +925,49 @@ G.coldStep = function (c, dtH) {
   c.cold += dtH * G.LIFE.coldOutdoor / 24 * childMul;
 };
 
+/* Validate only the next segment after dispatch, including diagonal side
+ * tiles. Failed detours retain the task/cargo and retry every two hours. */
+G.pathStepBlocked = function (w, c, t) {
+  if (G.tileBlocked(w, t.x, t.y)) return true;
+  const dx = t.x - c.x, dy = t.y - c.y;
+  if (Math.abs(dx) < 1e-8 || Math.abs(dy) < 1e-8) return false;
+  const sx = Math.round(c.x), sy = Math.round(c.y);
+  if (sx === t.x || sy === t.y) return false;
+  return G.tileBlocked(w, t.x, sy) || G.tileBlocked(w, sx, t.y);
+};
+G.detourCitizen = function (c, dtH) {
+  c.pathRetryH = Math.max(0, (c.pathRetryH || 0) - dtH);
+  if (c.pathRetryH > 0) return;
+  c.pathRetryH = 2;
+  let goal = c.path[c.path.length - 1];
+  if (G.tileBlocked(G.world, goal.x, goal.y)) {
+    // An arbitrary nearestWalkable point is not a valid door/delivery target.
+    if (c.state === 'haul' && c.carry) { G.startHaul(c); return; }
+    if (c.walkKind === 'home') {
+      const home = G.homeOf(c);
+      if (!home || !G.workSpot(G.world, home, c.x, c.y)) { c.path = null; c.state = 'rest'; c.camped = true; }
+      else G.goHome(c);
+      return;
+    }
+    const t = c.task;
+    if (G.physicalTaskEndpoint(t)) { G.dropBlockedTask(c, t); return; }
+    if (t) {
+      const spot = G.alternateTaskEndpoint(c, t);
+      if (!spot) return;
+      goal = spot; t.tx = spot.x; t.ty = spot.y;
+    } else if (c.walkKind === 'wander') { c.path = null; c.state = 'idle'; c.wanderT = 2; return; }
+    else return;
+  }
+  const path = G.findPath(G.world, Math.round(c.x), Math.round(c.y), goal.x, goal.y);
+  if (!path) {
+    if (c.state === 'haul' && G.isMineralCargo(c)) { c.haulPending = true; G.waitForMineralStorage(c, 'route'); }
+    return;
+  }
+  if (path.length && G.pathStepBlocked(G.world, c, path[0])) return;
+  c.path = path; c.pi = 0; c.pathRetryH = 0;
+  if (!path.length) G.arrive(c);
+};
+
 /* 市民每帧步进 */
 G.stepCitizen = function (c, dtH) {
   if (c.dead) return;
@@ -924,6 +996,8 @@ G.stepCitizen = function (c, dtH) {
       while (mv > 0) {
         if (!c.path || c.pi >= c.path.length) break;
         const t = c.path[c.pi];
+        if (G.pathStepBlocked(G.world, c, t)) { G.detourCitizen(c, dtH); return; }
+        c.pathRetryH = 0;
         const dx = t.x - c.x, dy = t.y - c.y;
         const d = Math.hypot(dx, dy);
         if (d <= mv) { c.x = t.x; c.y = t.y; mv -= d; c.pi++; }
@@ -1145,6 +1219,13 @@ G.foresterReachability = function (w, c) {
   };
 };
 
+// Preserve forest density/yield rules, but require an actual legal work tile.
+G.foodForestCanWork = function (b) {
+  const p = G.PROD[b.type];
+  const trees = G.treesInRadius(G.world, b.x, b.y, p.radius, b.type === 'hunting');
+  return trees.length >= p.needTrees && trees.some(t => !G.tileBlocked(G.world, t.x, t.y));
+};
+
 /* 按建筑类型生成任务 */
 G.makeTask = function (b, c) {
   const P = G.PROD, g = G.game, w = G.world;
@@ -1236,7 +1317,9 @@ G.makeTask = function (b, c) {
       // 产出随森林成熟度浮动：成熟树越多采集越丰（护林砍穿森林会砸了采集小屋的饭碗）
       const mature = trees.reduce((s, t2) => s + (G.treeStage(t2) >= 2 ? 1 : 0), 0);
       const qty = G.taskYield(Math.max(1, Math.round(P.gatherer.yield.qty * (0.4 + 0.6 * Math.min(1, mature / P.gatherer.fullForest)))));
-      const t = trees[G.ri(0, trees.length - 1)];
+      const targets = trees.filter(t => !G.tileBlocked(w, t.x, t.y));
+      if (!targets.length) { b.noWork = true; b.warnText = '森林目标被工地覆盖，需先清场'; return null; }
+      const t = targets[G.ri(0, targets.length - 1)];
       return {
         kind: 'work', b, tx: t.x, ty: t.y,
         work: G.taskWork(c, P.gatherer.workH), workLeft: 0, yield: { type: P.gatherer.yield.type, qty },
@@ -1304,9 +1387,11 @@ G.makeTask = function (b, c) {
       // 走最近的猎场（小抖动分散站位）：随机选树会把猎人的工作日耗在路上
       let best = null, bd = Infinity;
       for (const t2 of trees) {
+        if (G.tileBlocked(w, t2.x, t2.y)) continue;
         const d = G.d2(b.x, b.y, t2.x, t2.y) + G.rng() * 8;
         if (d < bd) { bd = d; best = t2; }
       }
+      if (!best) { b.noWork = true; b.warnText = '猎场目标被工地覆盖，需先清场'; return null; }
       return {
         kind: 'work', b, tx: best.x, ty: best.y,
         work: G.taskWork(c, P.hunting.workH), workLeft: 0, yield: { type: 'food', qty },
@@ -1540,8 +1625,7 @@ G.jobCanProduce = function (b) {
   if (b.type === 'blacksmith') return p.blacksmith.consume.every(c => r[c.type] >= c.qty);
   if (b.type === 'forester') return (b.doCut && !G.goalPaused('wood') && G.treesInRadius(w, b.x, b.y, p.forester.radius, true).length > p.forester.minMature) ||
     (b.doPlant && !!G.nearestPlantSpot(w, b.x, b.y, p.forester.radius));
-  if (b.type === 'gatherer') return G.treesInRadius(w, b.x, b.y, p.gatherer.radius, false).length >= p.gatherer.needTrees;
-  if (b.type === 'hunting') return G.treesInRadius(w, b.x, b.y, p.hunting.radius, true).length >= p.hunting.needTrees;
+  if (b.type === 'gatherer' || b.type === 'hunting') return G.foodForestCanWork(b);
   if (b.type === 'mine') return (!G.goalPaused('stone') && r.stone < G.storageCap()) || (!G.goalPaused('iron') && r.iron < G.storageCap());
   return true;
 };
@@ -1580,15 +1664,17 @@ G.scheduleJobs = function () {
   if (G.game.res.food < foodLow) G.game.foodUrgent = true;
   else if (G.game.res.food > foodRecovered) G.game.foodUrgent = false; // 滞回，避免在阈值附近反复打断工地
   const needFood = Math.ceil(dailyFood / (G.game.foodUrgent ? 4 : 8));
-  const isFood = b => b && b.state === 'ok' && !G.productionLimited(b) && FOOD_JOBS.includes(b.type) && (b.type !== 'farm' || G.farmHasWork(b));
+  const forestEligibility = new Map();
+  const hasForestWork = b => {
+    if (!['gatherer', 'hunting'].includes(b.type)) return true;
+    if (!forestEligibility.has(b.id)) forestEligibility.set(b.id, G.foodForestCanWork(b));
+    return forestEligibility.get(b.id);
+  };
+  const isFood = b => b && hasForestWork(b) && b.state === 'ok' && !G.productionLimited(b) && FOOD_JOBS.includes(b.type) && (b.type !== 'farm' || G.farmHasWork(b));
   const foodCount = () => w.citizens.filter(c => c.adult && !c.dead && isFood(w.bmap[c.job])).length;
   if (G.game.foodUrgent) {
     // 已占满的工地也必须能回补粮岗；只保护尚可工作的食物建筑，不空留人。
-    const foodBuildings = w.buildings.filter(isFood).filter(b => {
-      if (b.type === 'gatherer') return G.treesInRadius(w, b.x, b.y, G.PROD.gatherer.radius, false).length >= G.PROD.gatherer.needTrees;
-      if (b.type === 'hunting') return G.treesInRadius(w, b.x, b.y, G.PROD.hunting.radius, true).length >= G.PROD.hunting.needTrees;
-      return true;
-    });
+    const foodBuildings = w.buildings.filter(isFood);
     for (const b of foodBuildings) {
       let guard = 0;
       while (b.workers.length < G.BDEF[b.type].jobs && foodCount() < needFood && guard++ < 4) {
@@ -1782,6 +1868,11 @@ G.addBuilding = function (type, x, y, opt) {
   for (let j = y; j < y + def.h; j++)
     for (let i = x; i < x + def.w; i++)
       w.bgrid[j * w.N + i] = b.id;
+  // A solid footprint invalidates forest/field claims inside it immediately,
+  // so its builders can take over real clearing. Partial cargo stays owned.
+  if (!def.passable) for (const c of w.citizens) for (const task of [c.task, c.pausedTask])
+    if (G.physicalTaskEndpoint(task) && task.tx >= x && task.tx < x + def.w && task.ty >= y && task.ty < y + def.h)
+      G.dropBlockedTask(c, task);
   // 把站在占地内的市民挤到最近的可站立格（防止被封死在建筑里）
   for (const c of w.citizens) {
     const cx = Math.round(c.x), cy = Math.round(c.y);
@@ -1860,7 +1951,7 @@ G.demolishAt = function (tx, ty) {
     if (b) G.removeBuilding(b); // 拆除提示（含返还材料）在 removeBuilding 内
     return;
   }
-  if (w.road[i]) { w.road[i] = 0; G.markGroundDirty(tx, ty); return; }
+  if (w.road[i]) { G.setRoad(w, tx, ty, false); G.markGroundDirty(tx, ty); return; }
   if (w.treeIdx[i] >= 0) { G.removeTree(w, tx, ty); return; }
   if (w.rock[i]) { G.markRockAt(w, tx, ty); return; } // 岩石改为标记后由散工清除（资源入库需劳动）
 };
