@@ -108,21 +108,21 @@ test('rock work and farm claims survive overnight pauses', () => {
 });
 test('marked labor may borrow aggregate food surplus across buildings', () => {
   const a=building('gatherer',2,2,2,2),b=building('gatherer',10,2,2,2);
-  for(const hut of [a,b]) for(let i=0;i<4;i++) {
+  for(const hut of [a,b]) for(let i=0;i<2;i++) {
     const c=G.spawnCitizen({x:1,y:2,age:30,sex:'m'});c.job=hut.id;hut.workers.push(c.id);
   }
-  const donor=G.pickMarkDonor(G.world,false,['gatherer','dock','hunting'],5);
+  const donor=G.pickMarkDonor(G.world,false,['gatherer','dock','hunting'],3);
   assert.ok(donor);assert.ok(a.workers.includes(donor.id)||b.workers.includes(donor.id));
-  assert.equal(G.pickMarkDonor(G.world,false,['gatherer','dock','hunting'],8),null);
+  assert.equal(G.pickMarkDonor(G.world,false,['gatherer','dock','hunting'],4),null);
 });
 test('low food recalls builders and cannot leak food workers through rebalance', () => {
-  const huts=[building('gatherer',2,2,2,2),building('gatherer',12,2,2,2)];
+  const huts=[building('gatherer',2,2,2,2),building('gatherer',12,2,2,2),building('gatherer',2,12,2,2),building('gatherer',12,12,2,2)];
   for(const h of huts) for(let y=h.y-1;y<h.y+5;y++) for(let x=h.x-1;x<h.x+5;x++) G.addTree(G.world,x,y,-200);
   const site=building('house',20,2,2,2);site.state='site';site.workLeft=90;site.totalWork=90;
   building('woodcutter',20,10,2,2);
   for(let n=0;n<10;n++) {
     const c=G.spawnCitizen({x:5,y:5,age:30,sex:'m'});
-    const b=n<4?huts[0]:n<6?huts[1]:site;c.job=b.id;b.workers.push(c.id);c.state='idle';
+    const b=n<6?huts[Math.floor(n/2)]:site;c.job=b.id;b.workers.push(c.id);c.state='idle';
   }
   for(let n=0;n<5;n++) G.spawnCitizen({x:5,y:5,age:5,sex:'f'});
   G.game.res.food=75;
@@ -139,9 +139,9 @@ test('empty-input critical jobs never interrupt busy food workers', () => {
   G.game.res.iron=0;
   for(let y=9;y<15;y++) for(let x=9;x<15;x++) G.addTree(G.world,x,y,-200);
   const workers=[];
-  for(let n=0;n<4;n++) { const c=G.spawnCitizen({x:9,y:10,age:30,sex:'m'});c.job=gather.id;gather.workers.push(c.id);G.requestTask(c);workers.push([c,c.task]); }
+  for(let n=0;n<2;n++) { const c=G.spawnCitizen({x:9,y:10,age:30,sex:'m'});c.job=gather.id;gather.workers.push(c.id);G.requestTask(c);workers.push([c,c.task]); }
   for(let n=0;n<8;n++) G.scheduleJobs();
-  assert.equal(gather.workers.length,4);assert.equal(smith.workers.length,0);
+  assert.equal(gather.workers.length,2);assert.equal(smith.workers.length,0);
   for(const [c,task] of workers) assert.equal(c.task,task);
 });
 test('tools warn before exhaustion and suppress repeated warnings', () => {

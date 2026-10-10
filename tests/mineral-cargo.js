@@ -197,8 +197,8 @@ test('blocked stone carrier does not satisfy labour reservation for a reachable 
 for(const kind of ['dock','house'])test(`blocked cargo frees an empty ${kind} job slot without discarding cargo`, () => {
   building('storage');const b=building(kind,10,10,2,2);if(kind==='dock')waterForDock();else{b.state='site';b.totalWork=b.workLeft=30;}
   G.game.res.stone=500;const carrier=citizen();carrier.carry={type:'stone',qty:9};G.startHaul(carrier);G.assignWorker(b,carrier);
-  for(let n=0;n<3;n++)G.assignWorker(b,citizen(9,10));const free=citizen(8,10);G.scheduleJobs();
-  assert.equal(carrier.job,null);assert.equal(carrier.carry.qty,9);assert(!b.workers.includes(carrier.id));assert.equal(free.job,b.id);assert.equal(b.workers.length,4);
+  const cap=kind==='dock'?2:4;for(let n=0;n<cap-1;n++)G.assignWorker(b,citizen(9,10));const free=citizen(8,10);G.scheduleJobs();
+  assert.equal(carrier.job,null);assert.equal(carrier.carry.qty,9);assert(!b.workers.includes(carrier.id));assert.equal(free.job,b.id);assert.equal(b.workers.length,cap);
 });
 test('an isolated blocked donor does not make the reservation loop reassign forever', () => {
   building('storage');const mine=building('mine',10,10);G.game.res.stone=500;G.game.res.iron=0;G.game.res.food=400;

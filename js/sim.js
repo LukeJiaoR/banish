@@ -1017,7 +1017,9 @@ G.requestTask = function (c) {
   const w = G.world;
   const b = c.job != null ? w.bmap[c.job] : null;
   // 换岗/任务中断后先交货；农田未满批可继续收割，找不到下一格时也必须交货。
-  if (c.carry && (!b || b.type !== 'farm' || b.state !== 'ok' || c.carry.type !== 'food' || c.carry.qty >= G.PROD.farm.haulCap)) {
+  const partialFarm = b && b.type === 'farm' && b.state === 'ok' && c.carry && c.carry.type === 'food' && c.carry.qty < G.PROD.farm.haulCap;
+  const partialForester = b && b.type === 'forester' && b.state === 'ok' && b.doCut && !G.goalPaused('wood') && c.carry && c.carry.type === 'wood' && c.carry.qty + G.taskYield(G.taskLogYield(c)) <= G.PROD.forester.haulCap;
+  if (c.carry && !partialFarm && !partialForester) {
     G.startHaul(c); return;
   }
   if (!b) {
@@ -1078,6 +1080,7 @@ G.requestTask = function (c) {
     return;
   }
   const t = G.makeTask(b, c);
+  if (partialForester && (!t || t.kind !== 'chop')) { G.startHaul(c); return; }
   if (t) {
     b.warnText = '';
     c.task = t;
@@ -1108,6 +1111,38 @@ G.recordProduction = function (b, type, qty) {
   if (!b) return;
   if (!b.produced) b.produced = {};
   b.produced[type] = (b.produced[type] || 0) + qty;
+};
+
+/* 护林派单内按需扩张的四向连通扫描，与禁穿角 A* 可达性一致。
+ * 找到当前候选即停；无路时最多遍历一次起点连通分量，后续候选复用结果。
+ * 仅供本次 makeTask 使用，不跨任务缓存，建造、道路、水域、读档无需失效钩子。
+ * 真正出发仍由 sendTo 使用道路加权 A*，不改变行走路径与搬运成本。 */
+G.foresterReachability = function (w, c) {
+  const sx = Math.round(c.x), sy = Math.round(c.y), N = w.N;
+  let seen = null, queue = null, head = 0;
+  const directions = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  return (x, y) => {
+    if (G.tileBlocked(w, x, y)) {
+      const alt = G.nearestWalkable(w, x, y, 4);
+      if (!alt) return false;
+      x = alt.x; y = alt.y;
+    }
+    if (!seen) {
+      seen = new Uint8Array(N * N);
+      queue = [sy * N + sx];
+      seen[queue[0]] = 1; // 与 findPath 一样，允许从刚被建筑占据的起点走出。
+    }
+    const target = y * N + x;
+    while (head < queue.length && !seen[target]) {
+      const i = queue[head++], cx = i % N, cy = Math.floor(i / N);
+      for (const [dx, dy] of directions) {
+        const nx = cx + dx, ny = cy + dy, ni = ny * N + nx;
+        if (nx < 0 || ny < 0 || nx >= N || ny >= N || seen[ni] || G.tileBlocked(w, nx, ny)) continue;
+        seen[ni] = 1; queue.push(ni);
+      }
+    }
+    return !!seen[target];
+  };
 };
 
 /* 按建筑类型生成任务 */
@@ -1143,35 +1178,41 @@ G.makeTask = function (b, c) {
     }
     case 'forester': {
       const R = P.forester.radius;
+      const reachable = G.foresterReachability(w, c);
+      let waitingForClaim = false;
       // 砍倒即原地补种（原版护林人的可持续轮伐）：砍+种合并为一个任务，
-      // 采伐区稳定在屋旁成熟林带；圈 内无成熟树时才单独补种育林
+      // 在作业范围内就近连续采伐；无成熟树时才单独补种育林
       const plantTask = () => {
         // 同屋工人在种的坑不再重复认领（防止多人挤同一个点白跑）
         const claimed = new Set();
-        for (const c2 of w.citizens)
-          if (c2 !== c && c2.task && c2.task.kind === 'plant' && c2.task.b === b) claimed.add(c2.task.ty * w.N + c2.task.tx);
-        const spot = G.nearestPlantSpot(w, b.x, b.y, R, claimed);
+        for (const c2 of w.citizens) for (const task of [c2.task, c2.pausedTask])
+          if (c2 !== c && task && task.kind === 'plant') claimed.add(task.ty * w.N + task.tx);
+        const spot = G.nearestPlantSpot(w, b.x, b.y, R, claimed, reachable);
+        if (!spot && claimed.size && G.nearestPlantSpot(w, b.x, b.y, R, null, reachable)) waitingForClaim = true;
         return spot ? { kind: 'plant', b, tx: spot.x, ty: spot.y, work: G.taskWork(c, P.forester.plantH), workLeft: 0 } : null;
       };
       if (b.doCut && !G.goalPaused('wood')) { // 砍伐成熟树（面板可开关，原版 Forester 的 Cut 选项）
         const trees = G.treesInRadius(w, b.x, b.y, R, true).filter(t => w.bgrid[t.i] < 0);
         // 成熟树存量低于下限就停砍育林：防止清穿森林（也会拖垮同址采集小屋），等补种长回来
         if (trees.length > P.forester.minMature) {
-          // 已被其他工人认领的树不再重复认领（全部被认领时允许重叠）
+          // 已被其他工人认领的树不再重复认领，包括夜间暂停的任务
           const claimed = new Set();
-          for (const c2 of w.citizens)
-            if (c2.task && c2.task.kind === 'chop' && c2 !== c) claimed.add(c2.task.ty * w.N + c2.task.tx);
-          let best = null, bd = Infinity;
+          for (const c2 of w.citizens) for (const task of [c2.task, c2.pausedTask])
+            if (c2 !== c && task && ['chop', 'clearSite'].includes(task.kind) && task.tree) claimed.add(task.tree.i);
+          const ranked = [];
           for (const t of trees) {
-            if (claimed.has(t.i) && claimed.size < trees.length) continue;
-            const d = G.d2(b.x, b.y, t.x, t.y) + G.rng() * 8;
-            if (d < bd) { bd = d; best = t; }
+            if (claimed.has(t.i)) continue;
+            const d = G.d2(c.x, c.y, t.x, t.y) + G.rng() * 8;
+            ranked.push({ tree: t, d });
           }
+          if (!ranked.length && claimed.size) waitingForClaim = true;
+          ranked.sort((a, z) => a.d - z.d);
+          const best = ranked.find(t => reachable(t.tree.x, t.tree.y))?.tree;
           if (best) return {
             kind: 'chop', b, tx: best.x, ty: best.y, tree: best, logs: G.taskYield(G.taskLogYield(c)),
             // 砍+原地补种合并（补种耗时会加进工时；关补种则只砍不种，森林会被清光）
             replant: b.doPlant,
-            work: G.taskWork(c, P.forester.workH + (b.doPlant ? P.forester.plantH : 0)), workLeft: 0,
+            work: G.taskWork(c, (P.forester.cutWorkH || P.forester.workH) + (b.doPlant ? P.forester.plantH : 0)), workLeft: 0,
           };
         }
       }
@@ -1179,6 +1220,7 @@ G.makeTask = function (b, c) {
         const t = plantTask();
         if (t) return t;
       }
+      if (waitingForClaim) { b.noWork = false; b.warnText = '等待其他工人完成已认领的林业任务'; return null; }
       b.noWork = true;
       b.warnText = !b.doCut && !b.doPlant ? '已停用（砍伐/补种均关）'
         : (b.doCut ? '附近成熟树不足' : '无处可补种');
@@ -1331,10 +1373,13 @@ G.completeTask = function (c) {
       const jobOk = !t.b || G.world.bmap[t.b.id] === t.b; // b 为空 = 散工砍标记树
       if (treeOk && jobOk) {
         G.removeTree(G.world, t.tx, t.ty);
-        c.carry = { type: 'wood', qty: t.logs || G.TREE_LOGS };
+        const logs = t.logs || G.TREE_LOGS;
+        if (t.b && t.b.type === 'forester' && c.carry && c.carry.type === 'wood') c.carry.qty += logs;
+        else c.carry = { type: 'wood', qty: logs };
         G.recordProduction(t.b, 'wood', t.logs || G.TREE_LOGS);
         if (t.replant && t.b && t.b.doPlant) G.addTree(G.world, t.tx, t.ty); // 砍倒即原地补种
       }
+      if (treeOk && jobOk && t.b && t.b.type === 'forester' && c.carry && c.carry.qty < G.PROD.forester.haulCap) { G.requestTask(c); return; }
       break;
     }
     case 'plant': {

@@ -407,10 +407,10 @@ G.ui = { toast() {}, refreshHUD() {} };
   edu.educated = true;
   G.game.res.wood = 10;
   const t = G.makeTask(b, edu);
-  check('受教育伐木工：配比加成 2 木 → 8 柴，工时不变', t && t.yield.qty === 8 && t.work === 7);
+  check('受教育伐木工：配比加成 2 木 → 8 柴，工时为3.5小时', t && t.yield.qty === 8 && t.work === 3.5);
   const plain = G.spawnCitizen({ x: 5, y: 5, sex: 'f', age: 25, adult: true });
   const t2 = G.makeTask(b, plain);
-  check('未受教育伐木工：2 木 → 6 柴', t2 && t2.yield.qty === 6 && t2.work === 7);
+  check('未受教育伐木工：2 木 → 6 柴', t2 && t2.yield.qty === 6 && t2.work === 3.5);
 }
 {
   freshGame();
@@ -749,8 +749,10 @@ G.markGroundDirty = G.markGroundDirty || (() => {}); // render.js 未加载时�
   check('未受教育护林工：一棵树 2 原木', t2 && t2.kind === 'chop' && t2.logs === 2);
   t.work = 1; t.workLeft = 0;
   edu.task = t;
-  G.completeTask(edu); // 本局没有仓库 → 原木直接入库
-  check('砍倒后 3 原木入库', G.game.res.wood === 80 + 3 && !edu.carry);
+  G.completeTask(edu);
+  check('砍倒后3原木留在专业工人批次中', G.game.res.wood === 80 && edu.carry.qty === 3);
+  G.releaseWorker(edu);
+  check('离岗交出原木尾批', G.game.res.wood === 83 && !edu.carry);
 }
 {
   freshGame();
@@ -777,12 +779,12 @@ G.markGroundDirty = G.markGroundDirty || (() => {}); // render.js 未加载时�
   const c = G.spawnCitizen({ x: 4, y: 4, sex: 'm', age: 25 });
   c.job = b.id;
   const t = G.makeTask(b, c);
-  check('砍伐任务合并原地补种（8h+3h=11h）', t && t.kind === 'chop' && t.replant === true && t.work === 11 && t.tx === 5);
+  check('砍伐任务合并原地补种（4h+1.5h=5.5h）', t && t.kind === 'chop' && t.replant === true && t.work === 5.5 && t.tx === 5);
   c.task = t; t.workLeft = 0;
   G.completeTask(c);
   const i = 5 * w.N + 5;
-  check('砍倒后原坑立即长出树苗、2 原木入库',
-    w.treeIdx[i] >= 0 && w.trees[w.treeIdx[i]].b === G.game.day && G.game.res.wood === 80 + 2);
+  check('砍倒后原坑立即长出树苗、携带2原木',
+    w.treeIdx[i] >= 0 && w.trees[w.treeIdx[i]].b === G.game.day && G.game.res.wood === 80 && c.carry.qty === 2);
 }
 {
   freshGame();
@@ -794,10 +796,10 @@ G.markGroundDirty = G.markGroundDirty || (() => {}); // render.js 未加载时�
   const c = G.spawnCitizen({ x: 4, y: 4, sex: 'm', age: 25 });
   c.job = b.id;
   const t = G.makeTask(b, c);
-  check('关补种 → 只砍不种（8h）', t && t.kind === 'chop' && !t.replant && t.work === 8);
+  check('关补种 → 只砍不种（4h）', t && t.kind === 'chop' && !t.replant && t.work === 4);
   c.task = t; t.workLeft = 0;
   G.completeTask(c);
-  check('砍倒后树坑空置、2 原木入库', w.treeIdx[5 * w.N + 5] < 0 && G.game.res.wood === 80 + 2);
+  check('砍倒后树坑空置、携带2原木', w.treeIdx[5 * w.N + 5] < 0 && G.game.res.wood === 80 && c.carry.qty === 2);
 }
 
 /* ---- 8.6 拆除返还约一半材料（原版行为） ---- */
@@ -1023,12 +1025,12 @@ G.markGroundDirty = G.markGroundDirty || (() => {}); // render.js 未加载时�
   c.job = b.id;
   seedMatureTrees(w, 5, 5, 24); // 圈内成熟树达到满产基准
   let t = G.makeTask(b, c);
-  check('密林采集满产 5', t && t.yield.qty === 5);
+  check('密林采集满产10', t && t.yield.qty === 10);
   for (const t2 of w.trees.slice()) G.removeTree(w, t2.x, t2.y); // 清成幼林
   for (let k = 0; k < 20; k++) G.addTree(w, 5 + (k % 5), 5 + ((k / 5) | 0), 0); // 树苗 born=今天
   b.noWork = false;
   t = G.makeTask(b, c);
-  check('幼林采集减产至 0.4 倍档（5→2）', t && t.yield.qty === 2);
+  check('幼林采集减产至0.4倍档（10→4）', t && t.yield.qty === 4);
 }
 {
   freshGame();
@@ -1037,11 +1039,11 @@ G.markGroundDirty = G.markGroundDirty || (() => {}); // render.js 未加载时�
   const c = G.spawnCitizen({ x: 4, y: 4, sex: 'm', age: 25 });
   c.job = b.id;
   const t = G.makeTask(b, c);
-  check('周边无水渔获减半（4→2）', t && t.yield.qty === 2);
+  check('周边无水渔获减半（8→4）', t && t.yield.qty === 4);
   for (let y = 6; y < 12; y++) for (let x = 6; x < 12; x++) w.water[y * w.N + x] = 1; // 大片水域
   b.noWork = false;
   const t2 = G.makeTask(b, c);
-  check('大水域渔获满产 4', t2 && t2.yield.qty === 4);
+  check('大水域渔获满产8', t2 && t2.yield.qty === 8);
 }
 
 /* ---- 丧偶市民可再婚、单人家庭可分房 ---- */
@@ -1110,13 +1112,13 @@ G.markGroundDirty = G.markGroundDirty || (() => {}); // render.js 未加载时�
   const c = G.spawnCitizen({ x: 8, y: 8, sex: 'm', age: 25 });
   c.job = b.id;
   const t1 = G.makeTask(b, c);
-  check('矿井任务：采石 3', t1 && t1.kind === 'work' && t1.yield.type === 'stone' && t1.yield.qty === 3);
+  check('矿井任务：采石6', t1 && t1.kind === 'work' && t1.yield.type === 'stone' && t1.yield.qty === 6);
   b.mineTick = 4; // 下一趟是第 5 趟
   const t5 = G.makeTask(b, c);
-  check('每 5 趟 1 趟铁', t5 && t5.yield.type === 'iron' && t5.yield.qty === 3);
+  check('每 5 趟 1 趟铁', t5 && t5.yield.type === 'iron' && t5.yield.qty === 6);
   c.task = t1; c.state = 'work'; t1.workLeft = 0;
   G.completeTask(c);
-  check('采石完工 3 石入库', g.res.stone === 100 + 3);
+  check('采石完工6石入库', g.res.stone === 100 + 6);
   // 满仓不白挖：石铁都到上限停工；只有一项满仓时专采另一项
   g.res.stone = G.storageCap(); g.res.iron = 10;
   b.noWork = false; b.mineTick = 0;
@@ -1228,11 +1230,11 @@ G.markGroundDirty = G.markGroundDirty || (() => {}); // render.js 未加载时�
   seedMatureTrees(w, 5, 5, 20); // 圈内成熟树达满产基准
   b.noWork = false;
   t = G.makeTask(b, c);
-  check('密林狩猎满产 5 食物', t && t.kind === 'work' && t.yield.type === 'food' && t.yield.qty === 5);
+  check('密林狩猎满产10食物', t && t.kind === 'work' && t.yield.type === 'food' && t.yield.qty === 10);
   g.res.tools = 0;
   b.noWork = false;
   t = G.makeTask(b, c);
-  check('无工具狩猎减半（5→3）', t && t.yield.qty === 3);
+  check('无工具狩猎减半（10→5）', t && t.yield.qty === 5);
 }
 /* ---- 森林自然播种：护林屋之外森林也能再生 ---- */
 {

@@ -376,6 +376,18 @@ G.prepareSaveData = function (d) {
     };
     w.citizens.push(c); w.cmap[c.id] = c;
   }
+  // Old resource huts held four workers. Keep two stable assignments on completed
+  // specialist huts; builders keep their construction slots until finishBuilding runs.
+  // Tasks already restart under the existing snapshot contract; cargo stays owned
+  // by its citizen and is delivered by applySaveData after validation commits.
+  for (const b of w.buildings) if (['forester','dock','gatherer','hunting','mine'].includes(b.type) && b.state === 'ok') {
+    const assigned = w.citizens.filter(c => c.job === b.id);
+    const eligible = new Set(assigned.map(c => c.id));
+    const ordered = [...new Set([...b.workers.filter(id => eligible.has(id)), ...eligible])];
+    b.workers = ordered.slice(0, G.BDEF[b.type].jobs);
+    const keep = new Set(b.workers);
+    for (const c of assigned) if (!keep.has(c.id)) c.job = null;
+  }
   if (G.normalizeFamilyRelations) G.normalizeFamilyRelations(w);
   // Relocate old saves' citizens trapped inside a footprint before committing.
   for (const c of w.citizens) {

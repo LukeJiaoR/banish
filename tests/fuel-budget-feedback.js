@@ -319,7 +319,7 @@ test('descriptions explain inventory cutoff rather than asserting that target me
   const { G } = fixture(); const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
   for (const text of [G.BDEF.woodcutter.desc, html]) {
     assert.doesNotMatch(text, /柴火够用时自动停工/);
-    assert.match(text, /目标不代表过冬需求/); assert.match(text, /本屋停止接新批次/);
+    assert.match(text, /目标不代表过冬需求/); assert.match(text, /本屋停止接新批次|本屋燃料目标即停止新批次/);
   }
 });
 
