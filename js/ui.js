@@ -218,7 +218,7 @@ G.ui = {
       { id: 'homes', name: '住房', icon: '🏠', hint: '安家与过冬', tools: ['house', 'stonehouse', 'boarding'] },
       { id: 'food', name: '食物生产', icon: '🌾', hint: '肉类 · 蔬菜 · 主食', tools: ['gatherer', 'hunting', 'dock', 'farm', 'orchard', 'pasture'] },
       { id: 'industry', name: '资源与加工', icon: '⚒️', hint: '木石铁煤 · 工具 · 衣物 · 酿造', tools: ['forester', 'woodcutter', 'stonequarry', 'mine', 'blacksmith', 'tailor', 'tavern'] },
-      { id: 'services', name: '城镇服务', icon: '🏘️', hint: '储运 · 教育 · 医疗 · 迁入', tools: ['storage', 'school', 'herbalist', 'hospital', 'tradingpost', 'townhall'] },
+      { id: 'services', name: '城镇服务', icon: '🏘️', hint: '储运 · 教育 · 医疗 · 迁入 · 安葬', tools: ['storage', 'school', 'herbalist', 'hospital', 'tradingpost', 'townhall', 'cemetery'] },
       { id: 'land', name: '道路与采运', icon: '🛣️', hint: '修路 · 采集 · 拆除', tools: ['road', 'stoneroad', 'bridge', 'fell', 'quarry', 'demolish'] },
     ].map(group => ({ ...group, tools: group.tools.filter(available) })).filter(group => group.tools.length);
     const registered = new Set(this.toolGroups.flatMap(group => group.tools));
@@ -935,6 +935,19 @@ G.ui = {
     });
     this.refreshHouseUpgradeInfo(b);
   },
+  cemeteryInfoData: function(b) {
+    const s=G.cemeterySummary(b);if(!s)return null;
+    return {status:s.status,capacity:`墓位：${s.used} / ${s.capacity} · 空余 ${s.free}`,expiry:s.nextDays===null?'暂无墓位占用':`最早约 ${s.nextDays} 天后释放墓位`,
+      records:s.graves.length?s.graves.map(r=>`${r.name}（余 ${r.daysLeft} 天）`).join('、'):'墓位空置，建成不会追溯减免此前的哀伤',
+      removal:s.canRemove?'空墓园可正常拆除，退还一半已付建材':'仍有未到期墓位，禁止拆除；不能拆建刷新容量'};
+  },
+  cemeteryInfoMarkup: function(data) {
+    return `<section class="cemetery-info">${Object.keys(data).filter(k=>k!=='status').map(k=>`<div class="row desc" data-cemetery="${k}">${this.escHtml(data[k])}</div>`).join('')}</section>`;
+  },
+  refreshCemeteryInfo: function(b) {
+    const data=this.cemeteryInfoData(b);if(!data||!this.el.info.querySelector)return;
+    for(const k of Object.keys(data)){const node=this.el.info.querySelector(`[data-cemetery="${k}"]`);if(node&&node.textContent!==data[k])node.textContent=data[k];}
+  },
   townLedgerInfoData: function () {
     // A summary is a read-only view. Never initialize/backfill a ledger from UI
     // reads or reuse facts cached for another loaded game with the same hall ID.
@@ -1626,9 +1639,10 @@ G.ui = {
     const days = Math.max(0, Math.min(6, s ? s.remainingDays : G.leisureDaysOf ? G.leisureDaysOf(c) : 0));
     return {
       happiness: `幸福：${happiness.toFixed(1)} / 5${s ? ` · 当前目标 ${s.target.toFixed(1)} / 5` : ''}`,
+      grief: G.griefLoss(c)>0?`亲属哀伤：${c.grief.name} · ${c.grief.buried?'已安葬，损失减轻':'当时没有可达空墓位'} · 当前幸福目标 −${c.grief.loss.toFixed(2)}，约 ${c.grief.days} 天恢复`:'亲属哀伤：无',
       memory: days > 0 ? `休闲记忆：约余 ${days.toFixed(1)} 天${s ? ` · 幸福目标 +${s.leisureBonus}` : ''}` : '休闲记忆：暂无（酒馆仅接待 18 岁以上居民）',
       work: `幸福带来的劳动效率：+${(bonus * 100).toFixed(1)}%（仅 0～+5%，无负惩罚）`,
-      basis: `三类饮食（肉类、蔬菜、主食）是幸福基础${s ? `，当前饮食基础 ${s.dietBase.toFixed(1)} / 5` : ''}；休闲可补到 5，饥饿会降低幸福目标。完成休闲即时 +0.4（上限 5）；日终向目标最多变化 0.1。`,
+      basis: `三类饮食（肉类、蔬菜、主食）是幸福基础${s ? `，当前饮食基础 ${s.dietBase.toFixed(1)} / 5` : ''}；休闲可补到 5，饥饿和亲属哀伤会降低幸福目标。完成休闲即时 +0.4（上限 5）；日终向目标最多变化 0.1。`,
     };
   },
   citizenLeisureMarkup: function (c) {
@@ -1667,6 +1681,7 @@ G.ui = {
     if (sameSelection && selected.state === 'ok' && this._economyInfoState === selected.state && this.refreshEconomyInfo(selected)) return;
     if (sameSelection && selected.state === 'ok' && this._medicalInfoState === selected.state && this.refreshMedicalInfo(selected)) return;
     if (sameSelection && selected.state === 'ok' && this._resourceChainInfoState === selected.state && this.refreshResourceChainInfo(selected)) return;
+    if(sameSelection&&G.sel.kind==='b'&&selected.type==='cemetery'&&selected.state==='ok'&&this._infoBuildState==='ok'){this.refreshCemeteryInfo(selected);return;}
     if (sameSelection && selected.type === 'woodcutter' && this._fuelInfoState === selected.state && this.refreshFuelInfo(selected)) return;
     if (hadFocus && !force && sameSelection && selected.type !== 'woodcutter' &&
         !(selected.type === 'farm' && selected.state === 'ok' && G.farmSummary) && (G.sel.kind === 'c' || (this._infoBuildState === selected.state && this._infoBuildType === selected.type))) {
@@ -1704,11 +1719,13 @@ G.ui = {
       const tailorData = this.tailorInfoData(b);
       const farmData = this.farmInfoData(b);
       const schoolData=this.schoolInfoData(b);
+      const cemeteryData=b.type==='cemetery'&&b.state==='ok'?this.cemeteryInfoData(b):null;
       const workforceData = this.workforceInfoData(b);
       const homeData = this.homeInfoData(b), upgradeData = this.houseUpgradeInfoData(b);
       let status;
       if (fuelData) status = fuelData.status;
       else if (siteData) status = siteData.status;
+      else if(cemeteryData)status=cemeteryData.status;
       else if(schoolData)status=schoolData.status;
       else if (medicalData) status = medicalData.status;
       else if (chainData) status = chainData.status;
@@ -1763,6 +1780,7 @@ G.ui = {
       if (tailorData) extra += this.tailorInfoMarkup(tailorData);
       if (farmData) extra += this.farmInfoMarkup(farmData);
       if(schoolData)extra+=this.schoolInfoMarkup(b);
+      if(cemeteryData)extra+=this.cemeteryInfoMarkup(cemeteryData);
       if (b.state === 'ok') extra += this.economyInfoMarkup(b);
       if (medicalData) extra += this.medicalInfoMarkup(b, medicalData);
       const outputs = { gatherer: ['vegetables'], hunting: ['meat', 'leather'], dock: ['meat'], farm: ['grain'], orchard: ['vegetables'], pasture: ['meat', 'wool'], tailor: ['clothes'], herbalist: ['herbs'] };
@@ -1781,7 +1799,7 @@ G.ui = {
       }
       el.innerHTML = `
         <div class="info-head"><span>${def.icon} ${def.name}</span><button id="info-close">✕</button></div>
-        <div class="row"${siteData ? ' data-site-status' : ''}${homeData ? ' data-home-status' : ''}${fuelData ? ' data-fuel="status"' : ''}${medicalData ? ' data-medical="status"' : ''}${chainData ? ' data-resource-chain-live="status"' : ''}${hallData ? ' data-townhall="status"' : ''}${tavernData ? ' data-tavern="status"' : ''}${tailorData ? ' data-tailor="status"' : ''}${farmData ? ' data-farm="status"' : ''}${schoolData?' data-school="status"':''}${b.state === 'ok' && ['tradingpost', 'pasture', 'orchard'].includes(b.type) ? ' data-economy-status' : ''}>${this.escHtml(status)}</div>
+        <div class="row"${siteData ? ' data-site-status' : ''}${homeData ? ' data-home-status' : ''}${fuelData ? ' data-fuel="status"' : ''}${medicalData ? ' data-medical="status"' : ''}${chainData ? ' data-resource-chain-live="status"' : ''}${hallData ? ' data-townhall="status"' : ''}${tavernData ? ' data-tavern="status"' : ''}${tailorData ? ' data-tailor="status"' : ''}${farmData ? ' data-farm="status"' : ''}${cemeteryData?' data-cemetery="status"':''}${schoolData?' data-school="status"':''}${b.state === 'ok' && ['tradingpost', 'pasture', 'orchard'].includes(b.type) ? ' data-economy-status' : ''}>${this.escHtml(status)}</div>
         ${workers}${this.workforceInfoMarkup(b, workforceData)}${extra}
         <div class="row desc">${def.desc}</div>
         <div class="row desc" data-info-refund${fuelData ? ' data-fuel="refund"' : ''}>${fuelData ? fuelData.refund : siteData ? siteData.refund : '已开工：拆除退还一半已付建材，已砍树不恢复'}</div>

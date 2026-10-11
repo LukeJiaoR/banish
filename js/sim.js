@@ -98,6 +98,7 @@ G.endDay = function () {
   // Midnight meals/heating below belong to the new day, not the closed one.
   G.closeTownLedgerDay();
   g.day++;
+  G.advanceMemorials();
   const born0 = g.stats.born, died0 = g.stats.died; // 当日生死增量（进滚动日志）
   const oldSeason = g.season;
   g.season = G.seasonOf(g.day);
@@ -525,7 +526,8 @@ G.spawnCitizen = function (opt) {
 };
 
 G.killCitizen = function (c, why) {
-  if (c.dead) return;
+  if (!c || c.dead || G.world.cmap[c.id]!==c) return;
+  G.mournCitizen(c);
   c.dead = true;
   const w = G.world, g = G.game;
   const partner = w.cmap[c.partnerId];
@@ -2039,6 +2041,7 @@ G.addBuilding = function (type, x, y, opt) {
   if (type === 'forester') { b.doCut = true; b.doPlant = true; } // 原版 Forester 的 Cut / Plant 开关
   if (type === 'mine') { b.mineMode = 'iron'; b.legacyMine = false; b.mineTick = 0; }
   if (type === 'blacksmith') { b.toolLimit = G.PROD.blacksmith.toolLimit; b.toolRecipe = 'iron'; }
+  if(type==='cemetery')b.graves=[];
   if(type==='tavern')b.reserveDays=12;
   if(type==='tailor')b.coatRecipe='basic';
   if (type === 'woodcutter') b.fuelLimit = G.PROD.woodcutter.fuelLimit; // 燃料上限（原版 Fuel Limit）
@@ -2140,6 +2143,7 @@ G.finishBuilding = function (b) {
 G.removeBuilding = function (b) {
   const w = G.world;
   if(!b||w.bmap[b.id]!==b)return; // A consumed/cancelled site cannot refund twice.
+  if(b.type==='cemetery'&&G.activeGraves(b).length){G.ui.toast('墓园仍有未到期墓位，需等自然释放后才能拆除','warn');return;}
   if(b.type==='townhall'&&G.game.nomads.offer?.hallId===b.id)G.game.nomads.offer=null;
   if (b.type === 'bridge') { const check=G.bridgeRemovalStatus(w,b); if(!check.ok){G.ui.toast(check.reason,'warn');return;} }
   if (b.type === 'tradingpost' && Object.values(b.tradeInventory || {}).some(q => q > 0)) { G.ui.toast('先把待售目标设0，搬空贸易库存再拆除','warn'); return; }
@@ -2634,7 +2638,7 @@ G.townHallSummary = function(b) {
  * fetching and before fermenting. Reserved grain is physical refundable cargo. */
 G.LEISURE={age:18,hours:2,days:6,capacity:4,maxTravelHours:6,retryHours:6};
 G.leisureDaysOf=c=>G.clamp(Number.isFinite(c.leisureDays)?c.leisureDays:0,0,G.LEISURE.days);
-G.happinessTarget=c=>G.clamp(2.5+.5*(Number.isFinite(c.dietScore)?c.dietScore:1)+(G.leisureDaysOf(c)>0?1:0)-Math.min(2,(c.hunger||0)/3),1,5);
+G.happinessTarget=c=>G.clamp(2.5+.5*(Number.isFinite(c.dietScore)?c.dietScore:1)+(G.leisureDaysOf(c)>0?1:0)-Math.min(2,(c.hunger||0)/3)-G.griefLoss(c),1,5);
 G.happinessBonus=c=>G.clamp(((c.happiness||3)-3)*.025,0,.05);
 G.leisureSummary=c=>({dietBase:2.5+.5*(Number.isFinite(c.dietScore)?c.dietScore:1),leisureBonus:G.leisureDaysOf(c)>0?1:0,
   target:G.happinessTarget(c),happiness:c.happiness||3,workBonus:G.happinessBonus(c),remainingDays:G.leisureDaysOf(c)});
@@ -3006,4 +3010,50 @@ G.workforceSummary=function(b){
     '上限不是保证人数；保持原单工效率和自动调度。降额先放空闲者，有限生产批次结清后释放；教师/医师/接待停止服务时立即释放。粮柴岗位调低可能断供，缺粮时也不会越过上限。'+
     (b.type==='school'?'停教后学生保留课时并尝试转校。':['hospital','herbalist'].includes(b.type)?'停用后不再治疗或提供草药服务。':'');
   return {supported:maximum>0,current:workers.length,limit,maximum,draining:draining.length,paused,reason,rule,global};
+};
+
+
+/* Family loss is prospective only. Burial is an at-death capacity decision,
+ * not a new job or a transported-body simulation. Values adapt the original. */
+G.MEMORIAL={capacity:8,graveDays:4*G.YEAR_DAYS,griefDays:G.YEAR_DAYS,buriedLoss:.25,unburiedLoss:1,maxLoss:1.5};
+G.activeGraves=(b,day=G.game.day)=>(b.graves||[]).filter(r=>r.expiresDay>day);
+G.griefLoss=c=>c.grief&&c.grief.days>0?c.grief.loss:0;
+G.advanceMemorials=function(){
+  for(const b of G.world.buildings)if(b.type==='cemetery')b.graves=G.activeGraves(b);
+  for(const c of G.world.citizens)if(c.grief){
+    if(c.grief.days<=1)c.grief=null;
+    else{c.grief.loss*= (c.grief.days-1)/c.grief.days;c.grief.days--;}
+  }
+};
+G.burialPlace=function(c){
+  let best=null;
+  for(const b of G.world.buildings){
+    if(b.type!=='cemetery'||b.state!=='ok'||G.activeGraves(b).length>=G.MEMORIAL.capacity)continue;
+    const spot=G.workSpot(G.world,b,c.x,c.y);
+    if(spot&&(!best||spot.route.eta<best.spot.route.eta))best={b,spot};
+  }
+  return best;
+};
+G.mournCitizen=function(c){
+  const g=G.game,w=G.world,place=G.burialPlace(c),buried=!!place,name=c.name.slice(0,80);
+  if(place){const b=place.b;b.graves=G.activeGraves(b);const used=new Set(b.graves.map(r=>r.slot));let slot=0;while(used.has(slot))slot++;
+    b.graves.push({slot,name,deathDay:g.day,expiresDay:g.day+G.MEMORIAL.graveDays});}
+  let affected=0;
+  for(const other of w.citizens){
+    if(other===c||other.dead)continue;
+    const related=(c.familyId!=null&&other.familyId===c.familyId)||c.partnerId===other.id||other.partnerId===c.id||
+      (c.parentIds||[]).includes(other.id)||(other.parentIds||[]).includes(c.id);
+    if(!related)continue;
+    const before=G.griefLoss(other),loss=Math.min(G.MEMORIAL.maxLoss,before+(buried?G.MEMORIAL.buriedLoss:G.MEMORIAL.unburiedLoss));
+    other.grief={loss,days:G.MEMORIAL.griefDays,name,buried};
+    other.happiness=G.clamp((other.happiness||3)-(loss-before),1,5);affected++;
+  }
+  if(affected)G.ui.toast(buried?`🕯 ${c.name}已安葬，${affected}位亲属的哀伤得到减轻`:`🕯 ${c.name}没有可达空墓位，${affected}位亲属将逐日走出哀伤`,'info');
+};
+G.cemeterySummary=function(b){
+  if(!b||b.type!=='cemetery')return null;
+  const graves=G.activeGraves(b),next=graves.length?Math.min(...graves.map(r=>r.expiresDay)):null;
+  return {used:graves.length,capacity:G.MEMORIAL.capacity,free:G.MEMORIAL.capacity-graves.length,nextDays:next===null?null:next-G.game.day,
+    status:b.state!=='ok'?'施工中，尚不能安葬':graves.length>=G.MEMORIAL.capacity?'墓位已满，需等自然释放或新建墓园':'有空墓位；死亡时仍需检查实际可达路线',
+    graves:graves.map(r=>({slot:r.slot,name:r.name,daysLeft:r.expiresDay-G.game.day})),canRemove:graves.length===0};
 };

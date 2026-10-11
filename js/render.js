@@ -374,7 +374,7 @@ G.drawBuilding = function (ctx, b, time) {
   }
 
   // Direct-draw compatibility. The main frame sorts field props individually below.
-  if (b.type === 'orchard' || b.type === 'pasture') {
+  if (b.type === 'orchard' || b.type === 'pasture' || b.type === 'cemetery') {
     G.drawEconomyFieldGround(ctx, b);
     const parts = [];
     G.addEconomyFieldParts(parts, b);
@@ -511,7 +511,9 @@ G.addEconomyFieldParts = function (items, b, bounds) {
     const a = y0 + i * (y1 - y0) / b.h, c = y0 + (i + 1) * (y1 - y0) / b.h;
     fence(x0, a, x0, c); fence(x1, a, x1, c);
   }
-  if (b.type === 'orchard') {
+  if(b.type==='cemetery'){
+    for(const r of G.activeGraves(b))add({kind:'grave',x:b.x+.85+(r.slot%2)*1.7,y:b.y+.5+Math.floor(r.slot/2)*.85});
+  } else if (b.type === 'orchard') {
     for (let y = 1; y < b.h; y += 2) for (let x = 1; x < b.w; x += 2)
       add({ kind: 'fruitTree', x: b.x + x, y: b.y + y });
   } else {
@@ -538,6 +540,10 @@ G.drawEconomyFieldPart = function (ctx, p) {
     ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(a[0], a[1] - 12); ctx.moveTo(b[0], b[1]); ctx.lineTo(b[0], b[1] - 12); ctx.stroke();
     ctx.fillStyle = '#d0ad75'; ctx.fillRect(a[0] - 1.4, a[1] - 12.6, 2.8, 1.5); ctx.fillRect(b[0] - 1.4, b[1] - 12.6, 2.8, 1.5);
     ctx.restore(); return;
+  }
+  if(p.kind==='grave'){
+    if(!G.sprDraw(ctx,'grave',sx,sy,{w:16})){ctx.fillStyle='#b0a895';ctx.fillRect(sx-4,sy-12,8,12);ctx.fillStyle='#7b7365';ctx.fillRect(sx+4,sy-10,3,10);}
+    return;
   }
   if (p.kind === 'sheepShelter') {
     G.sprDraw(ctx, 'pasture', sx, sy, { w: 112 }); return;
@@ -810,7 +816,7 @@ G.frame = function (dtReal) {
 
   // All farm soil is ground, never a tall object sorted by the field's far corner.
   for (const b of w.buildings) if (b.type === 'farm') G.drawFarmGround(ctx, b, { tx0, ty0, tx1, ty1 });
-  for (const b of w.buildings) if (b.state === 'ok' && (b.type === 'pasture' || b.type === 'orchard'))
+  for (const b of w.buildings) if (b.state === 'ok' && (b.type === 'pasture' || b.type === 'orchard' || b.type === 'cemetery'))
     G.drawEconomyFieldGround(ctx, b, { tx0, ty0, tx1, ty1 });
 
   for(const b of w.buildings)if(b.type==='bridge')G.drawBridge(ctx,b);
@@ -916,7 +922,7 @@ G.frame = function (dtReal) {
     if (f.sown && !f.harvested && f.x >= tx0 && f.x <= tx1 && f.y >= ty0 && f.y <= ty1)
       items.push({ d: f.x + f.y + 1, k: 4, b, f });
   }
-  for (const b of w.buildings) if (b.state === 'ok' && (b.type === 'pasture' || b.type === 'orchard'))
+  for (const b of w.buildings) if (b.state === 'ok' && (b.type === 'pasture' || b.type === 'orchard' || b.type === 'cemetery'))
     G.addEconomyFieldParts(items, b, { tx0, ty0, tx1, ty1 });
   // 建筑
   for (const b of w.buildings) {
@@ -956,7 +962,7 @@ G.frame = function (dtReal) {
     else if (it.k === 5) G.drawEconomyFieldPart(ctx, it);
     else if (it.k === 1) {
       // Farm ground/crops were split above; keep its building-level badges.
-      if (it.b.type !== 'farm' && !(it.b.state === 'ok' && (it.b.type === 'pasture' || it.b.type === 'orchard')))
+      if (it.b.type !== 'farm' && !(it.b.state === 'ok' && (it.b.type === 'pasture' || it.b.type === 'orchard' || it.b.type === 'cemetery')))
         G.drawBuilding(ctx, it.b, now);
       // Cold homes get a distinct snowflake; no-work warning remains separate.
       if (G.isWinter() && it.b.unheated && it.b.state === 'ok') {
