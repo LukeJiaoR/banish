@@ -72,7 +72,7 @@ G.newGameState = function () {
     h: 6, day: 0, season: 0, year: 1,
     speed: 1, paused: false,
     res: { wood: 80, stone: 48, iron: 0, tools: 15, food: 500, meat: 0, vegetables: 0, grain: 500, leather: 0, wool: 0, clothes: 0, warmCoats: 0, herbs: 0, coal: 0, steelTools: 0, ale: 0, firewood: 50 }, // 开局（原版中难度 5 家庭，工具 15 件≈第一轮磨损周期）；存粮较原版加厚：15 人 6 天食物跑道撑不到第一座采集屋建成
-    heating:{allowCoal:false,coalReserve:20}, fishingRules:'shared', supplyMode:'automatic',clothingSupply:false,
+    heating:{allowCoal:false,coalReserve:20}, fishingRules:'shared', supplyMode:'automatic',clothingSupply:false,toolMode:'pooled',toolRemainders:{tools:0,steelTools:0},
     fireDisasters:{enabled:false,startedDay:null,graceUntil:0,lastDay:-1,nextIgnitionDay:0,serial:0,incidentHomes:[]},
     healthStartDay: 0, farmPests:{enabled:false,graceUntil:0,lastDay:-1}, challenges:{v:1,completed:{}},
     nomads: {nextDay:G.YEAR_DAYS,serial:0,offer:null,accepted:0,declined:0},
@@ -170,7 +170,7 @@ G.endDay = function () {
   const winter = g.season === 3;
   // ---- 工具磨损：每个成人每天磨损 1/toolLifeDays 把；用尽则全员生产减半 ----
   const adultsNow = w.citizens.filter(c => !c.dead && c.adult).length;
-  G.wearTools(adultsNow);
+  if(!G.personalToolsEnabled())G.wearTools(adultsNow);
   // 有人住的房子才烧柴（含石屋/宿舍；取暖量按建筑类型，原版石屋省一半）
   const houses = w.buildings.filter(b => G.isOccupiedHome(w, b));
   // 原版：木屋每年约烧 30 柴火（石屋 15），集中在冬季消耗；柴火按屋支付，付不起的屋子挨冻
@@ -238,13 +238,14 @@ G.endDay = function () {
     G.ui.toast('⚠ 食物储备不足 3 天', 'warn');
   }
   if (foodStock > pop * G.LIFE.eatPerDay * 8) g.warned.foodLow = false;
+  if(G.personalToolsEnabled())G.warnPersonalTools();
   const toolDays = G.toolDaysLeft(adultsNow);
-  if (pop > 0 && G.hasTools() && toolDays <= G.YEAR_DAYS && !g.warned.toolsLow) {
+  if (!G.personalToolsEnabled() && pop > 0 && G.hasTools() && toolDays <= G.YEAR_DAYS && !g.warned.toolsLow) {
     g.warned.toolsLow = true;
     G.ui.toast(`⚠ 工具约够 ${Math.floor(toolDays)} 天，尽早备好铁匠铺与铁矿；近矿耗尽时需向外找矿`, 'warn');
   }
   if (toolDays > G.YEAR_DAYS * 1.5) g.warned.toolsLow = false;
-  if (pop > 0 && !g.warned.noTools && !G.hasTools()) {
+  if (!G.personalToolsEnabled() && pop > 0 && !g.warned.noTools && !G.hasTools()) {
     g.warned.noTools = true;
     G.ui.toast('⚠ 工具用尽，生产减半——尽快建铁匠铺打工具（1铁+2木→2件）', 'bad');
   }
@@ -547,6 +548,7 @@ G.spawnCitizen = function (opt) {
     student: false, educated: false, school: null, studyHours:0, studyToday:0, studyDay:0,
     state: 'idle', walkKind: '', path: null, pi: 0, camped: false,
     wanderT: G.rng() * 3,
+    toolType:null,toolHours:0,
     hunger: 0, cold: 0, clothingLeft: 0, clothingType:null, dietVariety: 0, dietScore: 1, happiness: 3, leisureDays:0, health: 4, sickDays: 0, immunityDays: 0, herbCooldown: 0, careHours: 0,
     animT: G.rng() * 10,
     dead: false,
@@ -638,6 +640,7 @@ G.dropBlockedTask = function (c, t) {
 G.alternateTaskEndpoint = function (c, t) {
   if(t?.kind==='firefight')return G.fireLegSpot(c,t);
   if(t?.kind==='supply')return G.supplyLegSpot(c,t);
+  if(t?.kind==='toolFetch')return G.toolFetchRoute(c)?.spot||null;
   if (!t || G.physicalTaskEndpoint(t) || !t.b || G.world.bmap[t.b.id] !== t.b) return null;
   if (['build','clearSite'].includes(t.kind) ? t.b.state !== 'site' : t.b.state !== 'ok') return null;
   if (t.kind === 'clearSite' && (!t.tree || G.world.trees[G.world.treeIdx[t.tree.i]] !== t.tree)) return null;
@@ -667,7 +670,7 @@ G.routeCanReuse = function (route, c, tx, ty) {
 G.sendTo = function (c, tx, ty, planned = null) {
   let route=planned||(c.task&&c.task.dispatchRoute);
   if(c.task) delete c.task.dispatchRoute;
-  const buildingTask=c.task && (['build','clearSite','firewood','trade','care','clinic','arrival','leisure','host','brew','smith','fuel','tailor','study','teach','firefight','supply'].includes(c.task.kind) || (c.task.kind==='work' && c.task.b && ['dock','mine','stonequarry','blacksmith','pasture','orchard'].includes(c.task.b.type)));
+  const buildingTask=c.task && (['build','clearSite','firewood','trade','care','clinic','arrival','leisure','host','brew','smith','fuel','tailor','study','teach','firefight','supply','toolFetch'].includes(c.task.kind) || (c.task.kind==='work' && c.task.b && ['dock','mine','stonequarry','blacksmith','pasture','orchard'].includes(c.task.b.type)));
   if((route && !G.routeCanReuse(route,c,tx,ty)) || (!route && buildingTask)) {
     const spot=G.alternateTaskEndpoint(c,c.task);
     if(!spot){if(c.task)G.dropBlockedTask(c,c.task);c.path=null;c.state='idle';c.wanderT=.5;return false;}
@@ -682,7 +685,7 @@ G.sendTo = function (c, tx, ty, planned = null) {
   if (!p) { c.state = 'idle'; c.task = null; return false; }
   // The path planner rounds its start cell. Physically checked factory/mineral
   // tasks still walk the final fraction after an interrupted commute.
-  if((c.task?.mineral||['firefight','supply'].includes(c.task?.kind)||['fuel','tailor'].includes(c.task?.kind)) && p.length===0 && G.d2(c.x,c.y,tx,ty)>1e-8) {
+  if((c.task?.mineral||['firefight','supply','toolFetch'].includes(c.task?.kind)||['fuel','tailor'].includes(c.task?.kind)) && p.length===0 && G.d2(c.x,c.y,tx,ty)>1e-8) {
     c.path=[{x:tx,y:ty}];c.pi=0;c.state='walk';c.walkKind='task';return true;
   }
   c.path = p; c.pi = 0;
@@ -726,6 +729,7 @@ G.resumeTask = function (c) {
   if(c.student){c.pausedTask=null;return G.startStudy(c);}
   const t = c.pausedTask;
   c.pausedTask = null;
+  if(t?.kind==='toolFetch'){if(G.tryHouseholdSupply&&G.tryHouseholdSupply(c))return true;c.task=t;return G.planToolFetch(c,t);}
   if(t?.kind==='supply'){c.task=t;return G.planSupplyLeg(c,t);}
   if(t&&['teach','clinic','host'].includes(t.kind)&&G.tryHouseholdSupply&&G.tryHouseholdSupply(c))return true;
   if (!t) return false;
@@ -880,7 +884,7 @@ G.startHaul = function (c) {
 G.fuelLimitOf = function (b) { return Number.isFinite(b.fuelLimit) ? G.clamp(b.fuelLimit, 0, G.PROD.woodcutter.fuelMax) : G.PROD.woodcutter.fuelLimit; };
 G.fuelLimited = function (b) { return b.type === 'woodcutter' && (G.productionGoalOf('firewood') === null ? (G.supplyEconomyStock?G.supplyEconomyStock('firewood'):G.game.res.firewood) >= G.fuelLimitOf(b) : G.goalPaused('firewood', b)); };
 G.toolLimitOf = function (b) { return Number.isFinite(b.toolLimit) ? G.clamp(b.toolLimit, 0, G.PROD.blacksmith.toolMax) : G.PROD.blacksmith.toolLimit; };
-G.toolLimited = function (b) { const type = G.blacksmithOutput(b); return b.type === 'blacksmith' && (G.productionGoalOf(type) === null ? G.game.res[type] >= G.toolLimitOf(b) : G.goalPaused(type, b)); };
+G.toolLimited = function (b) { const type = G.blacksmithOutput(b); return b.type === 'blacksmith' && (G.productionGoalOf(type) === null ? G.toolReserveCount(type) >= G.toolLimitOf(b) : G.goalPaused(type, b)); };
 
 /* Optional automatic-production goals. Unset means the exact legacy rules.
  * Hysteresis changes at deliveries and the normal 2h scheduler, never in UI reads. */
@@ -987,6 +991,7 @@ G.buildingGoalStatus = function (b) {
 // Only configured automatic jobs gain completion protection. Never change the
 // unset baseline, teachers, manual tasks, or construction scheduling here.
 G.goalCommitment = function (c) {
+  if(G.toolFetchTask(c))return true;
   if(G.fireTaskOf&&G.fireTaskOf(c))return true;
   if(G.supplyTaskOf&&G.supplyTaskOf(c))return true;
   if(c.carry?.staffingReturn===true||(c.staffingRelease!=null&&c.staffingRelease===c.job))return true;
@@ -1213,6 +1218,7 @@ G.pathStepBlocked = function (w, c, t) {
   return G.tileBlocked(w, t.x, sy) || G.tileBlocked(w, sx, t.y);
 };
 G.detourCitizen = function (c, dtH) {
+  if(c.task?.kind==='toolFetch'){G.planToolFetch(c,c.task);return;}
   if(c.task?.kind==='firefight'){G.planFireLeg(c,c.task);return;}
   if(c.task?.kind==='supply'){G.planSupplyLeg(c,c.task);return;}
   c.pathRetryH = Math.max(0, (c.pathRetryH || 0) - dtH);
@@ -1257,6 +1263,7 @@ G.detourCitizen = function (c, dtH) {
 /* 市民每帧步进 */
 G.stepCitizen = function (c, dtH) {
   if (c.dead) return;
+  c.toolRetryH=Math.max(0,(c.toolRetryH||0)-dtH);
   if(c.student)G.restrictStudentWork(c);
   if(c.task?.kind==='orchard'&&!G.orchardTaskCurrent(c,c.task))G.dropBlockedTask(c,c.task);
   if(c.task&&['study','teach'].includes(c.task.kind)&&!G.validSchoolTask(c)){G.clearSchoolTasks(c);c.wanderT=0;}
@@ -1305,6 +1312,7 @@ G.stepCitizen = function (c, dtH) {
       return;
     }
     case 'work': {
+      if(c.task?.kind==='toolFetch'){G.stepToolFetch(c,dtH);return;}
       if(c.task?.mineral&&!G.atMineralTask(c,c.task)){
         const t=c.task,spot=G.mineralTaskCurrent(c,t)&&G.workSpot(G.world,t.b,c.x,c.y);
         if(spot){t.tx=spot.x;t.ty=spot.y;G.sendTo(c,t.tx,t.ty,spot.route);}
@@ -1332,7 +1340,7 @@ G.stepCitizen = function (c, dtH) {
       if(c.task?.kind==='brew'&&c.task.phase==='process'&&(G.isSick(c)||!G.tavernBrewStatus(c.task.b,true).ok)){G.returnBrewGrain(c);return;}
       if (!c.task) { c.state = 'idle'; return; }
       if (c.task.b && c.task.b.state === 'site') c.task.b.constructionStarted = true;
-      c.task.workLeft -= dtH * (1+G.happinessBonus(c)) / G.healthWorkMul(c);
+      c.task.workLeft -= G.toolWorkProgress(c,c.task,dtH);
       c.animT += dtH * 12;
       if (c.task.workLeft <= 0) G.completeTask(c);
       return;
@@ -1414,6 +1422,7 @@ G.cancelResourceMarks = function (kind) {
 };
 
 G.requestTask = function (c) {
+  if(G.toolFetchTask(c)){G.planToolFetch(c,G.toolFetchTask(c));return;}
   if(G.supplyTaskOf&&G.supplyTaskOf(c)){G.planSupplyLeg(c,G.supplyTaskOf(c));return;}
   if(G.fireTaskOf&&G.fireTaskOf(c)){G.planFireLeg(c,G.fireTaskOf(c));return;}
   const retiring=c.staffingRelease===c.job&&c.job!=null;
@@ -1427,6 +1436,7 @@ G.requestTask = function (c) {
   if(c.student){if(c.carry)G.startHaul(c);else G.startStudy(c);return;}
   if(!c.adult){G.wander(c);return;}
   if(!c.carry&&G.tryHouseholdSupply&&G.tryHouseholdSupply(c))return;
+  if(!c.carry && G.tryToolFetch(c))return;
   if(!c.carry && G.tryLeisure(c))return;
   const w = G.world;
   const b = c.job != null ? w.bmap[c.job] : null;
@@ -1513,8 +1523,8 @@ G.requestTask = function (c) {
 G.taskWork = function (c, hours) { return c.educated ? hours * G.LIFE.eduWorkMul : hours; };
 
 /* 任务产出按工具状态折算：工具用尽时减产（原版工具是效率核心，约 2.5 年磨坏一件） */
-G.taskYield = function (base) {
-  const m = G.hasTools() ? 1 : G.NO_TOOL_MULT;
+G.taskYield = function (base, task) {
+  const m = task?.toolYieldMultiplier ?? (G.personalToolsEnabled() || G.hasTools() ? 1 : G.NO_TOOL_MULT);
   return Math.max(1, Math.round(base * m));
 };
 
@@ -1809,7 +1819,7 @@ G.completeTask = function (c) {
       const i = t.ty * G.world.N + t.tx;
       if (G.world.rock[i] === t.rock) {
         G.clearRock(G.world, t.tx, t.ty);
-        c.carry = { type: t.rock === 2 ? 'iron' : 'stone', qty: G.taskYield(t.rock === 2 ? G.ROCK_IRON : G.ROCK_STONE) };
+        c.carry = { type: t.rock === 2 ? 'iron' : 'stone', qty: G.taskYield(t.rock === 2 ? G.ROCK_IRON : G.ROCK_STONE,t) };
       }
       break;
     }
@@ -1859,7 +1869,7 @@ G.completeTask = function (c) {
         t.b.farm[t.ti].harvested = true;
         // 攒批搬运：收获累计到 haulCap 才送一趟仓库
         const P = G.PROD.farm;
-        const output=G.CROPS[t.crop || G.farmCropOf(b)].output,qty=G.taskYield(G.farmHarvestBase(b));
+        const output=G.CROPS[t.crop || G.farmCropOf(b)].output,qty=G.taskYield(G.farmHarvestBase(b),t);
         if (c.carry) c.carry.qty += qty;
         else c.carry = { type: output, qty };
         G.recordProduction(b,output,qty);
@@ -1906,7 +1916,7 @@ G.releaseWorker = function (c) {
 };
 
 G.assignWorker = function (b, c) {
-  if(!c||c.dead||!c.adult||c.student||c.job!=null||c.carry?.staffingReturn===true||(G.fireTaskOf&&G.fireTaskOf(c))||(G.supplyTaskOf&&G.supplyTaskOf(c))||G.isArriving(c)||G.world.bmap[b.id]!==b||b.workers.length>=G.workerLimitOf(b))return;
+  if(!c||c.dead||!c.adult||c.student||c.job!=null||c.carry?.staffingReturn===true||G.toolFetchTask(c)||(G.fireTaskOf&&G.fireTaskOf(c))||(G.supplyTaskOf&&G.supplyTaskOf(c))||G.isArriving(c)||G.world.bmap[b.id]!==b||b.workers.length>=G.workerLimitOf(b))return;
   if(b.type==='tavern'&&b.state==='ok'&&(c.age<18||G.isSick(c)))return;
   if (b.type === 'hospital' && b.state === 'ok' && G.isSick(c)) return;
   c.job = b.id;
@@ -2902,10 +2912,11 @@ G.advanceHealth = function () {
 /* Resource specialization retains the old mine/save contract until the player
  * chooses another product. Exhaustion and irreversible pits are a later slice. */
 G.isTool = type => type === 'tools' || type === 'steelTools';
-G.toolStock = () => (G.game.res.tools || 0) + (G.game.res.steelTools || 0);
+G.toolStock = () => G.toolReserveCount('tools') + G.toolReserveCount('steelTools');
 G.hasTools = () => G.toolStock() > 0;
 G.toolDaysLeft = function (adults) {
   const g = G.game;
+  if(G.personalToolsEnabled())return G.toolRemainingHours()/16/Math.max(1,adults);
   const days = Math.max(0,(g.res.tools || 0)-(g.toolWear || 0))*G.LIFE.toolLifeDays +
     Math.max(0,(g.res.steelTools || 0)-(g.steelToolWear || 0))*G.LIFE.steelToolLifeDays;
   return days / Math.max(1,adults);
@@ -3513,7 +3524,7 @@ G.releaseStaffingWorker=function(c,b){
   if(!c.task&&c.state!=='rest'){c.state='idle';c.wanderT=.5;}
 };
 G.workforceWorkers=b=>G.world.citizens.filter(c=>!c.dead&&c.adult&&!c.student&&c.job===b.id);
-G.staffingBatchActive=(c,b)=>!!c.carry||[c.task,c.pausedTask].some(t=>t?.b===b&&!['teach','clinic','host'].includes(t.kind));
+G.staffingBatchActive=(c,b)=>!!c.carry||[c.task,c.pausedTask].some(t=>t?.b===b&&!['teach','clinic','host','toolFetch'].includes(t.kind));
 G.enforceWorkerLimit=function(b){
   if(b.workerLimit===undefined&&!b.sitePaused)return; // Old/default automatic play is unchanged.
   const workers=G.workforceWorkers(b),excess=Math.max(0,workers.length-G.workerLimitOf(b));
@@ -3679,4 +3690,79 @@ G.homeHeatingSummary=function(b){
   return {allowCoal:p.allowCoal,coalReserve:p.coalReserve,coalStock:G.game.res.coal,coalAvailable:G.heatingCoalAvailable(),fuel:G.usableHeatingFuel(),
     ratio:G.COAL_HEAT,occupied:G.isOccupiedHome(G.world,b),unheated:!!b.unheated,
     last:last?{...last}:null,perDay:G.BDEF[b.type].warmWoodPerYear/G.SEASON_DAYS};
+};
+
+
+/* Optional personal tools. Only two legacy remainder slots bridge pooled wear;
+ * they are not a second goods ledger and cannot be sold as pristine stock. */
+G.personalToolsEnabled=()=>G.game.toolMode==='individual';
+G.toolLifeHours=type=>(type==='steelTools'?G.LIFE.steelToolLifeDays:G.LIFE.toolLifeDays)*16;
+G.toolReserveCount=(type,g=G.game)=>(g.res[type]||0)+(g.toolMode==='individual'&&g.toolRemainders?.[type]>0?1:0);
+G.toolEquipped=c=>G.isTool(c?.toolType)&&c.toolHours>0;
+G.toolRemainingHours=function(g=G.game,w=G.world){return ['tools','steelTools'].reduce((n,k)=>n+(g.res[k]||0)*G.toolLifeHours(k)+(g.toolRemainders?.[k]||0),0)+w.citizens.filter(c=>!c.dead).reduce((n,c)=>n+(G.toolEquipped(c)?c.toolHours:0),0);};
+G.toolProductiveTask=t=>!!t&&(['build','clearSite','clearrock','chop','plant','sow','harvest','orchard','work'].includes(t.kind)||['smith','fuel','tailor','brew','firewood'].includes(t.kind)&&t.phase==='process');
+G.toolWorker=function(c){
+ if(!c||c.dead||!c.adult||c.student||G.isArriving(c))return false;
+ const b=G.world.bmap[c.job];if(!b)return !!(G.world.marked.size||G.world.markedRocks.size);
+ return G.workerLimitOf(b)>0&&(b.state==='site'||!['school','hospital','market','tradingpost'].includes(b.type));
+};
+G.toolWorkProgress=function(c,t,dt){
+ const rate=(1+G.happinessBonus(c))/G.healthWorkMul(c);
+ if(!G.personalToolsEnabled()||!G.toolProductiveTask(t)||t.toolPooledWork)return dt*rate;
+ // Split the real tick at tool breakage. Neither overshoot after task completion
+ // nor hauling/resting/service hours consume durability.
+ const whole=G.toolEquipped(c)?Math.min(dt,c.toolHours,Math.max(0,t.workLeft)/rate):0;
+ if(whole){c.toolHours=Math.max(0,c.toolHours-whole);if(c.toolHours<=1e-9){c.toolHours=0;c.toolType=null;}}
+ return whole*rate+Math.min(Math.max(0,dt-whole),Math.max(0,t.workLeft-whole*rate)/(rate*G.NO_TOOL_MULT))*rate*G.NO_TOOL_MULT;
+};
+G.toolModeQuote=function(){
+ const g=G.game,w=G.world,rows=[];let reason='';
+ for(const[type,wearKey]of [['tools','toolWear'],['steelTools','steelToolWear']]){
+  const stock=g.res[type]||0,wear=g[wearKey]||0;
+  if(wear>0&&(!(wear<1)||stock<1))reason='旧工具磨损尚不能无歧义分出一整把，请保留共用模式，等待原日界结算后重试';
+  const partial=wear>0&&wear<1&&stock>=1;rows.push({type,stock,wear,spare:stock-(partial?1:0),remainingHours:partial?(1-wear)*G.toolLifeHours(type):0});
+ }
+ const key=JSON.stringify([g.toolMode,g.day,rows,w.navigationRevision||0,w.buildings.map(b=>[b.id,b.state]),w.citizens.filter(c=>!c.dead).map(c=>[c.id,c.adult,c.student,c.job])]);
+ return {key,enabled:G.personalToolsEnabled(),ok:!G.personalToolsEnabled()&&!reason,reason,rows,
+ rule:'一次性切换，不能返回共用工具池。每人空手到可达通用仓实际领取一把；不到仓不扣库存、不装备。无工具仅本人生产/建设半速，原料与完整配方不变。钢工具只延长寿命，不加速。',
+ wearRule:'旧磨损每类至多分出一把半用工具，库存件数和剩余劳动量保留，先领半用工具；它不能作全新货品贸易。铁/钢120/240个16小时劳动日为本作适配，仅实际工作磨损。'};
+};
+G.enablePersonalTools=function(key,expectedGame=G.game){
+ const q=G.toolModeQuote();if(expectedGame!==G.game||!q.ok||q.key!==key)return false;
+ const g=G.game,oldMul=G.hasTools()?1:G.NO_TOOL_MULT;
+ for(const c of G.world.citizens)for(const t of [c.task,c.pausedTask])if(t&&(G.toolProductiveTask(t)||['smith','fuel','tailor','brew','firewood'].includes(t.kind))){t.toolPooledWork=true;t.toolYieldMultiplier=oldMul;}
+ g.toolRemainders={tools:0,steelTools:0};
+ for(const row of q.rows)if(row.wear>0){g.res[row.type]-=1;g.toolRemainders[row.type]=row.remainingHours;}
+ g.toolWear=0;g.steelToolWear=0;g.toolMode='individual';g.schedT=0;G.updateProductionGoals();return true;
+};
+G.toolFetchTask=c=>[c?.task,c?.pausedTask].find(t=>t?.kind==='toolFetch')||null;
+G.toolFetchChoice=function(){
+ for(const type of ['steelTools','tools'])if(G.game.toolRemainders?.[type]>0)return {type,remainder:true,hours:G.game.toolRemainders[type]};
+ for(const type of ['steelTools','tools'])if(G.game.res[type]>=1)return {type,remainder:false,hours:G.toolLifeHours(type)};
+ return null;
+};
+G.toolFetchRoute=c=>G.toolFetchChoice()?G.storageRoute(c.x,c.y,['tools','steelTools']):null;
+G.cancelToolFetch=function(c){if(c.task?.kind==='toolFetch')c.task=null;if(c.pausedTask?.kind==='toolFetch')c.pausedTask=null;c.path=null;c.state='idle';c.wanderT=.5;c.toolRetryH=4;};
+G.planToolFetch=function(c,t){
+ if(!t||G.world.cmap[c.id]!==c||c.dead||!G.toolWorker(c)||G.toolEquipped(c)||c.carry){G.cancelToolFetch(c);return false;}
+ const route=G.toolFetchRoute(c);if(!route){c.toolWaitReason=G.toolFetchChoice()?'无可达通用仓，暂以半速劳动':'公共仓缺整件工具，暂以半速劳动';G.cancelToolFetch(c);return false;}
+ t.source=route.storage;t.tx=route.spot.x;t.ty=route.spot.y;c.task=t;c.pausedTask=null;return G.sendTo(c,t.tx,t.ty,route.spot.route);
+};
+G.tryToolFetch=function(c){
+ if(!G.personalToolsEnabled()||!G.toolWorker(c)||G.toolEquipped(c)||c.carry||c.pausedTask||G.isSick(c)||(c.toolRetryH||0)>0)return false;
+ const t={kind:'toolFetch',b:G.world.bmap[c.job]||null,work:.25,workLeft:.25};c.task=t;
+ if(!G.planToolFetch(c,t))return false;c.toolWaitReason='正在到通用仓领取个人工具';return true;
+};
+G.stepToolFetch=function(c,dt){
+ const t=c.task;if(t?.kind!=='toolFetch')return;
+ if(!G.personalToolsEnabled()||G.world.cmap[c.id]!==c||c.dead||G.isSick(c)||c.hunger>=1||!G.toolWorker(c)||c.carry||G.toolEquipped(c)){G.cancelToolFetch(c);return;}
+ if(G.world.bmap[t.source?.id]!==t.source||t.source.type!=='storage'||t.source.state!=='ok'||!G.atMedicalDoor(c,t.source)||G.tileBlocked(G.world,Math.round(c.x),Math.round(c.y))||G.d2(c.x,c.y,t.tx,t.ty)>1e-8){G.planToolFetch(c,t);return;}
+ t.workLeft-=dt;if(t.workLeft>0)return;
+ const pick=G.toolFetchChoice();if(!pick){G.cancelToolFetch(c);return;}
+ if(pick.remainder)G.game.toolRemainders[pick.type]=0;else G.game.res[pick.type]-=1;
+ c.toolType=pick.type;c.toolHours=pick.hours;c.toolWaitReason='';G.cancelToolFetch(c);c.toolRetryH=0;G.updateProductionGoals();G.requestTask(c);
+};
+G.warnPersonalTools=function(){const n=G.world.citizens.filter(c=>G.toolWorker(c)&&!G.toolEquipped(c)).length;
+ if(n&&!G.game.warned.personalTools){G.game.warned.personalTools=true;G.ui.toast(`⚠ ${n} 名劳动者尚无个人工具，仅本人半速；需沿可达路线到通用仓领取，公共有货不等于已装备`,'warn');}
+ if(!n)G.game.warned.personalTools=false;
 };

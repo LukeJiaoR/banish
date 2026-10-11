@@ -479,4 +479,25 @@ test('same-ID reload revokes old clothing callbacks while new controls still ena
   G.ui.refreshHUD();assert.match(f.doc.getElementById('res-warmCoats').title,/公共库存.*只从家中/);
 });
 
+test('personal tools preview preserves count and worn life, with explicit one-way export flow',()=>{
+ const f=setup(),G=f.G,button=id=>f.info.querySelector('#tool-mode-'+id);G.game.res.tools=3;G.game.toolWear=.25;G.ui.renderInfo();
+ assert(!G.personalToolsEnabled());const before=state(f);button('start').click();assert.equal(state(f),before);assert.match(f.info.querySelector('[data-tool-mode-facts]').textContent,/半用 1 把.*90 劳动日/);
+ button('cancel').click();button('confirm').click();assert.equal(state(f),before);button('start').click();button('export').click();assert.equal(f.downloads.length,1);assert.equal(state(f),before);assert(button('confirm').disabled);
+ button('start').click();button('confirm').click();assert(G.personalToolsEnabled());assert.equal(G.game.res.tools,2);assert.equal(G.game.toolRemainders.tools,1440);assert(!G.toolEquipped(f.c));
+ const after=state(f);button('confirm').click();G.ui.refreshHUD();G.ui.renderInfo();assert.equal(state(f),after);assert.match(f.doc.getElementById('res-tools').title,/公共全新备用.*旧半用 1.*已装备 0 人/);assert.equal(G.game.supplyMode,'automatic');
+});
+test('personal tool quote invalidates when wear or stock changes and refuses ambiguous legacy wear',()=>{
+ const f=setup(),G=f.G,button=id=>f.info.querySelector('#tool-mode-'+id);button('start').click();G.game.toolWear=.5;G.ui.renderInfo();assert(button('confirm').disabled);button('confirm').click();assert(!G.personalToolsEnabled());
+ button('start').click();G.game.res.tools++;button('confirm').click();assert(!G.personalToolsEnabled());
+ G.game.res.tools=.5;G.ui.renderInfo();assert(button('start').disabled);assert.match(f.info.querySelector('[data-tool-mode-facts]').textContent,/不能切换.*无歧义/);
+ const before=state(f);button('start').emit('click');button('confirm').emit('click');assert.equal(state(f),before);
+});
+test('real save replacement and help revoke old personal-tool callbacks without download or migration',()=>{
+ const f=setup(),G=f.G;f.info.querySelector('#tool-mode-start').click();const old=['start','confirm','cancel','export'].map(id=>f.info.querySelector('#tool-mode-'+id));
+ G.applySaveData(JSON.parse(state(f)));f.select(G.world.bmap[f.b.id]);const before=state(f);for(const b of old)b.emit('click');assert.equal(state(f),before);assert.equal(f.downloads.length,0);
+ G.ui.el.help=f.mount('help');G.ui.el.help.classList.add('hidden');f.info.querySelector('#tool-mode-start').click();G.ui.toggleHelp(true);G.ui.toggleHelp(false);f.info.querySelector('#tool-mode-confirm').click();assert(!G.personalToolsEnabled());
+ f.info.querySelector('#tool-mode-start').click();f.info.querySelector('#tool-mode-confirm').click();assert(G.personalToolsEnabled());
+ f.select(G.world.bmap[f.home.id]);assert.equal(f.info.querySelector('#tool-mode-start'),null);
+});
+
 console.log(`Household supply UI: ${passed} suites passed (headless DOM with real migration/save APIs; browser/mobile visual acceptance not performed).`);

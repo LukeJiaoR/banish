@@ -104,7 +104,7 @@ G.serializeGame = function () {
       h: g.h, day: g.day, season: g.season, year: g.year,
       res: g.res, stats: g.stats, prevFood: g.prevFood, foodNet: g.foodNet, foodUrgent: g.foodUrgent, warned: g.warned,
       supplyMode:g.supplyMode,clothingSupply:g.clothingSupply,supplyStartedDay:g.supplyStartedDay,supplyUsed:g.supplyUsed,supplyLost:g.supplyLost,
-      heating:g.heating, fishingRules:g.fishingRules, fireDisasters:g.fireDisasters, farmPests:g.farmPests, townLedger:g.townLedger, challenges:g.challenges, hist: g.hist, buildLog: g.buildLog, toolWear: g.toolWear, steelToolWear: g.steelToolWear, healthStartDay: g.healthStartDay, nomads:g.nomads, unlocks: g.unlocks, livestock: g.livestock,
+      heating:g.heating, fishingRules:g.fishingRules, fireDisasters:g.fireDisasters, farmPests:g.farmPests, townLedger:g.townLedger, challenges:g.challenges, hist: g.hist, buildLog: g.buildLog, toolMode:g.toolMode,toolRemainders:g.toolRemainders,toolWear: g.toolWear, steelToolWear: g.steelToolWear, healthStartDay: g.healthStartDay, nomads:g.nomads, unlocks: g.unlocks, livestock: g.livestock,
       productionGoals: g.productionGoals && { ...g.productionGoals }, productionPaused: g.productionPaused && { ...g.productionPaused },
     },
     roads: Array.from(w.road).flatMap((road, i) => road ? [i] : []),
@@ -137,7 +137,7 @@ G.serializeGame = function () {
       x: c.x, y: c.y, familyId: c.familyId, job: c.job,
       partnerId: c.partnerId, parentIds: c.parentIds, grandparentIds: c.grandparentIds, ancestorIds: c.ancestorIds, birthFamilyId: c.birthFamilyId,
       student: c.student ? 1 : 0, educated: c.educated ? 1 : 0, school: c.school != null ? c.school : null, studyHours:G.studyHoursOf(c),studyToday:G.studyTodayOf(c),studyDay:g.day,
-      arrivalHallId:c.arrivalHallId, hunger: c.hunger, cold: c.cold, clothingLeft: c.clothingLeft, clothingType:c.clothingType, dietVariety: c.dietVariety, dietScore: c.dietScore, happiness: c.happiness, leisureDays:c.leisureDays, grief:c.grief, health: c.health, sickDays: c.sickDays, immunityDays: c.immunityDays, herbCooldown: c.herbCooldown, careHours: c.careHours, camped: c.camped ? 1 : 0, carry: c.carry,
+      toolType:c.toolType,toolHours:c.toolHours,arrivalHallId:c.arrivalHallId, hunger: c.hunger, cold: c.cold, clothingLeft: c.clothingLeft, clothingType:c.clothingType, dietVariety: c.dietVariety, dietScore: c.dietScore, happiness: c.happiness, leisureDays:c.leisureDays, grief:c.grief, health: c.health, sickDays: c.sickDays, immunityDays: c.immunityDays, herbCooldown: c.herbCooldown, careHours: c.careHours, camped: c.camped ? 1 : 0, carry: c.carry,
     })),
     supplyCaches:(w.supplyCaches||[]).map(b=>({id:b.id,x:b.x,y:b.y,w:b.w,h:b.h,supplyStock:b.supplyStock})),
     nextUid: G._peekUid(),
@@ -350,6 +350,12 @@ G.prepareSaveData = function (d) {
 
   g.toolWear = Number.isFinite(gd.toolWear) && gd.toolWear >= 0 ? gd.toolWear : 0;
   g.steelToolWear = gd.steelToolWear === undefined ? 0 : number(gd.steelToolWear, '钢工具磨损', 0, 1);
+  if(gd.toolMode!==undefined&&!['pooled','individual'].includes(gd.toolMode))bad('个人工具规则');
+  g.toolMode=gd.toolMode||'pooled';g.toolRemainders={tools:0,steelTools:0};
+  if(g.toolMode==='individual'&&gd.toolRemainders===undefined)bad('缺少旧工具余寿记录');
+  if(gd.toolRemainders!==undefined){const r=record(gd.toolRemainders,'旧半用工具');if(Object.keys(r).length!==2||Object.keys(r).some(k=>!G.isTool(k)))bad('旧半用工具种类');
+    for(const k of ['tools','steelTools']){g.toolRemainders[k]=number(r[k],'旧半用工具余寿',0,G.toolLifeHours(k));if(g.toolRemainders[k]>=G.toolLifeHours(k))bad('旧半用工具须保留实际磨损');}}
+  if(g.toolMode==='pooled'&&Object.values(g.toolRemainders).some(n=>n>0)||g.toolMode==='individual'&&(g.toolWear!==0||g.steelToolWear!==0))bad('工具磨损重复计量');
   g.warned = gd.warned === undefined ? {} : clone(record(gd.warned, '提醒状态'));
   g.hist = clone(optionalArray(gd.hist, '历史记录'));
   g.buildLog = clone(optionalArray(gd.buildLog, '建造记录'));
@@ -625,6 +631,9 @@ G.prepareSaveData = function (d) {
     }
     if(carry?.supplyBatch&&(carry.qty<=0||G.supplySum(G.supplyCargoItems(carry))>(carry.supplyBatch.kind==='home'?G.SUPPLY.homeCarry:G.SUPPLY.vendorCarry)+1e-6))bad('生活配送批量');
     if(carry?.supplyBatch)for(const k of G.CLOTHING_KEYS){const n=G.supplyCargoItems(carry)[k]||0;if(!Number.isSafeInteger(n)||n>0&&!g.clothingSupply)bad('随身配送衣物');}
+    if(g.toolMode==='individual'&&(!Object.hasOwn(cd,'toolType')||!Object.hasOwn(cd,'toolHours')))bad('缺少个人工具记录');
+    const toolType=cd.toolType??null,toolHours=cd.toolHours===undefined?0:number(cd.toolHours,'个人工具余寿',0,toolType===null?0:G.toolLifeHours(toolType));
+    if(toolType!==null&&!G.isTool(toolType)||!!toolType!==(toolHours>0)||toolType!==null&&(g.toolMode!=='individual'||!cd.adult||cd.student))bad('个人工具装备');
     if(cd.clothingType!=null&&!['basic','warm'].includes(cd.clothingType))bad('穿着衣物类型');
     const c = {
       id: uniqueId(cd.id, '市民 ID'), name: cd.name, sex: cd.sex, age: number(cd.age, '年龄', 0), adult: !!cd.adult,
@@ -644,6 +653,7 @@ G.prepareSaveData = function (d) {
       cold: cd.cold === undefined ? 0 : number(cd.cold, '寒冷', 0), animT: 0, dead: false,
       clothingLeft: cd.clothingLeft === undefined ? 0 : number(cd.clothingLeft, '衣物耐久天数', 0, G.YEAR_DAYS),
       clothingType:cd.clothingType??(cd.clothingLeft>0?'basic':null),
+      toolType,toolHours,
       dietVariety: cd.dietVariety === undefined ? 0 : integer(cd.dietVariety, '饮食种类', 0, 3),
       dietScore: cd.dietScore === undefined ? 1 : number(cd.dietScore, '饮食多样性', 0, 3),
       happiness: cd.happiness === undefined ? 3 : number(cd.happiness, '幸福度', 1, 5),

@@ -221,6 +221,7 @@ G.supplyInventory=function(g=G.game,w=G.world){
  result.available=G.emptySupplyStock();for(const key of ['public','market','home','camp','cache','transit'])add(result.available,result[key]);return result;
 };
 G.supplyEconomyStock=function(type,g=G.game,w=G.world){
+ if(G.isTool(type)&&g.toolMode==='individual')return G.toolReserveCount(type,g);
  if(g.supplyMode!=='physical'||!['food',...G.FOOD_KEYS,'firewood',...(g.clothingSupply?G.CLOTHING_KEYS:[])].includes(type))return g.res[type]||0;
  const total=G.supplyInventory(g,w).available;return type==='food'?G.supplyFood(total):total[type];
 };

@@ -41,6 +41,7 @@ G.ui = {
       return G.homeOf(c) ? '户外休息（未入屋）' : '露宿（无住房）';
     }
     if (c.state === 'work') {
+      if(c.task?.kind==='toolFetch')return '在通用仓领取个人工具（完成领取才扣库存）';
       if(c.task?.kind==='tailor')return c.task.phase==='fetch'?'在库领取整批衣料':`制作${G.RES[c.task.yield.type].name}（使用随身衣料）`;
       if(c.task?.kind==='fuel')return c.task.phase==='fetch'?'在库领取原木（整批出库）':'劈柴中（使用随身已取原木）';
       if(c.task?.kind==='smith')return c.task.phase==='fetch'?'在库取铁匠原料（整批出库）':`锻造${G.RES[c.task.yield.type].name}（使用随身已取原料）`;
@@ -59,6 +60,7 @@ G.ui = {
       if (c.carry) return c.carry.brewIngredient ? `搬运酿酒主食（${c.state === 'haul' ? '退回仓库' : '送往酒馆'}）` : `搬运${G.RES[c.carry.type].name}（${c.state === 'haul' ? '送仓' : '途中'}）`;
       if (c.walkKind === 'home') return '回家途中';
       if (c.walkKind === 'wander') return '闲逛';
+      if(c.task?.kind==='toolFetch')return '步行去通用仓领工具（尚未扣库存）';
       if(c.task?.kind==='tailor')return c.task.phase==='fetch'?'前往通用仓取衣料（尚未扣料）':`返回裁缝铺制作${G.RES[c.task.yield.type].name}`;
       if (c.task && c.task.kind === 'firewood' && c.task.phase === 'fetch') return c.task.consume && G.RES[c.task.consume.type] ? `前往仓库取${G.RES[c.task.consume.type].name}` : '前往仓库取原木';
       if(c.task?.kind==='orchard')return ({plant:'前往空树位种植',tend:'前往幼树照料',harvest:'前往成熟果树采果'})[c.task.phase]+'（第'+(c.task.ti+1)+'株）';
@@ -622,8 +624,10 @@ G.ui = {
         if (!physical && k === 'food' && G.world.citizens.length) el.title += ` · 可供 ${(g.res.food / (G.world.citizens.length * G.LIFE.eatPerDay)).toFixed(1)} 天（不计新产出）`;
         if (tool) {
           const adults = G.world.citizens.filter(c => c.adult).length;
-          el.title += ` · 单件寿命 ${k === 'steelTools' ? G.LIFE.steelToolLifeDays : G.LIFE.toolLifeDays} 成人天；两类工具生产效率相同，优先磨损钢工具`;
-          if (adults) el.title += ` · 两类工具合计 ${Math.floor(G.toolStock())} 件，当前成人约可用 ${Math.floor(G.toolDaysLeft(adults))} 天（扣除已磨损，不计新产出）`;
+          if(G.personalToolsEnabled())el.title+=` · 公共全新备用；另有旧半用 ${(g.toolRemainders[k]||0)>0?1:0} 把（余 ${this.supplyNumber((g.toolRemainders[k]||0)/16)} 劳动日，只领用），已装备 ${G.world.citizens.filter(c=>!c.dead&&c.toolType===k&&G.toolEquipped(c)).length} 人；个人无工具才半速，钢仅耐用不加速；寿命按实际劳动累计`;
+          else{el.title += ` · 单件寿命 ${k === 'steelTools' ? G.LIFE.steelToolLifeDays : G.LIFE.toolLifeDays} 成人天；两类工具生产效率相同，优先磨损钢工具`;
+          if (adults) el.title += ` · 两类工具合计 ${Math.floor(G.toolStock())} 件，当前成人约可用 ${Math.floor(G.toolDaysLeft(adults))} 天（扣除已磨损，不计新产出）`;}
+
           el.title += k === 'steelTools' ? '；钢工具需铁、原木与煤' : '；铁工具需铁与原木';
         }
         if (k === 'clothes' || k === 'warmCoats') {
@@ -1012,7 +1016,7 @@ G.ui = {
       buyers: enabled ? '无健康成人的家庭需空闲散工协助；配送需要可达道路和真实库存。' : `无健康成人采购者 ${quote.familiesWithoutBuyer || 0} 户；完工通用仓 ${quote.readyStores || 0} 座。无采购者家庭依赖空闲散工，市场需另外安排货商。`,
     } };
   },
-  supplyModeInfoMarkup: function () {
+  supplyModeInfoMarkup: function (b) {
     const facts = this.supplyModeInfoData();
     if (!facts) return '';
     return `<section class="economy-form" data-supply-mode-panel aria-labelledby="supply-mode-title"><h3 id="supply-mode-title">全村真实配送 · 不可逆切换</h3>
@@ -1033,7 +1037,7 @@ G.ui = {
         <button type="button" id="clothing-supply-start">查看衣物配送确认</button>
         <div data-clothing-supply-confirm class="hidden"><p>不扣取或分配任何衣服；今后需要实际送到家，公共有货不等于家人已穿上。不能切回远程领取。</p>
           <button type="button" id="clothing-supply-confirm" class="danger" disabled>确认永久启用衣物配送</button><button type="button" id="clothing-supply-cancel">取消，保留原领取规则</button></div>
-        <p data-clothing-supply-message role="status" aria-live="polite"></p></div></section>`;
+        <p data-clothing-supply-message role="status" aria-live="polite"></p></div>${b?.type==='townhall'?this.toolModeInfoMarkup():''}</section>`;
   },
   supplyModeControlValid: function (b, context, node, allowModal = false) {
     if (!context) return false;
@@ -1076,6 +1080,7 @@ G.ui = {
     panel.querySelector('#supply-mode-confirm').disabled = enabled || !quote.ok || panel._supplyPending === null;
     if (enabled && actionFocused) this.el.info.querySelector('#info-close')?.focus?.();
     this.refreshClothingSupplyInfo(b);
+    this.refreshToolModeInfo(b);
     return true;
   },
   initSupplyModeInfo: function (b) {
@@ -1120,6 +1125,7 @@ G.ui = {
       if (ok) { this.refreshHUD(); el.querySelector('#info-close')?.focus?.(); } else start.focus?.();
     });
     this.initClothingSupplyInfo(b);
+    if(b.type==='townhall')this.initToolModeInfo(b);
     this.refreshSupplyModeInfo(b);
   },
   resetClothingConfirmation: function(panel, message) {
@@ -1166,6 +1172,45 @@ G.ui = {
         if(G.enableClothingSupply(pending,context.game)){this.refreshSupplyModeInfo(b);this.refreshVillageSupplyInfo();this.refreshMarketSupplyInfo(b);this.refreshHUD();this.el.info.querySelector('#info-close')?.focus?.();}
       });
     }
+  },
+  toolModeInfoMarkup:function(){
+    const q=G.toolModeQuote();return `<div data-tool-mode-controls><h3>个人工具 · 一次性切换</h3><p data-tool-mode-status></p><p data-tool-mode-facts></p>
+      <div data-tool-mode-actions><p class="warn-txt">${this.escHtml(q.rule)}已接批次（含取料途中）先按原规则收尾，之后新批次才适用新规则。请先导出存档。</p><p>${this.escHtml(q.wearRule)}</p>
+        <button type="button" id="tool-mode-export">先导出当前存档</button><button type="button" id="tool-mode-start">查看个人工具确认</button>
+        <div data-tool-mode-confirm class="hidden"><p>不是赠送工具，也不立即装备全村；按以上明细保留旧磨损，之后每人需要亲自走到通用仓。此存档不能切回共用池。</p>
+          <button type="button" id="tool-mode-confirm" class="danger" disabled>确认永久启用个人工具</button><button type="button" id="tool-mode-cancel">取消，保留共用工具</button></div>
+      </div><p data-tool-mode-message role="status" aria-live="polite"></p></div>`;
+  },
+  resetToolModeConfirmation:function(panel,message){
+    if(!panel.querySelector('[data-tool-mode-controls]'))return;panel._toolModePending=null;
+    panel.querySelector('[data-tool-mode-confirm]').classList.add('hidden');panel.querySelector('#tool-mode-confirm').disabled=true;
+    if(message!==undefined)panel.querySelector('[data-tool-mode-message]').textContent=message;
+  },
+  refreshToolModeInfo:function(b){
+    const panel=this.el.info.querySelector?.('[data-supply-mode-panel]'),box=panel?.querySelector('[data-tool-mode-controls]');if(!box)return;
+    const q=G.toolModeQuote(),valid=this.supplyModeControlValid(b,panel._supplyContext,null,true),modal=G.hasOpenModal?.(),pending=panel._toolModePending;
+    if(!valid||modal||!q.ok||pending!=null&&pending!==q.key)this.resetToolModeConfirmation(panel,pending!=null?'条件已变化，未切换；请重新核对工具明细。':undefined);
+    const equipped=G.world.citizens.filter(c=>!c.dead&&G.toolEquipped(c)).length;
+    panel.querySelector('[data-tool-mode-status]').textContent=q.enabled?`个人工具已启用：已装备 ${equipped} 人；只有无工具的生产/建设者半速，运输和服务不受影响。`:'仍使用全镇共用工具池（新旧局默认）。';
+    panel.querySelector('[data-tool-mode-facts]').textContent=q.enabled?['tools','steelTools'].map(k=>`${G.RES[k].name}：公共全新 ${this.supplyNumber(G.game.res[k])}；旧半用 ${(G.game.toolRemainders[k]||0)>0?1:0} 把（剩 ${this.supplyNumber((G.game.toolRemainders[k]||0)/16)} 劳动日，仅领用、不贸易）`).join('；'):
+      q.rows.map(r=>`${G.RES[r.type].name}现存 ${this.supplyNumber(r.stock)} 把，旧累计磨损 ${this.supplyNumber(r.wear)} 把；切换后全新/余额 ${this.supplyNumber(r.spare)}，半用 ${r.remainingHours>0?1:0} 把（余 ${this.supplyNumber(r.remainingHours/16)} 劳动日）`).join('；')+(q.reason?'；不能切换：'+q.reason:'；不足整件的旧余额保留，凑满整件才可领取。');
+    const actions=panel.querySelector('[data-tool-mode-actions]'),focused=actions.contains(document.activeElement);actions.classList.toggle('hidden',q.enabled);
+    for(const id of ['start','export','cancel'])panel.querySelector('#tool-mode-'+id).disabled=q.enabled;
+    panel.querySelector('#tool-mode-start').disabled=!q.ok;panel.querySelector('#tool-mode-confirm').disabled=!q.ok||panel._toolModePending==null;
+    if(q.enabled&&focused)this.el.info.querySelector('#info-close')?.focus?.();
+  },
+  initToolModeInfo:function(b){
+    const panel=this.el.info.querySelector('[data-supply-mode-panel]');if(!panel?.querySelector('[data-tool-mode-controls]'))return;
+    const context=panel._supplyContext,button=id=>panel.querySelector('#tool-mode-'+id);panel._toolModePending=null;
+    for(const id of ['export','start','cancel','confirm']){const node=button(id);node.addEventListener('keydown',e=>{if(e.repeat&&(e.key==='Enter'||e.key===' '))e.preventDefault();});node.addEventListener('click',e=>{
+      if(e.detail>1||G.personalToolsEnabled()||!this.supplyModeControlValid(b,context,node)){this.resetToolModeConfirmation(panel);return;}
+      if(id==='cancel'){this.resetToolModeConfirmation(panel,'已取消，工具规则及库存未变。');button('start').focus();return;}
+      if(id==='export'){this.resetToolModeConfirmation(panel);try{G.exportSaveFile();panel.querySelector('[data-tool-mode-message]').textContent='已请求下载，请确认文件已保存；尚未切换，请重新预览。';}catch(error){panel.querySelector('[data-tool-mode-message]').textContent='导出未完成，工具规则未改。';}return;}
+      const pending=panel._toolModePending,q=G.toolModeQuote();this.refreshToolModeInfo(b);if(!q.ok)return;
+      if(id==='start'){panel._toolModePending=q.key;panel.querySelector('[data-tool-mode-confirm]').classList.remove('hidden');button('confirm').disabled=false;button('confirm').focus();return;}
+      if(pending==null||pending!==q.key||panel._toolModePending!==pending)return;
+      this.resetToolModeConfirmation(panel);if(G.enablePersonalTools(pending,context.game)){this.refreshToolModeInfo(b);this.refreshTownHallInfo(b);this.refreshHUD();this.el.info.querySelector('#info-close')?.focus?.();}
+    });}
   },
   heatingInfoData:function(b){
     const s=G.homeHeatingSummary(b);if(!s)return null;
@@ -1718,7 +1763,7 @@ G.ui = {
       medical: `已任职健康医师 ${s.doctors} · 草药 ${Math.floor(s.herbs || 0)}；治疗仍需医师到岗、可达通路及接诊名额。`,
       food: physical ? `公共食物 ${Math.floor(g.res.food)}；全村食物 ${this.supplyNumber(G.supplyFood(G.supplyInventory().available))}（含在途和待回收，不含火情封存）。各家能吃几天请看家庭现货。` : `食物 ${Math.floor(g.res.food)} · 现有人口约够 ${days(s.foodDays)}（不计新产出）`,
       fuel: `${physical ? '公共' : ''}柴火 ${Math.floor(g.res.firewood)} · ${this.heatDemandText(heat)}${physical ? '；住房只烧本地现货。' : ''}`,
-      tools: `工具 ${Math.floor(G.toolStock())} 件 · 当前成人约可用 ${days(G.toolDaysLeft(s.adults))}（不计新产出）`,
+      tools: G.personalToolsEnabled()?`公共备用工具 ${this.supplyNumber(G.toolStock())} 把（含旧半用）；已装备 ${G.world.citizens.filter(c=>!c.dead&&G.toolEquipped(c)).length} 人；个人无工具才半速，详细领取/旧磨损规则见下方。`:`工具 ${Math.floor(G.toolStock())} 件 · 当前成人约可用 ${days(G.toolDaysLeft(s.adults))}（不计新产出）`,
       arriving: `迁入途中 ${s.arriving} 人；从地图边界步行到市政厅报到后再参加工作。`,
       schedule: s.offer ? `本批申请至第 ${s.offer.expiresDay} 天；等待你的接纳或婉拒。`
         : s.arriving ? '已接纳的家庭正在赶来。'
@@ -1745,7 +1790,7 @@ G.ui = {
     const data = facts.data;
     return `<section class="townhall-details" data-townhall-panel>
       ${['population', 'housing', 'education', 'health', 'medical', 'food', 'fuel', 'tools', 'arriving', 'schedule', 'decisions'].map(key => `<p class="row" data-townhall="${key}">${this.escHtml(data[key])}</p>`).join('')}
-      ${this.villageSupplyInfoMarkup()}${this.supplyModeInfoMarkup()}
+      ${this.villageSupplyInfoMarkup()}${this.supplyModeInfoMarkup(b)}
       ${this.fireActionMarkup('fire-rules', this.fireRulesInfoData(b))}${this.fishingInfoMarkup(b)}
       <div data-townhall-offer></div>
       <p class="economy-message" data-townhall-message role="status" aria-live="polite"></p>
@@ -2366,7 +2411,7 @@ G.ui = {
       data.logistics='取料：实际步行到兼容堆料场/仓库后整批扣料，携料回屋加工；工具仍送通用仓库。道路和仓点距离影响往返。中断或读档时未消耗原料退仓，仓满保留随身；读档不恢复加工工时。';
       data.inputs = '公共可用原料（不含已出库批次）：' + recipe.map(item => `${G.RES[item.type].name} ${Math.floor(G.game.res[item.type] || 0)}`).join(' · ');
       data.target = `本屋${G.RES[output].name}目标：${G.toolLimitOf(b)}（只看当前所选产物库存）`;
-      data.lifetime = `寿命：铁工具 ${G.LIFE.toolLifeDays} / 钢工具 ${G.LIFE.steelToolLifeDays} 成人天；生产效率相同，优先磨损钢工具。工具不限仓储。`;
+      data.lifetime = G.personalToolsEnabled()?`个人工具：铁120/钢240个16小时劳动日（本作适配），同速；公共全新 ${this.supplyNumber(G.game.res[G.blacksmithOutput(b)])} / 目标计量 ${this.supplyNumber(G.toolReserveCount(G.blacksmithOutput(b)))}（含旧半用，不含已装备）。无工具只让该工人半速，完整配方不变。`:`寿命：铁工具 ${G.LIFE.toolLifeDays} / 钢工具 ${G.LIFE.steelToolLifeDays} 成人天；生产效率相同，优先磨损钢工具。工具不限仓储。`;
     } else {
       data.reserve = mineral?.finite ? `有限储量：剩余 ${mineral.remaining} / ${mineral.capacity} 单位；最多 ${this.mineralEquivalentText(mineral)}。` : '旧版无限：无限矿源，保留旧存档既有矿点的产出规则，不会耗尽。';
       data.reserved = mineral?.finite ? `已接/夜间暂停批次预留 ${mineral.reserved} 单位；可供新批次 ${mineral.available} 单位。预留尚未扣除，实际开采才减少剩余储量；已产随身矿不再占储量。` : '旧版无限不占有限储量；切换模式不会把既有矿点改为有限矿点。';
@@ -2530,6 +2575,7 @@ G.ui = {
       cold: `户外受冻 ×${mul.toFixed(1)}${type === 'warm' ? '（降低 70%，比普通衣物再减半）' : type === 'basic' ? '（降低 40%）' : '（无衣物防寒）'}`,
       renewal: `日终磨损 1 天，穿坏才优先领暖衣，无则普通；每件 ${G.YEAR_DAYS} 天，不提前替换旧衣。` + (G.clothingSupplyEnabled?.() ? '只从家中/临时补给点现货领取，成人提前为7日内需换衣的家人实际采购。' : '仍沿用远程公共领取，可在市政厅或市场明确启用衣物配送。'),
       shelter: '衣物不改变无柴冷屋受冻或烧柴暖屋恢复，仍需住房与柴火。',
+      tools:G.personalToolsEnabled()?`个人工具：${G.toolEquipped(c)?G.RES[c.toolType].name+'，余 '+this.supplyNumber(c.toolHours/16)+' 劳动日':'未装备'}；${G.toolEquipped(c)?'工作正常速度，钢工具不加速':G.toolWorker(c)?(c.toolWaitReason||'待空手到可达通用仓领取，目前本人生产/建设半速'):'当前没有需工具的生产/建设工作'}。切换时已接旧批次先按原规则收尾，步行、休息和服务不磨损。`:'工具：沿用全镇共用池，可在市政厅明确选择个人领取。',
     };
   },
   citizenClothingMarkup: function (c) {
@@ -2587,7 +2633,7 @@ G.ui = {
       if (panel && (!sameSelection || !this.fireActionValid(selected, panel._fireContext, null, true))) this.resetFireAction(panel);
     }
     const supplyPanel = el.querySelector?.('[data-supply-mode-panel]');
-    if (supplyPanel && (!sameSelection || !this.supplyModeControlValid(selected, supplyPanel._supplyContext, null, true))) { this.resetSupplyConfirmation(supplyPanel); this.resetClothingConfirmation(supplyPanel); }
+    if (supplyPanel && (!sameSelection || !this.supplyModeControlValid(selected, supplyPanel._supplyContext, null, true))) { this.resetSupplyConfirmation(supplyPanel); this.resetClothingConfirmation(supplyPanel); this.resetToolModeConfirmation(supplyPanel); }
     const fishingPanel = el.querySelector?.('[data-fishing-panel]');
     if (fishingPanel && (!sameSelection || !this.fishingControlValid(selected, fishingPanel._fishingContext, null, true))) this.resetFishingConfirmation(fishingPanel);
     const homeFire = G.sel.kind === 'b' ? this.homeFireInfoData(selected) : null;
@@ -2731,7 +2777,7 @@ G.ui = {
       }
       if (chainData) extra += this.resourceChainInfoMarkup(b, chainData);
       if (hallData) extra += this.townHallInfoMarkup(b, hallData);
-      if (marketData) extra += this.marketSupplyInfoMarkup(b) + this.supplyModeInfoMarkup();
+      if (marketData) extra += this.marketSupplyInfoMarkup(b) + this.supplyModeInfoMarkup(b);
       if (b.type === 'dock' && b.state === 'ok') extra += this.fishingInfoMarkup(b);
       if (tavernData) extra += this.tavernInfoMarkup(tavernData);
       if (tailorData) extra += this.tailorInfoMarkup(tailorData);
@@ -3331,6 +3377,7 @@ G.ui = {
       const tool = type === 'tools' || type === 'steelTools';
       const distributedGoal = physical && (type === 'food' || foodClass || type === 'firewood' || G.clothingSupplyEnabled?.() && G.CLOTHING_KEYS.includes(type));
       stock.textContent = `${physical ? '公共库存' : '库存'} ${Math.floor(G.game.res[type])} · ${foodClass ? '与其他食物共享总仓容 ' + cap + '（总食物 ' + Math.floor(G.game.res.food) + '）' : '硬仓容 ' + (tool ? '不限' : cap)}`;
+      if(tool&&G.personalToolsEnabled())stock.textContent+=`；目标计量 ${this.supplyNumber(G.toolReserveCount(type))}（全新备用 + 旧半用，不含已装备）`;
       if (distributedGoal) stock.textContent += `；目标计量 ${this.supplyNumber(type === 'food' ? G.supplyFood(supplies) : supplies[type])}（公共 + 市场/住处/配送在途/待回收，不含火情封存；逐户现货才可使用）`;
       status.textContent = target === null ? '未设置全镇目标，继承原规则' :
         `已应用目标 ${target} · ${target === 0 ? '关闭新自动生产' : `恢复线 ≤${G.productionResumeAt(target)} · ${G.goalPaused(type) ? '达标暂停' : '可生产'}`}`;
@@ -3351,7 +3398,7 @@ G.ui = {
     const el = document.getElementById(id);
     if (!el) return;
     const supplyPanel = this.el.info && this.el.info.querySelector?.('[data-supply-mode-panel]');
-    if (supplyPanel) { this.resetSupplyConfirmation(supplyPanel, '确认已取消，请关闭弹窗后重新预览。'); this.resetClothingConfirmation(supplyPanel, '确认已取消，请关闭弹窗后重新预览。'); }
+    if (supplyPanel) { this.resetSupplyConfirmation(supplyPanel, '确认已取消，请关闭弹窗后重新预览。'); this.resetClothingConfirmation(supplyPanel, '确认已取消，请关闭弹窗后重新预览。'); this.resetToolModeConfirmation(supplyPanel, '确认已取消，请关闭弹窗后重新预览。'); }
     const mineralPanel = this.el.info && this.el.info.querySelector && this.el.info.querySelector('[data-mineral-removal-panel]');
     if (mineralPanel) this.resetMineralRemoval(mineralPanel, '拆除确认已取消，请关闭弹窗后重新查看。');
     this._dialogFocus = this._dialogFocus || {};
