@@ -14,7 +14,7 @@ G.newGameState = function () {
     over: false,
     stats: { born: 0, died: 0, deadReasons: {} },
     prevFood: 200,
-    unlocks: { orchard: false }, livestock: { sheep: 0 },
+    unlocks: { orchard: false, cabbage:false }, livestock: { sheep: 0 },
     foodNet: 0,
     foodUrgent: false,
     warned: {},
@@ -220,15 +220,15 @@ G.onSeasonChange = function (from, to) {
   if (to === 0) {
     // 春回大地：农田全部复位（含上年已收获的），开始新一轮播种
     for (const b of G.world.buildings) {
-      if (b.type === 'farm' && b.state === 'ok') G.resetFarm(b);
+      if (b.type === 'farm' && b.state === 'ok') G.resetFarm(b,true);
     }
   }
   if (to === 3) {
     // 未收获的作物冻死
     for (const b of G.world.buildings) {
-      if (b.type === 'farm' && b.sownAll && !b.harvestDone) {
+      if (b.type === 'farm' && G.farmSeasonCommitted(b) && !b.harvestDone) {
         G.ui.toast('农田里的作物被冻死了', 'bad');
-        G.resetFarm(b);
+        G.resetFarm(b,false);
       }
     }
   }
@@ -677,9 +677,9 @@ G.resumeTask = function (c) {
     const i = t.ty * w.N + t.tx;
     ok = !w.water[i] && !w.rock[i] && !w.road[i] && w.treeIdx[i] < 0 && w.bgrid[i] < 0;
   } else if (ok && t.kind === 'sow') {
-    ok = !!(t.b.farm && t.b.farm[t.ti] && !t.b.farm[t.ti].sown);
+    ok = G.farmTaskCurrent(t) && !t.b.farm[t.ti].sown;
   } else if (ok && t.kind === 'harvest') {
-    ok = !!(t.b.farm && t.b.farm[t.ti] && t.b.farm[t.ti].sown && !t.b.farm[t.ti].harvested);
+    ok = G.farmTaskCurrent(t) && t.b.farm[t.ti].sown && !t.b.farm[t.ti].harvested;
   } else if (ok && t.kind === 'firewood') {
     ok = t.b.state === 'ok';
   } else if (ok && t.kind === 'build') {
@@ -843,7 +843,7 @@ G.setProductionGoal = function (type, value) {
   if (previous === value) return true;
   g.productionGoals = g.productionGoals || {}; g.productionPaused = g.productionPaused || {};
   // A not-yet-finished first sow task is already a seasonal commitment.
-  if ((type === 'food' || type === 'grain') && value !== null) for (const b of G.world.buildings)
+  if ((type === 'food' || type === 'grain' || type === 'vegetables') && value !== null) for (const b of G.world.buildings)
     if (b.type === 'farm' && (G.farmSeasonCommitted(b) ||
       G.world.citizens.some(c => [c.task, c.pausedTask].some(t => t && t.b === b && t.kind === 'sow')))) b.sowingCommitted = true;
   if (value === null) delete g.productionGoals[type]; else g.productionGoals[type] = value;
@@ -867,7 +867,7 @@ G.productionLimited = function (b) {
   if (G.fuelLimited(b) || G.toolLimited(b)) return true;
   if (['gatherer', 'dock', 'hunting'].includes(b.type)) return G.goalPaused(b.type === 'gatherer' ? 'vegetables' : 'meat');
   if (b.type === 'tailor') return G.goalPaused(G.tailorOutput(b));
-  if (b.type === 'farm') return G.goalPaused('grain') && !G.farmSeasonCommitted(b);
+  if (b.type === 'farm') return G.goalPaused(G.farmOutput(b)) && !G.farmSeasonCommitted(b);
   if (b.type === 'forester') return G.goalPaused('wood') && !b.doPlant;
   if (b.type === 'stonequarry' || (b.type === 'mine' && G.mineModeOf(b) !== 'legacy')) {
     const type = b.type === 'stonequarry' ? 'stone' : G.mineModeOf(b);
@@ -912,7 +912,7 @@ G.goalCommitment = function (c) {
   if (c.carry && paused(c.carry.type)) return true;
   return [c.task, c.pausedTask].some(task => {
     if (!task || task.b !== b) return false;
-    const type = task.yield ? task.yield.type : ({ chop: 'wood', firewood: 'firewood', sow: 'grain', harvest: 'grain' })[task.kind];
+    const type = task.yield ? task.yield.type : ['sow','harvest'].includes(task.kind) ? G.CROPS[task.crop || G.farmCropOf(b)].output : ({ chop: 'wood', firewood: 'firewood' })[task.kind];
     return !!type && paused(type);
   });
 };
@@ -1172,7 +1172,7 @@ G.requestTask = function (c) {
   const w = G.world;
   const b = c.job != null ? w.bmap[c.job] : null;
   // 换岗/任务中断后先交货；农田未满批可继续收割，找不到下一格时也必须交货。
-  const partialFarm = b && b.type === 'farm' && b.state === 'ok' && c.carry && c.carry.type === 'grain' && !c.carry.brewIngredient && c.carry.qty < G.PROD.farm.haulCap;
+  const partialFarm = b && b.type === 'farm' && b.state === 'ok' && c.carry && c.carry.type === G.farmOutput(b) && !c.carry.brewIngredient && c.carry.qty < G.PROD.farm.haulCap;
   const partialForester = b && b.type === 'forester' && b.state === 'ok' && b.doCut && !G.goalPaused('wood') && c.carry && c.carry.type === 'wood' && c.carry.qty + G.taskYield(G.taskLogYield(c)) <= G.PROD.forester.haulCap;
   if (c.carry && !partialFarm && !partialForester) {
     G.startHaul(c); return;
@@ -1500,12 +1500,12 @@ G.makeTask = function (b, c) {
         if (c2 !== c && t2 && t2.b === b && c2.job === b.id && (t2.kind === 'sow' || t2.kind === 'harvest'))
           claimed.add(t2.ti);
       // 播种（春）
-      if (!b.sownAll && (g.season === 0 || g.season === 1) && (!G.goalPaused('grain') || G.farmSeasonCommitted(b))) {
+      if (!b.sownAll && (g.season === 0 || g.season === 1) && (!G.goalPaused(G.farmOutput(b)) || G.farmSeasonCommitted(b))) {
         const ti = b.farm.findIndex((f, i) => !f.sown && !claimed.has(i));
         if (ti >= 0) {
           const f = b.farm[ti];
-          if (G.productionGoalOf('food') !== null || G.productionGoalOf('grain') !== null) b.sowingCommitted = true;
-          return { kind: 'sow', b, ti, tx: f.x, ty: f.y, work: G.taskWork(c, P2.tileWorkH), workLeft: 0 };
+          b.sowingCommitted = true; // First accepted sow locks this season's crop, even before arrival.
+          return { kind: 'sow', b, ti, crop:G.farmCropOf(b), cropYear:g.year, tx: f.x, ty: f.y, work: G.taskWork(c, P2.tileWorkH), workLeft: 0 };
         }
       }
       // 收获（秋，作物长成）
@@ -1513,7 +1513,7 @@ G.makeTask = function (b, c) {
         const ti = b.farm.findIndex((f, i) => f.sown && !f.harvested && !claimed.has(i));
         if (ti >= 0) {
           const f = b.farm[ti];
-          return { kind: 'harvest', b, ti, tx: f.x, ty: f.y, work: G.taskWork(c, P2.tileWorkH), workLeft: 0 };
+          return { kind: 'harvest', b, ti, crop:G.farmCropOf(b), cropYear:g.year, tx: f.x, ty: f.y, work: G.taskWork(c, P2.tileWorkH), workLeft: 0 };
         }
       }
       return null;
@@ -1608,19 +1608,21 @@ G.completeTask = function (c) {
       break;
     }
     case 'sow': {
-      if (b && b.farm && b.farm[t.ti]) {
+      if (G.farmTaskCurrent(t) && !b.farm[t.ti].sown) {
         b.farm[t.ti].sown = true;
         if (b.farm.every(f => f.sown)) b.sownAll = true;
       }
       break;
     }
     case 'harvest': {
-      if (t.b && t.b.farm && t.b.farm[t.ti] && !t.b.farm[t.ti].harvested) {
+      if (G.farmTaskCurrent(t) && b.farm[t.ti].sown && !b.farm[t.ti].harvested && (!c.carry || (c.carry.type===G.farmOutput(b) && !c.carry.brewIngredient))) {
         t.b.farm[t.ti].harvested = true;
         // 攒批搬运：收获累计到 haulCap 才送一趟仓库
         const P = G.PROD.farm;
-        if (c.carry && c.carry.type === 'grain') c.carry.qty = Math.min(P.haulCap, c.carry.qty + G.taskYield(P.perTile));
-        else c.carry = { type: 'grain', qty: G.taskYield(P.perTile) };
+        const output=G.CROPS[t.crop || G.farmCropOf(b)].output,qty=G.taskYield(P.perTile);
+        if (c.carry) c.carry.qty += qty;
+        else c.carry = { type: output, qty };
+        G.recordProduction(b,output,qty);
         if (b.farm.every(f => f.harvested)) b.harvestDone = true;
         // 还没背满且田里没收完：继续收下一格
         if (c.carry.qty < P.haulCap && !b.harvestDone) { G.requestTask(c); return; }
@@ -1632,12 +1634,13 @@ G.completeTask = function (c) {
   else G.requestTask(c);
 };
 
-G.resetFarm = function (b) {
+G.resetFarm = function (b, applyChoice = G.game.season === 0) {
+  if(applyChoice)b.cropType=G.cropChoiceOf(b);
   for (const f of b.farm) { f.sown = false; f.harvested = false; }
   b.sownAll = false; b.growth = 0; b.harvestDone = false; delete b.sowingCommitted;
   // A commitment belongs to this crop season, not next year's empty field.
-  // Expire old crop work only in the opt-in path; harvested cargo remains owned.
-  if (G.productionGoalOf('food') !== null || G.productionGoalOf('grain') !== null) for (const c of G.world.citizens) {
+  // Expire every old season's crop task, including paused tasks; keep actual cargo.
+  for (const c of G.world.citizens) {
     const expired = t => t && t.b === b && (t.kind === 'sow' || t.kind === 'harvest');
     if (expired(c.task)) {
       c.task = null;
@@ -1722,7 +1725,7 @@ G.pickMarkDonor = function (w, harvestSeason, foodJobs, needFood) {
 
 G.farmHasWork = function (b) {
   const season = G.game.season;
-  return (!b.sownAll && (season === 0 || season === 1) && (!G.goalPaused('grain') || G.farmSeasonCommitted(b))) ||
+  return (!b.sownAll && (season === 0 || season === 1) && (!G.goalPaused(G.farmOutput(b)) || G.farmSeasonCommitted(b))) ||
     (b.sownAll && b.growth >= 1 && season === 2 && !b.harvestDone);
 };
 
@@ -1968,6 +1971,7 @@ G.addBuilding = function (type, x, y, opt) {
     paidCost: opt.free ? {} : Object.assign({}, def.cost), constructionStarted: false,
   };
   if (type === 'farm') {
+    b.cropType='wheat';b.cropChoice='wheat';
     b.farm = [];
     for (let j = y; j < y + def.h; j++)
       for (let i = x; i < x + def.w; i++)
@@ -2093,7 +2097,7 @@ G.demolishAt = function (tx, ty) {
 G.TRADE_CAPACITY = 2000;
 G.tradeStored = b => Object.values(b.tradeInventory || {}).reduce((n,q) => n + q, 0);
 G.TRADE_VALUES = {wood:2,stone:7,iron:5,tools:8,firewood:4,meat:1,vegetables:1,grain:1,leather:10,wool:5,clothes:15,warmCoats:20,herbs:4,coal:6,steelTools:10};
-G.TRADE_GOODS = {coal:{name:'煤',price:6,stock:100},steelTools:{name:'钢工具',price:10,stock:20},sheep:{name:'羊',price:600,stock:4},orchardSeed:{name:'果树种子',price:2500,stock:1},grain:{name:'主食',price:1,stock:400},iron:{name:'铁',price:5,stock:100},leather:{name:'皮革',price:10,stock:80}};
+G.TRADE_GOODS = {coal:{name:'煤',price:6,stock:100},steelTools:{name:'钢工具',price:10,stock:20},sheep:{name:'羊',price:600,stock:4},orchardSeed:{name:'果树种子',price:2500,stock:1},cabbageSeed:{name:'卷心菜种子',price:2500,stock:1},grain:{name:'主食',price:1,stock:400},iron:{name:'铁',price:5,stock:100},leather:{name:'皮革',price:10,stock:80}};
 G.ensureEconomyBuilding = function(b) {
   if(b.type==='tradingpost'){b.tradeInventory=b.tradeInventory||{};b.tradeTargets=b.tradeTargets||{};if(!Number.isFinite(b.nextMerchantDay))b.nextMerchantDay=G.game.day+G.SEASON_DAYS;}
   if(b.type==='pasture'){b.animals=b.animals||0;b.animalGrowth=b.animalGrowth||0;b.woolReady=b.woolReady||0;if(!Number.isFinite(b.animalTarget))b.animalTarget=8;}
@@ -2145,12 +2149,12 @@ G.executeTrade = function(b,good,qty,payment){
   if(G.world.bmap[b.id]!==b||b.type!=='tradingpost'||b.state!=='ok'||!b.merchant||b.merchant.leaveDay<=G.game.day)return {ok:false,reason:'没有停靠商人'};
   const offer=Object.hasOwn(G.TRADE_GOODS,good)?G.TRADE_GOODS[good]:null,value=Object.hasOwn(G.TRADE_VALUES,payment)?G.TRADE_VALUES[payment]:0;
   if(!offer||!value||!Number.isInteger(qty)||qty<=0||qty>(b.merchant.stock[good]||0))return {ok:false,reason:'交易数量或货物无效'};
-  if(good==='orchardSeed'&&(qty!==1||G.game.unlocks.orchard))return {ok:false,reason:'果树种子已永久解锁'};
+  const seedReason=G.seedTradeReason(good,qty);if(seedReason)return {ok:false,reason:seedReason};
   const cost=Math.ceil(offer.price*qty/value);if((b.tradeInventory[payment]||0)<cost)return {ok:false,reason:'待售库存不足，请先让商人搬入'};
-  if(good!=='sheep'&&good!=='orchardSeed'&&G.tradeStored(b)-cost+qty>G.TRADE_CAPACITY)return {ok:false,reason:'贸易站库存容量不足（共2000）'};
+  if(good!=='sheep'&&!G.seedUnlockKey(good)&&G.tradeStored(b)-cost+qty>G.TRADE_CAPACITY)return {ok:false,reason:'贸易站库存容量不足（共2000）'};
   b.tradeInventory[payment]-=cost;b.merchant.stock[good]-=qty;
   if(good==='sheep')G.game.livestock.sheep+=qty;
-  else if(good==='orchardSeed')G.game.unlocks.orchard=true;
+  else if(G.seedUnlockKey(good))G.game.unlocks[G.seedUnlockKey(good)]=true;
   else b.tradeInventory[good]=(b.tradeInventory[good]||0)+qty;
   G.game.schedT=0;return {ok:true,paid:cost};
 };
@@ -2165,7 +2169,7 @@ G.advanceTownEconomy = function(){
   for(const b of G.world.buildings){if(b.state!=='ok')continue;G.ensureEconomyBuilding(b);
     if(b.type==='tradingpost'){
       if(b.merchant&&g.day>=b.merchant.leaveDay){b.merchant=null;b.nextMerchantDay=g.day+G.YEAR_DAYS-G.SEASON_DAYS;}
-      if(!b.merchant&&g.day>=b.nextMerchantDay){b.merchant={leaveDay:g.day+G.SEASON_DAYS,stock:Object.fromEntries(Object.entries(G.TRADE_GOODS).map(([k,v])=>[k,v.stock]))};G.ui.toast('⛵ 商船已到贸易站，可换物资、羊和果树种子','good');}
+      if(!b.merchant&&g.day>=b.nextMerchantDay){b.merchant={leaveDay:g.day+G.SEASON_DAYS,stock:Object.fromEntries(Object.entries(G.TRADE_GOODS).map(([k,v])=>[k,v.stock]))};G.ui.toast('⛵ 商船已到贸易站，可换物资、羊和种子','good');}
     }
     if(b.type==='pasture'&&b.animals>0&&b.tendedDay>=g.day-2){
       if(b.animals>=2)b.animalGrowth+=b.animals/(G.YEAR_DAYS*2);while(b.animalGrowth>=1&&b.animals<12){b.animals++;b.animalGrowth--;}
@@ -2354,6 +2358,7 @@ G.mineModeOf = b => ['iron','coal'].includes(b.mineMode) ? b.mineMode : 'legacy'
 G.blacksmithOutput = b => b && b.toolRecipe === 'steel' ? 'steelTools' : 'tools';
 G.blacksmithRecipe = b => G.blacksmithOutput(b) === 'steelTools' ? [...G.PROD.blacksmith.consume,{type:'coal',qty:2}] : G.PROD.blacksmith.consume;
 G.productionOutputsOf = function (b) {
+  if(b.type==='farm')return ['food',G.farmOutput(b)];
   if(b.type==='tailor')return [G.tailorOutput(b)];
   if (b.type === 'mine') return G.mineModeOf(b) === 'legacy' ? ['stone','iron'] : [G.mineModeOf(b)];
   if (b.type === 'blacksmith') return [G.blacksmithOutput(b)];
@@ -2610,4 +2615,45 @@ G.tailorSummary=function(b){
   }
   return {recipe:G.tailorRecipeOf(b),output:G.tailorOutput(b),materials:s.materials,canProduce:s.ok,reason:s.reason,batches,
     clothes:G.game.res.clothes,warmCoats:G.game.res.warmCoats,wearers};
+};
+
+
+/* Crop diversity stays inside the three existing food classes. Selection is
+ * next-season intent; a started field and its cargo keep the actual crop. */
+G.CROPS={wheat:{name:'小麦',output:'grain'},cabbage:{name:'卷心菜',output:'vegetables'}};
+G.seedUnlockKey=good=>good==='orchardSeed'?'orchard':good==='cabbageSeed'?'cabbage':null;
+G.seedTradeReason=function(good,qty){
+  const key=G.seedUnlockKey(good);if(!key)return '';
+  if(G.game.unlocks[key])return `${G.TRADE_GOODS[good].name}已永久解锁，无需重复购买`;
+  return qty!==1?'种子只需购买1份，永久解锁所有对应农田或果园':'';
+};
+G.cropUnlocked=type=>type==='wheat'||(type==='cabbage'&&G.game.unlocks.cabbage===true);
+G.farmCropOf=b=>b.cropType==='cabbage'?'cabbage':'wheat';
+G.cropChoiceOf=b=>b.cropChoice==='cabbage'?'cabbage':'wheat';
+G.farmOutput=b=>G.CROPS[G.farmCropOf(b)].output;
+G.farmTaskCurrent=function(t){
+  const b=t&&t.b,g=G.game;
+  if(!b||G.world.bmap[b.id]!==b||b.type!=='farm'||b.state!=='ok'||!b.farm[t.ti]||
+    (t.crop&&t.crop!==G.farmCropOf(b))||(t.cropYear!==undefined&&t.cropYear!==g.year))return false;
+  return t.kind==='sow'?(g.season===0||g.season===1):t.kind==='harvest'&&g.season===2&&b.sownAll&&b.growth>=1&&!b.harvestDone;
+};
+G.setFarmCrop=function(b,type){
+  if(!b||G.world.bmap[b.id]!==b||b.type!=='farm'||b.state!=='ok'||!Object.hasOwn(G.CROPS,type)||!G.cropUnlocked(type))return false;
+  // An outstanding first sow counts even for older runtime tasks without a flag.
+  if(G.world.citizens.some(c=>[c.task,c.pausedTask].some(t=>t&&t.b===b&&t.kind==='sow')))b.sowingCommitted=true;
+  b.cropChoice=type;
+  if(!G.farmSeasonCommitted(b)&&(G.game.season===0||G.game.season===1))b.cropType=type;
+  b.noWork=false;b.warnText='';G.updateProductionGoals();G.game.schedT=0;return true;
+};
+G.farmSummary=function(b){
+  const crop=G.farmCropOf(b),choice=G.cropChoiceOf(b),committed=G.farmSeasonCommitted(b),g=G.game;
+  const sown=b.farm.filter(f=>f.sown).length,harvested=b.farm.filter(f=>f.harvested).length;
+  let status=g.season===3?'冬季休耕，等待下一春':b.harvestDone?'本季收获完成':!b.sownAll?
+    (g.season===2?'秋季已过播种窗口':G.goalPaused(G.farmOutput(b))&&!committed?'目标已达，暂停新季播种':`播种 ${sown}/${b.farm.length}`):
+    b.growth<1?`生长中 ${Math.floor(b.growth*100)}%`:g.season===2?`秋收 ${harvested}/${b.farm.length}`:'作物成熟，等待秋季';
+  const reason=committed?'本季已开始：只改下一春，不改变已接任务、在田作物或在途收获':
+    g.season===0||g.season===1?'空田尚未开始：已解锁作物可用于本季播种':'当前不能播种：选择留待下一春';
+  return {crop,choice,output:G.CROPS[crop].output,choiceOutput:G.CROPS[choice].output,pending:crop!==choice,committed,
+    unlocked:{wheat:true,cabbage:G.cropUnlocked('cabbage')},status,reason,growth:b.growth,sown,harvested,total:b.farm.length,
+    grain:g.res.grain,vegetables:g.res.vegetables,workers:b.workers.filter(id=>G.world.cmap[id]&&!G.world.cmap[id].dead&&G.world.cmap[id].job===b.id).length};
 };

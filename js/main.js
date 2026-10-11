@@ -120,7 +120,7 @@ G.serializeGame = function () {
       mineMode: b.mineMode, legacyMine: b.legacyMine, mineTick: b.mineTick, toolRecipe: b.toolRecipe, reserveDays:b.reserveDays, coatRecipe:b.coatRecipe,
       doCut: b.doCut, doPlant: b.doPlant, fuelLimit: b.fuelLimit, toolLimit: b.toolLimit,
       farm: b.farm ? b.farm.map(f => [f.sown ? 1 : 0, f.harvested ? 1 : 0]) : undefined,
-      sownAll: b.sownAll, growth: b.growth, harvestDone: b.harvestDone,
+      sownAll: b.sownAll, growth: b.growth, harvestDone: b.harvestDone, cropType:b.cropType, cropChoice:b.cropChoice,
       sowingCommitted: b.sowingCommitted, productionPaused: b.productionPaused,
       tradeInventory: b.tradeInventory, tradeTargets: b.tradeTargets, merchant: b.merchant, nextMerchantDay: b.nextMerchantDay,
       animals: b.animals, animalGrowth: b.animalGrowth, animalTarget: b.animalTarget, woolReady: b.woolReady,
@@ -247,7 +247,7 @@ G.prepareSaveData = function (d) {
   const hasFoodClasses = G.FOOD_KEYS.some(k => gd.res[k] !== undefined);
   if (hasFoodClasses && Math.abs(G.FOOD_KEYS.reduce((n,k) => n + g.res[k], 0) - g.res.food) > 0.00001) bad('食物分类合计');
   if (!hasFoodClasses) g.res.grain = g.res.food; // legacy stock is preserved once
-  if (gd.unlocks !== undefined) {record(gd.unlocks,'产业解锁');if(typeof gd.unlocks.orchard !== 'boolean')bad('果树种子解锁');g.unlocks={orchard:gd.unlocks.orchard};}
+  if (gd.unlocks !== undefined) {record(gd.unlocks,'产业解锁');if(typeof gd.unlocks.orchard !== 'boolean')bad('果树种子解锁');if(gd.unlocks.cabbage!==undefined&&typeof gd.unlocks.cabbage!=='boolean')bad('卷心菜种子解锁');g.unlocks={orchard:gd.unlocks.orchard,cabbage:gd.unlocks.cabbage===true};}
   if (gd.livestock !== undefined) {record(gd.livestock,'待安置牲畜');g.livestock={sheep:integer(gd.livestock.sheep,'待安置羊',0,1000000)};}
   if (gd.productionGoals !== undefined) {
     const goals = record(gd.productionGoals, '自动生产目标');
@@ -404,6 +404,9 @@ G.prepareSaveData = function (d) {
       }
     }
     if (bd.type === 'farm') {
+      b.cropType=bd.cropType===undefined?'wheat':bd.cropType;b.cropChoice=bd.cropChoice===undefined?b.cropType:bd.cropChoice;
+      if(typeof b.cropType!=='string'||typeof b.cropChoice!=='string'||!Object.hasOwn(G.CROPS,b.cropType)||!Object.hasOwn(G.CROPS,b.cropChoice))bad('农田作物种类');
+      if((b.cropType==='cabbage'||b.cropChoice==='cabbage')&&!g.unlocks.cabbage)bad('农田作物种子未解锁');
       if (!Array.isArray(bd.farm) || bd.farm.length !== b.w * b.h) bad('农田格数');
       b.farm = bd.farm.map((row, k) => {
         if (!Array.isArray(row) || row.length !== 2 || !row.every(v => v === 0 || v === 1 || v === false || v === true)) bad('农田状态');
