@@ -56,13 +56,13 @@ G.BDEF = {
     id: 'tradingpost', name: '贸易站', icon: '⛵', w: 4, h: 4,
     cost: { wood: 80, stone: 40, iron: 10 }, buildWork: 180, jobs: 1, passable: false,
     wall: '#89694a', wallD: '#604936', roof: '#695645',
-    desc: '紧邻水面。1名商人按待售目标真实搬入库存，以物易物；待售资源不供居民消费。每年有商船停留一季，可换羊、果树种子和物资。',
+    desc: '紧邻水面。1名商人按待售目标真实搬入库存，以物易物；待售资源不供居民消费。每年有商船停留一季，可换羊、牛、种子和物资。',
   },
   pasture: {
-    id: 'pasture', name: '羊牧场', icon: '🐑', w: 6, h: 6,
+    id: 'pasture', name: '牧场', icon: '🐑', w: 6, h: 6,
     cost: { wood: 30 }, buildWork: 50, jobs: 1, passable: true,
     wall: '#938060', wallD: '#725e43', roof: '#b09a73',
-    desc: '先从贸易站购买至少2只羊。1名牧人照料繁殖、剪毛；超过保留数量才屠宰产肉。羊不产皮革，羊毛可供裁缝。',
+    desc: '先贸易购买至少2头同种牲畜，空场选择羊或牛，禁止混养。1名牧人照料繁殖；羊剪毛、超额产肉，牛超额屠宰产肉和皮革。逐批实际送仓；羊毛与皮革可制暖衣。',
   },
   orchard: {
     id: 'orchard', name: '果园', icon: '🍎', w: 6, h: 6,

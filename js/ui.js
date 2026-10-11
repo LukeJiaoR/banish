@@ -43,7 +43,7 @@ G.ui = {
       if (c.task && c.task.kind === 'clinic') return b && b.type === 'herbalist' ? '采药屋值守' : '诊所值守';
       if (c.task && c.task.kind === 'trade') return c.task.phase === 'return' ? '退回待售库存' : '装卸贸易物资';
       const labels = { clearSite: '清理工地', chop: '砍伐', clearrock: '清矿', build: '建造中', sow: '播种', harvest: '收获', plant: '补种', firewood: '加工柴火' };
-      return c.task ? (labels[c.task.kind] || (b && b.type === 'tailor' ? '制作衣物' : b && b.type === 'orchard' ? '果园劳作' : b && b.type === 'pasture' ? '照料羊群' : '工作中')) : '等待下一项任务';
+      return c.task ? (labels[c.task.kind] || (b && b.type === 'tailor' ? '制作衣物' : b && b.type === 'orchard' ? '果园劳作' : b && b.type === 'pasture' ? `照料${G.LIVESTOCK[G.pastureTypeOf(b)].name}群` : '工作中')) : '等待下一项任务';
     }
     if (c.state === 'walk' || c.state === 'haul') {
       if (c.carry) return c.carry.brewIngredient ? `搬运酿酒主食（${c.state === 'haul' ? '退回仓库' : '送往酒馆'}）` : `搬运${G.RES[c.carry.type].name}（${c.state === 'haul' ? '送仓' : '途中'}）`;
@@ -63,7 +63,7 @@ G.ui = {
     if (b.type === 'school') return '教学中';
     if (b.type === 'tradingpost') return b.warnText || '贸易站备货待命';
     if (b.type === 'tavern' && G.tavernSummary) return G.tavernSummary(b).reason || '等待酒馆酿造或接待任务';
-    if (b.type === 'pasture' && !(b.animals > 0)) return '等待放入羊群';
+    if (b.type === 'pasture' && !(b.animals > 0)) return '等待放入同种牲畜';
     if (b.type === 'orchard' && !(G.game.unlocks && G.game.unlocks.orchard)) return '等待贸易购入果树种子';
     if (G.productionLimited(b) && G.buildingGoalStatus(b)) return G.buildingGoalStatus(b);
     if (G.fuelLimited(b)) return '暂停生产（柴火已达目标）';
@@ -1437,8 +1437,9 @@ G.ui = {
       if (b.state === 'ok') extra += this.economyInfoMarkup(b);
       if (medicalData) extra += this.medicalInfoMarkup(b, medicalData);
       const outputs = { gatherer: ['vegetables'], hunting: ['meat', 'leather'], dock: ['meat'], farm: ['grain'], orchard: ['vegetables'], pasture: ['meat', 'wool'], tailor: ['clothes'], herbalist: ['herbs'] };
+      if(b.type==='pasture')outputs.pasture=G.productionOutputsOf(b).filter(k=>k!=='food');
       const produced = (chainData || tailorData || farmData ? [] : outputs[b.type] || []).filter(type => G.RES[type]);
-      if (produced.length) extra += `<div class="row resource-output">产出：${produced.map(type => `${this.resourceIcon(type)}${G.RES[type].name}`).join(' · ')}</div>`;
+      if (produced.length) extra += `<div class="row resource-output"${b.type==='pasture'?' data-pasture-output':''}>产出：${produced.map(type => `${this.resourceIcon(type)}${G.RES[type].name}`).join(' · ')}</div>`;
       if (b.type === 'tailor' && !tailorData) extra += `<div class="row">原料库存：皮革 ${Math.floor(G.game.res.leather || 0)} · 羊毛 ${Math.floor(G.game.res.wool || 0)}</div><div class="row">成衣库存：${Math.floor(G.game.res.clothes || 0)}</div>`;
       if (b.type !== 'woodcutter' && !medicalData && !chainData && !tavernData && !tailorData && !farmData && G.buildingGoalStatus(b)) extra += `<div class="row desc"${['tradingpost', 'pasture', 'orchard'].includes(b.type) ? ' data-economy-goals' : ''}>${this.escHtml(G.buildingGoalStatus(b))}</div>`;
       if (['gatherer', 'hunting', 'forester'].includes(b.type)) {
@@ -1537,7 +1538,7 @@ G.ui = {
   economyStatus: function (b) {
     if (G.productionLimited(b) && G.buildingGoalStatus(b)) return G.buildingGoalStatus(b);
     if (b.type === 'tradingpost') return b.merchant && b.merchant.leaveDay > G.game.day ? '商船停靠，可交易' : b.workers.length ? '等待商船，商人按目标搬运备货' : '等待商人岗位分配';
-    if (b.type === 'pasture') return !b.animals ? '空牧场：贸易买羊后放入' : b.animals < 2 ? '需至少 2 只羊才能繁殖' : b.workers.length ? '羊群饲养中' : '等待牧人照料';
+    if (b.type === 'pasture') return G.pastureSummary(b).status;
     if (b.type === 'orchard') {
       if (!(G.game.unlocks && G.game.unlocks.orchard)) return '需从贸易站购买果树种子';
       if ((b.orchardAge || 0) < G.YEAR_DAYS * 4) return '幼树养护中，约 4 年成熟';
@@ -1568,17 +1569,18 @@ G.ui = {
           <label for="trade-payment">用一种待售物资支付</label><select id="trade-payment">${payments}</select>
           <p data-economy-live="quote" class="trade-quote" role="status" aria-live="polite"></p>
           <button type="submit" id="trade-execute">确认交易</button>
-          <p class="desc">付款数量向上取整，不找零。买入普通物资先进入本站库存，低于现存数量的待售目标会让商人搬回；羊购入后去牧场放入。果树种子与卷心菜种子各买 1 次永久解锁，不能复购，不是库存物品，也不占贸易站或仓库容量。卷心菜解锁后到农田选择种植，产出计入蔬菜。</p>
+          <p class="desc">付款数量向上取整，不找零。买入普通物资先进入本站库存，低于现存数量的待售目标会让商人搬回；羊或牛购入后进入各自待安置数量，到同种牧场放入。果树种子与卷心菜种子各买 1 次永久解锁，不能复购，不是库存物品，也不占贸易站或仓库容量。卷心菜解锁后到农田选择种植，产出计入蔬菜。</p>
         </form>
         <p class="economy-message" data-economy-message role="status" aria-live="polite"></p>
       </section>`;
     }
     if (b.type === 'pasture' && G.stockPasture && G.setPastureTarget) return `<section class="economy-details" data-economy="pasture">
       <p class="row" data-economy-live="animals"></p><p class="row" data-economy-live="pasture-production"></p>
-      <form id="pasture-stock-form" class="economy-form"><h3>放入购入的羊</h3><p data-economy-live="sheep-bank"></p>
+      <form id="pasture-type-form" class="economy-form"><h3>空场选择物种</h3><label for="pasture-type">羊或牛（不能混养）</label><select id="pasture-type"><option value="sheep"${G.pastureTypeOf(b)==='sheep'?' selected':''}>羊：肉、羊毛</option><option value="cattle"${G.pastureTypeOf(b)==='cattle'?' selected':''}>牛：肉、皮革</option></select><button type="submit" id="pasture-type-apply">应用物种</button><p data-economy-live="pasture-switch"></p></form>
+      <form id="pasture-stock-form" class="economy-form"><h3>放入已购同种牲畜</h3><p data-economy-live="sheep-bank"></p>
         <label for="pasture-stock-quantity">放入数量</label><input id="pasture-stock-quantity" type="number" min="1" max="12" step="1" value="2" inputmode="numeric"><button type="submit" id="pasture-stock">放入牧场</button></form>
-      <form id="pasture-target-form" class="economy-form"><h3>羊群保留数量</h3><label for="pasture-target-quantity">保留 2–12 只</label><input id="pasture-target-quantity" type="number" min="2" max="12" step="1" value="${Number(b.animalTarget) || 8}" inputmode="numeric"><button type="submit">应用保留数量</button>
-        <p class="desc">至少两只且有人照料才会繁殖。超过保留数量的羊由牧人屠宰产肉，羊毛需剪取并送仓。</p></form>
+      <form id="pasture-target-form" class="economy-form"><h3>繁殖与保留数量</h3><label for="pasture-target-quantity" data-economy-live="pasture-target-range"></label><input id="pasture-target-quantity" type="number" min="2" max="12" step="1" value="${Number(b.animalTarget) || 8}" inputmode="numeric"><button type="submit">应用保留数量</button>
+        <p class="desc" data-economy-live="pasture-rule"></p><p class="desc">至少两头同种牲畜且牧人实际照料才繁殖。保留数只控制超额屠宰。已屠宰产物逐批搬运，库存满则保留；牧场内待送产物未搬空不能拆场。</p></form>
       <p class="economy-message" data-economy-message role="status" aria-live="polite"></p>
     </section>`;
     if (b.type === 'orchard') return `<section class="economy-details" data-economy="orchard"><p data-economy-live="orchard-age"></p><p data-economy-live="orchard-harvest"></p><p class="desc">种子永久解锁后，工人照料幼树约 4 年才结果。秋季采收，果实归入蔬菜；冬季未收果实损失。</p></section>`;
@@ -1618,18 +1620,19 @@ G.ui = {
         if (!quote.ok) { message(quote.reason); return; }
         const result = G.executeTrade(b, quote.good, quote.qty, quote.payment);
         const seed = G.seedUnlockKey ? G.seedUnlockKey(quote.good) : quote.good === 'orchardSeed' ? 'orchard' : null;
-        message(result.ok ? `已购买${G.TRADE_GOODS[quote.good].name} × ${quote.qty}，支付${G.RES[quote.payment].name} × ${result.paid}。${quote.good === 'sheep' ? '到羊牧场放入羊群。' : seed === 'orchard' ? '所有果园已永久解锁种植，种子不占仓位。' : seed === 'cabbage' ? '所有农田已永久解锁卷心菜，请到农田选择；本季已开始的作物保留，改选留到下一春。种子不占仓位。' : '物资已到本站，等待商人按目标搬回仓库。'}` : result.reason || '交易未完成。');
+        message(result.ok ? `已购买${G.TRADE_GOODS[quote.good].name} × ${quote.qty}，支付${G.RES[quote.payment].name} × ${result.paid}。${G.isLivestockType(quote.good) ? `到${G.TRADE_GOODS[quote.good].name}牧场放入，不能混养。` : seed === 'orchard' ? '所有果园已永久解锁种植，种子不占仓位。' : seed === 'cabbage' ? '所有农田已永久解锁卷心菜，请到农田选择；本季已开始的作物保留，改选留到下一春。种子不占仓位。' : '物资已到本站，等待商人按目标搬回仓库。'}` : result.reason || '交易未完成。');
         this.refreshHUD();
       });
     }
     if (b.type === 'pasture') {
+      onSubmit('pasture-type-form',()=>{const type=el.querySelector('#pasture-type').value;message(G.setPastureType(b,type)?`牧场物种已设为${G.LIVESTOCK[type].name}；下一次放入只接收该物种。`:G.pastureSwitchReason(b)||'物种选择无效');});
       onSubmit('pasture-stock-form', () => {
         const qty = Number(el.querySelector('#pasture-stock-quantity').value);
-        message(G.stockPasture(b, qty) ? `已放入 ${qty} 只羊。` : '无法放入：请检查整数数量、已购羊数及牧场 12 只容量。');
+        const d=G.pastureSummary(b);message(G.stockPasture(b, qty, d.type) ? `已放入 ${qty} 头${d.name}。` : `无法放入：请检查整数数量、待安置${d.name}数及${d.cap}头容量。`);
       });
       onSubmit('pasture-target-form', () => {
         const qty = Number(el.querySelector('#pasture-target-quantity').value);
-        message(G.setPastureTarget(b, qty) ? `保留数量已设为 ${qty} 只，超出部分由牧人屠宰。` : '请输入 2–12 的整数。');
+        message(G.setPastureTarget(b, qty) ? `保留数量已设为 ${qty} 头，超出部分由牧人屠宰。` : `请输入 2–${G.pastureSummary(b).cap} 的整数。`);
       });
     }
     this.refreshEconomyInfo(b);
@@ -1648,7 +1651,7 @@ G.ui = {
     const seed = G.seedUnlockKey ? G.seedUnlockKey(good) : good === 'orchardSeed' ? 'orchard' : null;
     const seedReason = G.seedTradeReason ? G.seedTradeReason(good, qty) : seed && G.game.unlocks && G.game.unlocks[seed] ? '果树种子已永久解锁。' : seed && qty !== 1 ? '种子每次只能购买 1 份。' : '';
     let reason = !merchant ? '商船尚未停靠。' : seedReason || (qty > stock ? `商船只有 ${stock} 件，数量不足。` : available < cost ? `本站待售${G.RES[payment].name}不足，还需 ${Math.ceil(cost - available)}。` : '');
-    if (!reason && good !== 'sheep' && !seed && G.tradeStored && G.TRADE_CAPACITY && G.tradeStored(b) - cost + qty > G.TRADE_CAPACITY) reason = '交易后会超过本站共享容量，请先腾出空间。';
+    if (!reason && !G.isLivestockType(good) && !seed && G.tradeStored && G.TRADE_CAPACITY && G.tradeStored(b) - cost + qty > G.TRADE_CAPACITY) reason = '交易后会超过本站共享容量，请先腾出空间。';
     const text = `购买${offer.name} × ${qty}，实际支付${G.RES[payment].name} × ${cost}（单价 ${offer.price}，付款价值 ${value}/件）。\n商船存货 ${stock} · 本站可支付 ${Math.floor(available)}。` + (seed ? '\n种子仅购 1 份永久解锁，不可复购，不占仓位。' : '') + (reason ? '\n' + reason : '');
     return { ok: !reason, good, payment, qty, cost, reason, text };
   },
@@ -1675,11 +1678,17 @@ G.ui = {
       const buy = el.querySelector('#trade-execute'); buy.disabled = !quote.ok;
       buy.textContent = quote.ok ? `确认支付 ${quote.cost} ${G.RES[quote.payment].name}` : '确认交易';
     } else if (b.type === 'pasture') {
-      const bank = G.game.livestock && G.game.livestock.sheep || 0;
-      set('[data-economy-live="animals"]', `羊群 ${b.animals || 0} / 12 只 · 当前保留 ${b.animalTarget || 8} 只`);
-      set('[data-economy-live="pasture-production"]', `待剪羊毛 ${Math.floor(b.woolReady || 0)} · 下一只羊繁殖进度 ${Math.floor((b.animalGrowth || 0) * 100)}%`);
-      set('[data-economy-live="sheep-bank"]', `已购入、待安置的羊：${bank} 只。`);
-      el.querySelector('#pasture-stock').disabled = bank <= 0 || b.animals >= 12;
+      const d=G.pastureSummary(b),bank=G.game.livestock;
+      set('[data-economy-live="animals"]', `${d.name}群 ${d.animals}/${d.cap} 头 · 当前保留 ${d.target} 头`);
+      set('[data-economy-live="pasture-production"]', `繁殖进度 ${Math.floor(d.growth*100)}% · ${d.type==='sheep'?`待剪羊毛 ${Math.floor(d.wool)}`:`已屠宰待送：肉 ${d.meat} · 皮革 ${d.leather}`}`);
+      set('[data-economy-live="sheep-bank"]', `已购待安置：羊 ${bank.sheep||0} · 牛 ${bank.cattle||0}。本场只接收${d.name}。`);
+      set('[data-economy-live="pasture-switch"]', d.switchReason||`当前${d.name}场；空场且原任务与产物已清空时可改种类。`);
+      set('[data-economy-live="pasture-rule"]', d.rule);
+      set('[data-economy-live="pasture-target-range"]', `保留 2–${d.cap} 头（已有设置 ${d.target}）`);
+      el.querySelector('#pasture-stock').disabled=d.bank<=0||d.animals>=d.cap;
+      el.querySelector('#pasture-type-apply').disabled=!!d.switchReason;
+      el.querySelector('#pasture-stock-quantity').max=String(d.cap);el.querySelector('#pasture-target-quantity').max=String(d.cap);
+      const output=el.querySelector('[data-pasture-output]');if(output){const html='产出：'+G.productionOutputsOf(b).filter(k=>k!=='food').map(k=>`${this.resourceIcon(k)}${G.RES[k].name}`).join(' · ');if(output.innerHTML!==html)output.innerHTML=html;}
     } else {
       const unlocked = G.game.unlocks && G.game.unlocks.orchard, age = b.orchardAge || 0;
       set('[data-economy-live="orchard-age"]', `果树种子：${unlocked ? '已永久解锁' : '尚未购买'} · 已养护 ${(age / G.YEAR_DAYS).toFixed(1)} / 4 年`);
