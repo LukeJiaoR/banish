@@ -33,7 +33,7 @@ test('seed exchange only uses real trade stock, charges once and works within sh
   assert.equal(G.game.res.cabbageSeed,undefined);assert.equal(G.game.res.vegetables,0);
   assert(G.executeTrade(post,'orchardSeed',1,'stone').ok);assert.equal(G.game.unlocks.orchard,true);
 });
-test('future merchant stocks include one cabbage seed; old visiting ships are not rewritten',()=>{
+test('first general merchant includes one cabbage seed; old visiting ships are not rewritten',()=>{
   const G=fresh(),b=trade(G);delete b.merchant.stock.cabbageSeed;
   assert.equal(G.executeTrade(b,'cabbageSeed',1,'stone').ok,false);
   b.merchant=null;b.nextMerchantDay=G.game.day;G.advanceTownEconomy();assert.equal(b.merchant.stock.cabbageSeed,1);

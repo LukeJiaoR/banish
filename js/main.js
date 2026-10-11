@@ -123,7 +123,7 @@ G.serializeGame = function () {
       farm: b.farm ? b.farm.map(f => [f.sown ? 1 : 0, f.harvested ? 1 : 0]) : undefined,
       sownAll: b.sownAll, growth: b.growth, harvestDone: b.harvestDone, cropType:b.cropType, cropChoice:b.cropChoice,
       sowingCommitted: b.sowingCommitted, earlyHarvestYield:b.earlyHarvestYield, productionPaused: b.productionPaused,
-      tradeInventory: b.tradeInventory, tradeTargets: b.tradeTargets, merchant: b.merchant, nextMerchantDay: b.nextMerchantDay,
+      tradeInventory: b.tradeInventory, tradeTargets: b.tradeTargets, merchant: b.merchant, nextMerchantDay: b.nextMerchantDay, merchantVisits:b.merchantVisits, merchantOrders:b.merchantOrders,
       lastHeating:b.lastHeating, unheated:b.unheated, graves:b.graves,
       animalType:b.animalType, pastureProducts:b.pastureProducts, animals: b.animals, animalGrowth: b.animalGrowth, animalTarget: b.animalTarget, woolReady: b.woolReady,
       orchardAge: b.orchardAge, orchardYield: b.orchardYield, orchardSeason: b.orchardSeason, tendedDay: b.tendedDay,
@@ -413,8 +413,19 @@ G.prepareSaveData = function (d) {
       }
       if(G.tradeStored(b)>G.TRADE_CAPACITY+1e-6)bad('贸易库存超容量');
       b.nextMerchantDay=bd.nextMerchantDay===undefined?g.day+G.SEASON_DAYS:integer(bd.nextMerchantDay,'商船下次到访',0);
-      if(bd.merchant!=null){record(bd.merchant,'商船');record(bd.merchant.stock,'商船货物');b.merchant={leaveDay:integer(bd.merchant.leaveDay,'商船离港',0),stock:{}};
-        for(const key of Object.keys(bd.merchant.stock)){if(!Object.hasOwn(G.TRADE_GOODS,key))bad('商船货物种类');b.merchant.stock[key]=integer(bd.merchant.stock[key],'商船库存',0,G.TRADE_GOODS[key].stock);}
+      b.merchantVisits=bd.merchantVisits===undefined?(bd.merchant?1:0):integer(bd.merchantVisits,'商人来访轮次',0,1000000);
+      b.merchantOrders={};
+      if(bd.merchantOrders!==undefined){record(bd.merchantOrders,'回访订货');for(const id of Object.keys(bd.merchantOrders)){
+        if(!Object.hasOwn(G.MERCHANTS,id))bad('订货商人');const order=record(bd.merchantOrders[id],'订货');
+        if(typeof order.good!=='string'||!G.MERCHANTS[id].goods.includes(order.good))bad('商人订货目录');
+        b.merchantOrders[id]={good:order.good,qty:integer(order.qty,'订货数量',1,G.TRADE_GOODS[order.good].stock)};
+      }}
+      if(bd.merchant!=null){record(bd.merchant,'商船');record(bd.merchant.stock,'商船货物');
+        const id=bd.merchant.id===undefined?'general':bd.merchant.id;if(!Object.hasOwn(G.MERCHANTS,id))bad('商人身份');
+        b.merchant={id,leaveDay:integer(bd.merchant.leaveDay,'商船离港',0),stock:{}};
+        if(bd.merchant.arrivedDay!==undefined){b.merchant.arrivedDay=integer(bd.merchant.arrivedDay,'商船到港',0,g.day);if(b.merchant.leaveDay<=b.merchant.arrivedDay)bad('商船停靠日期');}
+        for(const key of Object.keys(bd.merchant.stock)){if(!G.MERCHANTS[id].goods.includes(key))bad('商船货物种类');b.merchant.stock[key]=integer(bd.merchant.stock[key],'商船库存',0,G.TRADE_GOODS[key].stock);}
+        if(bd.merchant.orderedGood!==undefined){const good=bd.merchant.orderedGood;if(typeof good!=='string'||!Object.hasOwn(b.merchant.stock,good))bad('本次订货货物');b.merchant.orderedGood=good;}
       }
     }
     if(bd.unheated!==undefined){if(def.warmWoodPerYear==null||b.state!=='ok'||typeof bd.unheated!=='boolean')bad('住宅供暖状态');b.unheated=bd.unheated;}

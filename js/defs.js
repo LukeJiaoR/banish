@@ -62,7 +62,7 @@ G.BDEF = {
     id: 'tradingpost', name: '贸易站', icon: '⛵', w: 4, h: 4,
     cost: { wood: 80, stone: 40, iron: 10 }, buildWork: 180, jobs: 1, passable: false,
     wall: '#89694a', wallD: '#604936', roof: '#695645',
-    desc: '紧邻水面。1名商人按待售目标真实搬入库存，以物易物；待售资源不供居民消费。每年有商船停留一季，可换羊、牛、种子和物资。',
+    desc: '紧邻水面。1名商人按待售目标真实搬入库存，以物易物；待售资源不供居民消费。综合、物资、种子商轮流到访，收货范围不同；停靠时可向同一商人订下次回访货物，无需预付。',
   },
   pasture: {
     id: 'pasture', name: '牧场', icon: '🐑', w: 6, h: 6,
