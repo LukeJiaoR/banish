@@ -121,7 +121,7 @@ G.serializeGame = function () {
       doCut: b.doCut, doPlant: b.doPlant, fuelLimit: b.fuelLimit, toolLimit: b.toolLimit,
       farm: b.farm ? b.farm.map(f => [f.sown ? 1 : 0, f.harvested ? 1 : 0]) : undefined,
       sownAll: b.sownAll, growth: b.growth, harvestDone: b.harvestDone, cropType:b.cropType, cropChoice:b.cropChoice,
-      sowingCommitted: b.sowingCommitted, productionPaused: b.productionPaused,
+      sowingCommitted: b.sowingCommitted, earlyHarvestYield:b.earlyHarvestYield, productionPaused: b.productionPaused,
       tradeInventory: b.tradeInventory, tradeTargets: b.tradeTargets, merchant: b.merchant, nextMerchantDay: b.nextMerchantDay,
       lastHeating:b.lastHeating, unheated:b.unheated, graves:b.graves,
       animalType:b.animalType, pastureProducts:b.pastureProducts, animals: b.animals, animalGrowth: b.animalGrowth, animalTarget: b.animalTarget, woolReady: b.woolReady,
@@ -449,6 +449,7 @@ G.prepareSaveData = function (d) {
         b.paidCost[key] = number(bd.paidCost[key], '已付建材数量', 0);
       }
     }
+    if(bd.earlyHarvestYield!==undefined&&bd.type!=='farm')bad('抢收仅用于农田');
     if (bd.type === 'farm') {
       b.cropType=bd.cropType===undefined?'wheat':bd.cropType;b.cropChoice=bd.cropChoice===undefined?b.cropType:bd.cropChoice;
       if(typeof b.cropType!=='string'||typeof b.cropChoice!=='string'||!Object.hasOwn(G.CROPS,b.cropType)||!Object.hasOwn(G.CROPS,b.cropChoice))bad('农田作物种类');
@@ -462,6 +463,10 @@ G.prepareSaveData = function (d) {
       if (bd.sowingCommitted !== undefined && typeof bd.sowingCommitted !== 'boolean') bad('农田本季承诺');
       if (bd.sowingCommitted === true) b.sowingCommitted = true;
       b.growth = bd.growth === undefined ? 0 : number(bd.growth, '农田生长', 0, 1);
+      if(bd.earlyHarvestYield!==undefined){
+        b.earlyHarvestYield=integer(bd.earlyHarvestYield,'抢收基础产量',1,G.PROD.farm.perTile);
+        if(b.state!=='ok'||!b.sownAll||!b.farm.every(f=>f.sown)||b.earlyHarvestYield!==Math.floor(G.PROD.farm.perTile*b.growth+1e-9))bad('抢收农田状态');
+      }
     }
     for (let yy = y; yy < y + b.h; yy++) for (let xx = x; xx < x + b.w; xx++) {
       const i = yy * w.N + xx; if (w.bgrid[i] >= 0) bad('建筑重叠'); w.bgrid[i] = b.id;

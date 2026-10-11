@@ -15,7 +15,7 @@ function trade(G){for(let x=10;x<14;x++)G.world.water[1*G.world.N+x]=1;G.bumpNav
 function dispatch(G,b,c){c.task=G.makeTask(b,c);assert(c.task);G.sendTo(c,c.task.tx,c.task.ty);}
 function until(G,c,predicate,limit=15000){for(let i=0;i<limit&&!predicate();i++)G.stepCitizen(c,.1);assert(predicate(),'expected progress did not occur');}
 const snapshot=G=>JSON.parse(JSON.stringify(G.serializeGame()));
-function ripe(G,b){for(const f of b.farm){f.sown=true;f.harvested=false;}b.sownAll=true;b.growth=1;b.harvestDone=false;G.game.season=2;G.game.day=24;}
+function ripe(G,b){for(const f of b.farm){f.sown=true;f.harvested=false;}b.sownAll=true;b.growth=1;b.harvestDone=false;G.game.season=2;G.game.day=24;G.game.townLedger=G.newTownLedger(G.game);}
 function test(name,fn){fn();passed++;console.log('ok '+name);}
 
 test('default wheat is free; cabbage cannot be selected before the permanent seed unlock',()=>{
