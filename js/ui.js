@@ -1325,7 +1325,7 @@ G.ui = {
       reason: s.reason,
       seeds: `种子：小麦已解锁 · 卷心菜${s.unlocked.cabbage ? '已永久解锁' : '未解锁，需贸易购买卷心菜种子'}（永久解锁，不是库存物品，不占仓位）`,
       progress: `播种 ${s.sown}/${s.total} · 成长 ${Math.floor(s.growth * 100)}% · 收获 ${s.harvested}/${s.total}`,
-      yield: `收获产出：按当前工具状态，每格 ${G.taskYield(G.PROD.farm.perTile)} ${G.RES[s.output].name}；每筐达到 ${G.PROD.farm.haulCap} 后送仓，入仓后才可用`,
+      yield: `收获产出：按当前工具状态，每格 ${G.taskYield(G.farmHarvestBase(b))} ${G.RES[s.output].name}；每筐达到 ${G.PROD.farm.haulCap} 后送仓，入仓后才可用`,
       stock: `全镇可用库存：主食 ${Math.floor(s.grain || 0)} · 蔬菜 ${Math.floor(s.vegetables || 0)}（在途未入库不计）`,
       targets: `全镇目标：${['food', 'grain', 'vegetables'].map(target).join(' · ')}`,
       goals: `本季产出：${G.buildingGoalStatus(b) || '未设目标，仍受仓容限制'}；目标只限制尚未开始的新一季，已接第一播种任务后继续本季。`,
@@ -1338,8 +1338,14 @@ G.ui = {
         <p class="desc" id="farm-crop-note">春、夏尚未开始播种的空田立即应用；已接第一播种任务、已播种、生长或已收获的本季作物锁定，改选留到下一春。已背起的粮食不变。新局与旧农田默认小麦。</p>
       </div>
       ${Object.keys(facts.data).filter(key => !['status', 'workers'].includes(key)).map(key => `<p class="row" data-farm="${key}">${this.escHtml(facts.data[key])}</p>`).join('')}
+      <div class="economy-actions"><button type="button" id="early-harvest-start">提前抢收</button></div>
+      <p class="desc" data-early-harvest-status></p>
+      <div class="hidden" data-early-harvest-confirm role="group" aria-label="确认提前抢收">
+        <p class="desc" data-early-harvest-quote></p>
+        <div class="economy-actions"><button type="button" id="early-harvest-confirm">确认本季抢收</button><button type="button" id="early-harvest-cancel">继续等待</button></div>
+      </div>
       <p class="economy-message" data-farm-message role="status" aria-live="polite"></p>
-      <p class="desc">全田播完才开始成长；春、夏播种，秋季成熟后收获，冬季未收作物损失。农夫收获后实际搬运入仓。</p>
+      <p class="desc">全田播完才开始成长；默认秋季成熟后收获，也可确认提前抢收，按当时成熟度锁定较低产量并停止继续成长，本季不能复种。冬季未收作物损失；农夫仍须收割并实际搬运入仓。</p>
       <p class="desc">食物仍分肉类、蔬菜、主食三类。小麦产主食，卷心菜产蔬菜；多种作物不额外增加饮食类别，也不产肉。</p>
     </section>`;
   },
@@ -1365,6 +1371,7 @@ G.ui = {
       // Native selects may hold a keyboard draft before firing change.
       if (document.activeElement !== select) select.value = facts.summary.choice;
     }
+    this.refreshEarlyHarvest(b);
     return true;
   },
   initFarmInfo: function (b) {
@@ -1383,7 +1390,33 @@ G.ui = {
       const message = el.querySelector('[data-farm-message]');
       if (message) message.textContent = accepted ? G.farmSummary(b).pending ? '选择已保存，将在下一春生效；本季作物和在途粮食保留。' : '选择已保存，本季作物与下季选择一致。' : '作物未更改，请先购买对应种子并检查农田是否仍可用。';
     });
+    this.initEarlyHarvest(b);
     this.refreshFarmInfo(b);
+  },
+  earlyHarvestText:function(q){
+    if(!q.ok)return q.reason;
+    return `现成熟${Math.floor(q.growth*100)}%，基础每格${q.base}。按当前工具，每格${q.perTile}，剩余${q.remaining}格预计${q.estimated} ${G.RES[q.output].name}；等全熟预计${q.fullEstimated}，较全熟估算少${q.fullEstimated-q.estimated}。这是在田估算，仓满、工具变化或冬季未收完会影响实际入库。`;
+  },
+  refreshEarlyHarvest:function(b){
+    const el=this.el.info,panel=el.querySelector('[data-farm-panel]');if(!panel)return;
+    const start=panel.querySelector('#early-harvest-start'),box=panel.querySelector('[data-early-harvest-confirm]'),status=panel.querySelector('[data-early-harvest-status]');if(!start||!box||!status)return;
+    const q=G.earlyHarvestQuote(b);start.disabled=!q.ok;status.textContent=this.earlyHarvestText(q);
+    const modal=G.hasOpenModal&&G.hasOpenModal();
+    if(panel._harvestQuote&&(!q.ok||panel._harvestQuote!==q.key||modal)){
+      panel._harvestQuote=null;box.classList.add('hidden');
+      const msg=panel.querySelector('[data-farm-message]');if(msg&&!modal)msg.textContent='抢收条件或预计产量已变，请重新确认。';
+      if(!modal&&box.contains&&box.contains(document.activeElement)){const focus=q.ok?start:el.querySelector('#info-close');if(focus&&focus.focus)focus.focus();}
+    }
+  },
+  initEarlyHarvest:function(b){
+    const el=this.el.info,w=G.world,g=G.game,panel=el.querySelector('[data-farm-panel]');if(!panel)return;
+    const start=panel.querySelector('#early-harvest-start'),confirm=panel.querySelector('#early-harvest-confirm'),cancel=panel.querySelector('#early-harvest-cancel'),box=panel.querySelector('[data-early-harvest-confirm]'),quote=panel.querySelector('[data-early-harvest-quote]'),msg=panel.querySelector('[data-farm-message]');
+    if(!start||!confirm||!cancel||!box||!quote)return;panel._harvestQuote=null;
+    const reset=()=>{panel._harvestQuote=null;box.classList.add('hidden');};
+    const valid=()=>G.world===w&&G.game===g&&this.el.info===el&&!el.classList.contains('hidden')&&G.sel?.kind==='b'&&G.sel.id===b.id&&w.bmap[b.id]===b&&b.state==='ok'&&el.querySelector('[data-farm-panel]')===panel&&!(G.hasOpenModal&&G.hasOpenModal());
+    start.addEventListener('click',e=>{if(!valid()||e.detail>1){reset();return;}const q=G.earlyHarvestQuote(b);if(!q.ok){reset();this.refreshFarmInfo(b);return;}panel._harvestQuote=q.key;quote.textContent=this.earlyHarvestText(q)+' 确认后本季不再成长、不可撤回，也不能再次播种；只下收割指令，不会立即获得粮食。';box.classList.remove('hidden');if(confirm.focus)confirm.focus();});
+    cancel.addEventListener('click',()=>{if(!valid()){reset();return;}reset();if(start.focus)start.focus();});
+    confirm.addEventListener('click',e=>{if(!valid()||!panel._harvestQuote||e.detail>1){reset();return;}const key=panel._harvestQuote;reset();const result=G.beginEarlyHarvest(b,key);if(msg)msg.textContent=result.ok?'已确认本季抢收，等待农夫逐格收割送仓；没有立即增加库存。':result.reason;this.refreshFarmInfo(b);const focus=result.ok?el.querySelector('#info-close'):start;if(focus&&focus.focus)focus.focus();});
   },
   tailorInfoData: function (b) {
     if (b.type !== 'tailor' || b.state !== 'ok' || !G.tailorSummary) return null;

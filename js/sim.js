@@ -111,7 +111,7 @@ G.endDay = function () {
 
   // ---- 农田生长 ----
   for (const b of w.buildings) {
-    if (b.type === 'farm' && b.state === 'ok' && b.sownAll && b.growth < 1 && g.season !== 3)
+    if (b.type === 'farm' && b.state === 'ok' && b.sownAll && !b.earlyHarvestYield && b.growth < 1 && g.season !== 3)
       b.growth = Math.min(1, b.growth + 1 / G.PROD.farm.growDays);
   }
 
@@ -1587,7 +1587,7 @@ G.makeTask = function (b, c) {
         }
       }
       // 收获（秋，作物长成）
-      if (b.sownAll && b.growth >= 1 && g.season === 2 && !b.harvestDone) {
+      if (G.farmHarvestReady(b)) {
         const ti = b.farm.findIndex((f, i) => f.sown && !f.harvested && !claimed.has(i));
         if (ti >= 0) {
           const f = b.farm[ti];
@@ -1698,7 +1698,7 @@ G.completeTask = function (c) {
         t.b.farm[t.ti].harvested = true;
         // 攒批搬运：收获累计到 haulCap 才送一趟仓库
         const P = G.PROD.farm;
-        const output=G.CROPS[t.crop || G.farmCropOf(b)].output,qty=G.taskYield(P.perTile);
+        const output=G.CROPS[t.crop || G.farmCropOf(b)].output,qty=G.taskYield(G.farmHarvestBase(b));
         if (c.carry) c.carry.qty += qty;
         else c.carry = { type: output, qty };
         G.recordProduction(b,output,qty);
@@ -1716,7 +1716,7 @@ G.completeTask = function (c) {
 G.resetFarm = function (b, applyChoice = G.game.season === 0) {
   if(applyChoice)b.cropType=G.cropChoiceOf(b);
   for (const f of b.farm) { f.sown = false; f.harvested = false; }
-  b.sownAll = false; b.growth = 0; b.harvestDone = false; delete b.sowingCommitted;
+  b.sownAll = false; b.growth = 0; b.harvestDone = false; delete b.sowingCommitted; delete b.earlyHarvestYield;
   // A commitment belongs to this crop season, not next year's empty field.
   // Expire every old season's crop task, including paused tasks; keep actual cargo.
   for (const c of G.world.citizens) {
@@ -1770,6 +1770,7 @@ G.pickSchool = function(counts,c){return G.schoolCandidate(c,counts)?.b||null;};
  * 顺序：超员 → 柴满伐木屋（燃料上限停产，纯闲）→ 石铁双满的矿井 → 非收获季农田 →
  * 人手最多的非粮食岗 → 粮食富余岗（人数 > 按人口测算的需求） */
 G.pickMarkDonor = function (w, harvestSeason, foodJobs, needFood) {
+  const isFoodRole=b=>foodJobs.includes(b.type)||(b.type==='farm'&&G.farmHarvestReady(b));
   const staffed = w.buildings.filter(b => b.state === 'ok' && G.BDEF[b.type].jobs > 0 && b.workers.length > 0);
   const adultsOf = (b) => b.workers.map(id => w.cmap[id]).filter(c => c && !c.dead && c.adult && !G.goalCommitment(c) && !G.mineralDeliveryBlocked(c));
   for (const b of staffed) {
@@ -1782,15 +1783,15 @@ G.pickMarkDonor = function (w, harvestSeason, foodJobs, needFood) {
     if (['mine', 'stonequarry'].includes(b.type) && !G.jobCanProduce(b)) { const c = adultsOf(b)[0]; if (c) return c; }
   if (!harvestSeason)
     for (const b of staffed)
-      if (b.type === 'farm' && b.sownAll) { const c = adultsOf(b)[0]; if (c) return c; } // 已播完种的农田；播种进行中不抽（否则秋收窗口顺延）
+      if (b.type === 'farm' && b.sownAll && !G.farmHarvestReady(b)) { const c = adultsOf(b)[0]; if (c) return c; } // 已播完种的农田；播种进行中不抽（否则秋收窗口顺延）
   let best = null, bestN = 1;
   for (const b of staffed) {
-    if (b.type === 'school' || foodJobs.includes(b.type)) continue;
+    if (b.type === 'school' || isFoodRole(b)) continue;
     const n = adultsOf(b).length;
     if (n > bestN) { bestN = n; best = b; }
   }
   if (best) return adultsOf(best)[0];
-  const foodStaff = staffed.filter(b => foodJobs.includes(b.type));
+  const foodStaff = staffed.filter(isFoodRole);
   const totalFood = foodStaff.reduce((n, b) => n + adultsOf(b).length, 0);
   if (totalFood <= needFood) return null;
   const fb = foodStaff.sort((a, b) => adultsOf(b).length - adultsOf(a).length)[0];
@@ -1800,7 +1801,7 @@ G.pickMarkDonor = function (w, harvestSeason, foodJobs, needFood) {
 G.farmHasWork = function (b) {
   const season = G.game.season;
   return (!b.sownAll && (season === 0 || season === 1) && (!G.goalPaused(G.farmOutput(b)) || G.farmSeasonCommitted(b))) ||
-    (b.sownAll && b.growth >= 1 && season === 2 && !b.harvestDone);
+    G.farmHarvestReady(b);
 };
 
 /* 纯读的派工前置检查，避免为缺料/停用岗位取消正在干活的粮工。 */
@@ -1855,6 +1856,7 @@ G.scheduleJobs = function () {
 
   const harvestSeason = G.game.season === 2;
   const FOOD_JOBS = harvestSeason ? ['gatherer', 'dock', 'hunting', 'farm'] : ['gatherer', 'dock', 'hunting'];
+  const isFoodRole=b=>FOOD_JOBS.includes(b.type)||(b.type==='farm'&&G.farmHarvestReady(b));
   const dailyFood = w.citizens.filter(x => !x.dead).length * G.LIFE.eatPerDay;
   const foodDays = dailyFood ? G.game.res.food / dailyFood : Infinity;
   const foodLow = Math.min(dailyFood * 8, G.storageCap() * 0.5);
@@ -1868,7 +1870,7 @@ G.scheduleJobs = function () {
     if (!forestEligibility.has(b.id)) forestEligibility.set(b.id, G.foodForestCanWork(b));
     return forestEligibility.get(b.id);
   };
-  const isFood = b => b && G.workerLimitOf(b)>0 && hasForestWork(b) && b.state === 'ok' && !G.productionLimited(b) && FOOD_JOBS.includes(b.type) && (b.type !== 'farm' || G.farmHasWork(b));
+  const isFood = b => b && G.workerLimitOf(b)>0 && hasForestWork(b) && b.state === 'ok' && !G.productionLimited(b) && isFoodRole(b) && (b.type !== 'farm' || G.farmHasWork(b));
   const foodCount = () => w.citizens.filter(c => c.adult && !c.dead && isFood(w.bmap[c.job])).length;
   if (G.game.foodUrgent) {
     // 已占满的工地也必须能回补粮岗；只保护尚可工作的食物建筑，不空留人。
@@ -1923,10 +1925,10 @@ G.scheduleJobs = function () {
           return jb && jb.state === 'ok' && G.BDEF[jb.type].jobs > 0 && jb.type !== 'school'
             && !(jb.type === 'farm' && !jb.sownAll && (G.game.season === 0 || G.game.season === 1) && jb.workers.length <= 1); // 教师不抽调
         });
-        let pool = busyAll.filter(ci => !FOOD_JOBS.includes(w.bmap[ci.job].type));
+        let pool = busyAll.filter(ci => !isFoodRole(w.bmap[ci.job]));
         if (!pool.length) {
           // 粮食劳动力富余量：按人口测算所需粮食工人
-          const foodWorkers = busyAll.filter(ci => FOOD_JOBS.includes(w.bmap[ci.job].type));
+          const foodWorkers = busyAll.filter(ci => isFoodRole(w.bmap[ci.job]));
           if (foodWorkers.length > needFood) pool = foodWorkers;
         }
         c = G.pickNearest(reachable(pool), b);
@@ -1957,7 +1959,7 @@ G.scheduleJobs = function () {
   // 优先级：伐木屋（柴火=过冬命脉）> 其他；供体依次为：
   //   非收获季农田 → 全员闲置岗位 → 木材富余时的护林屋 → 秋收季从林业抽人抢收
   const FOOD_SET = ['gatherer', 'dock', 'hunting', 'farm'];
-  const foodWorkerCount = () => w.buildings.filter(x => x.state === 'ok' && FOOD_JOBS.includes(x.type)).reduce((n, x) => n + x.workers.length, 0);
+  const foodWorkerCount = () => w.buildings.filter(x => x.state === 'ok' && isFoodRole(x)).reduce((n, x) => n + x.workers.length, 0);
   const targets = w.buildings
     .filter(b => b.state === 'ok' && G.BDEF[b.type].jobs > 0 && b.workers.length < G.workerLimitOf(b) && !b.noWork && G.jobCanProduce(b))
     .sort((a, b2) => (a.type === 'woodcutter' ? -1 : b2.type === 'woodcutter' ? 1 : 0));
@@ -1973,7 +1975,7 @@ G.scheduleJobs = function () {
     };
     // 供体 1：非收获季且已播完种的农田（播种进行中不抽，否则秋收窗口顺延）
     if (!harvestSeason) {
-      const farm = w.buildings.find(x => x.type === 'farm' && x.state === 'ok' && x.sownAll && x.workers.length > 0 && available(x));
+      const farm = w.buildings.find(x => x.type === 'farm' && x.state === 'ok' && x.sownAll && !G.farmHarvestReady(x) && x.workers.length > 0 && available(x));
       if (farm) { give(farm); return; }
     }
     // 供体 2：有闲置工人的岗位（工人正闲着就是临时富余；粮食岗至少留 1 人。
@@ -1981,12 +1983,12 @@ G.scheduleJobs = function () {
     // 关键岗位（伐木屋）会永久 0 工人，柴火归零冻死人）
     const lazy = w.buildings.find(x => x !== b && x.state === 'ok' && G.BDEF[x.type].jobs > 0 && x.workers.length > 0
       && x.type !== 'school' // 教师不外借，保证学堂开学
-      && (!FOOD_SET.includes(x.type) || (x.workers.length > 1 && (FOOD_JOBS.includes(b.type) || foodWorkerCount() > needFood)))
+      && (!FOOD_SET.includes(x.type) || (x.workers.length > 1 && (isFoodRole(b) || foodWorkerCount() > needFood)))
       && x.workers.some(id => { const c = w.cmap[id]; return eligibleForTarget(c) && c.state === 'idle' && !c.task; }));
     if (lazy) { give(lazy); return; }
     // 关键空岗不能永远等粮工碰巧idle：采集任务完工会直接接下一趟，正常忙碌不是不可抽调。
     if (b.workers.length === 0 && ['woodcutter', 'blacksmith', 'farm', 'forester'].includes(b.type) && foodWorkerCount() > needFood) {
-      const surplus = w.buildings.find(x => x !== b && x.state === 'ok' && FOOD_JOBS.includes(x.type) && x.workers.length > 1 && available(x));
+      const surplus = w.buildings.find(x => x !== b && x.state === 'ok' && isFoodRole(x) && x.workers.length > 1 && available(x));
       if (surplus) { give(surplus); return; }
     }
     // 供体 3：伐木屋缺人且木材有富余 → 护林屋（>1 人）抽一人锯柴
@@ -1995,7 +1997,7 @@ G.scheduleJobs = function () {
       if (forester) { give(forester); return; }
     }
     // 供体 4：秋收窗口宝贵 → 从伐木/护林抽人抢收
-    if (harvestSeason && b.type === 'farm') {
+    if ((harvestSeason || G.farmHarvestReady(b)) && b.type === 'farm') {
       const winterNeed = w.buildings.reduce((n, x) => n + (G.isOccupiedHome(w, x) ? G.BDEF[x.type].warmWoodPerYear : 0), 0);
       const d = w.buildings.find(x => x.state === 'ok' && x.type === 'forester' && x.workers.length > 0 && available(x)) ||
         w.buildings.find(x => x.state === 'ok' && x.type === 'woodcutter' && x.workers.length > 0 && G.usableHeatingFuel() >= winterNeed && available(x));
@@ -2810,11 +2812,39 @@ G.cropUnlocked=type=>type==='wheat'||(type==='cabbage'&&G.game.unlocks.cabbage==
 G.farmCropOf=b=>b.cropType==='cabbage'?'cabbage':'wheat';
 G.cropChoiceOf=b=>b.cropChoice==='cabbage'?'cabbage':'wheat';
 G.farmOutput=b=>G.CROPS[G.farmCropOf(b)].output;
+/* Early harvest fixes this season's reduced base yield. It never grants food
+ * directly; normal tile work, tools and hauling still produce each unit. */
+G.farmHarvestBase=b=>b.earlyHarvestYield||G.PROD.farm.perTile;
+G.farmHarvestReady=b=>!!(b&&b.type==='farm'&&b.state==='ok'&&b.sownAll&&!b.harvestDone&&G.game.season!==3&&
+  (b.earlyHarvestYield||(G.game.season===2&&b.growth>=1)));
+G.earlyHarvestQuote=function(b){
+  if(!b||G.world.bmap[b.id]!==b||b.type!=='farm'||b.state!=='ok')return {ok:false,reason:'农田尚不可用'};
+  if(G.game.season===3)return {ok:false,reason:'冬季休耕，不能抢收'};
+  if(b.harvestDone)return {ok:false,reason:'本季已收完，下一春才能再播种'};
+  if(b.earlyHarvestYield)return {ok:false,reason:`本季已确认抢收，基础每格${b.earlyHarvestYield}；等农夫实际收割送仓`};
+  if(!b.sownAll)return {ok:false,reason:'全田播完后才可抢收'};
+  if(G.game.season===2&&b.growth>=1)return {ok:false,reason:'作物已成熟，农夫会正常秋收'};
+  const base=Math.floor(G.PROD.farm.perTile*b.growth+1e-9);
+  if(base<1)return {ok:false,reason:'成长不足，至少长出每格1单位才可抢收'};
+  const remaining=b.farm.filter(f=>f.sown&&!f.harvested).length;
+  if(!remaining)return {ok:false,reason:'没有尚未收割的作物'};
+  const perTile=G.taskYield(base),fullPerTile=G.taskYield(G.PROD.farm.perTile),crop=G.farmCropOf(b);
+  return {ok:true,base,perTile,fullPerTile,remaining,growth:b.growth,output:G.farmOutput(b),
+    estimated:perTile*remaining,fullEstimated:fullPerTile*remaining,
+    key:[G.game.year,G.game.day,G.game.season,crop,b.growth,base,remaining,perTile,fullPerTile].join(':')};
+};
+G.beginEarlyHarvest=function(b,key){
+  const q=G.earlyHarvestQuote(b);
+  if(!q.ok)return {ok:false,reason:q.reason};
+  if(typeof key!=='string'||key!==q.key)return {ok:false,reason:'成熟度、日期或工具情况已变，请重新确认抢收产量'};
+  b.earlyHarvestYield=q.base;b.noWork=false;b.warnText='';G.game.schedT=0;
+  return {ok:true};
+};
 G.farmTaskCurrent=function(t){
   const b=t&&t.b,g=G.game;
   if(!b||G.world.bmap[b.id]!==b||b.type!=='farm'||b.state!=='ok'||!b.farm[t.ti]||
     (t.crop&&t.crop!==G.farmCropOf(b))||(t.cropYear!==undefined&&t.cropYear!==g.year))return false;
-  return t.kind==='sow'?(g.season===0||g.season===1):t.kind==='harvest'&&g.season===2&&b.sownAll&&b.growth>=1&&!b.harvestDone;
+  return t.kind==='sow'?(g.season===0||g.season===1):t.kind==='harvest'&&G.farmHarvestReady(b);
 };
 G.setFarmCrop=function(b,type){
   if(!b||G.world.bmap[b.id]!==b||b.type!=='farm'||b.state!=='ok'||!Object.hasOwn(G.CROPS,type)||!G.cropUnlocked(type))return false;
@@ -2829,7 +2859,7 @@ G.farmSummary=function(b){
   const sown=b.farm.filter(f=>f.sown).length,harvested=b.farm.filter(f=>f.harvested).length;
   let status=g.season===3?'冬季休耕，等待下一春':b.harvestDone?'本季收获完成':!b.sownAll?
     (g.season===2?'秋季已过播种窗口':G.goalPaused(G.farmOutput(b))&&!committed?'目标已达，暂停新季播种':`播种 ${sown}/${b.farm.length}`):
-    b.growth<1?`生长中 ${Math.floor(b.growth*100)}%`:g.season===2?`秋收 ${harvested}/${b.farm.length}`:'作物成熟，等待秋季';
+    b.earlyHarvestYield?`抢收 ${harvested}/${b.farm.length}（本季基础每格${b.earlyHarvestYield}）`:b.growth<1?`生长中 ${Math.floor(b.growth*100)}%`:g.season===2?`秋收 ${harvested}/${b.farm.length}`:'作物成熟，等待秋季';
   const reason=committed?'本季已开始：只改下一春，不改变已接任务、在田作物或在途收获':
     g.season===0||g.season===1?'空田尚未开始：已解锁作物可用于本季播种':'当前不能播种：选择留待下一春';
   return {crop,choice,output:G.CROPS[crop].output,choiceOutput:G.CROPS[choice].output,pending:crop!==choice,committed,
