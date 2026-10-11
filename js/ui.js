@@ -181,6 +181,7 @@ G.ui = {
     this.initHarvestRangeControls();
     this.initProductionGoals();
     this.initRoadControls();
+    this.initFarmPlanControls();
 
     // 顶栏按钮
     document.getElementById('btn-save').addEventListener('click', () => { G.saveGame(); });
@@ -317,7 +318,7 @@ G.ui = {
     if (status) {
       const t = G.tool && (G.tool.kind === 'build' ? G.tool.type : G.tool.kind==='road' ? (G.tool.surface==='bridge'?'bridge':G.tool.surface==='stone'?'stoneroad':'road') : G.tool.kind);
       const names = { fell: '砍伐', quarry: '采石采铁', demolish: '拆除', road: '铺路' };
-      status.textContent = t ? `当前：${names[t] || G.BDEF[t].name} · ${t === 'demolish' ? '点击建筑或道路立即拆除' : ['fell', 'quarry'].includes(t) ? '框选范围后确认标记' : ['road','stoneroad','bridge'].includes(t) ? '选起终点后预览并确认' : '点击地图放置，可连续建造'} · Esc / 右键取消` :
+      status.textContent = t ? `当前：${names[t] || G.BDEF[t].name} · ${t === 'demolish' ? '点击建筑或道路立即拆除' : ['fell', 'quarry'].includes(t) ? '框选范围后确认标记' : ['road','stoneroad','bridge'].includes(t) ? '选起终点后预览并确认' : t==='farm'?'选两个角或拖出矩形，再确认开田' : '点击地图放置，可连续建造'} · Esc / 右键取消` :
         group ? '未选择工具。点击一项开始；返回分类可切换功能。' : '选择分类，再选择建筑或操作。';
     }
   },
@@ -338,6 +339,7 @@ G.ui = {
     this.refreshHarvestControls();
     this.refreshHarvestRangeControls();
     this.refreshRoadControls();
+    this.refreshFarmPlanControls();
   },
 
   initHarvestRangeControls: function () {
@@ -397,6 +399,31 @@ G.ui = {
     if (text.textContent !== message) text.textContent = message;
     button._harvestIntent = s.ok ? { plan: s.plan, signature: s.signature } : null;
     button.disabled = !s.ok || !s.added.length || G.hasOpenModal();
+  },
+
+  initFarmPlanControls: function(){
+    const confirm=document.getElementById('farm-plan-confirm'),cancel=document.getElementById('farm-plan-cancel');if(!confirm||!cancel)return;
+    let armed=null,keyHeld=false;
+    const capture=e=>{if(e.type==='mousedown'&&armed?.source==='touchstart')return;keyHeld=false;armed=confirm._farmIntent?{...confirm._farmIntent,source:e.type}:null;};
+    for(const name of(window.PointerEvent?['pointerdown']:['mousedown','touchstart']))confirm.addEventListener(name,capture);
+    confirm.addEventListener('keydown',e=>{if(!['Enter',' '].includes(e.key)||e.repeat)return;keyHeld=true;armed=confirm._farmIntent?{...confirm._farmIntent,source:'keyboard'}:null;});
+    confirm.addEventListener('keyup',e=>{if(['Enter',' '].includes(e.key))keyHeld=false;});
+    for(const name of ['pointercancel','touchcancel'])confirm.addEventListener(name,()=>{armed=null;keyHeld=false;});
+    window.addEventListener('blur',()=>{armed=null;keyHeld=false;});
+    confirm.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();const intent=armed||confirm._farmIntent;if(!keyHeld)armed=null;if(!intent){this.refreshFarmPlanControls();return;}const r=G.confirmFarmPlan(intent);if(r.ok)this.toast(`农田 ${r.b.w}×${r.b.h} 已规划；工人清场施工后才能播种`,'good');else if(r.reason)this.toast(r.reason,'warn');this.refreshFarmPlanControls();});
+    cancel.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();if(G.hasOpenModal())return;armed=null;keyHeld=false;G.cancelFarmPlan();this.refreshFarmPlanControls();});
+  },
+  refreshFarmPlanControls: function(){
+    const el=document.getElementById('farm-plan-controls');if(!el)return;
+    const visible=!!G.world&&G.isFarmPlanning&&G.isFarmPlanning();
+    if(!visible&&el.contains&&el.contains(document.activeElement)){const b=this.el.toolbar?.querySelector('[data-tool="farm"]');if(b)b.focus({preventScroll:true});}
+    el.classList.toggle('hidden',!visible);if(!visible)return;
+    const text=document.getElementById('farm-plan-status'),button=document.getElementById('farm-plan-confirm');if(!text||!button)return;
+    const s=G.farmPlanStatus();let message=s.reason||'';
+    if(s.ok)message=`农田 ${s.size[0]}×${s.size[1]} · ${s.area}格\n免费；施工 ${Number(s.work.toFixed(2))} 工时，先清 ${s.trees} 棵树（实际搬木，不瞬间砍树）\n初始农夫上限 ${s.workers} 人，可在建成后改0–4；上限不保证配足人\n成熟满收理论 ${s.fullYield} 食物，未扣工具不足、冬损与仓满弃货；不是保证入库。大田种收与长途搬运可能赶不上季节。`;
+    message+='\n鼠标拖矩形或点两个角；手机点两个角。每边4–15格，确认才创建工地。重选不撤销已确认工地。';
+    if(text.textContent!==message)text.textContent=message;
+    button._farmIntent=s.ok?{plan:s.plan,signature:s.signature}:null;button.disabled=!s.ok||G.hasOpenModal();
   },
 
   initRoadControls: function () {
@@ -662,6 +689,7 @@ G.ui = {
 
   refreshPlacement: function (type, x, y) {
     if (this.refreshRoadControls) this.refreshRoadControls();
+    if(this.refreshFarmPlanControls)this.refreshFarmPlanControls();
     if (this.refreshHarvestRangeControls) this.refreshHarvestRangeControls(false);
     if (this.refreshHarvestControls) this.refreshHarvestControls();
     const el = this.el.placement;
@@ -1323,6 +1351,7 @@ G.ui = {
     return { summary: s, data: {
       status: s.status,
       workers: `${s.workers} 人${workerNames.length ? ' · ' + workerNames.join('、') : '（等待可用农夫）'}`,
+      plot: `地块 ${b.w}×${b.h} · ${s.total}格 · 成熟满收理论 ${s.total*G.PROD.farm.perTile} 食物；实际受种收工时、工具、冬损和仓容影响`,
       current: `本季作物：${crop.name} → ${G.RES[s.output].name}`,
       choice: `下季 / 空田选择：${choice.name} → ${G.RES[s.choiceOutput].name}${s.pending ? '（下一春生效）' : '（与本季一致）'}`,
       reason: s.reason,

@@ -552,8 +552,17 @@ G.workSpot = function (w, b, fx, fy, reachable = false) {
 };
 
 /* ---------- 放置判定 ---------- */
-G.canPlace = function (w, type, ox, oy) {
-  const def = G.BDEF[type];
+// Only farm plots opt into variable dimensions; old/default definitions stay fixed.
+G.farmDefinition=function(size){
+  const d=G.BDEF.farm;if(size===undefined)return d;
+  if(!Array.isArray(size)||size.length!==2||!size.every(n=>Number.isInteger(n)&&n>=4&&n<=15))return null;
+  return {...d,w:size[0],h:size[1],buildWork:d.buildWork*size[0]*size[1]/64};
+};
+G.initialFarmWorkers=size=>Math.min(4,Math.max(1,Math.ceil(size[0]*size[1]/56)));
+G.canPlace = function (w, type, ox, oy, farmSize) {
+  if(type==='farm'&&(!Number.isInteger(ox)||!Number.isInteger(oy)))return {ok:false,reason:'农田坐标须为整数'};
+  const def = type==='farm'?G.farmDefinition(farmSize):G.BDEF[type];
+  if(!def||(farmSize!==undefined&&type!=='farm'))return {ok:false,reason:'农田每边须为4至15格的整数'};
   const N = w.N;
   if (ox < 0 || oy < 0 || ox + def.w > N || oy + def.h > N) return { ok: false, reason: '超出地图范围' };
   let hasWater = false;

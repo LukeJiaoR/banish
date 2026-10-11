@@ -446,6 +446,17 @@ G.drawBuilding = function (ctx, b, time) {
   }
 };
 
+G.drawFarmPlan=function(ctx){
+  if(!G.isFarmPlanning||!G.isFarmPlanning())return;
+  const p=G.farmDrag||G.farmPlan;if(!p||p.world!==G.world)return;
+  const bounds=G.farmBounds(p.end?p:{...p,end:p.start});if(!bounds)return;
+  const {x,y,w,h}=bounds,size=[w,h],valid=!!G.farmDefinition(size),check=valid?G.canPlace(G.world,'farm',x,y,size):{ok:false};
+  ctx.save();ctx.fillStyle=check.ok?'rgba(120,230,140,.28)':'rgba(230,90,80,.25)';ctx.strokeStyle=check.ok?'#c4e89b':'#e78f80';ctx.lineWidth=1/G.cam.z;
+  if(valid)for(let yy=y;yy<y+h;yy++)for(let xx=x;xx<x+w;xx++){G.diamondPath(ctx,...G.T2S(xx,yy));ctx.fill();ctx.stroke();}
+  else{const corners=[[x,y],[x+w,y],[x+w,y+h],[x,y+h]];ctx.beginPath();corners.forEach(([xx,yy],i)=>{const [sx,sy]=G.T2S(xx,yy);if(i)ctx.lineTo(sx,sy);else ctx.moveTo(sx,sy);});ctx.closePath();ctx.fill();ctx.stroke();}
+  ctx.restore();
+};
+
 G.drawFarmGround = function (ctx, b, bounds) {
   const pal = G.PAL[G.game.season];
   const soilTex = pal.snow ? 'farm_soil_snow' : 'farm_soil';
@@ -832,7 +843,7 @@ G.frame = function (dtReal) {
 
   // 建造幽灵：贴着地面画、在建筑之前——后面的建筑/树会正确把它挡住，
   // 不会出现“绿色预览浮在已有建筑上”的误导
-  if (G.tool && G.tool.kind === 'build' && G.hover.tx >= 0) {
+  if (G.tool && G.tool.kind === 'build' && G.hover.tx >= 0 && !(G.isFarmPlanning&&G.isFarmPlanning())) {
     const def = G.BDEF[G.tool.type];
     const ox = G.hover.tx - ((def.w - 1) >> 1), oy = G.hover.ty - ((def.h - 1) >> 1);
     const chk = G.canPlace(w, G.tool.type, ox, oy);
@@ -859,6 +870,8 @@ G.frame = function (dtReal) {
     if (harvesting) G.ui.refreshHarvest();
     else G.ui.refreshPlacement(null);
   }
+
+  G.drawFarmPlan(ctx);
 
   // 矿石与道路工具悬停（同样贴地）
   if (G.tool && G.tool.kind === 'quarry' && G.hover.tx >= 0 && G.hover.ty >= 0 && G.hover.tx < w.N && G.hover.ty < w.N) {
