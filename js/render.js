@@ -490,10 +490,10 @@ G.drawFarmCrop = function (ctx, b, f) {
   const [sx, sy] = G.T2S(f.x, f.y);
   if (f.sown && !f.harvested) {
     const g = b.growth;
-    const prefix = G.farmCropOf(b)==='cabbage'?'cabbage':'crop';
+    const prefix = G.CROPS[G.farmCropOf(b)].sprite;
     const stage = prefix + (g >= 1 ? '_ripe' : g >= 0.66 ? '_stage2' : g >= 0.33 ? '_stage1' : '_stage0');
     if (G.sprDraw(ctx, stage, sx, sy + 26)) return;
-    const cropCol = G.farmCropOf(b)==='cabbage'?G.lerpColor('#699248','#a2aa63',g):g >= 1 ? (G.game.season === 2 ? '#d8b23a' : '#c8a83a') : G.lerpColor('#5d8a3a', '#c2a13a', g);
+    const cropCol = G.farmCropOf(b)!=='wheat'?G.lerpColor('#699248','#a2aa63',g):g >= 1 ? (G.game.season === 2 ? '#d8b23a' : '#c8a83a') : G.lerpColor('#5d8a3a', '#c2a13a', g);
     const rr = 1 + g * 1.6;
     ctx.fillStyle = cropCol;
     for (let k = 0; k < 4; k++) {
