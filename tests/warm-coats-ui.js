@@ -122,10 +122,10 @@ test('basic defaults show the legacy recipe, atomic consumption, stock split and
   assert.equal(f.G.tailorRecipeOf(f.b), 'basic');
   assert.match(f.info.innerHTML, /value="basic" selected/);
   assert.match(live(f, 'recipe').textContent, /2 皮革或 2 羊毛（自动优先皮革）.*1 普通衣（受教育 2）.*8 小时/);
-  assert.match(live(f, 'materials').textContent, /2 皮革.*未预留/);
+  assert.match(live(f, 'materials').textContent, /2 皮革.*到仓才整批领取/);
   assert.match(live(f, 'stock').textContent, /普通衣物 2.*暖衣 1.*在途未入库不计/);
-  assert.match(f.info.textContent, /原料暂留全镇库存.*制作完成时才一次扣齐全部原料/);
-  assert.match(f.info.textContent, /取消或读档重开未完成批次不扣原料/);
+  assert.match(f.info.textContent, /整批领取衣料并立即出库.*同批不再次扣料/);
+  assert.match(f.info.textContent, /中断或读档退回未用衣料/);
   assert.match(f.info.textContent, /48 天.*日终磨损 1 天.*穿坏时先领暖衣/);
   assert.match(f.info.textContent, /旧衣剩余耐久保留/);
   assert.match(f.info.textContent, /降低 40%.*降低 70%.*比普通再减半/);
@@ -187,8 +187,8 @@ test('accepted and paused recipes retain their own outputs, deduplicate shared t
   assert.equal(live(f, 'batches').textContent.match(/普通衣 1/g).length, 1);
   assert.match(live(f, 'stock').textContent, /普通衣物 2.*暖衣 1/);
   c.pausedTask = null; c.carry = null; task.phase = 'fetch'; G.ui.renderInfo();
-  assert.match(live(f, 'batches').textContent, /前往仓库核料/);
-  task.phase = 'work'; G.ui.renderInfo(); assert.match(live(f, 'batches').textContent, /回铺 \/ 制作/);
+  assert.match(live(f, 'batches').textContent, /前往仓库领料/);
+  task.phase = 'process'; G.ui.renderInfo(); assert.match(live(f, 'batches').textContent, /回铺 \/ 制作/);
 });
 
 test('rejected and invalid recipe changes restore the actual value without replacing or blurring the selector', () => {
@@ -261,10 +261,10 @@ test('legacy coat durability and leisure updates coexist without false instant r
 
 test('citizen work feedback follows the accepted coat rather than the newly selected recipe', () => {
   const f = tailor(), { G, b, c } = f; c.task = G.makeTask(b, c); c.state = 'walk';
-  G.setCoatRecipe(b, 'warm'); assert.match(G.ui.citizenStatus(c), /前往仓库核对衣料.*完成时才扣原料/);
-  c.task.phase = 'work'; assert.match(G.ui.citizenStatus(c), /返回裁缝铺制作普通衣/);
-  c.state = 'work'; assert.equal(G.ui.citizenStatus(c), '制作普通衣');
-  c.task.yield.type = 'warmCoats'; assert.equal(G.ui.citizenStatus(c), '制作保暖外套');
+  G.setCoatRecipe(b, 'warm'); assert.match(G.ui.citizenStatus(c), /前往通用仓取衣料.*尚未扣料/);
+  c.task.phase = 'process'; assert.match(G.ui.citizenStatus(c), /返回裁缝铺制作普通衣/);
+  c.state = 'work'; assert.equal(G.ui.citizenStatus(c), '制作普通衣（使用随身衣料）');
+  c.task.yield.type = 'warmCoats'; assert.equal(G.ui.citizenStatus(c), '制作保暖外套（使用随身衣料）');
   c.task = null; c.carry = { type: 'warmCoats', qty: 1 }; c.state = 'haul';
   assert.equal(G.ui.citizenStatus(c), '搬运保暖外套（送仓）');
 });
@@ -297,12 +297,12 @@ test('live walking, completion, cargo and actual wardrobe upgrade flow through t
   for (let i = 0; i < 1200 && G.game.res.warmCoats < 1; i++) {
     G.ui.renderInfo();
     for (const batch of G.tailorSummary(b).batches) phases.add(batch.phase);
-    if (c.task) assert.deepEqual([G.game.res.leather, G.game.res.wool], inputs);
+    if (c.task) assert.deepEqual([G.game.res.leather, G.game.res.wool], c.task.phase==='fetch'?inputs:inputs.map(n=>n-2));
     G.stepCitizen(c, .1);
   }
   G.ui.renderInfo(); assert.equal(G.game.res.warmCoats, 1);
   assert.deepEqual([G.game.res.leather, G.game.res.wool], inputs.map(n => n - 2));
-  assert(phases.has('fetch')); assert(phases.has('work')); assert(phases.has('haul'));
+  assert(phases.has('fetch')); assert(phases.has('process')); assert(phases.has('haul'));
   assert.match(live(f, 'stock').textContent, /暖衣 1/); assert.match(live(f, 'batches').textContent, /：无/);
   assert.equal(f.doc.activeElement, select); assert.equal(f.doc.getElementById('coat-recipe'), select);
   selectCitizen(f); f.doc.getElementById('info-close').focus(); G.wearClothing(c); G.ui.renderInfo();
@@ -360,6 +360,22 @@ test('constructing the tailor is reported as building work rather than clothes p
   const f = tailor(); f.b.state = 'site'; f.c.task = { kind: 'build', b: f.b }; f.c.state = 'work';
   assert.equal(f.G.ui.citizenStatus(f.c), '建造中');
   f.c.state = 'walk'; assert.equal(f.G.ui.citizenStatus(f.c), '前往工作点');
+});
+
+test('ordinary material selector locks only future batches and preserves focused draft during live refresh',()=>{
+ const f=tailor(),{G,b,c}=f;f.select(b);const input=f.info.querySelector('#coat-material');assert(input);assert.equal(input.value,'auto');
+ c.task=G.makeTask(b,c);const accepted=c.task;input.focus();input.value='wool';const writes=f.info.htmlWrites;G.ui.renderInfo();assert.equal(input.value,'wool');assert.equal(G.tailorMaterialOf(b),'auto');input.emit('change');
+ assert.equal(G.tailorMaterialOf(b),'wool');assert.equal(accepted.consume[0].type,'leather');assert.equal(f.doc.activeElement,input);assert.equal(f.info.htmlWrites,writes);assert.match(live(f,'recipe').textContent,/仅用所选材料/);assert.match(live(f,'materials').textContent,/2 羊毛/);
+ G.game.res.wool=0;G.ui.renderInfo();assert.match(live(f,'status').textContent,/不会自动改料/);
+});
+test('warm recipe disables ordinary-material controls without discarding the saved future choice',()=>{
+ const f=tailor(),{G,b}=f;G.setCoatMaterial(b,'wool');f.select(b);choose(f,'warm');const input=f.info.querySelector('#coat-material');assert.equal(input.disabled,true);input.value='leather';input.emit('change');assert.equal(G.tailorMaterialOf(b),'wool');choose(f,'basic');assert.equal(input.disabled,false);assert.equal(input.value,'wool');
+});
+test('old material callback cannot change new worlds, selected buildings or a dismissed panel',()=>{
+ for(const mode of ['world','selection','closed']){const f=tailor(),{G,b}=f;f.select(b);const input=f.info.querySelector('#coat-material');if(mode==='world')G.world={...G.world};else if(mode==='selection')G.sel=null;else f.info.classList.add('hidden');input.value='wool';input.emit('change');assert.equal(G.tailorMaterialOf(b),'auto');}
+});
+test('live raw mixed cargo and returns are visible separately from public material and finished coats',()=>{
+ const f=tailor(),{G,b,c}=f;G.setCoatRecipe(b,'warm');G.game.res.leather=G.game.res.wool=2;c.task=G.makeTask(b,c);c.task.phase='process';c.carry={type:'leather',qty:2,extra:{wool:2},staffingReturn:true,coatInput:b.id};G.game.res.leather=G.game.res.wool=0;c.state='walk';f.select(b);assert.match(live(f,'batches').textContent,/原配料 2 皮革.*2 羊毛 已出库/);assert.match(G.ui.citizenStatus(c),/携衣料返回裁缝铺/);c.task=null;c.state='haul';G.ui.renderInfo();assert.match(live(f,'batches').textContent,/退回未用衣料.*皮革 2.*羊毛 2/);assert.match(G.ui.citizenStatus(c),/退回未使用衣料/);assert.match(live(f,'stock').textContent,/普通衣物 2.*暖衣 1/);
 });
 
 console.log(`Warm coats UI: ${passed} DOM and live-simulation suites passed (browser visual acceptance not performed).`);
