@@ -130,7 +130,7 @@ G.fillTerrainSurface = function (c, name, x, y) {
 
 /* 建筑精灵按占地菱形的宽度比例缩放（图里自带栅栏/台阶等出格装饰） */
 G.BUILD_SPR_W = {
-  house: 1.16, stonehouse: 1.12, boarding: 1.04, storage: 1.03, mine: 1.12,
+  house: 1.16, stonehouse: 1.12, boarding: 1.04, storage: 1.03, stockpile:1.25, mine: 1.12,
   gatherer: 1.10, forester: 1.06, woodcutter: 1.12, dock: 1.0,
   school: 1.06, blacksmith: 1.06, hunting: 1.08, site_2x2: 1.0, site_3x3: 1.0,
   tailor: 1.04, tavern: 7 / 6, tradingpost: 0.875, herbalist: 1.25, hospital: 7 / 6, stonequarry: 7 / 6, townhall: 7 / 6,
@@ -395,6 +395,12 @@ G.drawBuilding = function (ctx, b, time) {
     return;
   }
 
+  if(b.type==='stockpile'){
+    ctx.strokeStyle='#846745';ctx.lineWidth=3;
+    ctx.beginPath();ctx.moveTo(L[0],L[1]-5);ctx.lineTo(T[0],T[1]-5);ctx.lineTo(R[0],R[1]-5);ctx.stroke();
+    for(const p of [T,L,R]){ctx.beginPath();ctx.moveTo(p[0],p[1]);ctx.lineTo(p[0],p[1]-12);ctx.stroke();}
+    return;
+  }
   const H = b.type === 'storage' ? 17 : 20;
   // 右墙（东南面，暗）
   quadFill(ctx, R[0], R[1], B[0], B[1], B[0], B[1] - H, R[0], R[1] - H, def.wallD);

@@ -275,10 +275,10 @@ G.ui = { toast() {}, refreshHUD() {} };
   G.game.res.wood = 10;
   const t = G.makeTask(b, c);
   check('有仓库 → 先去仓库背料（phase fetch）', !!t && t.kind === 'firewood' && t.phase === 'fetch');
-  c.task = t;
+  c.task = t; c.x=t.tx; c.y=t.ty; // This direct-completion fixture must stand at the actual storage endpoint.
   G.completeTask(c); // 到仓库
   check('背料段不扣木材、转入加工段', t.phase === 'work' && G.game.res.wood === 10 && t.workLeft === t.work);
-  t.workLeft = 0;
+  t.workLeft = 0;c.x=t.tx;c.y=t.ty; // The direct fixture has now reached its workshop.
   G.completeTask(c); // 加工完成
   check('加工完扣 2 木、6 柴背着去仓库', G.game.res.wood === 8 && c.carry && c.carry.type === 'firewood' && c.carry.qty === 6);
   for (let k = 0; k < 100 && c.carry; k++) G.stepCitizen(c, 0.5);
@@ -1005,6 +1005,7 @@ G.markGroundDirty = G.markGroundDirty || (() => {}); // render.js 未加载时�
   check('收第 1 格 → 背 14 主食继续收（不立即送仓）', c.carry && c.carry.type === 'grain' && c.carry.qty === 14 && g.res.food === 0 && !!c.task);
   G.completeTask(c); // c.task 已由 requestTask 指到下一格
   check('背满 28 → 起程送仓', c.carry && c.carry.qty === 28 && c.state === 'haul' && g.res.food === 0);
+  const delivery=c.path[c.path.length-1];c.x=delivery.x;c.y=delivery.y;
   G.arrive(c);
   check('一趟送达 28 食物', g.res.food === 28 && !c.carry);
 }

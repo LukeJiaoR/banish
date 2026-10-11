@@ -40,6 +40,12 @@ G.BDEF = {
     wall: '#7c7466', wallD: '#5e574c', roof: '#5c5648',
     desc: '原版 Storage Barn 成本 48木+16石。存放全镇资源，工人把收获搬到预计耗时较短的可达仓库。',
   },
+  stockpile: {
+    id:'stockpile', name:'露天堆料场', icon:'🪵', w:2, h:2,
+    cost:{wood:8}, buildWork:20, jobs:0, passable:true,
+    wall:'#95724d', wallD:'#685139', roof:'#967755',
+    desc:'低成本原料交货点，需清场和施工。只收原木、石头、铁、煤与柴火；各类公共仓容增加250，按实际可达耗时选择。食物与工具仍送通用仓库；沿用公共库存，不代表独立地方存货。',
+  },
   mine: {
     id: 'mine', name: '矿井', icon: '⛏️', w: 3, h: 3,
     cost: { wood: 80, stone: 40, iron: 10 }, buildWork: 140, jobs: 2, passable: false,

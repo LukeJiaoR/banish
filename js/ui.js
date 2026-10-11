@@ -218,7 +218,7 @@ G.ui = {
       { id: 'homes', name: '住房', icon: '🏠', hint: '安家与过冬', tools: ['house', 'stonehouse', 'boarding'] },
       { id: 'food', name: '食物生产', icon: '🌾', hint: '肉类 · 蔬菜 · 主食', tools: ['gatherer', 'hunting', 'dock', 'farm', 'orchard', 'pasture'] },
       { id: 'industry', name: '资源与加工', icon: '⚒️', hint: '木石铁煤 · 工具 · 衣物 · 酿造', tools: ['forester', 'woodcutter', 'stonequarry', 'mine', 'blacksmith', 'tailor', 'tavern'] },
-      { id: 'services', name: '城镇服务', icon: '🏘️', hint: '储运 · 教育 · 医疗 · 迁入 · 安葬', tools: ['storage', 'school', 'herbalist', 'hospital', 'tradingpost', 'townhall', 'cemetery'] },
+      { id: 'services', name: '城镇服务', icon: '🏘️', hint: '储运 · 教育 · 医疗 · 迁入 · 安葬', tools: ['storage', 'stockpile', 'school', 'herbalist', 'hospital', 'tradingpost', 'townhall', 'cemetery'] },
       { id: 'land', name: '道路与采运', icon: '🛣️', hint: '修路 · 采集 · 拆除', tools: ['road', 'stoneroad', 'bridge', 'fell', 'quarry', 'demolish'] },
     ].map(group => ({ ...group, tools: group.tools.filter(available) })).filter(group => group.tools.length);
     const registered = new Set(this.toolGroups.flatMap(group => group.tools));
@@ -262,7 +262,7 @@ G.ui = {
 
   toolButton: function (t) {
     const icons = { stonehouse: 'tool_stonehouse', boarding: 'tool_boarding', mine: 'tool_mine', stonequarry: 'tool_stonequarry',
-      blacksmith: 'tool_blacksmith', hunting: 'tool_hunting', house: 'tool_house', storage: 'tool_storage',
+      blacksmith: 'tool_blacksmith', hunting: 'tool_hunting', house: 'tool_house', storage: 'tool_storage', stockpile:'tool_stockpile',
       gatherer: 'tool_gatherer', forester: 'tool_forester', woodcutter: 'tool_woodcutter', dock: 'tool_dock',
       school: 'tool_school', herbalist: 'tool_herbalist', hospital: 'tool_hospital', townhall: 'tool_townhall', tavern: 'tool_tavern', farm: 'tool_farm', road: 'tool_road', stoneroad: 'tool_stoneroad', bridge: 'tool_bridge', demolish: 'tool_demolish' };
     const special = {
@@ -539,7 +539,7 @@ G.ui = {
       const el = document.getElementById('res-' + k);
       if (el) {
         el.querySelector('b').textContent = Math.floor(g.res[k]);
-        const cap = G.storageCap();
+        const cap = G.storageCap(k);
         const foodClass = (G.FOOD_KEYS || []).includes(k);
         const tool = k === 'tools' || k === 'steelTools';
         el.title = `${G.RES[k].name}：${Math.floor(g.res[k])}${tool ? '（工具不限仓储）' : foodClass ? '（三类食物共享总食物仓容 ' + cap + '）' : ' / ' + cap}`;
@@ -965,6 +965,16 @@ G.ui = {
     });
     this.refreshHouseUpgradeInfo(b);
   },
+  stockpileInfoData: function(b) {
+    if(!b||b.type!=='stockpile'||b.state!=='ok')return null;
+    return {rules:'只接原木、石头、铁、煤、柴火；不收食物、工具、衣物。无需常驻工人。',
+      capacity:'本场为以上每类公共仓容增加 '+G.STOCKPILE_CAP+'；这是公共合计，不是本场独立库存。',
+      stocks:G.STOCKPILE_TYPES.map(k=>G.RES[k].name+' '+Math.floor(G.game.res[k])+' / '+G.storageCap(k)).join(' · '),
+      removal:'拆除会降低分类仓容，但不删除已有公共资源；超过新容量时暂停入库。在途交货保留并改投可达兼容仓。',
+      routing:'按真实可达通行时间选择交货点。粮食、工具等仍需要通用仓库；最后一座通用仓库不可拆。'};
+  },
+  stockpileInfoMarkup: function(b) {const d=this.stockpileInfoData(b);return Object.keys(d).map(k=>'<div class="row desc" data-stockpile="'+k+'">'+this.escHtml(d[k])+'</div>').join('');},
+  refreshStockpileInfo: function(b) {const d=this.stockpileInfoData(b);for(const k of Object.keys(d)){const n=this.el.info.querySelector('[data-stockpile="'+k+'"]');if(n)n.textContent=d[k];}},
   cemeteryInfoData: function(b) {
     const s=G.cemeterySummary(b);if(!s)return null;
     return {status:s.status,capacity:`墓位：${s.used} / ${s.capacity} · 空余 ${s.free}`,expiry:s.nextDays===null?'暂无墓位占用':`最早约 ${s.nextDays} 天后释放墓位`,
@@ -1711,6 +1721,7 @@ G.ui = {
     if (sameSelection && selected.state === 'ok' && this._economyInfoState === selected.state && this.refreshEconomyInfo(selected)) return;
     if (sameSelection && selected.state === 'ok' && this._medicalInfoState === selected.state && this.refreshMedicalInfo(selected)) return;
     if (sameSelection && selected.state === 'ok' && this._resourceChainInfoState === selected.state && this.refreshResourceChainInfo(selected)) return;
+    if(sameSelection&&G.sel.kind==='b'&&selected.type==='stockpile'&&selected.state==='ok'&&this._infoBuildState==='ok'){this.refreshStockpileInfo(selected);return;}
     if(sameSelection&&G.sel.kind==='b'&&selected.type==='cemetery'&&selected.state==='ok'&&this._infoBuildState==='ok'){this.refreshCemeteryInfo(selected);return;}
     if (sameSelection && selected.type === 'woodcutter' && this._fuelInfoState === selected.state && this.refreshFuelInfo(selected)) return;
     if (hadFocus && !force && sameSelection && selected.type !== 'woodcutter' &&
@@ -1812,6 +1823,7 @@ G.ui = {
       if (farmData) extra += this.farmInfoMarkup(farmData);
       if(schoolData)extra+=this.schoolInfoMarkup(b);
       if(cemeteryData)extra+=this.cemeteryInfoMarkup(cemeteryData);
+      if(b.type==='stockpile'&&b.state==='ok')extra+=this.stockpileInfoMarkup(b);
       if (b.state === 'ok') extra += this.economyInfoMarkup(b);
       if (medicalData) extra += this.medicalInfoMarkup(b, medicalData);
       const outputs = { gatherer: ['vegetables'], hunting: ['meat', 'leather'], dock: ['meat'], farm: ['grain'], orchard: ['vegetables'], pasture: ['meat', 'wool'], tailor: ['clothes'], herbalist: ['herbs'] };
@@ -2151,8 +2163,8 @@ G.ui = {
   refreshProductionGoals: function () {
     const modal = document.getElementById('production-goals');
     if (!modal || modal.classList.contains('hidden')) return;
-    const cap = G.storageCap();
     for (const type of G.RES_KEYS) {
+      const cap=G.storageCap(type);
       const stock = document.getElementById('goal-stock-' + type), status = document.getElementById('goal-status-' + type);
       if (!stock || !status) continue;
       const target = G.productionGoalOf(type);
@@ -2418,8 +2430,7 @@ G.harvestFeedback = function () {
   const active = new Set(), paused = new Set();
   const h = { trees: trees.size, rocks: rocks.size, total: trees.size + rocks.size, active: 0, paused: 0, queued: 0,
     laborers: 0, haulers: 0, waitingCarriers: 0, blockedMineralCarriers: 0, blockedMineralMarks: 0, carry: {}, reason: '' };
-  const cap = G.storageCap();
-  for (const i of rocks) if (G.game.res[w.rock[i] === 2 ? 'iron' : 'stone'] >= cap) h.blockedMineralMarks++;
+  for (const i of rocks) {const type=w.rock[i]===2?'iron':'stone';if(G.game.res[type]>=G.storageCap(type))h.blockedMineralMarks++;}
   for (const k of G.RES_KEYS) h.carry[k] = 0;
   let adults = 0, builders = 0, foodWorkers = 0, otherWorkers = 0;
   const claim = t => {
@@ -2446,7 +2457,7 @@ G.harvestFeedback = function () {
     }
     if (c.carry && G.RES_KEYS.includes(c.carry.type) && Number.isFinite(c.carry.qty) && c.carry.qty > 0) {
       h.carry[c.carry.type] += c.carry.qty;
-      if (G.isMineralCargo(c) && G.game.res[c.carry.type] >= cap && c.state !== 'haul') h.blockedMineralCarriers++;
+      if (G.isMineralCargo(c) && G.game.res[c.carry.type] >= G.storageCap(c.carry.type) && c.state !== 'haul') h.blockedMineralCarriers++;
       if (c.state === 'haul') h.haulers++;
       else h.waitingCarriers++;
     }
@@ -2497,8 +2508,10 @@ G.placementInfo = function (type, x, y) {
     lines.push(`工作范围 ±${p.waterR} 格（方形） · 水域 ${result.water} 格 / 满产参考 ${p.fullWater}`);
     if (result.water < p.fullWater) { result.warning = true; lines.push('△ 可建但水域较少，单次渔获降低'); }
   }
+  if(type==='stockpile')lines.push('完工后：仅木/石/铁/煤/柴各增加250公共仓容，零常驻工人；不是独立地方库存。');
   if (check.ok) {
-    const route = G.storageRoute(x, y);
+    const outputs=G.productionOutputsOf({type});
+    const route = G.storageRoute(x,y,outputs.length?outputs:null);
     if (route) lines.push(`当前地形可达仓：约 ${route.path.length} 步；道路更快，完工后须保留出入口。`);
     else { result.warning = true; lines.push('⚠ 当前找不到可达仓库，产物无法正常入库'); }
   } else lines.push('物流：地块合法后显示可达仓；近仓且通路畅通，搬运更快。');

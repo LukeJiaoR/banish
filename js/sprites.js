@@ -46,7 +46,7 @@ G.SPRITE_SIZES = {
       'rock_a', 'rock_b', 'rock_a_snow', 'rock_b_snow',
       'crop_stage0', 'crop_stage1', 'crop_stage2', 'crop_ripe', 'crop_dead', 'cabbage_stage0', 'cabbage_stage1', 'cabbage_stage2', 'cabbage_ripe', 'sheep', 'cattle', 'orchard_leafy', 'grave'],
     bridges: ['bridge_x', 'bridge_y'],
-    buildings: ['house', 'stonehouse', 'boarding', 'storage', 'mine', 'stonequarry', 'gatherer',
+    buildings: ['house', 'stonehouse', 'boarding', 'storage', 'stockpile', 'mine', 'stonequarry', 'gatherer',
       'forester', 'woodcutter', 'dock', 'school', 'townhall', 'blacksmith', 'hunting',
       'tailor', 'tavern', 'tradingpost', 'pasture', 'orchard', 'herbalist', 'hospital', 'site_2x2', 'site_3x3'],
     citizens: ['adult_walk_0', 'adult_walk_1', 'adult_walk_2', 'adult_walk_3',
@@ -58,7 +58,7 @@ G.SPRITE_SIZES = {
     icons: ['res_wood', 'res_stone', 'res_food', 'res_firewood', 'res_iron', 'res_tools', 'res_coal', 'res_steelTools',
       'res_meat', 'res_vegetables', 'res_grain', 'res_leather', 'res_wool', 'res_clothes', 'res_warmCoats', 'res_herbs', 'res_ale',
       'tool_stonehouse', 'tool_boarding', 'tool_mine', 'tool_stonequarry', 'tool_blacksmith', 'tool_hunting',
-      'tool_house', 'tool_storage', 'tool_gatherer', 'tool_forester', 'tool_woodcutter',
+      'tool_house', 'tool_storage', 'tool_stockpile', 'tool_gatherer', 'tool_forester', 'tool_woodcutter',
       'tool_dock', 'tool_tavern', 'tool_townhall', 'tool_school', 'tool_herbalist', 'tool_hospital', 'tool_farm', 'tool_road', 'tool_stoneroad', 'tool_bridge', 'tool_demolish', 'alert'],
   };
   let pending = 0;
