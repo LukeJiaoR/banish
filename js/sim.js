@@ -73,7 +73,7 @@ G.newGameState = function () {
     speed: 1, paused: false,
     res: { wood: 80, stone: 48, iron: 0, tools: 15, food: 500, meat: 0, vegetables: 0, grain: 500, leather: 0, wool: 0, clothes: 0, warmCoats: 0, herbs: 0, coal: 0, steelTools: 0, ale: 0, firewood: 50 }, // 开局（原版中难度 5 家庭，工具 15 件≈第一轮磨损周期）；存粮较原版加厚：15 人 6 天食物跑道撑不到第一座采集屋建成
     heating:{allowCoal:false,coalReserve:20},
-    healthStartDay: 0, challenges:{v:1,completed:{}},
+    healthStartDay: 0, farmPests:{enabled:false,graceUntil:0,lastDay:-1}, challenges:{v:1,completed:{}},
     nomads: {nextDay:G.YEAR_DAYS,serial:0,offer:null,accepted:0,declined:0},
     schedT: 1,
     over: false,
@@ -136,6 +136,8 @@ G.endDay = function () {
     if (b.type === 'farm' && b.state === 'ok' && b.sownAll && !b.earlyHarvestYield && b.growth < 1 && g.season !== 3)
       b.growth = Math.min(1, b.growth + 1 / G.PROD.farm.growDays);
   }
+
+  G.advanceFarmPests();
 
   // ---- 森林自然轮转：非冬季偶发自播（护林屋之外，森林也能缓慢恢复/扩张） ----
   if (g.season !== 3 && w.trees.length > 0 && G.chance(G.TREE_SPREAD_CHANCE)) {
@@ -1788,6 +1790,7 @@ G.completeTask = function (c) {
     case 'sow': {
       if (G.farmTaskCurrent(t) && !b.farm[t.ti].sown) {
         b.farm[t.ti].sown = true;
+        if(b.lastPestCrop&&b.lastPestCrop!==G.farmCropOf(b))delete b.lastPestCrop;
         if (b.farm.every(f => f.sown)) b.sownAll = true;
       }
       break;
@@ -1814,7 +1817,8 @@ G.completeTask = function (c) {
 
 G.resetFarm = function (b, applyChoice = G.game.season === 0) {
   if(applyChoice)b.cropType=G.cropChoiceOf(b);
-  for (const f of b.farm) { f.sown = false; f.harvested = false; }
+  for (const f of b.farm) { f.sown = false; f.harvested = false; delete f.pestLost; }
+  delete b.pestInfestation;
   b.sownAll = false; b.growth = 0; b.harvestDone = false; delete b.sowingCommitted; delete b.earlyHarvestYield;
   // A commitment belongs to this crop season, not next year's empty field.
   // Expire every old season's crop task, including paused tasks; keep actual cargo.
@@ -3144,10 +3148,62 @@ G.nextFarmTile=function(b,c,claimed,eligible){
     const d=G.d2(c.x,c.y,f.x,f.y);if(d<distance){distance=d;best=i;}}
   return best;
 };
+/* Optional farm-only disaster. Never removes harvested stock/cargo. Timing,
+ * rates and a two-field cap are small-map adaptations, not original numbers. */
+G.FARM_PESTS={graceDays:12,warningDays:2,lossFraction:.08,baseChance:.012,repeatChance:.04,spreadChance:.12,maxActive:2,spreadGap:3};
+G.pestFieldActive=b=>!!(b&&b.type==='farm'&&b.state==='ok'&&b.pestInfestation&&G.game.season!==3&&b.farm.some(f=>f.sown&&!f.harvested));
+G.markPestGround=b=>{for(const f of b.farm)G.markGroundDirty(f.x,f.y);};
+G.setFarmPests=function(enabled,expectedGame){
+  if(typeof enabled!=='boolean'||(expectedGame!==undefined&&expectedGame!==G.game))return false;
+  const p=G.game.farmPests;if(p.enabled===enabled)return true;
+  p.enabled=enabled;p.lastDay=G.game.day;if(enabled)p.graceUntil=G.game.day+G.FARM_PESTS.graceDays;
+  else for(const b of G.world.buildings)if(b.type==='farm'&&b.pestInfestation){delete b.pestInfestation;G.markPestGround(b);}
+  return true;
+};
+G.pestFieldGap=function(a,b){
+  const dx=Math.max(a.x-(b.x+b.w),b.x-(a.x+a.w),0),dy=Math.max(a.y-(b.y+b.h),b.y-(a.y+a.h),0);
+  return Math.hypot(dx,dy);
+};
+G.farmPestSummary=function(b){
+  const p=G.game.farmPests||{enabled:false,graceUntil:0},active=G.pestFieldActive(b),crop=G.farmCropOf(b),choice=G.cropChoiceOf(b);
+  return {enabled:p.enabled,graceDays:Math.max(0,p.graceUntil-G.game.day),active,
+    warningDays:active?Math.max(0,b.pestInfestation.startedDay+G.FARM_PESTS.warningDays-G.game.day):0,
+    damagePerDay:Math.ceil(b.farm.length*G.FARM_PESTS.lossFraction),lost:b.farm.filter(f=>f.pestLost).length,
+    remaining:b.farm.filter(f=>f.sown&&!f.harvested).length,recurrence:b.lastPestCrop===crop,
+    rotationAvailable:G.cropUnlocked('cabbage'),rotationPlanned:choice!==crop&&G.cropUnlocked(choice),crop,choice};
+};
+G.advanceFarmPests=function(){
+  const g=G.game,p=g.farmPests,rule=G.FARM_PESTS;
+  if(!p||p.lastDay>=g.day)return;p.lastDay=g.day;
+  if(!p.enabled)return;
+  const fields=G.world.buildings.filter(b=>b.type==='farm'&&b.state==='ok');
+  if(g.season===3){for(const b of fields)delete b.pestInfestation;return;}
+  // Sources are a snapshot: today's new infestation cannot chain through town.
+  const sources=fields.filter(G.pestFieldActive);
+  for(const b of sources){
+    if(g.day<b.pestInfestation.startedDay+rule.warningDays)continue;
+    const losses=b.farm.filter(f=>f.sown&&!f.harvested).slice(0,Math.ceil(b.farm.length*rule.lossFraction));
+    for(const f of losses){f.harvested=true;f.pestLost=true;G.markGroundDirty(f.x,f.y);}
+    if(b.farm.every(f=>f.harvested))b.harvestDone=true;
+    if(!G.pestFieldActive(b))delete b.pestInfestation;
+  }
+  if(g.day<p.graceUntil||g.season===0||fields.filter(G.pestFieldActive).length>=rule.maxActive)return;
+  // New outbreaks only in summer and the first four autumn days. Warn before loss.
+  if(g.season===2&&g.day%G.SEASON_DAYS>=4)return;
+  for(const b of fields){
+    if(b.pestInfestation||b.harvestDone||!b.sownAll||b.growth<.35||!b.farm.some(f=>f.sown&&!f.harvested))continue;
+    const crop=G.farmCropOf(b),exposed=sources.some(a=>a!==b&&G.farmCropOf(a)===crop&&G.pestFieldGap(a,b)<=rule.spreadGap);
+    const chance=exposed?rule.spreadChance:b.lastPestCrop===crop?rule.repeatChance:rule.baseChance;
+    if(!G.chance(chance))continue;
+    b.pestInfestation={crop,startedDay:g.day};b.lastPestCrop=crop;G.markPestGround(b);
+    G.ui.toast(`⚠ ${G.CROPS[crop].name}田出现虫害：2天后每天损失最多${Math.ceil(b.farm.length*rule.lossFraction)}格未收作物。可抢收，下一季换种降低复发风险。`,'warn');
+    break;
+  }
+};
 G.farmSummary=function(b){
   const crop=G.farmCropOf(b),choice=G.cropChoiceOf(b),committed=G.farmSeasonCommitted(b),g=G.game;
-  const sown=b.farm.filter(f=>f.sown).length,harvested=b.farm.filter(f=>f.harvested).length;
-  let status=g.season===3?'冬季休耕，等待下一春':b.harvestDone?'本季收获完成':!b.sownAll?
+  const sown=b.farm.filter(f=>f.sown).length,harvested=b.farm.filter(f=>f.harvested&&!f.pestLost).length;
+  let status=g.season===3?'冬季休耕，等待下一春':b.harvestDone?(b.farm.some(f=>f.pestLost)?'本季已结束（含虫害损失）':'本季收获完成'):!b.sownAll?
     (g.season===2?'秋季已过播种窗口':G.goalPaused(G.farmOutput(b))&&!committed?'目标已达，暂停新季播种':`播种 ${sown}/${b.farm.length}`):
     b.earlyHarvestYield?`抢收 ${harvested}/${b.farm.length}（本季基础每格${b.earlyHarvestYield}）`:b.growth<1?`生长中 ${Math.floor(b.growth*100)}%`:g.season===2?`秋收 ${harvested}/${b.farm.length}`:'作物成熟，等待秋季';
   const reason=committed?'本季已开始：只改下一春，不改变已接任务、在田作物或在途收获':

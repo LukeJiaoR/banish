@@ -463,15 +463,28 @@ G.drawFarmGround = function (ctx, b, bounds) {
   for (const f of b.farm) {
     if (bounds && (f.x < bounds.tx0 || f.x > bounds.tx1 || f.y < bounds.ty0 || f.y > bounds.ty1)) continue;
     const [sx, sy] = G.T2S(f.x, f.y);
-    if (!G.fillTexDiamond(ctx, soilTex, sx, sy, f.harvested ? '#5c452c' : null, f.harvested ? 0.25 : 0)) {
+    if (!G.fillTexDiamond(ctx, soilTex, sx, sy, f.pestLost ? '#51483c' : f.harvested ? '#5c452c' : null, f.pestLost ? .58 : f.harvested ? 0.25 : 0)) {
       G.diamondPath(ctx, sx, sy);
-      ctx.fillStyle = f.harvested ? (pal.snow ? '#aeb6bd' : '#7a5c39') : pal.soil;
+      ctx.fillStyle = f.pestLost ? (pal.snow?'#999f9d':'#665746') : f.harvested ? (pal.snow ? '#aeb6bd' : '#7a5c39') : pal.soil;
       ctx.fill();
       ctx.strokeStyle = 'rgba(0,0,0,0.15)';
       ctx.lineWidth = 0.5;
       ctx.stroke();
     }
+    if(f.pestLost){ // Muted dead stalks on the real lost cells, not a permanent grid.
+      ctx.save();ctx.strokeStyle='#4e4231';ctx.lineWidth=1.8;
+      for(const [dx,dy] of [[-13,8],[9,17],[2,5]]){ctx.beginPath();ctx.moveTo(sx+dx-4,sy+dy+2);ctx.lineTo(sx+dx+3,sy+dy-2);ctx.lineTo(sx+dx+5,sy+dy-7);ctx.stroke();}
+      ctx.restore();
+    }
   }
+};
+G.drawFarmPestBadge=function(ctx,b){
+  if(!G.pestFieldActive||!G.pestFieldActive(b))return;
+  const [x,y]=G.T2S(b.x+b.w/2,b.y+b.h),warning=G.game.day<b.pestInfestation.startedDay+G.FARM_PESTS.warningDays;
+  ctx.save();ctx.translate(x,y+12);ctx.beginPath();ctx.arc(0,0,12,0,Math.PI*2);ctx.fillStyle=warning?'#c0a369':'#ad7553';ctx.fill();ctx.strokeStyle='#554332';ctx.lineWidth=1.5;ctx.stroke();
+  ctx.fillStyle='#514131';ctx.beginPath();ctx.ellipse(0,0,3.5,5,0,0,Math.PI*2);ctx.fill();
+  for(const side of [-1,1])for(const dy of [-3,0,3]){ctx.beginPath();ctx.moveTo(side*3,dy);ctx.lineTo(side*7,dy-2);ctx.stroke();}
+  ctx.beginPath();ctx.arc(0,-6,2,0,Math.PI*2);ctx.fill();ctx.restore();
 };
 G.drawFarmCrop = function (ctx, b, f) {
   const [sx, sy] = G.T2S(f.x, f.y);
@@ -495,6 +508,7 @@ G.drawFarmCrop = function (ctx, b, f) {
 G.drawFarm = function (ctx, b) {
   G.drawFarmGround(ctx, b);
   for (const f of b.farm) G.drawFarmCrop(ctx, b, f);
+  G.drawFarmPestBadge(ctx,b);
 };
 
 /* 果园/牧场不能是一张铺满 6×6 的“大建筑图”：地面在底层，
@@ -982,6 +996,7 @@ G.frame = function (dtReal) {
     else if (it.k === 4) G.drawFarmCrop(ctx, it.b, it.f);
     else if (it.k === 5) G.drawEconomyFieldPart(ctx, it);
     else if (it.k === 1) {
+      if(it.b.type==='farm')G.drawFarmPestBadge(ctx,it.b);
       // Farm ground/crops were split above; keep its building-level badges.
       if (it.b.type !== 'farm' && !(it.b.state === 'ok' && (it.b.type === 'pasture' || it.b.type === 'orchard' || it.b.type === 'cemetery')))
         G.drawBuilding(ctx, it.b, now);
