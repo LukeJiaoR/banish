@@ -865,6 +865,83 @@ G.ui = {
     });
     this.refreshTavernInfo(b);
   },
+  farmInfoData: function (b) {
+    if (b.type !== 'farm' || b.state !== 'ok' || !G.farmSummary) return null;
+    const s = G.farmSummary(b), crops = G.CROPS;
+    const crop = crops[s.crop], choice = crops[s.choice];
+    const workerNames = b.workers.map(id => G.world.cmap[id]).filter(c => c && !c.dead && c.job === b.id).map(c => c.name);
+    const target = type => {
+      const value = G.productionGoalOf(type);
+      return `${G.RES[type].name} ${value === null ? '未设置' : value === 0 ? '0（关闭新一季）' : value + (G.goalPaused(type) ? '（达标暂停新一季）' : '（可开始新一季）')}`;
+    };
+    return { summary: s, data: {
+      status: s.status,
+      workers: `${s.workers} 人${workerNames.length ? ' · ' + workerNames.join('、') : '（等待可用农夫）'}`,
+      current: `本季作物：${crop.name} → ${G.RES[s.output].name}`,
+      choice: `下季 / 空田选择：${choice.name} → ${G.RES[s.choiceOutput].name}${s.pending ? '（下一春生效）' : '（与本季一致）'}`,
+      reason: s.reason,
+      seeds: `种子：小麦已解锁 · 卷心菜${s.unlocked.cabbage ? '已永久解锁' : '未解锁，需贸易购买卷心菜种子'}（永久解锁，不是库存物品，不占仓位）`,
+      progress: `播种 ${s.sown}/${s.total} · 成长 ${Math.floor(s.growth * 100)}% · 收获 ${s.harvested}/${s.total}`,
+      yield: `收获产出：按当前工具状态，每格 ${G.taskYield(G.PROD.farm.perTile)} ${G.RES[s.output].name}；每筐达到 ${G.PROD.farm.haulCap} 后送仓，入仓后才可用`,
+      stock: `全镇可用库存：主食 ${Math.floor(s.grain || 0)} · 蔬菜 ${Math.floor(s.vegetables || 0)}（在途未入库不计）`,
+      targets: `全镇目标：${['food', 'grain', 'vegetables'].map(target).join(' · ')}`,
+      goals: `本季产出：${G.buildingGoalStatus(b) || '未设目标，仍受仓容限制'}；目标只限制尚未开始的新一季，已接第一播种任务后继续本季。`,
+    } };
+  },
+  farmInfoMarkup: function (facts) {
+    return `<section class="farm-details" data-farm-panel>
+      <div class="economy-form farm-crop"><label for="farm-crop">下季 / 空田选择</label>
+        <select id="farm-crop" aria-describedby="farm-crop-note">${Object.keys(G.CROPS).map(type => `<option value="${type}"${type === facts.summary.choice ? ' selected' : ''}${facts.summary.unlocked[type] ? '' : ' disabled'}>${this.escHtml(G.CROPS[type].name)}${facts.summary.unlocked[type] ? '' : '（需购买种子）'}</option>`).join('')}</select>
+        <p class="desc" id="farm-crop-note">春、夏尚未开始播种的空田立即应用；已接第一播种任务、已播种、生长或已收获的本季作物锁定，改选留到下一春。已背起的粮食不变。新局与旧农田默认小麦。</p>
+      </div>
+      ${Object.keys(facts.data).filter(key => !['status', 'workers'].includes(key)).map(key => `<p class="row" data-farm="${key}">${this.escHtml(facts.data[key])}</p>`).join('')}
+      <p class="economy-message" data-farm-message role="status" aria-live="polite"></p>
+      <p class="desc">全田播完才开始成长；春、夏播种，秋季成熟后收获，冬季未收作物损失。农夫收获后实际搬运入仓。</p>
+      <p class="desc">食物仍分肉类、蔬菜、主食三类。小麦产主食，卷心菜产蔬菜；多种作物不额外增加饮食类别，也不产肉。</p>
+    </section>`;
+  },
+  refreshFarmInfo: function (b) {
+    const el = this.el.info;
+    if (!el.querySelector || !el.querySelector('[data-farm-panel]')) return false;
+    const facts = this.farmInfoData(b);
+    if (!facts) return false;
+    const nodes = {};
+    for (const key of Object.keys(facts.data)) {
+      nodes[key] = el.querySelector(`[data-farm="${key}"]`);
+      if (!nodes[key]) return false;
+    }
+    for (const key of Object.keys(nodes)) if (nodes[key].textContent !== facts.data[key]) nodes[key].textContent = facts.data[key];
+    const select = el.querySelector('#farm-crop');
+    if (select) {
+      for (const option of select.querySelectorAll('option')) {
+        const type = option.value, unlocked = facts.summary.unlocked[type];
+        option.disabled = !unlocked;
+        const label = `${G.CROPS[type].name}${unlocked ? '' : '（需购买种子）'}`;
+        if (option.textContent !== label) option.textContent = label;
+      }
+      // Native selects may hold a keyboard draft before firing change.
+      if (document.activeElement !== select) select.value = facts.summary.choice;
+    }
+    return true;
+  },
+  initFarmInfo: function (b) {
+    const el = this.el.info, w = G.world, g = G.game;
+    const panel = el.querySelector && el.querySelector('[data-farm-panel]');
+    const select = panel && panel.querySelector('#farm-crop');
+    if (!select || !G.setFarmCrop) return;
+    select.addEventListener('change', () => {
+      if (G.world !== w || G.game !== g || this.el.info !== el || el.classList.contains('hidden') || !G.sel ||
+          G.sel.kind !== 'b' || G.sel.id !== b.id || w.bmap[b.id] !== b || b.state !== 'ok' ||
+          el.querySelector('[data-farm-panel]') !== panel || el.querySelector('#farm-crop') !== select ||
+          (G.hasOpenModal && G.hasOpenModal())) return;
+      const accepted = G.setFarmCrop(b, select.value);
+      select.value = G.cropChoiceOf(b);
+      this.refreshFarmInfo(b);
+      const message = el.querySelector('[data-farm-message]');
+      if (message) message.textContent = accepted ? G.farmSummary(b).pending ? '选择已保存，将在下一春生效；本季作物和在途粮食保留。' : '选择已保存，本季作物与下季选择一致。' : '作物未更改，请先购买对应种子并检查农田是否仍可用。';
+    });
+    this.refreshFarmInfo(b);
+  },
   tailorInfoData: function (b) {
     if (b.type !== 'tailor' || b.state !== 'ok' || !G.tailorSummary) return null;
     const s = G.tailorSummary(b), warm = s.recipe === 'warm', g = G.game;
@@ -1195,11 +1272,13 @@ G.ui = {
     if (sameSelection && selected.state === 'ok' && this._townHallInfoState === selected.state && this.refreshTownHallInfo(selected)) return;
     if (sameSelection && selected.state === 'ok' && this._tavernInfoState === selected.state && this.refreshTavernInfo(selected)) return;
     if (sameSelection && selected.state === 'ok' && this._tailorInfoState === selected.state && this.refreshTailorInfo(selected)) return;
+    if (sameSelection && selected.state === 'ok' && this._farmInfoState === selected.state && this.refreshFarmInfo(selected)) return;
     if (sameSelection && selected.state === 'ok' && this._economyInfoState === selected.state && this.refreshEconomyInfo(selected)) return;
     if (sameSelection && selected.state === 'ok' && this._medicalInfoState === selected.state && this.refreshMedicalInfo(selected)) return;
     if (sameSelection && selected.state === 'ok' && this._resourceChainInfoState === selected.state && this.refreshResourceChainInfo(selected)) return;
     if (sameSelection && selected.type === 'woodcutter' && this._fuelInfoState === selected.state && this.refreshFuelInfo(selected)) return;
-    if (hadFocus && !force && sameSelection && selected.type !== 'woodcutter' && (G.sel.kind === 'c' || this._infoBuildState === selected.state)) {
+    if (hadFocus && !force && sameSelection && selected.type !== 'woodcutter' &&
+        !(selected.type === 'farm' && selected.state === 'ok' && G.farmSummary) && (G.sel.kind === 'c' || this._infoBuildState === selected.state)) {
       if (G.sel.kind === 'c') { this.refreshCitizenLeisure(selected); this.refreshCitizenClothing(selected); }
       // Patch changing site facts in place without stealing keyboard focus.
       if (G.sel.kind === 'b' && selected.state === 'site') {
@@ -1229,6 +1308,7 @@ G.ui = {
       const hallData = this.townHallInfoData(b);
       const tavernData = this.tavernInfoData(b);
       const tailorData = this.tailorInfoData(b);
+      const farmData = this.farmInfoData(b);
       let status;
       if (fuelData) status = fuelData.status;
       else if (siteData) status = siteData.status;
@@ -1237,6 +1317,7 @@ G.ui = {
       else if (hallData) status = hallData.data.status;
       else if (tavernData) status = tavernData.data.status;
       else if (tailorData) status = tailorData.data.status;
+      else if (farmData) status = farmData.data.status;
       else if (G.productionLimited(b) && G.buildingGoalStatus(b)) status = G.buildingGoalStatus(b);
       else if (b.type === 'house' || b.type === 'stonehouse') status = b.family != null ? '有人居住' : '空置';
       else if (['tradingpost', 'pasture', 'orchard'].includes(b.type)) status = this.economyStatus(b);
@@ -1251,7 +1332,7 @@ G.ui = {
       let workers = '';
       if (def.jobs > 0 || b.state === 'site') {
         const names = b.workers.map(id => w.cmap[id]).filter(Boolean).map(c => this.escHtml(c.name)).join('、');
-        workers = `<div class="row">${medicalData ? b.type === 'hospital' ? '医师' : '采药员' : tavernData ? '酿酒工（需 18 岁以上且健康）' : '工人'}：<span${siteData ? ' data-site-workers' : ''}${fuelData ? ' data-fuel="workers"' : ''}${medicalData ? ' data-medical="workers"' : ''}${chainData ? ' data-resource-chain-live="workers"' : ''}${tavernData ? ' data-tavern="workers"' : ''}${tailorData ? ' data-tailor="workers"' : ''}${b.state === 'ok' && ['tradingpost', 'pasture', 'orchard'].includes(b.type) ? ' data-economy-workers' : ''}>${names || (b.state === 'site' ? '等待建筑工人' : '无')}</span></div>`;
+        workers = `<div class="row">${medicalData ? b.type === 'hospital' ? '医师' : '采药员' : tavernData ? '酿酒工（需 18 岁以上且健康）' : '工人'}：<span${siteData ? ' data-site-workers' : ''}${fuelData ? ' data-fuel="workers"' : ''}${medicalData ? ' data-medical="workers"' : ''}${chainData ? ' data-resource-chain-live="workers"' : ''}${tavernData ? ' data-tavern="workers"' : ''}${tailorData ? ' data-tailor="workers"' : ''}${farmData ? ' data-farm="workers"' : ''}${b.state === 'ok' && ['tradingpost', 'pasture', 'orchard'].includes(b.type) ? ' data-economy-workers' : ''}>${names || (b.state === 'site' ? '等待建筑工人' : '无')}</span></div>`;
       }
       let extra = '';
       if ((b.type === 'house' || b.type === 'stonehouse') && b.family != null) {
@@ -1284,24 +1365,25 @@ G.ui = {
       if (hallData) extra += this.townHallInfoMarkup(b, hallData);
       if (tavernData) extra += this.tavernInfoMarkup(tavernData);
       if (tailorData) extra += this.tailorInfoMarkup(tailorData);
+      if (farmData) extra += this.farmInfoMarkup(farmData);
       if (b.state === 'ok') extra += this.economyInfoMarkup(b);
       if (medicalData) extra += this.medicalInfoMarkup(b, medicalData);
       const outputs = { gatherer: ['vegetables'], hunting: ['meat', 'leather'], dock: ['meat'], farm: ['grain'], orchard: ['vegetables'], pasture: ['meat', 'wool'], tailor: ['clothes'], herbalist: ['herbs'] };
-      const produced = (chainData || tailorData ? [] : outputs[b.type] || []).filter(type => G.RES[type]);
+      const produced = (chainData || tailorData || farmData ? [] : outputs[b.type] || []).filter(type => G.RES[type]);
       if (produced.length) extra += `<div class="row resource-output">产出：${produced.map(type => `${this.resourceIcon(type)}${G.RES[type].name}`).join(' · ')}</div>`;
       if (b.type === 'tailor' && !tailorData) extra += `<div class="row">原料库存：皮革 ${Math.floor(G.game.res.leather || 0)} · 羊毛 ${Math.floor(G.game.res.wool || 0)}</div><div class="row">成衣库存：${Math.floor(G.game.res.clothes || 0)}</div>`;
-      if (b.type !== 'woodcutter' && !medicalData && !chainData && !tavernData && !tailorData && G.buildingGoalStatus(b)) extra += `<div class="row desc"${['tradingpost', 'pasture', 'orchard'].includes(b.type) ? ' data-economy-goals' : ''}>${this.escHtml(G.buildingGoalStatus(b))}</div>`;
+      if (b.type !== 'woodcutter' && !medicalData && !chainData && !tavernData && !tailorData && !farmData && G.buildingGoalStatus(b)) extra += `<div class="row desc"${['tradingpost', 'pasture', 'orchard'].includes(b.type) ? ' data-economy-goals' : ''}>${this.escHtml(G.buildingGoalStatus(b))}</div>`;
       if (['gatherer', 'hunting', 'forester'].includes(b.type)) {
         const trees = G.treesInRadius(w, b.x, b.y, G.PROD[b.type].radius, false);
         const mature = trees.filter(t => G.treeStage(t) >= 2).length;
         extra += `<div class="row">工作圈：${trees.length} 棵树 · 成熟 ${mature}（砍伐、建造清林会影响产出）</div>`;
       }
-      if (b.type === 'farm' && b.farm) {
+      if (b.type === 'farm' && b.farm && !farmData) {
         extra += `<div class="row">播种 ${b.farm.filter(f => f.sown).length}/${b.farm.length} · 收获 ${b.farm.filter(f => f.harvested).length}/${b.farm.length}</div>`;
       }
       el.innerHTML = `
         <div class="info-head"><span>${def.icon} ${def.name}</span><button id="info-close">✕</button></div>
-        <div class="row"${siteData ? ' data-site-status' : ''}${fuelData ? ' data-fuel="status"' : ''}${medicalData ? ' data-medical="status"' : ''}${chainData ? ' data-resource-chain-live="status"' : ''}${hallData ? ' data-townhall="status"' : ''}${tavernData ? ' data-tavern="status"' : ''}${tailorData ? ' data-tailor="status"' : ''}${b.state === 'ok' && ['tradingpost', 'pasture', 'orchard'].includes(b.type) ? ' data-economy-status' : ''}>${this.escHtml(status)}</div>
+        <div class="row"${siteData ? ' data-site-status' : ''}${fuelData ? ' data-fuel="status"' : ''}${medicalData ? ' data-medical="status"' : ''}${chainData ? ' data-resource-chain-live="status"' : ''}${hallData ? ' data-townhall="status"' : ''}${tavernData ? ' data-tavern="status"' : ''}${tailorData ? ' data-tailor="status"' : ''}${farmData ? ' data-farm="status"' : ''}${b.state === 'ok' && ['tradingpost', 'pasture', 'orchard'].includes(b.type) ? ' data-economy-status' : ''}>${this.escHtml(status)}</div>
         ${workers}${extra}
         <div class="row desc">${def.desc}</div>
         <div class="row desc" data-info-refund${fuelData ? ' data-fuel="refund"' : ''}>${fuelData ? fuelData.refund : siteData ? siteData.refund : '已开工：拆除退还一半已付建材，已砍树不恢复'}</div>
@@ -1313,9 +1395,11 @@ G.ui = {
       this._townHallInfoState = b.state;
       this._tavernInfoState = b.state;
       this._tailorInfoState = b.state;
+      this._farmInfoState = b.state;
       if (hallData) this.refreshTownHallInfo(b);
       if (tavernData) this.initTavernInfo(b);
       if (tailorData) this.initTailorInfo(b);
+      if (farmData) this.initFarmInfo(b);
       if (medicalData) this.refreshMedicalPatients(b);
       if (chainData) this.initResourceChainInfo(b);
       if (b.state === 'ok') this.initEconomyInfo(b);
@@ -1413,7 +1497,7 @@ G.ui = {
           <label for="trade-payment">用一种待售物资支付</label><select id="trade-payment">${payments}</select>
           <p data-economy-live="quote" class="trade-quote" role="status" aria-live="polite"></p>
           <button type="submit" id="trade-execute">确认交易</button>
-          <p class="desc">付款数量向上取整，不找零。买入普通物资先进入本站库存，低于现存数量的待售目标会让商人搬回；羊购入后去牧场放入，果树种子购买一次永久解锁。</p>
+          <p class="desc">付款数量向上取整，不找零。买入普通物资先进入本站库存，低于现存数量的待售目标会让商人搬回；羊购入后去牧场放入。果树种子与卷心菜种子各买 1 次永久解锁，不能复购，不是库存物品，也不占贸易站或仓库容量。卷心菜解锁后到农田选择种植，产出计入蔬菜。</p>
         </form>
         <p class="economy-message" data-economy-message role="status" aria-live="polite"></p>
       </section>`;
@@ -1431,41 +1515,49 @@ G.ui = {
   },
 
   initEconomyInfo: function (b) {
-    const el = this.el.info, w = G.world;
-    if (!el.querySelector || !el.querySelector('[data-economy]')) return;
-    const valid = () => G.world === w && G.sel && G.sel.kind === 'b' && G.sel.id === b.id && w.bmap[b.id] === b && b.state === 'ok';
+    const el = this.el.info, w = G.world, g = G.game;
+    const panel = el.querySelector && el.querySelector('[data-economy]');
+    if (!panel) return;
+    const valid = node => G.world === w && G.game === g && this.el.info === el && !el.classList.contains('hidden') &&
+      G.sel && G.sel.kind === 'b' && G.sel.id === b.id && w.bmap[b.id] === b && b.state === 'ok' &&
+      el.querySelector('[data-economy]') === panel && (!node || !node.id || el.querySelector('#' + node.id) === node);
     const message = text => { const node = el.querySelector('[data-economy-message]'); if (node) node.textContent = text; };
     const onSubmit = (id, callback) => {
-      const form = document.getElementById(id); if (form) form.addEventListener('submit', e => { e.preventDefault(); if (!valid() || (G.hasOpenModal && G.hasOpenModal())) return; callback(); this.refreshEconomyInfo(b); });
+      const form = el.querySelector('#' + id); if (form) form.addEventListener('submit', e => { e.preventDefault(); if (!valid(form) || (G.hasOpenModal && G.hasOpenModal())) return; callback(); this.refreshEconomyInfo(b); });
     };
     if (b.type === 'tradingpost') {
-      const target = document.getElementById('trade-target-resource'), quantity = document.getElementById('trade-target-quantity');
-      target.addEventListener('change', () => { if (!valid()) return; quantity.value = Number(b.tradeTargets && b.tradeTargets[target.value]) || 0; this.refreshEconomyInfo(b); });
+      const target = el.querySelector('#trade-target-resource'), quantity = el.querySelector('#trade-target-quantity');
+      target.addEventListener('change', () => { if (!valid(target)) return; quantity.value = Number(b.tradeTargets && b.tradeTargets[target.value]) || 0; this.refreshEconomyInfo(b); });
       onSubmit('trade-target-form', () => {
         const qty = quantity.value.trim() === '' ? NaN : Number(quantity.value);
         message(G.setTradeTarget(b, target.value, qty) ? `${G.RES[target.value].name}待售目标已设为 ${qty}，由商人搬运。` : '请输入 0–2000 的整数。');
       });
-      document.getElementById('trade-return-stock').addEventListener('click', () => {
-        if (!valid() || (G.hasOpenModal && G.hasOpenModal())) return;
+      const returnStock = el.querySelector('#trade-return-stock');
+      returnStock.addEventListener('click', () => {
+        if (!valid(returnStock) || (G.hasOpenModal && G.hasOpenModal())) return;
         if (G.setTradeTarget(b, target.value, 0)) { quantity.value = '0'; message(`${G.RES[target.value].name}目标已设为 0，商人会把本站余货搬回仓库。`); }
         this.refreshEconomyInfo(b);
       });
-      for (const id of ['trade-good', 'trade-buy-quantity', 'trade-payment']) document.getElementById(id).addEventListener('input', () => { if (valid()) this.refreshEconomyInfo(b); });
+      for (const id of ['trade-good', 'trade-buy-quantity', 'trade-payment']) {
+        const input = el.querySelector('#' + id);
+        input.addEventListener('input', () => { if (valid(input)) this.refreshEconomyInfo(b); });
+      }
       onSubmit('trade-exchange-form', () => {
         const quote = this.tradeQuote(b);
         if (!quote.ok) { message(quote.reason); return; }
         const result = G.executeTrade(b, quote.good, quote.qty, quote.payment);
-        message(result.ok ? `已购买${G.TRADE_GOODS[quote.good].name} × ${quote.qty}，支付${G.RES[quote.payment].name} × ${result.paid}。${quote.good === 'sheep' ? '到羊牧场放入羊群。' : quote.good === 'orchardSeed' ? '所有果园已永久解锁种植。' : '物资已到本站，等待商人按目标搬回仓库。'}` : result.reason || '交易未完成。');
+        const seed = G.seedUnlockKey ? G.seedUnlockKey(quote.good) : quote.good === 'orchardSeed' ? 'orchard' : null;
+        message(result.ok ? `已购买${G.TRADE_GOODS[quote.good].name} × ${quote.qty}，支付${G.RES[quote.payment].name} × ${result.paid}。${quote.good === 'sheep' ? '到羊牧场放入羊群。' : seed === 'orchard' ? '所有果园已永久解锁种植，种子不占仓位。' : seed === 'cabbage' ? '所有农田已永久解锁卷心菜，请到农田选择；本季已开始的作物保留，改选留到下一春。种子不占仓位。' : '物资已到本站，等待商人按目标搬回仓库。'}` : result.reason || '交易未完成。');
         this.refreshHUD();
       });
     }
     if (b.type === 'pasture') {
       onSubmit('pasture-stock-form', () => {
-        const qty = Number(document.getElementById('pasture-stock-quantity').value);
+        const qty = Number(el.querySelector('#pasture-stock-quantity').value);
         message(G.stockPasture(b, qty) ? `已放入 ${qty} 只羊。` : '无法放入：请检查整数数量、已购羊数及牧场 12 只容量。');
       });
       onSubmit('pasture-target-form', () => {
-        const qty = Number(document.getElementById('pasture-target-quantity').value);
+        const qty = Number(el.querySelector('#pasture-target-quantity').value);
         message(G.setPastureTarget(b, qty) ? `保留数量已设为 ${qty} 只，超出部分由牧人屠宰。` : '请输入 2–12 的整数。');
       });
     }
@@ -1473,16 +1565,20 @@ G.ui = {
   },
 
   tradeQuote: function (b) {
-    const goodEl = document.getElementById('trade-good'), quantity = document.getElementById('trade-buy-quantity'), paymentEl = document.getElementById('trade-payment');
+    const el = this.el.info;
+    const find = id => el.querySelector ? el.querySelector('#' + id) : document.getElementById(id);
+    const goodEl = find('trade-good'), quantity = find('trade-buy-quantity'), paymentEl = find('trade-payment');
     if (!goodEl || !quantity || !paymentEl) return { ok: false, reason: '请选择交易内容。' };
     const good = goodEl.value, payment = paymentEl.value, qty = Number(quantity.value), offer = G.TRADE_GOODS[good], value = G.TRADE_VALUES[payment];
     if (!offer || !value || !Number.isInteger(qty) || qty <= 0) return { ok: false, reason: '请输入正整数购买数量。' };
     const cost = Math.ceil(offer.price * qty / value), available = b.tradeInventory && b.tradeInventory[payment] || 0;
     const merchant = b.merchant && b.merchant.leaveDay > G.game.day;
     const stock = merchant ? b.merchant.stock[good] || 0 : 0;
-    let reason = !merchant ? '商船尚未停靠。' : good === 'orchardSeed' && G.game.unlocks && G.game.unlocks.orchard ? '果树种子已永久解锁。' : qty > stock ? `商船只有 ${stock} 件，数量不足。` : available < cost ? `本站待售${G.RES[payment].name}不足，还需 ${Math.ceil(cost - available)}。` : '';
-    if (!reason && good !== 'sheep' && good !== 'orchardSeed' && G.tradeStored && G.TRADE_CAPACITY && G.tradeStored(b) - cost + qty > G.TRADE_CAPACITY) reason = '交易后会超过本站共享容量，请先腾出空间。';
-    const text = `购买${offer.name} × ${qty}，实际支付${G.RES[payment].name} × ${cost}（单价 ${offer.price}，付款价值 ${value}/件）。\n商船存货 ${stock} · 本站可支付 ${Math.floor(available)}。` + (reason ? '\n' + reason : '');
+    const seed = G.seedUnlockKey ? G.seedUnlockKey(good) : good === 'orchardSeed' ? 'orchard' : null;
+    const seedReason = G.seedTradeReason ? G.seedTradeReason(good, qty) : seed && G.game.unlocks && G.game.unlocks[seed] ? '果树种子已永久解锁。' : seed && qty !== 1 ? '种子每次只能购买 1 份。' : '';
+    let reason = !merchant ? '商船尚未停靠。' : seedReason || (qty > stock ? `商船只有 ${stock} 件，数量不足。` : available < cost ? `本站待售${G.RES[payment].name}不足，还需 ${Math.ceil(cost - available)}。` : '');
+    if (!reason && good !== 'sheep' && !seed && G.tradeStored && G.TRADE_CAPACITY && G.tradeStored(b) - cost + qty > G.TRADE_CAPACITY) reason = '交易后会超过本站共享容量，请先腾出空间。';
+    const text = `购买${offer.name} × ${qty}，实际支付${G.RES[payment].name} × ${cost}（单价 ${offer.price}，付款价值 ${value}/件）。\n商船存货 ${stock} · 本站可支付 ${Math.floor(available)}。` + (seed ? '\n种子仅购 1 份永久解锁，不可复购，不占仓位。' : '') + (reason ? '\n' + reason : '');
     return { ok: !reason, good, payment, qty, cost, reason, text };
   },
 
@@ -1501,18 +1597,18 @@ G.ui = {
       set('[data-economy-live="trade-capacity"]', `待售总量 ${Math.floor(stored)} / ${G.TRADE_CAPACITY || 2000}（各资源共享，货物价值用于以物易物）`);
       const lines = Object.keys(G.TRADE_VALUES).map(type => `${G.RES[type].name}：待售 ${Math.floor(inventory[type] || 0)} / 目标 ${targets[type] || 0}`);
       set('[data-economy-live="inventory"]', lines.join('\n'));
-      const type = document.getElementById('trade-target-resource').value;
+      const type = el.querySelector('#trade-target-resource').value;
       set('[data-economy-live="target-stock"]', `全镇可用 ${Math.floor(G.game.res[type] || 0)} · 本站待售 ${Math.floor(inventory[type] || 0)} · 已应用目标 ${targets[type] || 0}`);
       const quote = this.tradeQuote(b);
       set('[data-economy-live="quote"]', quote.text || quote.reason);
-      const buy = document.getElementById('trade-execute'); buy.disabled = !quote.ok;
+      const buy = el.querySelector('#trade-execute'); buy.disabled = !quote.ok;
       buy.textContent = quote.ok ? `确认支付 ${quote.cost} ${G.RES[quote.payment].name}` : '确认交易';
     } else if (b.type === 'pasture') {
       const bank = G.game.livestock && G.game.livestock.sheep || 0;
       set('[data-economy-live="animals"]', `羊群 ${b.animals || 0} / 12 只 · 当前保留 ${b.animalTarget || 8} 只`);
       set('[data-economy-live="pasture-production"]', `待剪羊毛 ${Math.floor(b.woolReady || 0)} · 下一只羊繁殖进度 ${Math.floor((b.animalGrowth || 0) * 100)}%`);
       set('[data-economy-live="sheep-bank"]', `已购入、待安置的羊：${bank} 只。`);
-      document.getElementById('pasture-stock').disabled = bank <= 0 || b.animals >= 12;
+      el.querySelector('#pasture-stock').disabled = bank <= 0 || b.animals >= 12;
     } else {
       const unlocked = G.game.unlocks && G.game.unlocks.orchard, age = b.orchardAge || 0;
       set('[data-economy-live="orchard-age"]', `果树种子：${unlocked ? '已永久解锁' : '尚未购买'} · 已养护 ${(age / G.YEAR_DAYS).toFixed(1)} / 4 年`);

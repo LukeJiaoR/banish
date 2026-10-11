@@ -82,3 +82,13 @@ a = im.getchannel('A')
 assert a.getextrema() == (0,255), 'warm coat alpha'
 assert all(a.getpixel(p) == 0 for p in [(0,0),(127,0),(0,127),(127,127)]), 'warm coat transparent corners'
 print('icons/res_warmCoats', im.size, 'warm coat size and alpha: OK')
+
+for stage in ['stage0','stage1','stage2','ripe']:
+    file = 'props/cabbage_' + stage
+    im = Image.open(ROOT / 'assets' / (file + '.png'))
+    assert im.mode == 'RGBA' and im.size == (128,96), file
+    a = im.getchannel('A')
+    assert a.getextrema() == (0,255), file
+    assert all(a.getpixel(p) == 0 for p in [(0,0),(127,0),(0,95),(127,95)]), file
+    assert a.getbbox(), file
+    print(file, im.size, 'cabbage crop size and alpha: OK')

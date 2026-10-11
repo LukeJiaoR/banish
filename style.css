@@ -453,3 +453,10 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .tailor-recipe select:focus-visible { outline: 2px solid #ffe4a0; outline-offset: 3px; }
 .tailor-details [data-tailor="batches"] { white-space: pre-line; font-variant-numeric: tabular-nums; }
 @media (max-width: 600px) { .tailor-recipe select { min-height: 44px; } }
+.farm-details { margin-top: 7px; padding-top: 5px; border-top: 1px solid rgba(216,178,90,.3); }
+.farm-details p { overflow-wrap: anywhere; }
+.farm-details [data-farm="current"], .farm-details [data-farm="choice"] { color: #f4ddb0; }
+.farm-details [data-farm="progress"], .farm-details [data-farm="stock"] { font-variant-numeric: tabular-nums; }
+.farm-crop select:focus-visible { outline: 2px solid #ffe4a0; outline-offset: 3px; }
+.farm-crop select option:disabled { color: #ad9b7b; }
+@media (max-width: 600px) { .farm-crop select { min-height: 44px; } }
