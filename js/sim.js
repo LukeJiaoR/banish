@@ -3,8 +3,50 @@
  * sim.js —— 游戏状态、时间、市民 AI、职业调度、经济与生死
  * ============================================================ */
 
+/* Measured town flows: bounded observations, never an economy controller.
+ * Food total is derived from three groups; held goods are not warehouse stock. */
+G.LEDGER_RES=['meat','vegetables','grain','firewood'];
+G.LEDGER_METRICS=['produced','received','used','withdrawn','discarded'];
+G.ledgerStock=g=>Object.fromEntries(G.LEDGER_RES.map(k=>[k,Math.max(0,Number(g.res[k])||0)]));
+G.ledgerBucket=(g,day=g.day,fromHour=g.h)=>({day,fromHour,partial:fromHour>0,opening:G.ledgerStock(g),
+  flows:Object.fromEntries(G.LEDGER_RES.map(k=>[k,Object.fromEntries(G.LEDGER_METRICS.map(m=>[m,0]))]))});
+G.newTownLedger=g=>({v:1,startDay:g.day,startHour:g.h,current:G.ledgerBucket(g),days:[]});
+G.ensureTownLedger=function(g=G.game){
+  if(!g.townLedger||g.townLedger.current.day!==g.day)g.townLedger=G.newTownLedger(g);
+  return g.townLedger;
+};
+G.ledgerRecord=function(metric,type,qty){
+  if(type==='food')type='grain';
+  if(!G.LEDGER_RES.includes(type)||!G.LEDGER_METRICS.includes(metric)||!Number.isFinite(qty)||qty<=0)return;
+  G.ensureTownLedger().current.flows[type][metric]+=qty;
+};
+G.closeTownLedgerDay=function(){
+  const g=G.game,l=G.ensureTownLedger(g);
+  l.days.push({...l.current,toHour:G.DAY_H,closing:G.ledgerStock(g)});
+  if(l.days.length>48)l.days.shift();
+  l.current=G.ledgerBucket(g,g.day+1,0);
+};
+G.ledgerTotals=function(rows){
+  const totals={};
+  for(const k of G.LEDGER_RES){
+    const n=Object.fromEntries(G.LEDGER_METRICS.map(m=>[m,rows.reduce((sum,r)=>sum+r.flows[k][m],0)]));
+    n.opening=rows.length?rows[0].opening[k]:0;n.closing=rows.length?rows[rows.length-1].closing[k]:0;n.delta=n.closing-n.opening;totals[k]=n;
+  }
+  totals.food=Object.fromEntries([...G.LEDGER_METRICS,'opening','closing','delta'].map(m=>[m,G.FOOD_KEYS.reduce((n,k)=>n+totals[k][m],0)]));
+  return totals;
+};
+G.townLedgerSummary=function(){
+  const g=G.game,l=g.townLedger||G.newTownLedger(g),complete=l.days.filter(r=>!r.partial);
+  const period=rows=>({days:rows.length,fromDay:rows.length?rows[0].day:null,toDay:rows.length?rows[rows.length-1].day:null,totals:G.ledgerTotals(rows)});
+  const recent=period(complete.slice(-12)),previous=period(complete.slice(-24,-12));
+  const current={...l.current,toHour:g.h,closing:G.ledgerStock(g)};
+  return {windowDays:12,retentionDays:48,startedDay:l.startDay,startedHour:l.startHour,recordedDays:l.days.length,completeDays:complete.length,
+    current:{day:current.day,fromHour:current.fromHour,toHour:current.toHour,partial:current.partial,totals:G.ledgerTotals([current])},
+    recent,previous,comparable:recent.days===12&&previous.days===12};
+};
+
 G.newGameState = function () {
-  return {
+  const g = {
     h: 6, day: 0, season: 0, year: 1,
     speed: 1, paused: false,
     res: { wood: 80, stone: 48, iron: 0, tools: 15, food: 500, meat: 0, vegetables: 0, grain: 500, leather: 0, wool: 0, clothes: 0, warmCoats: 0, herbs: 0, coal: 0, steelTools: 0, ale: 0, firewood: 50 }, // 开局（原版中难度 5 家庭，工具 15 件≈第一轮磨损周期）；存粮较原版加厚：15 人 6 天食物跑道撑不到第一座采集屋建成
@@ -23,6 +65,7 @@ G.newGameState = function () {
     steelToolWear: 0,
     toolWear: 0,    // 工具磨损累积器（满 1 磨掉 1 把）
   };
+  g.townLedger=G.newTownLedger(g);return g;
 };
 G.game = G.newGameState();
 
@@ -51,6 +94,9 @@ G.isOccupiedHome = function (w, b) {
 
 G.endDay = function () {
   const g = G.game, w = G.world;
+  // Close the outgoing calendar day before the season callback can autosave.
+  // Midnight meals/heating below belong to the new day, not the closed one.
+  G.closeTownLedgerDay();
   g.day++;
   const born0 = g.stats.born, died0 = g.stats.died; // 当日生死增量（进滚动日志）
   const oldSeason = g.season;
@@ -102,6 +148,7 @@ G.endDay = function () {
   if (winter && houses.length) {
     for (const h of houses) {
       const perHouse = G.BDEF[h.type].warmWoodPerYear / G.SEASON_DAYS;
+      G.ledgerRecord('used','firewood',Math.min(g.res.firewood,perHouse));
       if (g.res.firewood >= perHouse) g.res.firewood -= perHouse;
       else { h.unheated = true; g.res.firewood = 0; }
     }
@@ -929,7 +976,7 @@ G.consumeFood = function (qty) {
   // Share a meal across available groups, then fill deficits from what remains.
   for (let pass = 0; pass < 3 && left > 1e-9; pass++) {
     const keys = G.FOOD_KEYS.filter(k => r[k] > 1e-9), portion = left / keys.length;
-    for (const k of keys) { const take = Math.min(r[k], portion); r[k] -= take; left -= take; if (take > 0) eaten.add(k); }
+    for (const k of keys) { const take = Math.min(r[k], portion); r[k] -= take; left -= take; G.ledgerRecord('used',k,take); if (take > 0) eaten.add(k); }
   }
   r.food = G.FOOD_KEYS.reduce((n,k) => n + r[k], 0); return [...eaten];
 };
@@ -946,6 +993,8 @@ G.deposit = function (type, qty, retain=false) {
   const space = G.isTool(type) ? Infinity : Math.max(0, G.storageCap() - stock);
   const got = Math.min(qty, space); g.res[type] = (g.res[type] || 0) + got;
   if (G.FOOD_KEYS.includes(type)) g.res.food += got;
+  G.ledgerRecord('received',type,got);
+  if(!retain)G.ledgerRecord('discarded',type,Math.max(0,qty-got));
   if (got < qty && !retain && !['stone', 'iron', 'coal', 'ale', 'clothes', 'warmCoats'].includes(type) && !g.warned.storageFull) {
     g.warned.storageFull = true; G.ui.toast('⚠ 仓库满了，多出的资源只能丢弃——再建一座仓库吧', 'warn');
   }
@@ -1272,6 +1321,7 @@ G.recordProduction = function (b, type, qty) {
   if (!b) return;
   if (!b.produced) b.produced = {};
   b.produced[type] = (b.produced[type] || 0) + qty;
+  G.ledgerRecord('produced',type,qty);
 };
 
 /* 护林派单内按需扩张的四向连通扫描，与禁穿角 A* 可达性一致。
@@ -1597,6 +1647,7 @@ G.completeTask = function (c) {
         for (const c2 of cons) G.game.res[c2.type] -= c2.qty;
       }
       if (t.yield) { c.carry = { type: t.yield.type, qty: t.yield.qty };
+        if(G.LEDGER_RES.includes(t.yield.type))G.recordProduction(b,t.yield.type,t.yield.qty);
         if (t.extra) c.carry.extra = { ...t.extra };
       }
       break;
@@ -1612,7 +1663,7 @@ G.completeTask = function (c) {
       if(ingredients.some(item=>G.game.res[item.type]<item.qty))break; // all-or-nothing, no partial wool/leather charge
       for(const item of ingredients)G.withdrawResource(item.type,item.qty);
       c.carry = { type: t.yield.type, qty: t.yield.qty };
-      if(b?.type==='tailor')G.recordProduction(b,t.yield.type,t.yield.qty);
+      if(b?.type==='tailor'||G.LEDGER_RES.includes(t.yield.type))G.recordProduction(b,t.yield.type,t.yield.qty);
       break;
     }
     case 'sow': {
@@ -2162,7 +2213,7 @@ G.withdrawResource = function(type,qty){
   if(!Number.isFinite(qty)||qty<=0)return 0;
   if(G.isFood(type))G.reconcileFood();
   if(type==='food')type='grain';
-  const r=G.game.res,n=Math.min(qty,r[type]||0);r[type]-=n;if(G.FOOD_KEYS.includes(type))r.food-=n;return n;
+  const r=G.game.res,n=Math.min(qty,r[type]||0);r[type]-=n;if(G.FOOD_KEYS.includes(type))r.food-=n;G.ledgerRecord('withdrawn',type,n);return n;
 };
 G.setTradeTarget = function(b,type,qty){
   if(G.world.bmap[b.id]!==b||b.type!=='tradingpost'||!Object.hasOwn(G.TRADE_VALUES,type)||!Number.isInteger(qty)||qty<0||qty>2000)return false;
@@ -2286,7 +2337,7 @@ G.completeEconomyWork = function(c,t){
       const qty=Math.min(20,b.pastureProducts[type]);b.pastureProducts[type]-=qty;c.carry={type,qty,pastureId:b.id};return;
     }
     if(G.pastureTypeOf(b)==='sheep'&&b.woolReady>=1&&!G.goalPaused('wool')&&G.mineralStorageSpace('wool')>0){const qty=Math.min(8,Math.floor(b.woolReady));b.woolReady-=qty;c.carry={type:'wool',qty,pastureId:b.id};G.recordProduction(b,'wool',qty);}
-  }else if(t.economy==='orchard'&&G.game.season===2&&b.orchardAge>=G.YEAR_DAYS*4&&b.orchardYield>0){const qty=Math.min(20,b.orchardYield);b.orchardYield-=qty;c.carry={type:'vegetables',qty};}
+  }else if(t.economy==='orchard'&&G.game.season===2&&b.orchardAge>=G.YEAR_DAYS*4&&b.orchardYield>0){const qty=Math.min(20,b.orchardYield);b.orchardYield-=qty;c.carry={type:'vegetables',qty};G.recordProduction(b,'vegetables',qty);}
 };
 
 /* Health is separate from happiness. Rates/capacity are small-town adaptations;
