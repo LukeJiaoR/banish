@@ -136,6 +136,16 @@ G.BDEF = {
     wall: '#6b4f33', wallD: '#573f29', roof: '#6b4f33',
     desc: '免费。约 14 主食/格/年：春播秋收，8×8 满收约 896 食物，收获攒满一筐（28）才送仓——挨着仓库建更省工。秋收不完会被冬天冻死。',
   },
+  stoneroad: {
+    id: 'stoneroad', name: '石路', icon: '🧱', w: 1, h: 1,
+    cost: { stone: 1 }, buildWork: 0, jobs: 0, passable: true, road: true,
+    desc: '每格1石，可把土路升级为石路。基础速度3.2格/小时（土路2.6、野地1.6）；仍先预览并确认，拆除不退石。',
+  },
+  bridge: {
+    id: 'bridge', name: '木桥', icon: '🌉', w: 1, h: 1,
+    cost: { wood: 4, stone: 1 }, buildWork: 3, jobs: 0, passable: true,
+    desc: '选两岸陆地端点，自动吸附直线。每格4木1石、3工时；工人从可达岸边建造，完工前不可通行。最多24格。桥上有人或没有替代跨岸通路时不能拆除。',
+  },
   road: {
     id: 'road', name: '土路', icon: '🛣️', w: 1, h: 1,
     cost: {}, buildWork: 0, jobs: 0, passable: true, road: true,

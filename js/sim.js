@@ -532,8 +532,7 @@ G.killCitizen = function (c, why) {
 /* 移动速度（格/游戏小时） */
 G.moveSpeed = function (c) {
   const w = G.world;
-  const road = G.onRoad(w, Math.round(c.x), Math.round(c.y));
-  let v = road ? G.TRAVEL_SPEED.road : G.TRAVEL_SPEED.field;
+  let v = G.surfaceSpeed(w, Math.round(c.x), Math.round(c.y));
   if (G.isWinter()) v *= 0.75;
   if (c.carry) v *= 0.9;
   return v;
@@ -2002,6 +2001,7 @@ G.finishBuilding = function (b) {
 
 G.removeBuilding = function (b) {
   const w = G.world;
+  if (b.type === 'bridge') { const check=G.bridgeRemovalStatus(w,b); if(!check.ok){G.ui.toast(check.reason,'warn');return;} }
   if (b.type === 'tradingpost' && Object.values(b.tradeInventory || {}).some(q => q > 0)) { G.ui.toast('先把待售目标设0，搬空贸易库存再拆除','warn'); return; }
   if (b.type === 'pasture' && b.animals) { G.game.livestock.sheep += b.animals; b.animals = 0; }
   if (b.type === 'storage') {
@@ -2346,4 +2346,16 @@ G.makeMineralTask = function (b, c) {
   if (!spot) { b.noWork=true; b.warnText='采矿入口不可达'; return null; }
   const qty=type==='coal'?p.coalYield:p.yield;
   return G.withTaskRoute({kind:'work',b,tx:spot.x,ty:spot.y,work:G.taskWork(c,p.workH),workLeft:0,yield:{type,qty:G.taskYield(qty)}},spot.route);
+};
+
+G.addBridge = function(start,end) {
+  const w=G.world,plan=G.planBridge(w,start,end);if(!plan.ok)return plan;
+  for(const [type,qty]of Object.entries(plan.materials))if(G.game.res[type]<qty)return {ok:false,reason:`${G.RES[type].name}不足（需要${qty}）`};
+  const b={id:G.nextId(),type:'bridge',x:Math.min(start.x,end.x),y:Math.min(start.y,end.y),w:Math.abs(start.x-end.x)+1,h:Math.abs(start.y-end.y)+1,bridgeAxis:plan.axis,state:'site',progress:0,workLeft:plan.length*3,totalWork:plan.length*3,workers:[],family:null,noWork:false,warnText:'',paidCost:{...plan.materials},constructionStarted:false};
+  // Only shoreline workers can start a bridge. Never grant walkable water early.
+  const shadow={...w,bmap:{...w.bmap,[b.id]:b},bgrid:w.bgrid.slice(),_pf:null};for(const p of plan.path)shadow.bgrid[p.y*w.N+p.x]=b.id;
+  if(!w.citizens.some(c=>!c.dead&&c.adult&&G.workSpot(shadow,b,c.x,c.y)))return {ok:false,reason:'没有居民能到达桥头施工；请从现有城镇可达的岸边起桥'};
+  for(const [type,qty]of Object.entries(plan.materials))G.game.res[type]-=qty;
+  w.buildings.push(b);w.bmap[b.id]=b;for(const p of plan.path){w.bgrid[p.y*w.N+p.x]=b.id;G.markGroundDirty(p.x,p.y);}
+  G.bumpNavigation(w);G.game.buildLog.push({d:G.game.day,t:'bridge'});if(G.game.buildLog.length>30)G.game.buildLog.shift();G.scheduleJobs();return {ok:true,b};
 };

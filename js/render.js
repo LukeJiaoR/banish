@@ -200,6 +200,12 @@ G.drawGroundTile = function (c, w, pal, x, y) {
     c.lineWidth = 1;
     c.stroke();
   }
+  if(w.road[i]===2){
+    c.save();G.diamondPath(c,sx,sy);c.clip();c.fillStyle=G.game.season===3?'#a4ada9':'#929487';c.fillRect(sx-32,sy,64,32);
+    c.strokeStyle='#656d64';c.lineWidth=.7;
+    for(let row=0;row<4;row++)for(let col=0;col<4;col++){const corners=[[row+.08,col+.08],[row+.92,col+.08],[row+.92,col+.92],[row+.08,col+.92]];c.beginPath();corners.forEach(([u,v],j)=>{const[px,py]=G.T2S(u/4,v/4);if(j)c.lineTo(sx+px,sy+py);else c.moveTo(sx+px,sy+py)});c.closePath();c.fillStyle=(row+col)%3?'#98998b':'#a5a492';c.fill();c.stroke();}
+    c.restore();
+  }
   // 岩石露头（1=石头 2=铁矿，锈色标记）
   if (w.rock[i]) {
     const iron = w.rock[i] === 2;
@@ -328,6 +334,7 @@ G.drawBuilding = function (ctx, b, time) {
   const L = G.T2S(b.x, b.y + b.h);
   const def = G.BDEF[b.type];
 
+  if (b.type === 'bridge') { G.drawBridge(ctx,b); return; }
   if (b.type === 'farm') { G.drawFarm(ctx, b); return; }
   if (b.type === 'dock') { G.drawDock(ctx, b); return; }
 
@@ -638,7 +645,7 @@ G.citizenFacing = function (c, workTarget) {
 G.drawCitizen = function (ctx, c, time, homes) {
   if (G.citizenIndoorHome(c, homes) || (G.inMedicalCare && G.inMedicalCare(c))) return;
   const [sx0, sy0] = G.T2S(c.x, c.y);
-  const sy = sy0 + 16;
+  const sy = sy0 + 16 - (G.bridgeAt(G.world,Math.round(c.x),Math.round(c.y))?.state==='ok'?8:0);
   const child = c.age < G.ADULT_AGE;
   const s = child ? 0.72 : 1;
   const walking = c.state === 'walk' || c.state === 'haul';
@@ -804,6 +811,8 @@ G.frame = function (dtReal) {
   for (const b of w.buildings) if (b.state === 'ok' && (b.type === 'pasture' || b.type === 'orchard'))
     G.drawEconomyFieldGround(ctx, b, { tx0, ty0, tx1, ty1 });
 
+  for(const b of w.buildings)if(b.type==='bridge')G.drawBridge(ctx,b);
+
   const harvesting = G.tool && (G.tool.kind === 'fell' || G.tool.kind === 'quarry');
   if (harvesting) G.drawFoodForestBounds(ctx);
 
@@ -878,7 +887,7 @@ G.frame = function (dtReal) {
       const px = sx * G.cam.z + G.cam.x, py = sy * G.cam.z + G.cam.y;
       if (px < -40 * G.cam.z || px > cv.clientWidth + 40 * G.cam.z || py < -20 * G.cam.z || py > cv.clientHeight + 20 * G.cam.z) continue;
       G.diamondPath(ctx, sx, sy);
-      ctx.fillStyle = w.water[i] === 1 || w.rock[i] || w.bgrid[i] >= 0 ? 'rgba(230,90,80,.6)' : w.treeIdx[i] >= 0 ? 'rgba(235,180,65,.6)' : 'rgba(120,230,140,.5)';
+      ctx.fillStyle = (w.water[i] === 1 && plan.surface!=='bridge') || w.rock[i] || w.bgrid[i] >= 0 ? 'rgba(230,90,80,.6)' : w.treeIdx[i] >= 0 ? 'rgba(235,180,65,.6)' : 'rgba(120,230,140,.5)';
       ctx.fill();
     }
   }
@@ -909,6 +918,7 @@ G.frame = function (dtReal) {
     G.addEconomyFieldParts(items, b, { tx0, ty0, tx1, ty1 });
   // 建筑
   for (const b of w.buildings) {
+    if(b.type==='bridge')continue; // Decks sit above water, below people and bankside objects.
     const cx = b.x + b.w / 2, cy = b.y + b.h / 2;
     if (cx < tx0 - 3 || cx > tx1 + 3 || cy < ty0 - 3 || cy > ty1 + 3) continue;
     items.push({ d: b.x + b.y + b.w + b.h - 2 - 0.5, k: 1, b });
@@ -1026,4 +1036,19 @@ G.frame = function (dtReal) {
     clearTimeout(G._gsTimer);
     G._gsTimer = null;
   }
+};
+
+G.drawBridge = function(ctx,b) {
+  const complete=b.state==='ok', length=b.w+b.h-1;
+  for(let n=0;n<length;n++){
+    const x=b.x+(b.w>1?n:0),y=b.y+(b.h>1?n:0),[sx,sy]=G.T2S(x,y);
+    if(complete&&G.sprDraw(ctx,'bridge_'+b.bridgeAxis,sx,sy+32,{w:64}))continue;
+    ctx.save();
+    // Construction is an explicitly dashed water footprint, never a finished deck.
+    G.diamondPath(ctx,sx,sy+(complete?-8:0));ctx.fillStyle=complete?'#98774b':'rgba(176,137,77,.22)';ctx.fill();
+    ctx.strokeStyle=complete?'#624b32':'#d9b064';ctx.lineWidth=1;ctx.setLineDash(complete?[]:[4,3]);ctx.stroke();
+    if(complete){for(let k=1;k<5;k++){const u=k/5;ctx.beginPath();if(b.w>1){ctx.moveTo(sx-32*u,sy+16*u-8);ctx.lineTo(sx+32-32*u,sy+16+16*u-8)}else{ctx.moveTo(sx+32*u,sy+16*u-8);ctx.lineTo(sx-32+32*u,sy+16+16*u-8)}ctx.stroke();}}
+    ctx.restore();
+  }
+  if(!complete){const [sx,sy]=G.T2S(b.x,b.y);ctx.fillStyle='#403924';ctx.fillRect(sx-19,sy-19,38,5);ctx.fillStyle='#dbb25f';ctx.fillRect(sx-19,sy-19,38*b.progress,5);}
 };

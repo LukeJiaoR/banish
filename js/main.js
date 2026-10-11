@@ -107,6 +107,7 @@ G.serializeGame = function () {
       productionGoals: g.productionGoals && { ...g.productionGoals }, productionPaused: g.productionPaused && { ...g.productionPaused },
     },
     roads: Array.from(w.road).flatMap((road, i) => road ? [i] : []),
+    stoneRoads: Array.from(w.road).flatMap((road, i) => road === 2 ? [i] : []),
     trees: w.trees.map(t => [t.i, t.x, t.y, t.b]),
     marked: [...w.marked],
     markedRocks: [...(w.markedRocks || [])],
@@ -115,6 +116,7 @@ G.serializeGame = function () {
       id: b.id, type: b.type, x: b.x, y: b.y, state: b.state,
       progress: b.progress, workLeft: b.workLeft, totalWork: b.totalWork, paidCost: b.paidCost, constructionStarted: b.constructionStarted,
       workers: b.workers, family: b.family, noWork: b.noWork, warnText: b.warnText,
+      bridgeAxis: b.bridgeAxis, bridgeLength: b.type === 'bridge' ? b.w + b.h - 1 : undefined,
       mineMode: b.mineMode, legacyMine: b.legacyMine, mineTick: b.mineTick, toolRecipe: b.toolRecipe,
       doCut: b.doCut, doPlant: b.doPlant, fuelLimit: b.fuelLimit, toolLimit: b.toolLimit,
       farm: b.farm ? b.farm.map(f => [f.sown ? 1 : 0, f.harvested ? 1 : 0]) : undefined,
@@ -307,6 +309,7 @@ G.prepareSaveData = function (d) {
   for (const i of optionalArray(d.marked, '砍伐标记')) { const t = gridIndex(i, '砍伐索引'); if (t !== null) w.marked.add(t); }
   for (const i of optionalArray(d.markedRocks, '采矿标记')) { const t = gridIndex(i, '采矿索引'); if (t !== null && w.rock[t]) w.markedRocks.add(t); }
   for (const i of optionalArray(d.roads, '道路')) { const t = gridIndex(i, '道路索引'); if (t !== null) G.setRoad(w, t % w.N, Math.floor(t / w.N), true); }
+  for (const i of optionalArray(d.stoneRoads, '石路')) { const t = gridIndex(i, '石路索引'); if (t !== null) { if(w.water[t]===1) bad('水上石路'); G.setRoad(w,t%w.N,Math.floor(t/w.N),2); } }
 
   const used = new Set(); let usedMax = 0;
   const uniqueId = (value, field) => {
@@ -316,7 +319,12 @@ G.prepareSaveData = function (d) {
   for (const bd of buildings) {
     record(bd, '建筑记录');
     if (!Object.prototype.hasOwnProperty.call(G.BDEF, bd.type)) bad('建筑类型');
-    const def = G.BDEF[bd.type];
+    let def = G.BDEF[bd.type];
+    if (bd.type === 'bridge') {
+      if (!['x','y'].includes(bd.bridgeAxis)) bad('木桥方向');
+      const length = integer(bd.bridgeLength,'木桥长度',3,24);
+      def = {...def,w:bd.bridgeAxis==='x'?length:1,h:bd.bridgeAxis==='y'?length:1,buildWork:length*3};
+    }
     const x = integer(bd.x, '建筑 x', 0, Math.min(oldN, w.N) - def.w);
     const y = integer(bd.y, '建筑 y', 0, Math.min(oldN, w.N) - def.h);
     if (bd.state !== 'ok' && bd.state !== 'site') bad('建筑状态');
@@ -331,6 +339,10 @@ G.prepareSaveData = function (d) {
       toolLimit: bd.type === 'blacksmith' ? G.toolLimitOf(bd) : undefined,
       fuelLimit: bd.type === 'woodcutter' ? G.fuelLimitOf(bd) : undefined,
     };
+    if (bd.type === 'bridge') {
+      b.bridgeAxis=bd.bridgeAxis;
+      if(!G.planBridge(w,{x,y},{x:x+b.w-1,y:y+b.h-1}).ok) bad('木桥跨岸几何');
+    }
     if (bd.type === 'mine') {
       b.mineMode = bd.mineMode === undefined ? 'legacy' : bd.mineMode;
       if (!['legacy', 'iron', 'coal'].includes(b.mineMode)) bad('矿井产出模式');
@@ -579,7 +591,7 @@ G.setTool = function (t) {
   G.cancelRoadPlan(); G.cancelHarvestPlan();
   if (t == null) { G.tool = null; }
   else if (t === 'demolish') G.tool = { kind: 'demolish' };
-  else if (t === 'road') G.tool = { kind: 'road' };
+  else if (['road','stoneroad','bridge'].includes(t)) G.tool = { kind: 'road', surface:t==='stoneroad'?'stone':t==='bridge'?'bridge':'dirt' };
   else if (t === 'fell') G.tool = { kind: 'fell' };
   else if (t === 'quarry') G.tool = { kind: 'quarry' };
   else G.tool = { kind: 'build', type: t };
@@ -652,21 +664,28 @@ G.roadGestureVersion = 0;
 G.cancelRoadPlan = function () { G.roadPlan = null; G.roadDrag = null; G.roadGestureVersion++; };
 G.selectRoadEndpoint = function (x, y) {
   if (!G.world || !G.tool || G.tool.kind !== 'road' || G.hasOpenModal()) return;
-  const w = G.world, point = { x, y }, old = G.roadPlan;
+  const w = G.world, old = G.roadPlan, surface=G.tool.surface||'dirt';
+  let point={x,y};
+  if(surface==='bridge'&&old&&old.start&&!old.end)point=G.bridgeEnd(old.start,point);
   if (!old || old.world !== w || old.end) {
-    const check = G.planRoad(w, point, point);
-    G.roadPlan = { world: w, start: point, end: null, result: check, message: check.ok ? '起点已选，请点击终点' : check.reason };
+    const check = surface==='bridge' ? G.bridgeStartStatus(w,point) : G.planRoad(w, point, point);
+    G.roadPlan = { world: w, surface, start: point, end: null, result: check, message: check.ok ? '起点已选，请点击终点' : check.reason };
     if (!check.ok) G.roadPlan.start = null;
     return;
   }
   if (!old.start) { G.roadPlan = null; G.selectRoadEndpoint(x, y); return; }
-  const result = G.planRoad(w, old.start, point);
-  G.roadPlan = { world: w, start: old.start, end: point, result, message: result.ok ? '' : result.reason };
+  const result = surface==='bridge'?G.planBridge(w,old.start,point):G.planRoad(w, old.start, point);
+  G.roadPlan = { world: w, surface, start: old.start, end: point, result, message: result.ok ? '' : result.reason };
 };
 G.roadPlanStatus = function () {
   if (G.roadDrag && G.roadDrag.world === G.world) return { ok: false, reason: '正在选择终点；松开后计算路线，再确认铺路。虚线仅表示起终点方向。' };
   const plan = G.roadPlan, w = G.world;
-  if (!plan || plan.world !== w || !plan.end || !plan.result.ok) return { ok: false, reason: plan && plan.world === w ? plan.message : '点击起点，再点击终点预览路线' };
+  if (!plan || plan.world !== w || (plan.surface||'dirt') !== (G.tool?.surface||'dirt') || !plan.end || !plan.result.ok) return { ok: false, reason: plan && plan.world === w ? plan.message : '点击起点，再点击终点预览路线' };
+  if(plan.surface==='bridge') {
+    const result=G.planBridge(w,plan.start,plan.end);
+    if(!result.ok)return result;
+    return {ok:true,trees:[],added:[],plan,materials:result.materials,bridge:true};
+  }
   const trees = [], added = [];
   for (const p of plan.result.path) {
     const i = p.y * w.N + p.x;
@@ -674,29 +693,33 @@ G.roadPlanStatus = function () {
     if (w.treeIdx[i] >= 0) { trees.push(p); if (!w.marked.has(i)) added.push(p); }
   }
   if (w.marked.size + added.length > 300) return { ok: false, reason: '清树标记将超过300处，请等待现有任务完成或取消多余标记' };
-  return { ok: true, trees, added, plan };
+  const materials={wood:0,stone:plan.surface==='stone'?plan.result.path.filter(p=>w.road[p.y*w.N+p.x]!==2).length:0};
+  return { ok: true, trees, added, plan, materials };
 };
 G.confirmRoadPlan = function (intent) {
   if (!G.tool || G.tool.kind !== 'road' || G.hasOpenModal()) return { ok: false };
   const status = G.roadPlanStatus();
   if (!status.ok) return status;
   const w = G.world, plan = status.plan;
-  const mode = status.trees.length ? 'clear' : 'pave';
+  const mode = status.bridge?'bridge':status.trees.length ? 'clear' : 'pave';
   const treeSignature = status.trees.map(p => p.y * w.N + p.x).join(',');
   if (intent && (intent.plan !== plan || intent.mode !== mode || intent.trees !== treeSignature))
     return { ok: false, reason: '路线或清树需求已变化，请复查预览后重新确认' };
+  if(status.bridge){const result=G.addBridge(plan.start,plan.end);if(result.ok){G.cancelRoadPlan();G.ui.refreshHUD();}return {...result,bridge:true};}
   if (status.trees.length) {
     for (const p of status.added) G.markFellAt(w, p.x, p.y);
     plan.message = '已确认清树任务；工人清树后，再点击确认铺路；木材仍须搬运入仓。退出规划不会撤销已确认标记。';
     return { ok: true, clearing: true, marked: status.added.length };
   }
+  if(G.game.res.stone<status.materials.stone)return {ok:false,reason:`石头不足：需${status.materials.stone}，现有${Math.floor(G.game.res.stone)}`};
+  G.game.res.stone-=status.materials.stone;
   let placed = 0;
   for (const p of plan.result.path) {
     const i = p.y * w.N + p.x;
-    if (!w.road[i]) { G.setRoad(w, p.x, p.y, true); G.markGroundDirty(p.x, p.y); placed++; }
+    if (plan.surface==='stone'?w.road[i]!==2:!w.road[i]) { G.setRoad(w, p.x, p.y, plan.surface==='stone'?2:true); G.markGroundDirty(p.x, p.y); placed++; }
   }
   G.cancelRoadPlan();
-  return { ok: true, placed };
+  G.ui.refreshHUD();return { ok: true, placed, surface:plan.surface||'dirt' };
 };
 
 /* Range previews are transient and hold original tree identities, never jobs or

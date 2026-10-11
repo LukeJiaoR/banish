@@ -203,7 +203,7 @@ G.ui = {
       { id: 'food', name: '食物生产', icon: '🌾', hint: '肉类 · 蔬菜 · 主食', tools: ['gatherer', 'hunting', 'dock', 'farm', 'orchard', 'pasture'] },
       { id: 'industry', name: '资源与加工', icon: '⚒️', hint: '木石铁煤 · 工具 · 衣物', tools: ['forester', 'woodcutter', 'stonequarry', 'mine', 'blacksmith', 'tailor'] },
       { id: 'services', name: '城镇服务', icon: '🏘️', hint: '储运 · 教育 · 医疗 · 贸易', tools: ['storage', 'school', 'herbalist', 'hospital', 'tradingpost'] },
-      { id: 'land', name: '道路与采运', icon: '🛣️', hint: '修路 · 采集 · 拆除', tools: ['road', 'fell', 'quarry', 'demolish'] },
+      { id: 'land', name: '道路与采运', icon: '🛣️', hint: '修路 · 采集 · 拆除', tools: ['road', 'stoneroad', 'bridge', 'fell', 'quarry', 'demolish'] },
     ].map(group => ({ ...group, tools: group.tools.filter(available) })).filter(group => group.tools.length);
     const registered = new Set(this.toolGroups.flatMap(group => group.tools));
     const extra = (G.TOOLBAR || []).filter(t => available(t) && !registered.has(t));
@@ -230,7 +230,7 @@ G.ui = {
     document.getElementById('toolbar-back').addEventListener('click', () => this.backToCategories());
     document.getElementById('toolbar-cancel').addEventListener('click', () => {
       if (G.hasOpenModal && G.hasOpenModal()) return;
-      const selected = G.tool && (G.tool.kind === 'build' ? G.tool.type : G.tool.kind);
+      const selected = G.tool && (G.tool.kind === 'build' ? G.tool.type : G.tool.kind==='road' ? (G.tool.surface==='bridge'?'bridge':G.tool.surface==='stone'?'stoneroad':'road') : G.tool.kind);
       G.setTool(null);
       const button = selected && this.el.toolbar.querySelector(`[data-tool="${selected}"]`);
       if (button && button.focus) button.focus({ preventScroll: true });
@@ -248,7 +248,7 @@ G.ui = {
     const icons = { stonehouse: 'tool_stonehouse', boarding: 'tool_boarding', mine: 'tool_mine', stonequarry: 'tool_stonequarry',
       blacksmith: 'tool_blacksmith', hunting: 'tool_hunting', house: 'tool_house', storage: 'tool_storage',
       gatherer: 'tool_gatherer', forester: 'tool_forester', woodcutter: 'tool_woodcutter', dock: 'tool_dock',
-      school: 'tool_school', herbalist: 'tool_herbalist', hospital: 'tool_hospital', farm: 'tool_farm', road: 'tool_road', demolish: 'tool_demolish' };
+      school: 'tool_school', herbalist: 'tool_herbalist', hospital: 'tool_hospital', farm: 'tool_farm', road: 'tool_road', stoneroad: 'tool_stoneroad', bridge: 'tool_bridge', demolish: 'tool_demolish' };
     const special = {
       demolish: { name: '拆除', icon: '🚫', cost: '建筑 · 道路', tip: '拆除：点击建筑或道路移除；树木请用砍伐，岩石和铁矿请用采石采铁' },
       quarry: { name: '采石采铁', icon: '⛏', cost: '灰石 · 锈铁', tip: '采石采铁：框选预览并确认矿石；灰色岩石产石头，锈色铁矿产铁，散工开采后搬运入库' },
@@ -296,9 +296,9 @@ G.ui = {
     const path = document.getElementById('toolbar-path'), status = document.getElementById('toolbar-state');
     if (path) path.textContent = group ? `建造与管理 / ${group.name}` : '建造与管理';
     if (status) {
-      const t = G.tool && (G.tool.kind === 'build' ? G.tool.type : G.tool.kind);
+      const t = G.tool && (G.tool.kind === 'build' ? G.tool.type : G.tool.kind==='road' ? (G.tool.surface==='bridge'?'bridge':G.tool.surface==='stone'?'stoneroad':'road') : G.tool.kind);
       const names = { fell: '砍伐', quarry: '采石采铁', demolish: '拆除', road: '铺路' };
-      status.textContent = t ? `当前：${names[t] || G.BDEF[t].name} · ${t === 'demolish' ? '点击建筑或道路立即拆除' : ['fell', 'quarry'].includes(t) ? '框选范围后确认标记' : t === 'road' ? '选起终点后确认铺设' : '点击地图放置，可连续建造'} · Esc / 右键取消` :
+      status.textContent = t ? `当前：${names[t] || G.BDEF[t].name} · ${t === 'demolish' ? '点击建筑或道路立即拆除' : ['fell', 'quarry'].includes(t) ? '框选范围后确认标记' : ['road','stoneroad','bridge'].includes(t) ? '选起终点后预览并确认' : '点击地图放置，可连续建造'} · Esc / 右键取消` :
         group ? '未选择工具。点击一项开始；返回分类可切换功能。' : '选择分类，再选择建筑或操作。';
     }
   },
@@ -309,7 +309,7 @@ G.ui = {
       if (btn.dataset.tool && btn.setAttribute) btn.setAttribute('aria-pressed', 'false');
     });
     if (G.tool) {
-      const t = G.tool.kind === 'build' ? G.tool.type : G.tool.kind;
+      const t = G.tool.kind === 'build' ? G.tool.type : G.tool.kind==='road' ? (G.tool.surface==='bridge'?'bridge':G.tool.surface==='stone'?'stoneroad':'road') : G.tool.kind;
       const btn = this.el.toolbar.querySelector(`[data-tool="${t}"]`);
       if (btn) { btn.classList.add('active'); if (btn.setAttribute) btn.setAttribute('aria-pressed', 'true'); }
       const group = this.toolGroups && this.toolGroups.find(item => item.tools.includes(t));
@@ -360,7 +360,7 @@ G.ui = {
     const el = document.getElementById('harvest-range-controls'); if (!el) return;
     const visible = !!G.world && !!G.tool && ['fell', 'quarry'].includes(G.tool.kind);
     if (!visible && el.contains(document.activeElement)) {
-      const tool = G.tool ? (G.tool.kind === 'build' ? G.tool.type : G.tool.kind) : this._harvestRangeTool;
+      const tool = G.tool ? (G.tool.kind === 'build' ? G.tool.type : G.tool.kind==='road' ? (G.tool.surface==='bridge'?'bridge':G.tool.surface==='stone'?'stoneroad':'road') : G.tool.kind) : this._harvestRangeTool;
       const button = tool && this.el.toolbar.querySelector(`[data-tool="${tool}"]`);
       if (button) button.focus({ preventScroll: true });
     }
@@ -406,7 +406,8 @@ G.ui = {
       if (!intent) { this.refreshRoadControls(); return; }
       const result = G.confirmRoadPlan(intent);
       if (result.reason) this.toast(result.reason, 'warn');
-      else if (result.placed != null) this.toast(`已铺设 ${result.placed} 格土路`, 'good');
+      else if (result.bridge && result.ok) this.toast('木桥工地已确认；工人完工前不可通行', 'good');
+      else if (result.placed != null) this.toast(`已铺设 ${result.placed} 格${result.surface==='stone'?'石路':'土路'}`, 'good');
       this.refreshRoadControls();
     });
     cancel.addEventListener('click', e => {
@@ -427,15 +428,19 @@ G.ui = {
     let message = status.reason || '';
     if (status.ok) {
       const r = plan.result;
-      message = `路线 ${r.path.length} 格 · 新铺 ${r.newTiles} · 复用 ${r.reusedTiles} · 转弯 ${r.turns} 次
-土路材料消耗：0 · 尚需清树 ${status.trees.length} 棵`;
+      const stone=plan.surface==='stone', bridge=plan.surface==='bridge';
+      const changed=stone?status.materials.stone:r.newTiles;
+      message = bridge ? `木桥 ${r.path.length} 格 · 直线跨水\n桥头 (${plan.start.x},${plan.start.y}) → (${plan.end.x},${plan.end.y})\n材料：木材 ${status.materials.wood} / 石头 ${status.materials.stone} · 建造 ${r.path.length*3} 工时\n工人从岸边施工，完工前不可通行` :
+        `路线 ${r.path.length} 格 · ${stone?'新铺/升级':'新铺'} ${changed} · 复用 ${r.path.length-changed} · 转弯 ${r.turns} 次\n${stone?'石路每格1石，合计 '+status.materials.stone+' 石':'土路材料消耗：0'} · 尚需清树 ${status.trees.length} 棵`;
+      const missing=Object.entries(status.materials).filter(([k,q])=>G.game.res[k]<q).map(([k,q])=>`${G.RES[k].name}差${Math.ceil(q-G.game.res[k])}`);
+      if(missing.length)message+='\n材料不足：'+missing.join(' · ');
       if (plan.message) message += '\n' + plan.message;
     }
-    message += '\n点选起终点，或鼠标拖出起终点、松开预览；再确认铺路。水面、建筑和矿石需绕行。Esc/右键退出。';
+    message += G.tool.surface==='bridge'?'\n点选/拖选两岸，终点吸附较长方向轴；需连续水面和清场桥头。Esc/右键退出。':'\n点选起终点，或鼠标拖出起终点、松开预览；再确认铺路。水面、建筑和矿石需绕行。Esc/右键退出。';
     if (text.textContent !== message) text.textContent = message;
     const waiting = status.ok && status.trees.length && !status.added.length;
-    button._roadIntent = status.ok ? { plan, mode: status.trees.length ? 'clear' : 'pave', trees: status.trees.map(p => p.y * G.world.N + p.x).join(',') } : null;
-    button.textContent = status.ok && status.trees.length ? (waiting ? '等待工人清树' : '确认标记清树') : '确认铺路';
+    button._roadIntent = status.ok ? { plan, mode: status.bridge?'bridge':status.trees.length ? 'clear' : 'pave', trees: status.trees.map(p => p.y * G.world.N + p.x).join(',') } : null;
+    button.textContent = status.ok && status.trees.length ? (waiting ? '等待工人清树' : '确认标记清树') : status.bridge?'确认建桥':'确认铺路';
     button.disabled = !status.ok || !!waiting || G.hasOpenModal();
   },
 
@@ -468,7 +473,7 @@ G.ui = {
     if (!visible) {
       // Escape or a tool switch must not leave keyboard focus in a hidden group.
       if (el.contains(document.activeElement)) {
-        const tool = G.tool ? (G.tool.kind === 'build' ? G.tool.type : G.tool.kind) : this._harvestTool;
+        const tool = G.tool ? (G.tool.kind === 'build' ? G.tool.type : G.tool.kind==='road' ? (G.tool.surface==='bridge'?'bridge':G.tool.surface==='stone'?'stoneroad':'road') : G.tool.kind) : this._harvestTool;
         const btn = tool && this.el.toolbar.querySelector(`[data-tool="${tool}"]`);
         if (btn) btn.focus({ preventScroll: true });
       }
