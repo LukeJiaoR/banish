@@ -446,3 +446,10 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .tavern-actions button:disabled { opacity: .45; cursor: default; }
 .tavern-actions button:focus-visible { outline: 2px solid #ffe4a0; outline-offset: 3px; }
 @media (max-width: 600px) { .tavern-actions button { min-height: 44px; } }
+
+/* Tailor recipes and clothing facts keep their controls mounted across updates. */
+.tailor-details, .citizen-clothing { margin-top: 7px; padding-top: 5px; border-top: 1px solid rgba(216,178,90,.3); }
+.tailor-details p, .citizen-clothing .row { overflow-wrap: anywhere; }
+.tailor-recipe select:focus-visible { outline: 2px solid #ffe4a0; outline-offset: 3px; }
+.tailor-details [data-tailor="batches"] { white-space: pre-line; font-variant-numeric: tabular-nums; }
+@media (max-width: 600px) { .tailor-recipe select { min-height: 44px; } }

@@ -35,7 +35,7 @@ G.ui = {
       return G.homeOf(c) ? '户外休息（未入屋）' : '露宿（无住房）';
     }
     if (c.state === 'work') {
-      if (b && b.type === 'tailor' && c.task) return '制作衣物';
+      if (c.task && c.task.kind === 'firewood' && c.task.b && c.task.b.type === 'tailor') return c.task.phase === 'fetch' ? '核对仓库衣料（完成时才扣原料）' : `制作${G.RES[c.task.yield && c.task.yield.type || 'clothes'].name}`;
       if (c.task && c.task.kind === 'brew') return c.task.phase === 'fetch' ? '取主食酿酒' : '加工麦酒';
       if (c.task && c.task.kind === 'host') return '酒馆在岗接待';
       if (c.task && c.task.kind === 'clinic') return b && b.type === 'herbalist' ? '采药屋值守' : '诊所值守';
@@ -47,6 +47,7 @@ G.ui = {
       if (c.carry) return c.carry.brewIngredient ? `搬运酿酒主食（${c.state === 'haul' ? '退回仓库' : '送往酒馆'}）` : `搬运${G.RES[c.carry.type].name}（${c.state === 'haul' ? '送仓' : '途中'}）`;
       if (c.walkKind === 'home') return '回家途中';
       if (c.walkKind === 'wander') return '闲逛';
+      if (c.task && c.task.kind === 'firewood' && c.task.b && c.task.b.type === 'tailor') return c.task.phase === 'fetch' ? '前往仓库核对衣料（完成时才扣原料）' : `返回裁缝铺制作${G.RES[c.task.yield && c.task.yield.type || 'clothes'].name}`;
       if (c.task && c.task.kind === 'firewood' && c.task.phase === 'fetch') return c.task.consume && G.RES[c.task.consume.type] ? `前往仓库取${G.RES[c.task.consume.type].name}` : '前往仓库取原木';
       if (c.task && c.task.kind === 'brew') return c.task.phase === 'fetch' ? '前往仓库取酿酒主食' : '前往酒馆加工麦酒';
       if (c.task && c.task.kind === 'trade') return c.task.phase === 'fetch' ? '前往仓库备货' : '运送贸易物资';
@@ -67,7 +68,10 @@ G.ui = {
     if (G.toolLimited(b)) return '暂停生产（工具已达目标）';
     if (b.type === 'woodcutter' && G.game.res.wood < G.PROD.woodcutter.logsIn) return '等待原木';
     if (b.type === 'blacksmith' && !G.jobCanProduce(b)) return G.blacksmithOutput(b) === 'steelTools' ? '等待铁、原木或煤' : '等待铁或原木';
-    if (b.type === 'tailor' && !G.jobCanProduce(b)) return G.game.res.clothes >= G.storageCap() ? '暂停制作（衣物仓容已满）' : b.warnText || '等待皮革或羊毛';
+    if (b.type === 'tailor' && G.tailorSummary) {
+      const summary = G.tailorSummary(b);
+      return !summary.canProduce ? summary.reason : b.noWork && b.warnText ? `等待：${b.warnText}` : '等待下一批衣物制作';
+    }
     if (b.type === 'farm' && !G.farmHasWork(b)) return '农闲（等待播种或收获）';
     if (b.noWork && b.warnText) return `等待：${b.warnText}`;
     return '等待下一项任务';
@@ -547,9 +551,9 @@ G.ui = {
           if (adults) el.title += ` · 两类工具合计 ${Math.floor(G.toolStock())} 件，当前成人约可用 ${Math.floor(G.toolDaysLeft(adults))} 天（扣除已磨损，不计新产出）`;
           el.title += k === 'steelTools' ? '；钢工具需铁、原木与煤' : '；铁工具需铁与原木';
         }
-        if (k === 'clothes') {
+        if (k === 'clothes' || k === 'warmCoats') {
           const unprotected = G.world.citizens.filter(c => !(c.clothingLeft > 0)).length;
-          el.title += ` · ${unprotected} 人衣物已耗尽；裁缝使用皮革或羊毛补充衣物`;
+          el.title += ` · ${unprotected} 人衣物已耗尽；${k === 'warmCoats' ? '暖衣需 2 皮革 + 2 羊毛，户外受冻降低 70%（较普通衣物再减半）' : '普通衣物需 2 皮革或 2 羊毛，户外受冻降低 40%'}；每件 ${G.YEAR_DAYS} 天，日终穿坏才优先领暖衣，再领普通衣物；不替代住房与柴火`;
         }
         if (k === 'herbs') el.title += ' · 采药屋在成熟林中采集，送仓后用于草药保健；诊所治疗不消耗草药';
         if (k === 'ale') el.title += ' · 麦酒不计入三类食物，不可充饥；仅供 18 岁以上居民到酒馆休闲，每次消耗 1 麦酒';
@@ -861,6 +865,82 @@ G.ui = {
     });
     this.refreshTavernInfo(b);
   },
+  tailorInfoData: function (b) {
+    if (b.type !== 'tailor' || b.state !== 'ok' || !G.tailorSummary) return null;
+    const s = G.tailorSummary(b), warm = s.recipe === 'warm', g = G.game;
+    const names = b.workers.map(id => G.world.cmap[id]).filter(Boolean).map(c => c.name).join('、');
+    const phases = { fetch: '前往仓库核料', work: '回铺 / 制作', haul: '待送仓', paused: '暂停保留' };
+    const batches = s.batches.map(batch => {
+      const carrier = typeof batch.carrier === 'object' && batch.carrier ? batch.carrier.name :
+        batch.carrier;
+      return `${G.RES[batch.type].name} ${batch.qty}（${phases[batch.phase] || '已接批次'}${carrier ? ' · ' + carrier : ''}）`;
+    });
+    const targets = ['clothes', 'warmCoats'].map(type => {
+      const target = G.productionGoalOf(type);
+      return `${G.RES[type].name} ${target === null ? '未设置' : target === 0 ? '0（关闭新生产）' : target + (G.goalPaused(type) ? '（达标暂停）' : '（可生产）')}`;
+    });
+    return { summary: s, data: {
+      status: `新批次：${s.canProduce ? b.noWork && b.warnText ? '等待：' + b.warnText : !names ? '等待可用工人' : '可制作' : s.reason || '暂不能制作'}`,
+      workers: names || '无',
+      production: `当前产出：${G.RES[s.output].name}`,
+      recipe: `每批：${warm ? '2 皮革 + 2 羊毛' : '2 皮革或 2 羊毛（自动优先皮革）'} → 1 ${G.RES[s.output].name}（受教育 2）；基础劳动 8 小时`,
+      materials: '新批次用料：' + s.materials.map(item => `${item.qty} ${G.RES[item.type].name}`).join(' + ') + '（未预留，完成时复核）',
+      inputs: `原料库存：皮革 ${Math.floor(g.res.leather || 0)} · 羊毛 ${Math.floor(g.res.wool || 0)}`,
+      stock: `可用成衣：普通衣物 ${Math.floor(s.clothes || 0)} · 暖衣 ${Math.floor(s.warmCoats || 0)}（在途未入库不计）`,
+      wearers: `全镇穿着：普通 ${s.wearers.basic} 人 · 暖衣 ${s.wearers.warm} 人 · 衣物耗尽 ${s.wearers.ragged} 人`,
+      targets: '独立全镇目标：' + targets.join(' · '),
+      goals: `当前配方：${G.buildingGoalStatus(b) || '未设全镇目标，仍受本类衣物仓容限制'}`,
+      batches: '已接批次 / 在途衣物：' + (batches.length ? batches.join('；') : '无'),
+    } };
+  },
+  tailorInfoMarkup: function (facts) {
+    return `<section class="tailor-details" data-tailor-panel>
+      <div class="economy-form tailor-recipe"><label for="coat-recipe">裁缝配方（仅新批次）</label>
+        <select id="coat-recipe" aria-describedby="coat-recipe-note">${[['basic', '普通衣物'], ['warm', '暖衣（保暖外套）']].map(([value, label]) => `<option value="${value}"${value === facts.summary.recipe ? ' selected' : ''}>${label}</option>`).join('')}</select>
+        <p class="desc" id="coat-recipe-note">切换只影响新批次；已接批次保留原产物、原材料，已有成衣继续送仓。旧档默认普通衣物。</p>
+      </div>
+      ${Object.keys(facts.data).filter(key => !['status', 'workers'].includes(key)).map(key => `<p class="row" data-tailor="${key}">${this.escHtml(facts.data[key])}</p>`).join('')}
+      <p class="economy-message" data-tailor-message role="status" aria-live="polite"></p>
+      <p class="desc">工人先走到可达仓库核对衣料，再回裁缝铺制作。原料暂留全镇库存，制作完成时才一次扣齐全部原料；此前不预扣，也没有随身衣料。取消或读档重开未完成批次不扣原料。成衣搬运入库后才可领取。</p>
+      <p class="desc">普通衣物和暖衣有独立库存与全镇目标，可在资源目标面板调整。目标只限制新批次；已接批次仍可能完成并超过目标。</p>
+      <p class="desc">每件 ${G.YEAR_DAYS} 天，日终磨损 1 天；穿坏时先领暖衣，无则领普通衣物。现有普通衣物不会立即换新，旧衣剩余耐久保留。户外受冻：普通衣物降低 40%，暖衣降低 70%（比普通再减半）。衣物不改变无柴冷屋受冻或烧柴暖屋恢复，仍需住房与柴火。</p>
+    </section>`;
+  },
+  refreshTailorInfo: function (b) {
+    const el = this.el.info;
+    if (!el.querySelector || !el.querySelector('[data-tailor-panel]')) return false;
+    const facts = this.tailorInfoData(b);
+    if (!facts) return false;
+    const nodes = {};
+    for (const key of Object.keys(facts.data)) {
+      nodes[key] = el.querySelector(`[data-tailor="${key}"]`);
+      if (!nodes[key]) return false;
+    }
+    for (const key of Object.keys(nodes)) if (nodes[key].textContent !== facts.data[key]) nodes[key].textContent = facts.data[key];
+    const select = el.querySelector('#coat-recipe');
+    // A focused native select can have a keyboard draft before its change event.
+    if (select && document.activeElement !== select) select.value = facts.summary.recipe;
+    return true;
+  },
+  initTailorInfo: function (b) {
+    const el = this.el.info, w = G.world, g = G.game;
+    const panel = el.querySelector && el.querySelector('[data-tailor-panel]');
+    const select = panel && panel.querySelector('#coat-recipe');
+    if (!select || !G.setCoatRecipe) return;
+    select.addEventListener('change', () => {
+      if (G.world !== w || G.game !== g || this.el.info !== el || el.classList.contains('hidden') || !G.sel ||
+          G.sel.kind !== 'b' || G.sel.id !== b.id || w.bmap[b.id] !== b || b.state !== 'ok' ||
+          el.querySelector('[data-tailor-panel]') !== panel || el.querySelector('#coat-recipe') !== select ||
+          (G.hasOpenModal && G.hasOpenModal())) return;
+      const accepted = G.setCoatRecipe(b, select.value);
+      // Setters can reject a stale or invalid selection without replacing its node.
+      select.value = G.tailorRecipeOf(b);
+      this.refreshTailorInfo(b);
+      const message = el.querySelector('[data-tailor-message]');
+      if (message) message.textContent = accepted ? '配方已应用于新批次；已有批次和在途衣物保留。' : '配方未更改，请检查裁缝铺并重新选择。';
+    });
+    this.refreshTailorInfo(b);
+  },
   resourceChainInfoData: function (b) {
     if (b.state !== 'ok' || !['mine', 'stonequarry', 'blacksmith'].includes(b.type)) return null;
     const smith = b.type === 'blacksmith', outputs = G.productionOutputsOf(b);
@@ -1050,6 +1130,30 @@ G.ui = {
       <div class="row${sick ? ' warn-txt' : ''}">疾病：${sick ? `患病第 ${Math.ceil(c.sickDays)} 天` : '无'}${!sick && c.immunityDays > 0 ? ` · 免疫约余 ${Math.ceil(c.immunityDays)} 天` : ''}</div>
       <div class="row">医疗：${this.escHtml(G.medicalStatus(c))}${c.herbCooldown > 0 ? ` · 草药调养间隔约余 ${Math.ceil(c.herbCooldown)} 天` : ''}</div>`;
   },
+  citizenClothingData: function (c) {
+    const type = G.clothingTypeOf ? G.clothingTypeOf(c) : c.clothingLeft > 0 ? 'basic' : 'none';
+    const mul = G.clothingColdMul ? G.clothingColdMul(c) : type === 'none' ? 1 : .6;
+    const left = Math.max(0, Number(c.clothingLeft) || 0);
+    return {
+      worn: `衣物：${type === 'warm' ? '暖衣' : type === 'basic' ? '普通衣物' : '已耗尽，等待成衣'}${type === 'none' ? '' : ' · 约剩 ' + Math.ceil(left) + ' 天'}`,
+      cold: `户外受冻 ×${mul.toFixed(1)}${type === 'warm' ? '（降低 70%，比普通衣物再减半）' : type === 'basic' ? '（降低 40%）' : '（无衣物防寒）'}`,
+      renewal: `日终磨损 1 天，穿坏才优先领暖衣，无则普通；每件 ${G.YEAR_DAYS} 天，不提前替换旧衣。`,
+      shelter: '衣物不改变无柴冷屋受冻或烧柴暖屋恢复，仍需住房与柴火。',
+    };
+  },
+  citizenClothingMarkup: function (c) {
+    const data = this.citizenClothingData(c);
+    return `<section class="citizen-clothing">${Object.keys(data).map(key => `<div class="row${key === 'worn' && !(c.clothingLeft > 0) ? ' warn-txt' : ''}${['renewal', 'shelter'].includes(key) ? ' desc' : ''}" data-citizen-clothing="${key}">${this.escHtml(data[key])}</div>`).join('')}</section>`;
+  },
+  refreshCitizenClothing: function (c) {
+    const el = this.el.info, data = this.citizenClothingData(c);
+    if (!el.querySelector) return;
+    for (const key of Object.keys(data)) {
+      const node = el.querySelector(`[data-citizen-clothing="${key}"]`);
+      if (node && node.textContent !== data[key]) node.textContent = data[key];
+      if (node && key === 'worn') node.classList.toggle('warn-txt', !(c.clothingLeft > 0));
+    }
+  },
   citizenLeisureData: function (c) {
     if (!Number.isFinite(c.happiness)) return null;
     const s = G.leisureSummary ? G.leisureSummary(c) : null;
@@ -1085,17 +1189,18 @@ G.ui = {
     const hadFocus = active && el.contains && el.contains(active);
     const selected = G.sel.kind === 'b' ? w.bmap[G.sel.id] : w.cmap[G.sel.id];
     if (!selected) { this.hideInfo(); return; }
-    const sameSelection = this._infoWorld === w && this._infoSelection === selected;
+    const sameSelection = this._infoWorld === w && this._infoGame === G.game && this._infoElement === el && this._infoSelection === selected;
     // Update only fuel text, never replace this panel's focused buttons. A new
     // selection or a site finishing construction still gets its own full panel.
     if (sameSelection && selected.state === 'ok' && this._townHallInfoState === selected.state && this.refreshTownHallInfo(selected)) return;
     if (sameSelection && selected.state === 'ok' && this._tavernInfoState === selected.state && this.refreshTavernInfo(selected)) return;
+    if (sameSelection && selected.state === 'ok' && this._tailorInfoState === selected.state && this.refreshTailorInfo(selected)) return;
     if (sameSelection && selected.state === 'ok' && this._economyInfoState === selected.state && this.refreshEconomyInfo(selected)) return;
     if (sameSelection && selected.state === 'ok' && this._medicalInfoState === selected.state && this.refreshMedicalInfo(selected)) return;
     if (sameSelection && selected.state === 'ok' && this._resourceChainInfoState === selected.state && this.refreshResourceChainInfo(selected)) return;
     if (sameSelection && selected.type === 'woodcutter' && this._fuelInfoState === selected.state && this.refreshFuelInfo(selected)) return;
     if (hadFocus && !force && sameSelection && selected.type !== 'woodcutter' && (G.sel.kind === 'c' || this._infoBuildState === selected.state)) {
-      if (G.sel.kind === 'c') this.refreshCitizenLeisure(selected);
+      if (G.sel.kind === 'c') { this.refreshCitizenLeisure(selected); this.refreshCitizenClothing(selected); }
       // Patch changing site facts in place without stealing keyboard focus.
       if (G.sel.kind === 'b' && selected.state === 'site') {
         const data = this.siteInfoData(selected);
@@ -1109,6 +1214,8 @@ G.ui = {
     const destructiveActionChanged = sameSelection && this._infoBuildState === 'site' && selected.state !== 'site' && active && active.id === 'info-demolish';
     const focusSelector = destructiveActionChanged ? '#info-close' : hadFocus ? (active.id ? '#' + active.id : active.dataset.tl ? '[data-tl="' + active.dataset.tl + '"]' : active.dataset.fl ? '[data-fl="' + active.dataset.fl + '"]' : active.dataset.k ? '[data-k="' + active.dataset.k + '"]' : null) : null;
     this._infoWorld = w;
+    this._infoGame = G.game;
+    this._infoElement = el;
     this._infoSelection = selected;
     this._infoBuildState = selected.state;
     if (G.sel.kind === 'b') {
@@ -1121,6 +1228,7 @@ G.ui = {
       const chainData = this.resourceChainInfoData(b);
       const hallData = this.townHallInfoData(b);
       const tavernData = this.tavernInfoData(b);
+      const tailorData = this.tailorInfoData(b);
       let status;
       if (fuelData) status = fuelData.status;
       else if (siteData) status = siteData.status;
@@ -1128,6 +1236,7 @@ G.ui = {
       else if (chainData) status = chainData.status;
       else if (hallData) status = hallData.data.status;
       else if (tavernData) status = tavernData.data.status;
+      else if (tailorData) status = tailorData.data.status;
       else if (G.productionLimited(b) && G.buildingGoalStatus(b)) status = G.buildingGoalStatus(b);
       else if (b.type === 'house' || b.type === 'stonehouse') status = b.family != null ? '有人居住' : '空置';
       else if (['tradingpost', 'pasture', 'orchard'].includes(b.type)) status = this.economyStatus(b);
@@ -1142,7 +1251,7 @@ G.ui = {
       let workers = '';
       if (def.jobs > 0 || b.state === 'site') {
         const names = b.workers.map(id => w.cmap[id]).filter(Boolean).map(c => this.escHtml(c.name)).join('、');
-        workers = `<div class="row">${medicalData ? b.type === 'hospital' ? '医师' : '采药员' : tavernData ? '酿酒工（需 18 岁以上且健康）' : '工人'}：<span${siteData ? ' data-site-workers' : ''}${fuelData ? ' data-fuel="workers"' : ''}${medicalData ? ' data-medical="workers"' : ''}${chainData ? ' data-resource-chain-live="workers"' : ''}${tavernData ? ' data-tavern="workers"' : ''}${b.state === 'ok' && ['tradingpost', 'pasture', 'orchard'].includes(b.type) ? ' data-economy-workers' : ''}>${names || (b.state === 'site' ? '等待建筑工人' : '无')}</span></div>`;
+        workers = `<div class="row">${medicalData ? b.type === 'hospital' ? '医师' : '采药员' : tavernData ? '酿酒工（需 18 岁以上且健康）' : '工人'}：<span${siteData ? ' data-site-workers' : ''}${fuelData ? ' data-fuel="workers"' : ''}${medicalData ? ' data-medical="workers"' : ''}${chainData ? ' data-resource-chain-live="workers"' : ''}${tavernData ? ' data-tavern="workers"' : ''}${tailorData ? ' data-tailor="workers"' : ''}${b.state === 'ok' && ['tradingpost', 'pasture', 'orchard'].includes(b.type) ? ' data-economy-workers' : ''}>${names || (b.state === 'site' ? '等待建筑工人' : '无')}</span></div>`;
       }
       let extra = '';
       if ((b.type === 'house' || b.type === 'stonehouse') && b.family != null) {
@@ -1174,13 +1283,14 @@ G.ui = {
       if (chainData) extra += this.resourceChainInfoMarkup(b, chainData);
       if (hallData) extra += this.townHallInfoMarkup(b, hallData);
       if (tavernData) extra += this.tavernInfoMarkup(tavernData);
+      if (tailorData) extra += this.tailorInfoMarkup(tailorData);
       if (b.state === 'ok') extra += this.economyInfoMarkup(b);
       if (medicalData) extra += this.medicalInfoMarkup(b, medicalData);
       const outputs = { gatherer: ['vegetables'], hunting: ['meat', 'leather'], dock: ['meat'], farm: ['grain'], orchard: ['vegetables'], pasture: ['meat', 'wool'], tailor: ['clothes'], herbalist: ['herbs'] };
-      const produced = (chainData ? [] : outputs[b.type] || []).filter(type => G.RES[type]);
+      const produced = (chainData || tailorData ? [] : outputs[b.type] || []).filter(type => G.RES[type]);
       if (produced.length) extra += `<div class="row resource-output">产出：${produced.map(type => `${this.resourceIcon(type)}${G.RES[type].name}`).join(' · ')}</div>`;
-      if (b.type === 'tailor') extra += `<div class="row">原料库存：皮革 ${Math.floor(G.game.res.leather || 0)} · 羊毛 ${Math.floor(G.game.res.wool || 0)}</div><div class="row">成衣库存：${Math.floor(G.game.res.clothes || 0)}</div>`;
-      if (b.type !== 'woodcutter' && !medicalData && !chainData && !tavernData && G.buildingGoalStatus(b)) extra += `<div class="row desc"${['tradingpost', 'pasture', 'orchard'].includes(b.type) ? ' data-economy-goals' : ''}>${this.escHtml(G.buildingGoalStatus(b))}</div>`;
+      if (b.type === 'tailor' && !tailorData) extra += `<div class="row">原料库存：皮革 ${Math.floor(G.game.res.leather || 0)} · 羊毛 ${Math.floor(G.game.res.wool || 0)}</div><div class="row">成衣库存：${Math.floor(G.game.res.clothes || 0)}</div>`;
+      if (b.type !== 'woodcutter' && !medicalData && !chainData && !tavernData && !tailorData && G.buildingGoalStatus(b)) extra += `<div class="row desc"${['tradingpost', 'pasture', 'orchard'].includes(b.type) ? ' data-economy-goals' : ''}>${this.escHtml(G.buildingGoalStatus(b))}</div>`;
       if (['gatherer', 'hunting', 'forester'].includes(b.type)) {
         const trees = G.treesInRadius(w, b.x, b.y, G.PROD[b.type].radius, false);
         const mature = trees.filter(t => G.treeStage(t) >= 2).length;
@@ -1191,7 +1301,7 @@ G.ui = {
       }
       el.innerHTML = `
         <div class="info-head"><span>${def.icon} ${def.name}</span><button id="info-close">✕</button></div>
-        <div class="row"${siteData ? ' data-site-status' : ''}${fuelData ? ' data-fuel="status"' : ''}${medicalData ? ' data-medical="status"' : ''}${chainData ? ' data-resource-chain-live="status"' : ''}${hallData ? ' data-townhall="status"' : ''}${tavernData ? ' data-tavern="status"' : ''}${b.state === 'ok' && ['tradingpost', 'pasture', 'orchard'].includes(b.type) ? ' data-economy-status' : ''}>${this.escHtml(status)}</div>
+        <div class="row"${siteData ? ' data-site-status' : ''}${fuelData ? ' data-fuel="status"' : ''}${medicalData ? ' data-medical="status"' : ''}${chainData ? ' data-resource-chain-live="status"' : ''}${hallData ? ' data-townhall="status"' : ''}${tavernData ? ' data-tavern="status"' : ''}${tailorData ? ' data-tailor="status"' : ''}${b.state === 'ok' && ['tradingpost', 'pasture', 'orchard'].includes(b.type) ? ' data-economy-status' : ''}>${this.escHtml(status)}</div>
         ${workers}${extra}
         <div class="row desc">${def.desc}</div>
         <div class="row desc" data-info-refund${fuelData ? ' data-fuel="refund"' : ''}>${fuelData ? fuelData.refund : siteData ? siteData.refund : '已开工：拆除退还一半已付建材，已砍树不恢复'}</div>
@@ -1202,8 +1312,10 @@ G.ui = {
       this._resourceChainInfoState = b.state;
       this._townHallInfoState = b.state;
       this._tavernInfoState = b.state;
+      this._tailorInfoState = b.state;
       if (hallData) this.refreshTownHallInfo(b);
       if (tavernData) this.initTavernInfo(b);
+      if (tailorData) this.initTailorInfo(b);
       if (medicalData) this.refreshMedicalPatients(b);
       if (chainData) this.initResourceChainInfo(b);
       if (b.state === 'ok') this.initEconomyInfo(b);
@@ -1222,7 +1334,7 @@ G.ui = {
         <div class="row">家庭：${fam ? (fam.houseId != null ? '有房' : '无房') : '单身'}</div>
         <div class="row">学识：${c.student ? '🎓 就读中' : c.educated ? '📖 受过教育' : '未受教育'}</div>
         <div class="row">饥饿 ${'▕'.repeat(Math.min(4, c.hunger)) || '无'} · 受冻 ${c.cold > 1 ? '是' : '无'}</div>
-        ${Number.isFinite(c.clothingLeft) ? `<div class="row${c.clothingLeft > 0 ? '' : ' warn-txt'}">衣物：${c.clothingLeft > 0 ? '约剩 ' + Math.ceil(c.clothingLeft) + ' 天' : '已耗尽，等待成衣'}</div>` : ''}
+        ${this.citizenClothingMarkup(c)}
         ${Number.isFinite(c.dietVariety) ? `<div class="row">最近饮食：${Math.max(0, Math.min(3, c.dietVariety))} / 3 类${Number.isFinite(c.dietScore) ? ' · 长期均衡 ' + c.dietScore.toFixed(1) + '/3' : ''}</div>` : ''}
         ${this.citizenHealthMarkup(c)}
         ${this.citizenLeisureMarkup(c)}`;
@@ -1421,7 +1533,7 @@ G.ui = {
   initProductionGoals: function () {
     const rows = document.getElementById('production-goal-rows');
     rows.innerHTML = G.RES_KEYS.map(type => {
-      const step = type === 'food' || (G.FOOD_KEYS || []).includes(type) ? 100 : ['tools', 'steelTools', 'clothes'].includes(type) ? 10 : 50;
+      const step = type === 'food' || (G.FOOD_KEYS || []).includes(type) ? 100 : ['tools', 'steelTools', 'clothes', 'warmCoats'].includes(type) ? 10 : 50;
       return `<section class="production-goal-row" aria-labelledby="goal-label-${type}">
         <label id="goal-label-${type}" for="goal-input-${type}">${this.resourceIcon(type)}${type === 'food' ? '总食物（肉类 + 蔬菜 + 主食）' : G.RES[type].name}</label>
         <p id="goal-stock-${type}"></p>
@@ -1495,7 +1607,7 @@ G.ui = {
       if ((type === 'food' || foodClass) && target !== null) status.textContent += '；已开始的整田继续播种和收获，过低目标可能断粮';
       if (type === 'firewood' && target !== null) status.textContent += '；过低目标可能挨冻';
       if (type === 'leather') status.textContent += '；仅控制狩猎的新批次皮革副产物，猎人是否继续产肉由肉类和总食物目标控制';
-      if (type === 'clothes') status.textContent += '；衣物仓满也会暂停裁缝接新批次';
+      if (type === 'clothes' || type === 'warmCoats') status.textContent += '；两类衣物目标独立，仅暂停生产本类的新批次；本类衣物仓满也会暂停裁缝，已接批次保留';
       if (type === 'ale') status.textContent += '；只控制麦酒新酿造，仍受酒馆储粮保护；麦酒不计入三类食物，不能充饥';
     }
   },
