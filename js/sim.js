@@ -7,7 +7,7 @@ G.newGameState = function () {
   return {
     h: 6, day: 0, season: 0, year: 1,
     speed: 1, paused: false,
-    res: { wood: 80, stone: 48, iron: 0, tools: 15, food: 500, meat: 0, vegetables: 0, grain: 500, leather: 0, wool: 0, clothes: 0, herbs: 0, coal: 0, steelTools: 0, firewood: 50 }, // 开局（原版中难度 5 家庭，工具 15 件≈第一轮磨损周期）；存粮较原版加厚：15 人 6 天食物跑道撑不到第一座采集屋建成
+    res: { wood: 80, stone: 48, iron: 0, tools: 15, food: 500, meat: 0, vegetables: 0, grain: 500, leather: 0, wool: 0, clothes: 0, herbs: 0, coal: 0, steelTools: 0, ale: 0, firewood: 50 }, // 开局（原版中难度 5 家庭，工具 15 件≈第一轮磨损周期）；存粮较原版加厚：15 人 6 天食物跑道撑不到第一座采集屋建成
     healthStartDay: 0,
     nomads: {nextDay:G.YEAR_DAYS,serial:0,offer:null,accepted:0,declined:0},
     schedT: 1,
@@ -85,7 +85,8 @@ G.endDay = function () {
     } else { c.hunger++; c.dietVariety = 0; }
     c.clothingLeft = Math.max(0, (c.clothingLeft || 0) - 1);
     if (c.clothingLeft <= 0 && g.res.clothes >= 1) { g.res.clothes--; c.clothingLeft = G.YEAR_DAYS; }
-    c.happiness = Math.max(1, Math.min(5, 2 + (c.dietScore || 1) - Math.min(2, c.hunger / 3)));
+    c.leisureDays=Math.max(0,G.leisureDaysOf(c)-1);
+    c.happiness=G.clamp((c.happiness||3)+G.clamp(G.happinessTarget(c)-(c.happiness||3),-.1,.1),1,5);
   }
 
 
@@ -491,7 +492,7 @@ G.spawnCitizen = function (opt) {
     student: false, educated: false, school: null,
     state: 'idle', walkKind: '', path: null, pi: 0, camped: false,
     wanderT: G.rng() * 3,
-    hunger: 0, cold: 0, clothingLeft: 0, dietVariety: 0, dietScore: 1, happiness: 3, health: 4, sickDays: 0, immunityDays: 0, herbCooldown: 0, careHours: 0,
+    hunger: 0, cold: 0, clothingLeft: 0, dietVariety: 0, dietScore: 1, happiness: 3, leisureDays:0, health: 4, sickDays: 0, immunityDays: 0, herbCooldown: 0, careHours: 0,
     animT: G.rng() * 10,
     dead: false,
   };
@@ -580,10 +581,10 @@ G.alternateTaskEndpoint = function (c, t) {
   if (!t || G.physicalTaskEndpoint(t) || !t.b || G.world.bmap[t.b.id] !== t.b) return null;
   if (['build','clearSite'].includes(t.kind) ? t.b.state !== 'site' : t.b.state !== 'ok') return null;
   if (t.kind === 'clearSite' && (!t.tree || G.world.trees[G.world.treeIdx[t.tree.i]] !== t.tree)) return null;
-  if (['care', 'clinic', 'arrival'].includes(t.kind)) return G.workSpot(G.world, t.b, c.x, c.y, true);
+  if (['care', 'clinic', 'arrival', 'leisure', 'host'].includes(t.kind)) return G.workSpot(G.world, t.b, c.x, c.y, true);
   if (t.kind === 'clearSite') return G.siteClearSpot(c, t.b, t.tree);
-  if (['firewood', 'trade'].includes(t.kind) && t.phase === 'fetch') return G.storageRoute(c.x, c.y)?.spot || null;
-  if (t.kind === 'build' || t.kind === 'firewood' || t.kind === 'trade' ||
+  if (['firewood', 'trade', 'brew'].includes(t.kind) && t.phase === 'fetch') return G.storageRoute(c.x, c.y)?.spot || null;
+  if (t.kind === 'build' || t.kind === 'firewood' || t.kind === 'trade' || t.kind === 'brew' ||
       (t.kind === 'work' && ['dock', 'mine', 'stonequarry', 'blacksmith', 'pasture', 'orchard'].includes(t.b.type)))
     return G.workSpot(G.world, t.b, c.x, c.y, true);
   return null;
@@ -605,7 +606,7 @@ G.routeCanReuse = function (route, c, tx, ty) {
 G.sendTo = function (c, tx, ty, planned = null) {
   let route=planned||(c.task&&c.task.dispatchRoute);
   if(c.task) delete c.task.dispatchRoute;
-  const buildingTask=c.task && (['build','clearSite','firewood','trade','care','clinic','arrival'].includes(c.task.kind) || (c.task.kind==='work' && c.task.b && ['dock','mine','stonequarry','blacksmith','pasture','orchard'].includes(c.task.b.type)));
+  const buildingTask=c.task && (['build','clearSite','firewood','trade','care','clinic','arrival','leisure','host','brew'].includes(c.task.kind) || (c.task.kind==='work' && c.task.b && ['dock','mine','stonequarry','blacksmith','pasture','orchard'].includes(c.task.b.type)));
   if((route && !G.routeCanReuse(route,c,tx,ty)) || (!route && buildingTask)) {
     const spot=G.alternateTaskEndpoint(c,c.task);
     if(!spot){if(c.task)G.dropBlockedTask(c,c.task);c.path=null;c.state='idle';c.wanderT=.5;return false;}
@@ -716,9 +717,10 @@ G.storageRoute = function (x, y) {
 };
 
 /* Limited minerals retain one ordinary carried batch when a warehouse rejects
- * part of a delivery. Other resource delivery policy is intentionally unchanged. */
-G.isMineralCargo = function (c) { return !!c.carry && ['stone', 'iron', 'coal'].includes(c.carry.type); };
-G.mineralStorageSpace = function (type) { return Math.max(0, G.storageCap() - G.game.res[type]); };
+ * part of a delivery. Tavern output and refundable raw grain share this bounded
+ * delivery path; other ordinary resource delivery policy is unchanged. */
+G.isMineralCargo = function (c) { return !!c.carry && (['stone','iron','coal','ale'].includes(c.carry.type) || (c.carry.type==='grain' && c.carry.brewIngredient===true)); };
+G.mineralStorageSpace = function (type) { return Math.max(0, G.storageCap() - G.game.res[G.isFood(type)?'food':type]); };
 // Ordinary in-flight minerals remain eligible as before; only an already
 // blocked delivery cannot count as available labour or occupy a productive slot.
 G.mineralDeliveryBlocked = function (c) {
@@ -732,12 +734,12 @@ G.waitForMineralStorage = function (c, reason) {
 G.warnMineralStorage = function () {
   if (G.game.warned.mineralStorageFull) return;
   G.game.warned.mineralStorageFull = true;
-  G.ui.toast('⚠ 矿物仓位已满，余矿由市民随身保留；使用库存或建成新仓库后继续送仓', 'warn');
+  G.ui.toast('⚠ 仓位已满，矿物、麦酒或退回原粮由市民随身保留；使用库存或建成新仓库后继续送仓', 'warn');
 };
 G.cargoWaitReason = function (c) {
   if (!G.isMineralCargo(c) || !c.haulPending || c.state === 'haul') return '';
-  if (G.mineralStorageSpace(c.carry.type) <= 0) return '仓满，带矿等待空间（使用库存或新建仓库）';
-  return c.haulWait === 'route' ? '带矿等待可达仓库' : '带矿等待送仓';
+  if (G.mineralStorageSpace(c.carry.type) <= 0) return '仓满，带货等待空间（使用库存或新建仓库）';
+  return c.haulWait === 'route' ? '带货等待可达仓库' : '带货等待送仓';
 };
 G.finishMineralHaul = function (c) {
   c.carry.qty -= G.depositCargo(c.carry);
@@ -791,7 +793,7 @@ G.toolLimited = function (b) { const type = G.blacksmithOutput(b); return b.type
 /* Optional automatic-production goals. Unset means the exact legacy rules.
  * Hysteresis changes at deliveries and the normal 2h scheduler, never in UI reads. */
 G.PRODUCTION_GOAL_MAX = 1000000;
-G.PRODUCTION_OUTPUTS = { woodcutter: ['firewood'], blacksmith: ['tools'], forester: ['wood'], mine: ['stone', 'iron'], stonequarry: ['stone'], gatherer: ['food', 'vegetables'], dock: ['food', 'meat'], hunting: ['food', 'meat', 'leather'], farm: ['food', 'grain'], tailor: ['clothes'], pasture: ['food', 'meat', 'wool'], orchard: ['food', 'vegetables'], herbalist: ['herbs'] };
+G.PRODUCTION_OUTPUTS = { woodcutter: ['firewood'], blacksmith: ['tools'], forester: ['wood'], mine: ['stone', 'iron'], stonequarry: ['stone'], gatherer: ['food', 'vegetables'], dock: ['food', 'meat'], hunting: ['food', 'meat', 'leather'], farm: ['food', 'grain'], tailor: ['clothes'], pasture: ['food', 'meat', 'wool'], orchard: ['food', 'vegetables'], herbalist: ['herbs'], tavern:['ale'] };
 G.productionGoalOf = function (type, game) {
   const goals = (game || G.game).productionGoals;
   return goals && Object.prototype.hasOwnProperty.call(goals, type) && Number.isFinite(goals[type]) ? goals[type] : null;
@@ -893,7 +895,8 @@ G.buildingGoalStatus = function (b) {
 // Only configured automatic jobs gain completion protection. Never change the
 // unset baseline, teachers, manual tasks, or construction scheduling here.
 G.goalCommitment = function (c) {
-  if (G.isArriving(c)) return true;
+  if (G.isArriving(c) || G.isLeisureVisitor(c)) return true;
+  if ([c.task,c.pausedTask].some(t=>t&&t.kind==='brew'&&t.phase==='process') && c.carry?.brewIngredient) return true;
   if (c.task && c.task.kind === 'care') return true;
   const b = G.world.bmap[c.job];
   if (b && b.type === 'hospital' && !G.isSick(c) && G.world.citizens.some(G.isSick)) return true;
@@ -943,11 +946,11 @@ G.consumeFood = function (qty) {
   r.food = G.FOOD_KEYS.reduce((n,k) => n + r[k], 0); return [...eaten];
 };
 G.depositCargo = function (cargo) {
-  const accepted = G.deposit(cargo.type, cargo.qty);
+  const accepted = G.deposit(cargo.type, cargo.qty, cargo.brewIngredient===true);
   if (cargo.extra) { for (const [type, qty] of Object.entries(cargo.extra)) G.deposit(type, qty); delete cargo.extra; }
   return accepted;
 };
-G.deposit = function (type, qty) {
+G.deposit = function (type, qty, retain=false) {
   const g = G.game;
   if (type === 'food') type = 'grain'; // old carried food retains its quantity
   if (G.FOOD_KEYS.includes(type)) G.reconcileFood();
@@ -955,7 +958,7 @@ G.deposit = function (type, qty) {
   const space = G.isTool(type) ? Infinity : Math.max(0, G.storageCap() - stock);
   const got = Math.min(qty, space); g.res[type] = (g.res[type] || 0) + got;
   if (G.FOOD_KEYS.includes(type)) g.res.food += got;
-  if (got < qty && !['stone', 'iron', 'coal'].includes(type) && !g.warned.storageFull) {
+  if (got < qty && !retain && !['stone', 'iron', 'coal', 'ale'].includes(type) && !g.warned.storageFull) {
     g.warned.storageFull = true; G.ui.toast('⚠ 仓库满了，多出的资源只能丢弃——再建一座仓库吧', 'warn');
   }
   G.updateProductionGoals(); return got;
@@ -1020,7 +1023,7 @@ G.detourCitizen = function (c, dtH) {
     if (G.physicalTaskEndpoint(t)) { G.dropBlockedTask(c, t); return; }
     if (t) {
       const spot = G.alternateTaskEndpoint(c, t);
-      if (!spot) { if (t.kind === 'care') G.cancelMedicalCare(c); return; }
+      if (!spot) { if (t.kind === 'care') G.cancelMedicalCare(c); else if(t.kind==='leisure')G.cancelLeisure(c); return; }
       goal = spot; t.tx = spot.x; t.ty = spot.y;
     } else if (c.walkKind === 'wander') { c.path = null; c.state = 'idle'; c.wanderT = 2; return; }
     else return;
@@ -1028,6 +1031,7 @@ G.detourCitizen = function (c, dtH) {
   const path = G.routeCanReuse(goal.route,c,goal.x,goal.y) ? goal.route.path : G.findPath(G.world, Math.round(c.x), Math.round(c.y), goal.x, goal.y);
   if (!path) {
     if (c.task && c.task.kind === 'care') { G.cancelMedicalCare(c); return; }
+    if(G.isLeisureVisitor(c)){G.cancelLeisure(c);return;}
     if (c.state === 'haul' && G.isMineralCargo(c)) { c.haulPending = true; G.waitForMineralStorage(c, 'route'); }
     return;
   }
@@ -1040,6 +1044,8 @@ G.detourCitizen = function (c, dtH) {
 G.stepCitizen = function (c, dtH) {
   if (c.dead) return;
   G.coldStep(c, dtH);
+  c.leisureRetryH=Math.max(0,(c.leisureRetryH||0)-dtH);
+  if(G.isLeisureVisitor(c) && (!G.validLeisureTask(c) || G.isRestTime()))G.cancelLeisure(c);
   c.careRetryH = Math.max(0, (c.careRetryH || 0) - dtH);
   if (c.task && c.task.kind === 'care' && !G.validCareTask(c)) G.cancelMedicalCare(c);
   if (c.task && c.task.kind === 'care' && c.state === 'work') { G.stepMedicalCare(c, dtH); return; }
@@ -1079,9 +1085,11 @@ G.stepCitizen = function (c, dtH) {
       return;
     }
     case 'work': {
+      if(G.isLeisureVisitor(c)){G.stepLeisure(c,dtH);return;}
+      if(c.task?.kind==='brew'&&c.task.phase==='process'&&(G.isSick(c)||!G.tavernBrewStatus(c.task.b,true).ok)){G.returnBrewGrain(c);return;}
       if (!c.task) { c.state = 'idle'; return; }
       if (c.task.b && c.task.b.state === 'site') c.task.b.constructionStarted = true;
-      c.task.workLeft -= dtH / G.healthWorkMul(c);
+      c.task.workLeft -= dtH * (1+G.happinessBonus(c)) / G.healthWorkMul(c);
       c.animT += dtH * 12;
       if (c.task.workLeft <= 0) G.completeTask(c);
       return;
@@ -1161,10 +1169,11 @@ G.requestTask = function (c) {
   if (G.isArriving(c)) {if(G.isRestTime())G.goHome(c);else G.startImmigration(c);return;}
   if (!c.carry && G.tryMedicalCare(c)) return;
   if (G.isRestTime()) { G.goHome(c); return; } // 深夜不接受新任务
+  if(!c.carry && G.tryLeisure(c))return;
   const w = G.world;
   const b = c.job != null ? w.bmap[c.job] : null;
   // 换岗/任务中断后先交货；农田未满批可继续收割，找不到下一格时也必须交货。
-  const partialFarm = b && b.type === 'farm' && b.state === 'ok' && c.carry && c.carry.type === 'grain' && c.carry.qty < G.PROD.farm.haulCap;
+  const partialFarm = b && b.type === 'farm' && b.state === 'ok' && c.carry && c.carry.type === 'grain' && !c.carry.brewIngredient && c.carry.qty < G.PROD.farm.haulCap;
   const partialForester = b && b.type === 'forester' && b.state === 'ok' && b.doCut && !G.goalPaused('wood') && c.carry && c.carry.type === 'wood' && c.carry.qty + G.taskYield(G.taskLogYield(c)) <= G.PROD.forester.haulCap;
   if (c.carry && !partialFarm && !partialForester) {
     G.startHaul(c); return;
@@ -1308,6 +1317,7 @@ G.makeTask = function (b, c) {
   switch (b.type) {
     case 'herbalist': return G.makeHerbalistTask(b, c);
     case 'hospital': return G.makeClinicTask(b, c);
+    case 'tavern': return G.makeTavernTask(b,c);
     case 'woodcutter': {
       if (G.fuelLimited(b)) { // 燃料上限：库存够用时自动停工（原版 Fuel Limit）
         b.noWork = true; b.warnText = '柴火已达上限';
@@ -1523,7 +1533,9 @@ G.completeTask = function (c) {
       else {G.startImmigration(c);return;}
       break;
     }
-    case 'clinic': break;
+    case 'clinic':
+    case 'host': break;
+    case 'brew': G.completeBrew(c,t);return;
     case 'build': {
       if (b && b.state === 'site') {
         b.workLeft -= t.work;
@@ -1648,6 +1660,7 @@ G.releaseWorker = function (c) {
 
 G.assignWorker = function (b, c) {
   if(G.isArriving(c))return;
+  if(b.type==='tavern'&&b.state==='ok'&&(c.age<18||G.isSick(c)))return;
   if (b.type === 'hospital' && b.state === 'ok' && G.isSick(c)) return;
   c.job = b.id;
   b.workers.push(c.id);
@@ -1714,6 +1727,7 @@ G.farmHasWork = function (b) {
 G.jobCanProduce = function (b) {
   const w = G.world, r = G.game.res, p = G.PROD;
   if (b.type === 'hospital') return G.world.citizens.some(G.isSick);
+  if(b.type==='tavern')return G.tavernBrewStatus(b).ok || G.game.res.ale>0;
   if (b.type === 'herbalist') return true; // A staffed hut also provides preventive care when gathering pauses.
   if (G.productionLimited(b)) return false;
   if (b.type === 'farm') return G.farmHasWork(b);
@@ -1846,7 +1860,7 @@ G.scheduleJobs = function () {
     if (b.type !== 'herbalist' && G.productionLimited(b)) continue; // 柴火/工具达到上限的岗位不拉人，空闲者留给「砍伐」标记
     let guard = 0;
     while (b.workers.length < def.jobs && guard++ < 6) {
-      const pool = jobless().filter(c => b.type !== 'hospital' || !G.isSick(c));
+      const pool = jobless().filter(c => (b.type !== 'hospital' || !G.isSick(c)) && (b.type!=='tavern'||(c.age>=18&&!G.isSick(c))));
       if (wantLabor && pool.length <= wantLabor) break;
       const c = G.pickNearest(pool, b);
       if (!c) break;
@@ -1863,7 +1877,7 @@ G.scheduleJobs = function () {
     .filter(b => b.state === 'ok' && G.BDEF[b.type].jobs > 0 && b.workers.length < G.BDEF[b.type].jobs && !b.noWork && G.jobCanProduce(b))
     .sort((a, b2) => (a.type === 'woodcutter' ? -1 : b2.type === 'woodcutter' ? 1 : 0));
   for (const b of targets) {
-    const eligibleForTarget = c => c && !G.goalCommitment(c) && (b.type !== 'hospital' || !G.isSick(c));
+    const eligibleForTarget = c => c && !G.goalCommitment(c) && (b.type !== 'hospital' || !G.isSick(c)) && (b.type!=='tavern'||(c.age>=18&&!G.isSick(c)));
     if (jobless().filter(eligibleForTarget).length > wantLabor) break; // 不能任医师的病人不能挡住健康接班人。
     // 从供体岗位抽人：优先抽当下正闲置的那个（别的工人还在干活）
     const available = x => x.workers.some(id => eligibleForTarget(w.cmap[id]));
@@ -1960,6 +1974,7 @@ G.addBuilding = function (type, x, y, opt) {
   if (type === 'forester') { b.doCut = true; b.doPlant = true; } // 原版 Forester 的 Cut / Plant 开关
   if (type === 'mine') { b.mineMode = 'iron'; b.legacyMine = false; b.mineTick = 0; }
   if (type === 'blacksmith') { b.toolLimit = G.PROD.blacksmith.toolLimit; b.toolRecipe = 'iron'; }
+  if(type==='tavern')b.reserveDays=12;
   if (type === 'woodcutter') b.fuelLimit = G.PROD.woodcutter.fuelLimit; // 燃料上限（原版 Fuel Limit）
   if (G.game && G.game.buildLog) { // 建造/拆除记录（反馈分析用；负号前缀 = 拆除）
     G.game.buildLog.push({ d: G.game.day, t: type });
@@ -2025,7 +2040,10 @@ G.removeBuilding = function (b) {
     const c = w.cmap[id];
     if (c) { c.job = null; c.task = null; c.pausedTask = null; c.path = null; c.state = 'idle'; }
   }
-  for (const c of w.citizens) if (c.task && c.task.kind === 'care' && c.task.b === b) G.cancelMedicalCare(c);
+  for (const c of w.citizens) {
+    if(c.task && c.task.kind==='care' && c.task.b===b)G.cancelMedicalCare(c);
+    if(G.isLeisureVisitor(c)&&c.task.b===b)G.cancelLeisure(c);
+  }
   // 尚未开工的规划全额撤销；已经劳动/建成的建筑拆除返还一半。
   const def = G.BDEF[b.type];
   const paid = b.paidCost || def.cost; // 旧档没有付款快照，沿用历史建材成本。
@@ -2449,4 +2467,98 @@ G.townHallSummary = function(b) {
     foodDays:pop?g.res.food/(pop*G.LIFE.eatPerDay):0,offer,offerPeople:people,offerFamilies:offeredFamilies,offerAdults:offeredFamilies*2,offerChildren:people-offeredFamilies*2,
     foodDaysAfter:pop+people?g.res.food/((pop+people)*G.LIFE.eatPerDay):0,addedFoodPerDay:people*G.LIFE.eatPerDay,addedFuelPerWinter:offeredFamilies*30,
     arriving:cs.filter(G.isArriving).length,nextDay:n.nextDay,accepted:n.accepted,declined:n.declined};
+};
+
+/* Tavern: one explicit food-to-leisure chain. Food safety is rechecked when
+ * fetching and before fermenting. Reserved grain is physical refundable cargo. */
+G.LEISURE={age:18,hours:2,days:6,capacity:4,maxTravelHours:6,retryHours:6};
+G.leisureDaysOf=c=>G.clamp(Number.isFinite(c.leisureDays)?c.leisureDays:0,0,G.LEISURE.days);
+G.happinessTarget=c=>G.clamp(2.5+.5*(Number.isFinite(c.dietScore)?c.dietScore:1)+(G.leisureDaysOf(c)>0?1:0)-Math.min(2,(c.hunger||0)/3),1,5);
+G.happinessBonus=c=>G.clamp(((c.happiness||3)-3)*.025,0,.05);
+G.leisureSummary=c=>({dietBase:2.5+.5*(Number.isFinite(c.dietScore)?c.dietScore:1),leisureBonus:G.leisureDaysOf(c)>0?1:0,
+  target:G.happinessTarget(c),happiness:c.happiness||3,workBonus:G.happinessBonus(c),remainingDays:G.leisureDaysOf(c)});
+G.tavernReserveDays=b=>Number.isInteger(b.reserveDays)?G.clamp(b.reserveDays,8,48):12;
+G.setTavernReserve=function(b,days){
+  if(!b||G.world.bmap[b.id]!==b||b.type!=='tavern'||b.state!=='ok'||!Number.isInteger(days)||days<8||days>48)return false;
+  b.reserveDays=days;b.noWork=false;G.game.schedT=0;return true;
+};
+G.tavernBrewStatus=function(b,reserved=false){
+  const r=G.game.res,reserveDays=G.tavernReserveDays(b),reserveFood=G.world.citizens.filter(c=>!c.dead).length*G.LIFE.eatPerDay*reserveDays;
+  const foodAfterBatch=r.food-(reserved?0:30),info={reserveDays,reserveFood,foodAfterBatch};
+  let reason='口粮充足，可取30主食酿酒';
+  if(!reserved && r.grain<30)reason='主食不足：每批需要30';
+  else if(foodAfterBatch<reserveFood)reason=reserved?`低于全村${reserveDays}天口粮，退回未酿原粮`:`取粮后不足全村${reserveDays}天口粮，暂停新酿造`;
+  else if(!reserved && G.goalPaused('ale'))reason='麦酒生产目标已达，仍可接待休闲';
+  else if(!reserved && r.ale>=Math.min(G.productionGoalOf('ale')??30,G.storageCap()))reason='麦酒备货目标或仓容已满，仍可接待休闲（未设全镇目标时备30）';
+  else return {...info,ok:true,reason};
+  return {...info,ok:false,reason};
+};
+G.isLeisureVisitor=c=>!!c&&!c.dead&&c.task?.kind==='leisure';
+G.tavernVisitors=b=>G.world.citizens.filter(c=>G.isLeisureVisitor(c)&&c.task.b===b);
+G.tavernStaff=function(b){
+  if(!b||G.world.bmap[b.id]!==b||b.type!=='tavern'||b.state!=='ok')return false;
+  return b.workers.some(id=>{const c=G.world.cmap[id],t=c?.task;return c&&!c.dead&&c.age>=18&&!G.isSick(c)&&c.job===b.id&&c.state==='work'&&t?.b===b&&
+    (t.kind==='host'||(t.kind==='brew'&&t.phase==='process'))&&G.atMedicalDoor(c,b);});
+};
+G.makeTavernTask=function(b,c){
+  if(c.age<18||G.isSick(c)){b.noWork=true;b.warnText='需要18岁以上健康酿酒工';return null;}
+  const status=G.tavernBrewStatus(b),visitors=G.tavernVisitors(b);
+  // While guests are on their way, keep the host physically on site rather
+  // than repeatedly leaving to fetch the next production batch.
+  if(visitors.length||!status.ok){
+    b.warnText=status.reason;
+    if(G.game.res.ale<=0){b.noWork=true;return null;}
+    const spot=G.workSpot(G.world,b,c.x,c.y);if(!spot){b.noWork=true;b.warnText='酒馆入口不可达';return null;}
+    return G.withTaskRoute({kind:'host',b,tx:spot.x,ty:spot.y,work:4,workLeft:4},spot.route);
+  }
+  const route=G.storageRoute(c.x,c.y);if(!route){b.noWork=true;b.warnText='取粮仓库不可达';return null;}
+  return G.withTaskRoute({kind:'brew',phase:'fetch',b,tx:route.spot.x,ty:route.spot.y,work:.1,workLeft:.1,yield:{type:'ale',qty:c.educated?4:3}},route.spot.route);
+};
+G.returnBrewGrain=function(c){c.task=null;c.pausedTask=null;if(c.carry)G.startHaul(c);else{c.state='idle';c.wanderT=2;}};
+G.completeBrew=function(c,t){
+  const b=t.b,w=G.world;
+  if(!b||w.bmap[b.id]!==b||b.state!=='ok'||c.job!==b.id||G.isSick(c)||G.d2(c.x,c.y,t.tx,t.ty)>.04||G.tileBlocked(w,t.tx,t.ty)){G.returnBrewGrain(c);return;}
+  if(t.phase==='fetch'){
+    if(!w.buildings.some(s=>s.type==='storage'&&s.state==='ok'&&G.atMedicalDoor(c,s))||!G.tavernBrewStatus(b).ok){G.returnBrewGrain(c);return;}
+    const spot=G.workSpot(w,b,c.x,c.y);if(!spot){G.returnBrewGrain(c);return;}
+    const qty=G.withdrawResource('grain',30);c.carry={type:'grain',qty,brewIngredient:true};
+    t.phase='process';t.tx=spot.x;t.ty=spot.y;t.work=t.workLeft=G.taskWork(c,6);c.task=t;
+    if(!G.sendTo(c,t.tx,t.ty,spot.route))G.returnBrewGrain(c);
+    return;
+  }
+  if(t.phase!=='process'||!G.atMedicalDoor(c,b)||!c.carry?.brewIngredient||c.carry.type!=='grain'||c.carry.qty!==30||!G.tavernBrewStatus(b,true).ok){G.returnBrewGrain(c);return;}
+  c.carry={type:'ale',qty:t.yield.qty};G.recordProduction(b,'ale',t.yield.qty);G.startHaul(c);
+};
+G.validLeisureTask=function(c){
+  const b=c.task?.b;return G.isLeisureVisitor(c)&&c.age>=18&&!G.isSick(c)&&!c.carry&&b&&G.world.bmap[b.id]===b&&b.state==='ok'&&b.type==='tavern';
+};
+G.cancelLeisure=function(c){c.task=null;c.path=null;c.pi=0;c.state='idle';c.walkKind='';c.wanderT=1;c.leisureRetryH=G.LEISURE.retryHours;};
+G.tryLeisure=function(c){
+  if(c.dead||c.age<18||!c.adult||c.carry||G.isArriving(c)||G.isSick(c)||G.isRestTime()||c.leisureRetryH>0||G.leisureDaysOf(c)>0||G.game.res.ale<1)return false;
+  const w=G.world,pop=w.citizens.filter(x=>!x.dead).length;
+  if(c.hunger>0||G.game.res.food<pop*G.LIFE.eatPerDay*8||G.game.res.ale<=w.citizens.filter(G.isLeisureVisitor).length)return false;
+  if(w.bmap[c.job]?.type==='hospital'&&w.citizens.some(G.isSick))return false;
+  const taverns=w.buildings.filter(b=>b.type==='tavern'&&b.id!==c.job&&b.state==='ok'&&G.tavernStaff(b)&&G.tavernVisitors(b).length<G.LEISURE.capacity&&G.d2(c.x,c.y,b.x,b.y)<=24*24)
+    .sort((a,b)=>G.d2(c.x,c.y,a.x,a.y)-G.d2(c.x,c.y,b.x,b.y));
+  for(const b of taverns){
+    const spot=G.workSpot(w,b,c.x,c.y,true);if(!spot||spot.route.eta>G.LEISURE.maxTravelHours)continue;
+    c.task={kind:'leisure',b,tx:spot.x,ty:spot.y,work:G.LEISURE.hours,workLeft:G.LEISURE.hours,waitingH:0};
+    if(G.sendTo(c,spot.x,spot.y,spot.route))return true;
+  }
+  c.leisureRetryH=G.LEISURE.retryHours;return false;
+};
+G.stepLeisure=function(c,dtH){
+  if(!G.validLeisureTask(c)||!G.atMedicalDoor(c,c.task.b)||G.d2(c.x,c.y,c.task.tx,c.task.ty)>.04){G.cancelLeisure(c);return;}
+  const t=c.task;
+  if(!G.tavernStaff(t.b)){t.waitingH+=dtH;if(t.waitingH>=4)G.cancelLeisure(c);return;}
+  if(G.game.res.ale<1){G.cancelLeisure(c);return;}
+  t.waitingH=0;t.workLeft-=dtH;if(t.workLeft>0)return;
+  G.game.res.ale--;c.leisureDays=G.LEISURE.days;c.happiness=Math.min(5,(c.happiness||3)+.4);
+  G.cancelLeisure(c);G.game.schedT=0;G.requestTask(c);
+};
+G.tavernSummary=function(b){
+  const s=G.tavernBrewStatus(b),cs=G.world.citizens;
+  return {...s,canBrew:s.ok,visitors:G.tavernVisitors(b).length,ale:G.game.res.ale,
+    workers:b.workers.filter(id=>G.world.cmap[id]&&!G.world.cmap[id].dead).length,onDuty:G.tavernStaff(b),
+    capacity:G.LEISURE.capacity,eligibleAdults:cs.filter(c=>!c.dead&&c.adult&&c.age>=18).length,batchGrain:30,batchAle:3,workHours:6,aleLimit:G.productionGoalOf('ale')??30};
 };

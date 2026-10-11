@@ -47,7 +47,7 @@ G.SPRITE_SIZES = {
     bridges: ['bridge_x', 'bridge_y'],
     buildings: ['house', 'stonehouse', 'boarding', 'storage', 'mine', 'stonequarry', 'gatherer',
       'forester', 'woodcutter', 'dock', 'school', 'townhall', 'blacksmith', 'hunting',
-      'tailor', 'tradingpost', 'pasture', 'orchard', 'herbalist', 'hospital', 'site_2x2', 'site_3x3'],
+      'tailor', 'tavern', 'tradingpost', 'pasture', 'orchard', 'herbalist', 'hospital', 'site_2x2', 'site_3x3'],
     citizens: ['adult_walk_0', 'adult_walk_1', 'adult_walk_2', 'adult_walk_3',
       'adult_work_0', 'adult_work_1',
       'adult_carry_walk_0', 'adult_carry_walk_1', 'adult_carry_walk_2', 'adult_carry_walk_3',
@@ -55,10 +55,10 @@ G.SPRITE_SIZES = {
       'child_walk_0', 'child_walk_1', 'child_walk_2', 'child_walk_3', 'child_idle',
       'carry_wood', 'carry_stone', 'carry_food', 'carry_firewood', 'carry_iron', 'carry_tools'],
     icons: ['res_wood', 'res_stone', 'res_food', 'res_firewood', 'res_iron', 'res_tools', 'res_coal', 'res_steelTools',
-      'res_meat', 'res_vegetables', 'res_grain', 'res_leather', 'res_wool', 'res_clothes', 'res_herbs',
+      'res_meat', 'res_vegetables', 'res_grain', 'res_leather', 'res_wool', 'res_clothes', 'res_herbs', 'res_ale',
       'tool_stonehouse', 'tool_boarding', 'tool_mine', 'tool_stonequarry', 'tool_blacksmith', 'tool_hunting',
       'tool_house', 'tool_storage', 'tool_gatherer', 'tool_forester', 'tool_woodcutter',
-      'tool_dock', 'tool_townhall', 'tool_school', 'tool_herbalist', 'tool_hospital', 'tool_farm', 'tool_road', 'tool_stoneroad', 'tool_bridge', 'tool_demolish', 'alert'],
+      'tool_dock', 'tool_tavern', 'tool_townhall', 'tool_school', 'tool_herbalist', 'tool_hospital', 'tool_farm', 'tool_road', 'tool_stoneroad', 'tool_bridge', 'tool_demolish', 'alert'],
   };
   let pending = 0;
   for (const dir of Object.keys(SHEET))
@@ -68,7 +68,7 @@ G.SPRITE_SIZES = {
       im.onload = () => {
         G.SPR.map.set(n, im);
         // Resource and carried-goods art share the same tiny PNG, without duplicate requests.
-        if (['res_meat', 'res_vegetables', 'res_grain', 'res_leather', 'res_wool', 'res_clothes', 'res_herbs', 'res_coal', 'res_steelTools'].includes(n))
+        if (['res_meat', 'res_vegetables', 'res_grain', 'res_leather', 'res_wool', 'res_clothes', 'res_herbs', 'res_ale', 'res_coal', 'res_steelTools'].includes(n))
           G.SPR.map.set('carry_' + n.slice(4), im);
         if (dir === 'tiles' || dir === 'terrain-v2' || n === 'res_iron') G.needGround = true; // 地表纹理到位后重建地面缓存
         if (--pending === 0) G.SPR.ready = true;

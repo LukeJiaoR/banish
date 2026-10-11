@@ -70,6 +70,12 @@ G.BDEF = {
     wall: '#8b7958', wallD: '#695936', roof: '#77924d',
     desc: '贸易购入果树种子后永久解锁。约4年长成，每年秋收，果实并入蔬菜类；需工人照料和搬运，不会建成即产粮。',
   },
+  tavern: {
+    id: 'tavern', name: '酒馆', icon: '🍺', w: 3, h: 3,
+    cost: {wood:52,stone:12,iron:20}, buildWork:90, jobs:1, passable:false,
+    wall:'#956a45', wallD:'#704b32', roof:'#804f3a',
+    desc:'1名成年酿酒工，30主食酿3麦酒（受教育4）。先留足设定天数的全村口粮；18岁以上居民真实到馆休闲，耗1麦酒、2小时，获得6天休闲记忆。幸福仅给予温和正向劳动加成。',
+  },
   tailor: {
     id: 'tailor', name: '裁缝铺', icon: '🧥', w: 3, h: 3,
     cost: { wood: 32, stone: 48, iron: 16 }, buildWork: 100, jobs: 1, passable: false,
