@@ -164,7 +164,7 @@ for (const action of ['demolition', 'upgrade']) test(`stocked house ${action} cr
   if (action === 'upgrade') { assert(G.upgradeHouse(old, G.houseUpgradeQuote(old).key).ok); G.setConstructionPaused(old, true); }
   else { assert(G.removeBuilding(old)); G.assignHousing(); }
   assert.equal(f.houseId, backup.id); assert.equal(old.supplyStock, undefined); assert.equal(G.world.supplyCaches.length, 1);
-  const cache = G.world.supplyCaches[0]; for (const k of G.SUPPLY.types) { near(cache.supplyStock[k], items[k]); near(G.game.res[k], before[k]); }
+  const cache = G.world.supplyCaches[0]; for (const k of G.SUPPLY.types) { near(cache.supplyStock[k], items[k] || 0); near(G.game.res[k], before[k]); }
   conserved(G, initial, action); if (!G.supplyTaskOf(c)) assert(G.beginSupplyTrip(c, backup)); assert.equal(c.task.to, backup); assert.equal(c.task.source, cache);
   const fetch = runUntil(G, () => !!c.carry, { citizen: c, initial, label: `${action} cache pickup` });
   const picked = { ...G.supplyCargoItems(c.carry) }; const onward = deliver(G, c, initial); assert(fetch.hours > 0 && onward.distance > 0);
@@ -212,7 +212,7 @@ test('real well rescue quenches fire while evacuated goods stay in the original 
   const { c, f } = family(G, h, [30, 30]); G.enablePhysicalSupplyPrototype();
   const stock = { grain: 6, vegetables: 7, meat: 8, firewood: 4, coal: 3 }; seedStore(G, h, stock);
   const initial = inventory(G); ignite(G, h); assert.equal(f.houseId, null); assert(h.houseFire);
-  for (const k of G.SUPPLY.types) near(h.supplyStock[k], stock[k], 'evacuation does not teleport household stock');
+  for (const k of G.SUPPLY.types) near(h.supplyStock[k], (stock[k] || 0), 'evacuation does not teleport household stock');
   let sawWater = false, buckets = 0, oldNeed = h.houseFire.need;
   const trip = runUntil(G, () => {
     for (const citizen of G.world.citizens) if (G.fireTaskOf(citizen)?.water) sawWater = true;
@@ -220,7 +220,7 @@ test('real well rescue quenches fire while evacuated goods stay in the original 
     return !h.houseFire;
   }, { initial, label: 'well rescue' });
   assert.equal(h.type, 'house'); assert.equal(f.houseId, h.id); assert(sawWater); assert.equal(buckets, 3);
-  for (const k of G.SUPPLY.types) { near(h.supplyStock[k], stock[k]); near(G.game.supplyLost[k], 0); }
+  for (const k of G.SUPPLY.types) { near(h.supplyStock[k], (stock[k] || 0)); near(G.game.supplyLost[k], 0); }
   assert.equal(c.carry, null); return { sawWater, buckets, originalStockPreserved: stock, trip };
 });
 
@@ -231,7 +231,7 @@ test('unquenched fire loses exactly stored goods after real elapsed time and pre
   const initial = inventory(G); ignite(G, h); assert.equal(f.houseId, backup.id);
   const wait = runUntil(G, () => h.type === 'burntruins', { initial, label: 'natural burnout' });
   assert(wait.hours >= G.FIRE.warningHours + G.FIRE.burnHours); assert.equal(h.supplyStock, undefined);
-  for (const k of G.SUPPLY.types) near(G.game.supplyLost[k], burned[k], `burned ${k}`);
+  for (const k of G.SUPPLY.types) near(G.game.supplyLost[k], (burned[k] || 0), `burned ${k}`);
   assert.equal(G.world.supplyCaches.length, 0); assert.equal(G.game.stats.died, 0); assert.equal(f.houseId, backup.id);
   const loss = { ...G.game.supplyLost }; assert(G.removeBuilding(h)); assert.deepEqual({ ...G.game.supplyLost }, loss);
   conserved(G, initial, 'ruin removal'); return { burned, wait, deaths: G.game.stats.died };
@@ -471,6 +471,78 @@ test('continuous school duty yields to real household shopping before hunger and
   for(let i=0;i<840;i++){G.advanceSim(.1);conserved(G,initial,'teacher actual '+i);hunger=Math.max(hunger,c.hunger);if(G.supplyTaskOf(c)){supplyTicks++;away=true;assert.equal(G.inSchool(c),false);assert.equal(c.job,school.id);}assert(school.workers.length<=1);}
   assert(supplyTicks>0);assert(away);assert.equal(hunger,0);assert.equal(c.job,school.id);
   return {hours:84,supplyTicks,hunger,job:c.job};
+});
+
+function clothingMode(G) { assert(G.enableClothingSupply(G.clothingSupplyQuote().key)); }
+
+test('clothing adoption is explicit, allocates nothing and migrates five-item physical saves without changing worn life', () => {
+  const G=fresh(),h=build(G,'house',18,10),{c}=family(G,h);G.enablePhysicalSupplyPrototype();c.clothingType='basic';c.clothingLeft=9;
+  G.game.res.clothes=3;G.game.res.warmCoats=2;const old=save(G);delete old.game.clothingSupply;
+  for(const stock of [old.game.supplyUsed,old.game.supplyLost,...old.buildings.map(b=>b.supplyStock).filter(Boolean)])for(const k of G.CLOTHING_KEYS)delete stock[k];
+  G.applySaveData(old);assert.equal(G.clothingSupplyEnabled(),false);assert.equal(G.world.cmap[c.id].clothingLeft,9);
+  const before=inventory(G),q=G.clothingSupplyQuote();clothingMode(G);conserved(G,before,'enable no gift');assert.equal(G.world.cmap[c.id].clothingLeft,9);
+  assert.equal(G.enableClothingSupply(q.key),false);roundtrip(G,before);assert(G.clothingSupplyEnabled());
+  return {legacyItems:5,oldWear:9,allocated:0,reloads:3};
+});
+
+test('market vendor and family carry whole warm coats before actual home replacement, preserving the child old coat', () => {
+  const G=fresh(),market=build(G,'market',18,10),vh=build(G,'house',24,10),home=build(G,'house',24,17);
+  const vendor=family(G,vh).c,{c,people}=family(G,home,[30,8]);vendor.clothingLeft=40;vendor.clothingType='basic';people[1].clothingLeft=5;people[1].clothingType='basic';
+  G.game.res.warmCoats=2;G.game.res.clothes=3;G.enablePhysicalSupplyPrototype();clothingMode(G);
+  seedStore(G,vh,{grain:40,firewood:10});const initial=inventory(G);G.assignWorker(market,vendor);
+  runUntil(G,()=>!!vendor.carry,{citizen:vendor,initial,label:'coat vendor pickup'});const basket=G.supplyCargoItems(vendor.carry);assert.equal(basket.warmCoats,2);assert.equal(basket.clothes,1);
+  deliver(G,vendor,initial);assert.equal(market.supplyStock.warmCoats,2);assert.equal(c.clothingLeft,0);
+  pickup(G,c,home,initial);assert.equal(c.task.source,market);assert.equal(G.supplyCargoItems(c.carry).warmCoats,2);
+  deliver(G,c,initial);assert.equal(home.supplyStock.warmCoats,2);assert.equal(c.clothingLeft,0);
+  G.game.h=23.9;G.advanceSim(.2);conserved(G,initial,'wear actual midnight');assert.equal(c.clothingType,'warm');assert.equal(c.clothingLeft,G.YEAR_DAYS);assert.equal(people[1].clothingLeft,4);assert.equal(people[1].clothingType,'basic');assert.equal(home.supplyStock.warmCoats,1);
+  assert.equal(G.game.supplyUsed.warmCoats,1);roundtrip(G,initial);assert.equal(G.world.cmap[c.id].clothingLeft,G.YEAR_DAYS);
+  return {vendorCoats:3,homeCoats:2,actuallyWorn:1,childOldDays:4};
+});
+
+test('unreachable public clothes do not equip remotely; reopening the crossing enables real delivery and winter protection', () => {
+  const G=fresh(),h=build(G,'house',25,10),{c}=family(G,h);G.game.res.warmCoats=2;G.enablePhysicalSupplyPrototype();clothingMode(G);seedStore(G,h,{grain:80,firewood:30});
+  for(let y=0;y<G.world.N;y++)G.world.water[y*G.world.N+15]=1;G.bumpNavigation(G.world);G.game.day=36;G.game.season=3;G.game.h=8;G.game.townLedger=G.newTownLedger(G.game);
+  const initial=inventory(G);for(let n=0;n<240;n++){G.advanceSim(.1);conserved(G,initial,'blocked coat '+n);assert.equal(c.clothingLeft,0);}
+  assert.equal(G.game.res.warmCoats,2);const before=c.cold;G.world.water[10*G.world.N+15]=0;G.bumpNavigation(G.world);
+  const trip=runUntil(G,()=>c.clothingType==='warm',{initial,label:'reopened clothing'});assert(trip.distance>0);assert.equal(G.clothingColdMul(c),.3);assert.equal(G.game.supplyUsed.warmCoats,1);
+  return {blockedHours:24,trip,beforeCold:before,protection:.3};
+});
+
+test('mixed clothing carrier death leaves exact real garments recoverable once', () => {
+  const G=fresh(),h=build(G,'house',25,10),{c}=family(G,h,[30,8]);G.game.res.clothes=2;G.game.res.warmCoats=1;G.enablePhysicalSupplyPrototype();clothingMode(G);
+  const initial=inventory(G),{items}=pickup(G,c,h,initial);assert.equal(items.warmCoats,1);assert.equal(items.clothes,1);G.killCitizen(c,'测试');conserved(G,initial,'death coat cache');
+  const cache=G.world.supplyCaches[0];assert.equal(cache.supplyStock.warmCoats,1);assert.equal(cache.supplyStock.clothes,1);roundtrip(G,initial);
+  const helper=family(G,null).c;helper.clothingLeft=30;helper.clothingType='basic';const next=inventory(G);assert(G.beginSupplyRecovery(helper));
+  runUntil(G,()=>!!helper.carry,{citizen:helper,initial:next,label:'recover clothing'});deliver(G,helper,next);assert.equal(G.game.res.warmCoats,1);assert.equal(G.game.res.clothes,2);
+  return {cacheCoats:2,reloads:3,recoveredWarm:1};
+});
+
+test('canceled clothing delivery survives fractional full public room and reload without splitting a garment', () => {
+  const G=fresh(),h=build(G,'house',25,10),{c}=family(G,h);G.game.res.warmCoats=1;G.enablePhysicalSupplyPrototype();clothingMode(G);seedStore(G,h,{grain:50,firewood:10});
+  pickup(G,c,h);assert.equal(G.supplyCargoItems(c.carry).warmCoats,1);G.game.res.warmCoats=G.storageCap('warmCoats')-.5;
+  const initial=inventory(G);G.returnSupplyCargo(c);runUntil(G,()=>c.state==='supplyWait',{citizen:c,initial,label:'fractional clothing room'});
+  assert.equal(G.supplyCargoItems(c.carry).warmCoats,1);roundtrip(G,initial);let loaded=G.world.cmap[c.id];
+  for(let i=0;i<50;i++){G.stepCitizen(loaded,.1);conserved(G,initial,'full coats');}assert.equal(G.supplyCargoItems(loaded.carry).warmCoats,1);
+  G.withdrawResource('warmCoats',.5);const next=inventory(G);deliver(G,loaded,next);assert.equal(G.game.res.warmCoats,G.storageCap('warmCoats'));assert.equal(G.game.supplyUsed.warmCoats,0);
+  return {heldCoats:1,partialRoom:.5,reloads:3,deliveredOnce:1};
+});
+
+test('clothing pickup races recheck stock and stockpiles never supply clothes', () => {
+  const G=fresh(),a=build(G,'house',18,10),b=build(G,'house',18,18),ca=family(G,a).c,cb=family(G,b).c;G.game.res.warmCoats=1;G.enablePhysicalSupplyPrototype();clothingMode(G);
+  const pile=build(G,'stockpile',13,10);assert.equal(G.supplySourceStock(pile,a,false).stock.warmCoats,0);assert.equal(G.supplySourceStock(pile,a,false).stock.clothes,0);
+  assert(G.beginSupplyTrip(ca,a));assert(G.beginSupplyTrip(cb,b));const initial=inventory(G);
+  runUntil(G,()=>!!ca.carry&&!!cb.carry,{initial,label:'last warm coat race'});
+  near((G.supplyCargoItems(ca.carry).warmCoats||0)+(G.supplyCargoItems(cb.carry).warmCoats||0),1);assert.equal(G.game.res.warmCoats,0);
+  return {lastCoat:1,carriers:2};
+});
+
+test('malformed fractional, disabled and incomplete clothing supply saves reject atomically', () => {
+  const G=fresh(),h=build(G,'house',18,10);family(G,h);G.game.res.warmCoats=1;G.enablePhysicalSupplyPrototype();clothingMode(G);seedStore(G,h,{warmCoats:1});
+  const valid=save(G),world=G.world,game=G.game;
+  for(const mutate of [d=>{d.buildings.find(b=>b.id===h.id).supplyStock.warmCoats=.5;},d=>{d.game.clothingSupply=false;},d=>{delete d.buildings.find(b=>b.id===h.id).supplyStock.clothes;},d=>{d.game.supplyMode='automatic';}]){
+    const bad=JSON.parse(JSON.stringify(valid));mutate(bad);assert.throws(()=>G.applySaveData(bad));assert.equal(G.world,world);assert.equal(G.game,game);
+  }
+  return {atomicRejects:4};
 });
 
 console.log(JSON.stringify({ suite: 'household-supply-lifecycles', sourceHash: loadGame(root).testSourceHash, passed: results.length, results }, null, 2));

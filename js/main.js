@@ -103,7 +103,7 @@ G.serializeGame = function () {
       v: G.VERSION,
       h: g.h, day: g.day, season: g.season, year: g.year,
       res: g.res, stats: g.stats, prevFood: g.prevFood, foodNet: g.foodNet, foodUrgent: g.foodUrgent, warned: g.warned,
-      supplyMode:g.supplyMode,supplyStartedDay:g.supplyStartedDay,supplyUsed:g.supplyUsed,supplyLost:g.supplyLost,
+      supplyMode:g.supplyMode,clothingSupply:g.clothingSupply,supplyStartedDay:g.supplyStartedDay,supplyUsed:g.supplyUsed,supplyLost:g.supplyLost,
       heating:g.heating, fishingRules:g.fishingRules, fireDisasters:g.fireDisasters, farmPests:g.farmPests, townLedger:g.townLedger, challenges:g.challenges, hist: g.hist, buildLog: g.buildLog, toolWear: g.toolWear, steelToolWear: g.steelToolWear, healthStartDay: g.healthStartDay, nomads:g.nomads, unlocks: g.unlocks, livestock: g.livestock,
       productionGoals: g.productionGoals && { ...g.productionGoals }, productionPaused: g.productionPaused && { ...g.productionPaused },
     },
@@ -239,8 +239,11 @@ G.prepareSaveData = function (d) {
   const ids = (v, field) => array(v, field).map(x => id(x, field));
   const clone = v => JSON.parse(JSON.stringify(v));
   const supplyStock=(value,field,limit=Infinity)=>{
-    record(value,field);if(Object.keys(value).length!==G.SUPPLY.types.length||Object.keys(value).some(k=>!G.SUPPLY.types.includes(k)))bad(field+'种类');
-    const stock=Object.fromEntries(G.SUPPLY.types.map(k=>[k,number(value[k],field,0)]));if(G.supplySum(stock)>limit+1e-6)bad(field+'容量');return stock;
+    record(value,field);const keys=Object.keys(value),legacy=gd.clothingSupply===undefined&&keys.length===5&&['grain','vegetables','meat','firewood','coal'].every(k=>keys.includes(k));
+    if(!legacy&&(keys.length!==G.SUPPLY.types.length||keys.some(k=>!G.SUPPLY.types.includes(k))))bad(field+'种类');
+    const stock=Object.fromEntries(G.SUPPLY.types.map(k=>[k,number(legacy&&G.CLOTHING_KEYS.includes(k)?0:value[k],field,0)]));
+    for(const k of G.CLOTHING_KEYS)if(!Number.isSafeInteger(stock[k])||stock[k]>0&&!g.clothingSupply)bad(field+'衣物');
+    if(G.supplySum(stock)>limit+1e-6)bad(field+'容量');return stock;
   };
   record(d, '根对象');
   if (d.v !== undefined && d.v !== 1) bad('版本不受支持');
@@ -262,6 +265,8 @@ G.prepareSaveData = function (d) {
   if(gd.fishingRules!==undefined&&!['classic','shared'].includes(gd.fishingRules))bad('渔场规则');
   g.fishingRules=gd.fishingRules===undefined?'classic':gd.fishingRules;
   if(gd.supplyMode!==undefined&&!['automatic','physical'].includes(gd.supplyMode))bad('生活配送规则');
+  if(gd.clothingSupply!==undefined&&typeof gd.clothingSupply!=='boolean')bad('衣物配送规则');
+  g.clothingSupply=gd.clothingSupply===true;if(g.clothingSupply&&gd.supplyMode!=='physical')bad('衣物配送须先启用家庭配送');
   g.supplyMode=gd.supplyMode||'automatic';g.supplyStartedDay=gd.supplyStartedDay==null?null:integer(gd.supplyStartedDay,'配送启用日',0,g.day);
   g.supplyUsed=gd.supplyUsed===undefined?G.emptySupplyStock():supplyStock(gd.supplyUsed,'家庭实际消耗');
   g.supplyLost=gd.supplyLost===undefined?G.emptySupplyStock():supplyStock(gd.supplyLost,'家庭实际损失');
@@ -619,6 +624,7 @@ G.prepareSaveData = function (d) {
       }
     }
     if(carry?.supplyBatch&&(carry.qty<=0||G.supplySum(G.supplyCargoItems(carry))>(carry.supplyBatch.kind==='home'?G.SUPPLY.homeCarry:G.SUPPLY.vendorCarry)+1e-6))bad('生活配送批量');
+    if(carry?.supplyBatch)for(const k of G.CLOTHING_KEYS){const n=G.supplyCargoItems(carry)[k]||0;if(!Number.isSafeInteger(n)||n>0&&!g.clothingSupply)bad('随身配送衣物');}
     if(cd.clothingType!=null&&!['basic','warm'].includes(cd.clothingType))bad('穿着衣物类型');
     const c = {
       id: uniqueId(cd.id, '市民 ID'), name: cd.name, sex: cd.sex, age: number(cd.age, '年龄', 0), adult: !!cd.adult,

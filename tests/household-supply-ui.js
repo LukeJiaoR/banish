@@ -448,4 +448,35 @@ test('production goals explain distributed counting and preserve the automatic/p
   assert.match(G.ui.fuelInfoData(fuel).stock, /公共库存：柴火 0.*目标计量柴火 1/);
 });
 
+test('clothing delivery is an explicit second choice, preserves worn durability and allocates no garments', () => {
+  const f=setup('market'),G=f.G,button=id=>f.info.querySelector('#clothing-supply-'+id);
+  assert(f.info.querySelector('[data-clothing-supply-controls]').classList.contains('hidden'));
+  assert.equal(G.clothingSupplyEnabled(),false);begin(f);confirm(f);
+  assert(!f.info.querySelector('[data-clothing-supply-controls]').classList.contains('hidden'));
+  f.c.clothingLeft=19;f.c.clothingType='basic';G.game.res.warmCoats=3;G.game.res.clothes=4;G.ui.renderInfo();
+  const inventory=JSON.stringify(G.supplyInventory()),before=state(f);button('start').click();assert.equal(state(f),before);
+  assert.match(f.info.querySelector('[data-clothing-supply-facts]').textContent,/公共普通衣 4 \/ 暖衣 3/);
+  button('confirm').click();assert(G.clothingSupplyEnabled());assert.equal(f.c.clothingLeft,19);assert.equal(f.c.clothingType,'basic');assert.equal(JSON.stringify(G.supplyInventory()),inventory);
+  assert(f.info.querySelector('[data-clothing-supply-controls]').classList.contains('hidden'));
+  button('confirm').click();assert.equal(JSON.stringify(G.supplyInventory()),inventory);assert.match(live(f,'supply-mode','clothing'),/只从住处现货/);
+});
+
+test('clothing preview cancels and exports without changing rules, and stock or wear changes revoke consent', () => {
+  const f=setup(),G=f.G,button=id=>f.info.querySelector('#clothing-supply-'+id);begin(f);confirm(f);
+  const before=state(f);button('start').click();button('cancel').click();button('confirm').click();assert.equal(state(f),before);
+  button('start').click();button('export').click();assert.equal(f.downloads.length,1);assert.equal(state(f),before);assert(button('confirm').disabled);
+  for(const change of [()=>{G.game.res.clothes++;},()=>{f.c.clothingLeft=10;f.c.clothingType='basic';}]){
+    button('start').click();change();G.ui.renderInfo();assert(button('confirm').disabled);button('confirm').click();assert.equal(G.clothingSupplyEnabled(),false);
+  }
+});
+
+test('same-ID reload revokes old clothing callbacks while new controls still enable exactly once', () => {
+  const f=setup(),G=f.G;begin(f);confirm(f);f.info.querySelector('#clothing-supply-start').click();
+  const old=['start','confirm','cancel','export'].map(id=>f.info.querySelector('#clothing-supply-'+id)),snapshot=JSON.parse(state(f));G.applySaveData(snapshot);
+  const b=G.world.bmap[f.b.id];f.select(b);const before=state(f);
+  for(const button of old)button.emit('click');assert.equal(state(f),before);assert.equal(f.downloads.length,0);assert.equal(G.clothingSupplyEnabled(),false);
+  f.info.querySelector('#clothing-supply-start').click();f.info.querySelector('#clothing-supply-confirm').click();assert(G.clothingSupplyEnabled());
+  G.ui.refreshHUD();assert.match(f.doc.getElementById('res-warmCoats').title,/公共库存.*只从家中/);
+});
+
 console.log(`Household supply UI: ${passed} suites passed (headless DOM with real migration/save APIs; browser/mobile visual acceptance not performed).`);
