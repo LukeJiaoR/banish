@@ -435,3 +435,14 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .townhall-ledger summary { cursor: pointer; color: #e5c88c; }
 .townhall-ledger p { margin: 6px 0; }
 .townhall-ledger-rows { max-height: 180px; overflow-y: auto; white-space: pre-line; font-size: 11px; font-variant-numeric: tabular-nums; }
+
+/* Food-first brewing controls stay mounted while stock and visitors change. */
+.tavern-details, .citizen-leisure { margin-top: 7px; padding-top: 5px; border-top: 1px solid rgba(216,178,90,.3); }
+.tavern-details p { overflow-wrap: anywhere; }
+.tavern-reserve { margin: 8px 0; padding: 8px; border: 1px solid #987641; border-radius: 6px; background: rgba(97,70,29,.25); }
+.tavern-actions { display: flex; gap: 8px; margin-top: 7px; }
+.tavern-actions button { flex: 1; min-height: 36px; padding: 5px 9px; border: 1px solid #ad8d4d; border-radius: 5px; background: #594321; color: #ffe4a0; font: inherit; cursor: pointer; }
+.tavern-actions button:hover { background: #75582b; }
+.tavern-actions button:disabled { opacity: .45; cursor: default; }
+.tavern-actions button:focus-visible { outline: 2px solid #ffe4a0; outline-offset: 3px; }
+@media (max-width: 600px) { .tavern-actions button { min-height: 44px; } }

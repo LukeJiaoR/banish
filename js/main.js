@@ -117,7 +117,7 @@ G.serializeGame = function () {
       progress: b.progress, workLeft: b.workLeft, totalWork: b.totalWork, paidCost: b.paidCost, constructionStarted: b.constructionStarted,
       workers: b.workers, family: b.family, noWork: b.noWork, warnText: b.warnText,
       bridgeAxis: b.bridgeAxis, bridgeLength: b.type === 'bridge' ? b.w + b.h - 1 : undefined,
-      mineMode: b.mineMode, legacyMine: b.legacyMine, mineTick: b.mineTick, toolRecipe: b.toolRecipe,
+      mineMode: b.mineMode, legacyMine: b.legacyMine, mineTick: b.mineTick, toolRecipe: b.toolRecipe, reserveDays:b.reserveDays,
       doCut: b.doCut, doPlant: b.doPlant, fuelLimit: b.fuelLimit, toolLimit: b.toolLimit,
       farm: b.farm ? b.farm.map(f => [f.sown ? 1 : 0, f.harvested ? 1 : 0]) : undefined,
       sownAll: b.sownAll, growth: b.growth, harvestDone: b.harvestDone,
@@ -132,7 +132,7 @@ G.serializeGame = function () {
       x: c.x, y: c.y, familyId: c.familyId, job: c.job,
       partnerId: c.partnerId, parentIds: c.parentIds, grandparentIds: c.grandparentIds, ancestorIds: c.ancestorIds, birthFamilyId: c.birthFamilyId,
       student: c.student ? 1 : 0, educated: c.educated ? 1 : 0, school: c.school != null ? c.school : null,
-      arrivalHallId:c.arrivalHallId, hunger: c.hunger, cold: c.cold, clothingLeft: c.clothingLeft, dietVariety: c.dietVariety, dietScore: c.dietScore, happiness: c.happiness, health: c.health, sickDays: c.sickDays, immunityDays: c.immunityDays, herbCooldown: c.herbCooldown, careHours: c.careHours, camped: c.camped ? 1 : 0, carry: c.carry,
+      arrivalHallId:c.arrivalHallId, hunger: c.hunger, cold: c.cold, clothingLeft: c.clothingLeft, dietVariety: c.dietVariety, dietScore: c.dietScore, happiness: c.happiness, leisureDays:c.leisureDays, health: c.health, sickDays: c.sickDays, immunityDays: c.immunityDays, herbCooldown: c.herbCooldown, careHours: c.careHours, camped: c.camped ? 1 : 0, carry: c.carry,
     })),
     nextUid: G._peekUid(),
   };
@@ -241,7 +241,7 @@ G.prepareSaveData = function (d) {
   g.day = integer(gd.day, '天数'); g.season = integer(gd.season, '季节', 0, 3); g.year = integer(gd.year, '年份', 1);
   record(gd.res, '资源');
   for (const key of G.RES_KEYS) {
-    const value = gd.res[key] === undefined && ['iron', ...G.FOOD_KEYS, 'leather', 'wool', 'clothes', 'herbs', 'coal', 'steelTools'].includes(key) ? 0 : gd.res[key] === undefined && key === 'tools' ? 10 : gd.res[key];
+    const value = gd.res[key] === undefined && ['iron', ...G.FOOD_KEYS, 'leather', 'wool', 'clothes', 'herbs', 'coal', 'steelTools', 'ale'].includes(key) ? 0 : gd.res[key] === undefined && key === 'tools' ? 10 : gd.res[key];
     g.res[key] = number(value, '资源 ' + key, 0);
   }
   const hasFoodClasses = G.FOOD_KEYS.some(k => gd.res[k] !== undefined);
@@ -349,6 +349,7 @@ G.prepareSaveData = function (d) {
       doCut: bd.doCut !== false, doPlant: bd.doPlant !== false,
       toolLimit: bd.type === 'blacksmith' ? G.toolLimitOf(bd) : undefined,
       fuelLimit: bd.type === 'woodcutter' ? G.fuelLimitOf(bd) : undefined,
+      reserveDays:bd.type==='tavern'?(bd.reserveDays===undefined?12:integer(bd.reserveDays,'酿酒储粮天数',8,48)):undefined,
     };
     if (bd.type === 'bridge') {
       b.bridgeAxis=bd.bridgeAxis;
@@ -429,6 +430,7 @@ G.prepareSaveData = function (d) {
     if (cd.carry != null) {
       record(cd.carry, '随身资源'); if (!G.RES_KEYS.includes(cd.carry.type)) bad('随身资源类型');
       carry = { type: cd.carry.type === 'food' ? 'grain' : cd.carry.type, qty: number(cd.carry.qty, '随身资源数量', 0) };
+      if(cd.carry.brewIngredient!==undefined){if(cd.carry.brewIngredient!==true||carry.type!=='grain')bad('酿造原粮标记');carry.brewIngredient=true;}
       if (cd.carry.extra !== undefined) {
         if(cd.carry.type!=='meat')bad('副产物携带类型');
         record(cd.carry.extra, '随身副产物'); carry.extra = {};
@@ -455,6 +457,7 @@ G.prepareSaveData = function (d) {
       dietVariety: cd.dietVariety === undefined ? 0 : integer(cd.dietVariety, '饮食种类', 0, 3),
       dietScore: cd.dietScore === undefined ? 1 : number(cd.dietScore, '饮食多样性', 0, 3),
       happiness: cd.happiness === undefined ? 3 : number(cd.happiness, '幸福度', 1, 5),
+      leisureDays:cd.leisureDays===undefined?0:number(cd.leisureDays,'休闲记忆天数',0,6),
       health: cd.health === undefined ? 4 : number(cd.health, '健康', 0, 5),
       sickDays: cd.sickDays === undefined ? 0 : integer(cd.sickDays, '患病天数', 0, 8),
       immunityDays: cd.immunityDays === undefined ? 0 : integer(cd.immunityDays, '免疫天数', 0, 12),

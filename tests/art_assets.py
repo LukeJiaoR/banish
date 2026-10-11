@@ -63,3 +63,15 @@ for file, size in townhall_sizes.items():
         foot = [x for x in range(im.width) if a.getpixel((x, im.height-1)) > 32]
         assert foot and abs((min(foot)+max(foot))/2 - im.width/2) <= 2, file
     print(file, size, 'town hall size, alpha and anchor: OK')
+
+tavern_sizes = {'buildings/tavern': (448, 320), 'icons/tool_tavern': (128, 128), 'icons/res_ale': (128, 128)}
+for file, size in tavern_sizes.items():
+    im = Image.open(ROOT / 'assets' / (file + '.png'))
+    assert im.mode == 'RGBA' and im.size == size, file
+    a = im.getchannel('A')
+    assert a.getextrema() == (0, 255), file
+    assert all(a.getpixel(p) == 0 for p in [(0,0),(im.width-1,0),(0,im.height-1),(im.width-1,im.height-1)]), file
+    if file.startswith('buildings/'):
+        foot = [x for x in range(im.width) if a.getpixel((x, im.height-1)) > 32]
+        assert foot and abs((min(foot)+max(foot))/2 - im.width/2) <= 2, file
+    print(file, size, 'tavern size, alpha and anchor: OK')
