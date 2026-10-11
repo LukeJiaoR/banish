@@ -117,7 +117,7 @@ G.serializeGame = function () {
       upgradeFrom:b.upgradeFrom, workerLimit:b.workerLimit, sitePaused:b.sitePaused, sitePriority:b.sitePriority, progress: b.progress, workLeft: b.workLeft, totalWork: b.totalWork, paidCost: b.paidCost, constructionStarted: b.constructionStarted,
       workers: b.workers, family: b.family, noWork: b.noWork, warnText: b.warnText,
       bridgeAxis: b.bridgeAxis, bridgeLength: b.type === 'bridge' ? b.w + b.h - 1 : undefined,
-      mineMode: b.mineMode, legacyMine: b.legacyMine, mineTick: b.mineTick, toolRecipe: b.toolRecipe, reserveDays:b.reserveDays, coatRecipe:b.coatRecipe, coatMaterial:b.coatMaterial,
+      mineralUnits:b.mineralUnits, pitSource:b.pitSource, mineMode: b.mineMode, legacyMine: b.legacyMine, mineTick: b.mineTick, toolRecipe: b.toolRecipe, reserveDays:b.reserveDays, coatRecipe:b.coatRecipe, coatMaterial:b.coatMaterial,
       doCut: b.doCut, doPlant: b.doPlant, fuelLimit: b.fuelLimit, toolLimit: b.toolLimit,
       farmSize:b.type==='farm'&&b.farmSize?[...b.farmSize]:undefined,
       farm: b.farm ? b.farm.map(f => [f.sown ? 1 : 0, f.harvested ? 1 : 0, f.pestLost ? 1 : 0]) : undefined,
@@ -403,6 +403,16 @@ G.prepareSaveData = function (d) {
       if (b.mineMode === 'legacy' && !b.legacyMine) bad('旧矿井模式');
       b.mineTick = bd.mineTick === undefined ? 0 : integer(bd.mineTick, '混采批次', 0);
     }
+    if(G.MINERAL_RULES[bd.type]&&bd.mineralUnits!==undefined){
+      b.mineralUnits=integer(bd.mineralUnits,'矿点剩余储量',0,G.MINERAL_RULES[bd.type].capacity);
+      if((b.state==='site'&&b.mineralUnits!==G.MINERAL_RULES[bd.type].capacity)||(bd.type==='mine'&&b.mineMode==='legacy'))bad('有限矿点状态');
+    }else if(bd.type!=='mineralpit'&&bd.mineralUnits!==undefined)bad('非矿点储量');
+    if(bd.type==='mineralpit'){
+      if(b.state!=='ok'||b.workers.length||b.family!==null||b.progress!==1||b.workLeft!==0||typeof bd.pitSource!=='string'||!Object.hasOwn(G.MINERAL_RULES,bd.pitSource))bad('永久矿坑状态');
+      b.pitSource=bd.pitSource;b.mineralUnits=integer(bd.mineralUnits,'废弃矿坑储量',0,G.MINERAL_RULES[b.pitSource].capacity-1);
+      if(bd.paidCost!==undefined&&(typeof bd.paidCost!=='object'||bd.paidCost===null||Object.keys(bd.paidCost).length))bad('矿坑不能返还建材');
+      b.paidCost={};
+    }else if(bd.pitSource!==undefined)bad('非矿坑来源');
     if (bd.type === 'blacksmith') {
       b.toolRecipe = bd.toolRecipe === undefined ? 'iron' : bd.toolRecipe;
       if (!['iron', 'steel'].includes(b.toolRecipe)) bad('工具配方');
@@ -595,6 +605,7 @@ G.prepareSaveData = function (d) {
     w.citizens.push(c); w.cmap[c.id] = c;
   }
   if(g.nomads.offer){const h=w.bmap[g.nomads.offer.hallId];if(!h||h.type!=='townhall'||h.state!=='ok')bad('来访申请市政厅失效');}
+  for(const c of w.citizens)if(c.job!==null&&w.bmap[c.job]?.type==='mineralpit')bad('永久矿坑不能分配岗位');
   for(const c of w.citizens)if(G.isArriving(c)){c.job=null;for(const b of w.buildings)b.workers=b.workers.filter(id=>id!==c.id);}
   // Old resource huts held four workers. Keep two stable assignments on completed
   // specialist huts; builders keep their construction slots until finishBuilding runs.

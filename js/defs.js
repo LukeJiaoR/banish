@@ -46,17 +46,22 @@ G.BDEF = {
     wall:'#95724d', wallD:'#685139', roof:'#967755',
     desc:'低成本原料交货点，需清场和施工。只收原木、石头、铁、煤与柴火；各类公共仓容增加250，按实际可达耗时选择。食物与工具仍送通用仓库；沿用公共库存，不代表独立地方存货。',
   },
+  mineralpit: {
+    id:'mineralpit',name:'永久矿坑',icon:'⛏️',w:3,h:3,cost:{},buildWork:0,jobs:0,passable:false,unbuildable:true,
+    wall:'#786d5a',wallD:'#504b40',roof:'#686254',
+    desc:'已开采矿点拆除后留下的永久3×3坑。不能移除、重建、铺路或继续采矿；此前实际背出的矿物仍归原工人送仓。',
+  },
   mine: {
     id: 'mine', name: '矿井', icon: '⛏️', w: 3, h: 3,
     cost: { wood: 80, stone: 40, iron: 10 }, buildWork: 140, jobs: 2, passable: false,
     wall: '#6f6a62', wallD: '#524e47', roof: '#4a463f',
-    desc: '2名矿工，可选择专采铁或煤；基础每批6铁或8煤，需要真实送仓。旧档矿井保留原石铁混采，只有主动切换才改变。当前原型深井不枯竭；采石场单独供应石头。',
+    desc: '2名矿工，可选择专采铁或煤；基础每批6铁或8煤，需要真实送仓。新井共用储量最多3500铁或7000煤；一经实际开采，拆除永久留下3×3矿坑且剩余矿失去。未开采取消不留坑。旧档矿点保留旧版无限，旧混采也不自动切换。',
   },
   stonequarry: {
     id: 'stonequarry', name: '采石场', icon: '🪨', w: 3, h: 3,
     cost: { wood: 64, stone: 32 }, buildWork: 140, jobs: 2, passable: false,
     wall: '#999084', wallD: '#726a60', roof: '#6b5b45',
-    desc: '2名石匠专门采石，每批基础6石、9小时，仍要搬到可达仓库。满仓余石由工人保留，目标达到后暂停。当前原型矿脉不枯竭，可正常拆除；不加入塌方伤亡。',
+    desc: '2名石匠专门采石，每批基础6石、9小时，仍要搬到可达仓库。满仓余石由工人保留，目标达到后暂停。新场储量4000石（本作适配）；一经实际开采，拆除永久留下3×3矿坑。未开采取消不留坑，旧档仍旧版无限；无塌方伤亡。',
   },
   tradingpost: {
     id: 'tradingpost', name: '贸易站', icon: '⛵', w: 4, h: 4,
@@ -192,7 +197,7 @@ G.PROD = {
   woodcutter: { workH: 3.5, logsIn: 2, firewoodOut: 6, eduFirewoodPerLog: 4,
     fuelLimit: 100, fuelStep: 50, fuelMax: 2000 }, // 燃料上限（原版 Fuel Limit）：柴火库存达到上限即停产；默认 100 ≈ 3 栋木屋一年取暖量，扩张后按面板需求提高，避免开局过量劈柴挤掉住房木材
   dock:      { workH: 5, yield: { type: 'meat', qty: 8 }, waterR: 10, fullWater: 40 },
-  mine:      { workH: 9, yield: 6, coalYield: 8, ironEvery: 5 }, // 新井专采铁/煤；旧档混采每5趟1趟铁，其余石（本批不枯竭）
+  mine:      { workH: 9, yield: 6, coalYield: 8, ironEvery: 5 }, // 新井专采铁/煤；旧档混采每5趟1趟铁，其余石（旧档仍无限）
   stonequarry: { workH: 9, yield: 6 },
   blacksmith: { toolLimit: 30, toolMax: 500, workH: 4, consume: [{ type: 'iron', qty: 1 }, { type: 'wood', qty: 2 }], toolsOut: 2, eduToolsOut: 3 }, // 1铁+2木→2工具（受教育 3）
   hunting:   { workH: 5, yield: 10, radius: 12, needTrees: 10, fullForest: 20 }, // 狩猎依赖成熟林（鹿群栖息地），猎物随森林再生
