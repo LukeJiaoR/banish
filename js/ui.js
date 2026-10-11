@@ -1812,6 +1812,12 @@ G.ui = {
     const selected = G.sel.kind === 'b' ? w.bmap[G.sel.id] : w.cmap[G.sel.id];
     if (!selected) { this.hideInfo(); return; }
     const sameSelection = this._infoWorld === w && this._infoGame === G.game && this._infoElement === el && this._infoSelection === selected;
+    const tradePanel = sameSelection && selected.type === 'tradingpost' && el.querySelector && el.querySelector('[data-economy="tradingpost"]');
+    const merchantChanged = tradePanel && tradePanel._merchant !== selected.merchant;
+    // A new boat gets new callbacks. Keep drafts, but never reuse a previous
+    // merchant's pay/order button or carry its keyboard focus onto a new deal.
+    const tradeDraft = merchantChanged ? Object.fromEntries(['trade-target-resource', 'trade-target-quantity', 'trade-good', 'trade-buy-quantity', 'trade-payment', 'trade-order-good', 'trade-order-quantity'].map(id => [id, el.querySelector('#' + id)?.value])) : null;
+    if (merchantChanged) force = true;
     // Workforce facts must update before every specialized panel's early return.
     if (sameSelection && G.sel.kind === 'b' && this._infoBuildState === selected.state) this.refreshWorkforceInfo(selected);
     if (!force && sameSelection && G.sel.kind === 'b' && this._infoBuildState === selected.state && this._infoBuildType === selected.type && this.refreshHomeInfo(selected)) return;
@@ -1822,7 +1828,7 @@ G.ui = {
     if (sameSelection && selected.state === 'ok' && this._tailorInfoState === selected.state && this.refreshTailorInfo(selected)) return;
     if (sameSelection && selected.state === 'ok' && this._farmInfoState === selected.state && this.refreshFarmInfo(selected)) return;
     if(sameSelection&&selected.state==='ok'&&this._schoolInfoState===selected.state&&this.refreshSchoolInfo(selected))return;
-    if (sameSelection && selected.state === 'ok' && this._economyInfoState === selected.state && this.refreshEconomyInfo(selected)) return;
+    if (!merchantChanged && sameSelection && selected.state === 'ok' && this._economyInfoState === selected.state && this.refreshEconomyInfo(selected)) return;
     if (sameSelection && selected.state === 'ok' && this._medicalInfoState === selected.state && this.refreshMedicalInfo(selected)) return;
     if (sameSelection && selected.state === 'ok' && this._resourceChainInfoState === selected.state && this.refreshResourceChainInfo(selected)) return;
     if(sameSelection&&G.sel.kind==='b'&&selected.type==='stockpile'&&selected.state==='ok'&&this._infoBuildState==='ok'){this.refreshStockpileInfo(selected);return;}
@@ -1844,7 +1850,8 @@ G.ui = {
     const destructiveActionChanged = sameSelection && this._infoBuildState === 'site' && selected.state !== 'site' && active && ['info-demolish', 'construction-pause', 'construction-resume','construction-priority','construction-normal'].includes(active.id);
     const workforceInput = sameSelection && this._infoBuildState === selected.state && el.querySelector && el.querySelector('#worker-limit-input');
     const workforceDraft = workforceInput ? workforceInput.value : null;
-    const focusSelector = destructiveActionChanged ? '#info-close' : hadFocus ? (active.id ? '#' + active.id : active.dataset.tl ? '[data-tl="' + active.dataset.tl + '"]' : active.dataset.fl ? '[data-fl="' + active.dataset.fl + '"]' : active.dataset.k ? '[data-k="' + active.dataset.k + '"]' : null) : null;
+    const merchantActionChanged = merchantChanged && active && ['trade-execute', 'trade-order-confirm', 'trade-order-cancel'].includes(active.id);
+    const focusSelector = destructiveActionChanged ? '#info-close' : merchantActionChanged ? '#trade-good' : hadFocus ? (active.id ? '#' + active.id : active.dataset.tl ? '[data-tl="' + active.dataset.tl + '"]' : active.dataset.fl ? '[data-fl="' + active.dataset.fl + '"]' : active.dataset.k ? '[data-k="' + active.dataset.k + '"]' : null) : null;
     this._infoWorld = w;
     this._infoGame = G.game;
     this._infoElement = el;
@@ -1975,6 +1982,13 @@ G.ui = {
       if (medicalData) this.refreshMedicalPatients(b);
       if (chainData) this.initResourceChainInfo(b);
       if (b.state === 'ok') this.initEconomyInfo(b);
+      if (tradeDraft) {
+        for (const [id, value] of Object.entries(tradeDraft)) {
+          const node = el.querySelector('#' + id);
+          if (node && value !== undefined && (id !== 'trade-order-good' || G.merchantProfile(b)?.goods.includes(value))) node.value = value;
+        }
+        this.refreshEconomyInfo(b);
+      }
     } else {
       const c = w.cmap[G.sel.id];
       if (!c) { this.hideInfo(); return; }
@@ -2050,9 +2064,11 @@ G.ui = {
   economyInfoMarkup: function (b) {
     if (b.type === 'tradingpost' && G.TRADE_VALUES && G.TRADE_GOODS && G.setTradeTarget && G.executeTrade) {
       const payments = Object.keys(G.TRADE_VALUES).map(type => `<option value="${type}"${type === 'firewood' ? ' selected' : ''}>${G.RES[type].name}（价值 ${G.TRADE_VALUES[type]}）</option>`).join('');
-      const goods = Object.keys(G.TRADE_GOODS).map(type => `<option value="${type}">${this.escHtml(G.TRADE_GOODS[type].name)}（单价 ${G.TRADE_GOODS[type].price}）</option>`).join('');
+      const goods = Object.keys(G.TRADE_GOODS).map(type => `<option value="${type}">${this.escHtml(G.TRADE_GOODS[type].name)}</option>`).join('');
+      const profile = G.merchantProfile ? G.merchantProfile(b) : null;
+      const orderGoods = profile ? profile.goods.map(type => `<option value="${type}">${this.escHtml(G.TRADE_GOODS[type].name)}</option>`).join('') : '<option value="">等待商船停靠</option>';
       return `<section class="economy-details" data-economy="tradingpost">
-        <p class="row" data-economy-live="merchant"></p><p class="row" data-economy-live="trade-capacity"></p>
+        <p class="row" data-economy-live="merchant"></p><p class="row" data-economy-live="merchant-payments"></p><p class="row" data-economy-live="trade-capacity"></p>
         <details class="trade-inventory"><summary>查看待售库存与目标</summary><p data-economy-live="inventory"></p></details>
         <form id="trade-target-form" class="economy-form">
           <h3>① 备货 / 搬回</h3>
@@ -2070,6 +2086,16 @@ G.ui = {
           <p data-economy-live="quote" class="trade-quote" role="status" aria-live="polite"></p>
           <button type="submit" id="trade-execute">确认交易</button>
           <p class="desc">付款数量向上取整，不找零。买入普通物资先进入本站库存，低于现存数量的待售目标会让商人搬回；羊或牛购入后进入各自待安置数量，到同种牧场放入。果树种子与卷心菜种子各买 1 次永久解锁，不能复购，不是库存物品，也不占贸易站或仓库容量。卷心菜解锁后到农田选择种植，产出计入蔬菜。</p>
+        </form>
+        <form id="trade-order-form" class="economy-form">
+          <h3>③ 向这位商人订货</h3>
+          <p data-economy-live="merchant-order"></p>
+          <p data-economy-live="merchant-orders"></p>
+          <label for="trade-order-good">下次由同一商人带来</label><select id="trade-order-good">${orderGoods}</select>
+          <label for="trade-order-quantity">订货数量</label><input id="trade-order-quantity" type="number" min="1" max="400" step="1" value="1" inputmode="numeric" aria-describedby="trade-order-note">
+          <p data-economy-live="order-quote" role="status" aria-live="polite"></p>
+          <div class="economy-actions"><button type="submit" id="trade-order-confirm">确认一次订货</button><button type="button" id="trade-order-cancel">取消待到货订单</button></div>
+          <p class="desc" id="trade-order-note">无需预付款，不会自动交易。每站每位商人只保留一份一次性订单；只能在该商人停靠时替换或取消。订单在同一商人下次到达时带来并清除，下一艘船可能是别的商人。到货单价为原价 × 1.25 向下取整，须手动支付购买；其他货物仍按普通价。未买货物会随船离开。</p>
         </form>
         <p class="economy-message" data-economy-message role="status" aria-live="polite"></p>
       </section>`;
@@ -2112,6 +2138,13 @@ G.ui = {
       const form = el.querySelector('#' + id); if (form) form.addEventListener('submit', e => { e.preventDefault(); if (!valid(form) || (G.hasOpenModal && G.hasOpenModal())) return; callback(); this.refreshEconomyInfo(b); });
     };
     if (b.type === 'tradingpost') {
+      const renderedMerchant = b.merchant;
+      panel._merchant = renderedMerchant;
+      const sameMerchant = () => {
+        if (b.merchant === renderedMerchant) return true;
+        this.renderInfo(true);
+        return false;
+      };
       const target = el.querySelector('#trade-target-resource'), quantity = el.querySelector('#trade-target-quantity');
       target.addEventListener('change', () => { if (!valid(target)) return; quantity.value = Number(b.tradeTargets && b.tradeTargets[target.value]) || 0; this.refreshEconomyInfo(b); });
       onSubmit('trade-target-form', () => {
@@ -2129,12 +2162,31 @@ G.ui = {
         input.addEventListener('input', () => { if (valid(input)) this.refreshEconomyInfo(b); });
       }
       onSubmit('trade-exchange-form', () => {
+        if (!sameMerchant()) return;
         const quote = this.tradeQuote(b);
         if (!quote.ok) { message(quote.reason); return; }
-        const result = G.executeTrade(b, quote.good, quote.qty, quote.payment);
+        const result = G.executeTrade(b, quote.good, quote.qty, quote.payment, renderedMerchant);
         const seed = G.seedUnlockKey ? G.seedUnlockKey(quote.good) : quote.good === 'orchardSeed' ? 'orchard' : null;
         message(result.ok ? `已购买${G.TRADE_GOODS[quote.good].name} × ${quote.qty}，支付${G.RES[quote.payment].name} × ${result.paid}。${G.isLivestockType(quote.good) ? `到${G.TRADE_GOODS[quote.good].name}牧场放入，不能混养。` : seed === 'orchard' ? '所有果园已永久解锁种植，种子不占仓位。' : seed === 'cabbage' ? '所有农田已永久解锁卷心菜，请到农田选择；本季已开始的作物保留，改选留到下一春。种子不占仓位。' : '物资已到本站，等待商人按目标搬回仓库。'}` : result.reason || '交易未完成。');
         this.refreshHUD();
+      });
+      for (const id of ['trade-order-good', 'trade-order-quantity']) {
+        const input = el.querySelector('#' + id);
+        input.addEventListener('input', () => { if (valid(input)) this.refreshEconomyInfo(b); });
+      }
+      onSubmit('trade-order-form', () => {
+        if (!sameMerchant()) return;
+        const quote = this.merchantOrderQuote(b);
+        if (!quote.ok) { message(quote.reason); return; }
+        const result = G.orderMerchantGoods(b, quote.good, quote.qty, renderedMerchant);
+        message(result.ok ? `已向${G.merchantProfile(b).name}订${G.TRADE_GOODS[quote.good].name} × ${quote.qty}，无需预付款；由同一商人下次带来，到货后需手动交易。` : result.reason || '订货未完成。');
+      });
+      const cancelOrder = el.querySelector('#trade-order-cancel');
+      cancelOrder.addEventListener('click', () => {
+        if (!valid(cancelOrder) || (G.hasOpenModal && G.hasOpenModal()) || !sameMerchant()) return;
+        const result = G.cancelMerchantOrder(b, renderedMerchant);
+        message(result.ok ? '已取消这位商人的待到货订单；未扣除任何待售物资。' : result.reason || '没有可取消的订单。');
+        this.refreshEconomyInfo(b);
       });
     }
     if(b.type==='orchard')onSubmit('orchard-replant-form',()=>{const value=el.querySelector('#orchard-replant').value;message(['on','off'].includes(value)&&G.setOrchardReplant(b,value==='on')?value==='on'?'允许新补种；需农夫到空树位劳动。':'已暂停新补种；现果、养护与已开始的工作继续。':'补种设置无效');});
@@ -2182,15 +2234,27 @@ G.ui = {
     if (!goodEl || !quantity || !paymentEl) return { ok: false, reason: '请选择交易内容。' };
     const good = goodEl.value, payment = paymentEl.value, qty = Number(quantity.value), offer = G.TRADE_GOODS[good], value = G.TRADE_VALUES[payment];
     if (!offer || !value || !Number.isInteger(qty) || qty <= 0) return { ok: false, reason: '请输入正整数购买数量。' };
-    const cost = Math.ceil(offer.price * qty / value), available = b.tradeInventory && b.tradeInventory[payment] || 0;
+    const quote = G.tradeQuote(b, good, qty, payment), unitPrice = quote.unitPrice;
+    const cost = Math.ceil(unitPrice * qty / value), available = b.tradeInventory && b.tradeInventory[payment] || 0;
     const merchant = b.merchant && b.merchant.leaveDay > G.game.day;
     const stock = merchant ? b.merchant.stock[good] || 0 : 0;
     const seed = G.seedUnlockKey ? G.seedUnlockKey(good) : good === 'orchardSeed' ? 'orchard' : null;
-    const seedReason = G.seedTradeReason ? G.seedTradeReason(good, qty) : seed && G.game.unlocks && G.game.unlocks[seed] ? '果树种子已永久解锁。' : seed && qty !== 1 ? '种子每次只能购买 1 份。' : '';
-    let reason = !merchant ? '商船尚未停靠。' : seedReason || (qty > stock ? `商船只有 ${stock} 件，数量不足。` : available < cost ? `本站待售${G.RES[payment].name}不足，还需 ${Math.ceil(cost - available)}。` : '');
-    if (!reason && !G.isLivestockType(good) && !seed && G.tradeStored && G.TRADE_CAPACITY && G.tradeStored(b) + G.tradeIncoming(b) - cost + qty > G.TRADE_CAPACITY) reason = '交易后会超过本站共享容量（含在途占位），请先腾出空间。';
-    const text = `购买${offer.name} × ${qty}，实际支付${G.RES[payment].name} × ${cost}（单价 ${offer.price}，付款价值 ${value}/件）。\n商船存货 ${stock} · 本站可支付 ${Math.floor(available)}。` + (seed ? '\n种子仅购 1 份永久解锁，不可复购，不占仓位。' : '') + (reason ? '\n' + reason : '');
-    return { ok: !reason, good, payment, qty, cost, reason, text };
+    const premium = merchant && b.merchant.orderedGood === good ? `；本次订货价：原价 ${offer.price} × 1.25 向下取整` : '';
+    const text = `购买${offer.name} × ${qty}，实际支付${G.RES[payment].name} × ${cost}（单价 ${unitPrice}${premium}，付款价值 ${value}/件）。\n商船存货 ${stock} · 本站可支付 ${Math.floor(available)}。` + (seed ? '\n种子仅购 1 份永久解锁，不可复购，不占仓位。' : '') + (quote.reason ? '\n' + quote.reason : '');
+    return { ...quote, text };
+  },
+
+  merchantOrderQuote: function (b) {
+    const el = this.el.info, good = el.querySelector('#trade-order-good')?.value;
+    const quantity = el.querySelector('#trade-order-quantity'), qty = quantity && quantity.value.trim() !== '' ? Number(quantity.value) : NaN;
+    const offer = Object.hasOwn(G.TRADE_GOODS, good) ? G.TRADE_GOODS[good] : null, profile = G.merchantProfile(b);
+    if (!b.merchant || b.merchant.leaveDay <= G.game.day) return { ok: false, reason: '商船尚未停靠；请等要订货的商人到访。' };
+    if (!offer || !profile.goods.includes(good)) return { ok: false, reason: '请选择这位商人目录中的货物。' };
+    if (!Number.isInteger(qty) || qty < 1 || qty > offer.stock) return { ok: false, reason: `请输入 1–${offer.stock} 的整数订货数量。` };
+    const seedReason = G.seedTradeReason(good, qty);
+    if (seedReason) return { ok: false, reason: seedReason };
+    const unitPrice = Math.floor(offer.price * 1.25);
+    return { ok: true, good, qty, unitPrice, text: `${profile.name}下次回访将带来${offer.name} × ${qty}，订货单价 ${unitPrice}（原价 ${offer.price} × 1.25 向下取整）。无需预付款；到货后手动交易。` };
   },
 
   refreshEconomyInfo: function (b) {
@@ -2201,8 +2265,13 @@ G.ui = {
     set('[data-economy-goals]', G.buildingGoalStatus(b));
     set('[data-economy-workers]', b.workers.map(id => G.world.cmap[id]).filter(Boolean).map(c => c.name).join('、') || '无');
     if (b.type === 'tradingpost') {
+      const panel = el.querySelector('[data-economy="tradingpost"]');
+      if (panel._merchant !== b.merchant) return false;
       const merchant = b.merchant && b.merchant.leaveDay > G.game.day;
-      set('[data-economy-live="merchant"]', merchant ? `商船将在 ${b.merchant.leaveDay - G.game.day} 天后离开。` : `下一艘商船约 ${Math.max(0, (b.nextMerchantDay || G.game.day) - G.game.day)} 天后到达。`);
+      const profile = G.merchantProfile(b), order = G.merchantOrderSummary(b);
+      set('[data-economy-live="merchant"]', merchant ? `${profile.name}停靠中，将在 ${b.merchant.leaveDay - G.game.day} 天后离开。` : `下一艘商船约 ${Math.max(0, (b.nextMerchantDay || G.game.day) - G.game.day)} 天后到达；不一定是已订货的商人。`);
+      const accepted = Object.keys(G.TRADE_VALUES).filter(type => G.merchantAccepts(b, type)).map(type => G.RES[type].name).join('、');
+      set('[data-economy-live="merchant-payments"]', merchant ? `收购：${accepted}。${profile.acceptsFood ? '接受三类食物付款。' : '拒收食物：肉类、蔬菜、主食。'}` : '各商人有不同目录与收购物资；订货要等同一商人回访。');
       const inventory = b.tradeInventory || {}, targets = b.tradeTargets || {};
       const stored = G.tradeStored ? G.tradeStored(b) : Object.values(inventory).reduce((sum, value) => sum + value, 0);
       set('[data-economy-live="trade-capacity"]', `已入站 ${Math.floor(stored)} + 在途占位 ${G.tradeIncoming(b)} / ${G.TRADE_CAPACITY || 2000} · 可用空位 ${G.tradeFreeSpace(b)}（各资源共享；在途货尚不可交易）`);
@@ -2214,6 +2283,24 @@ G.ui = {
       set('[data-economy-live="quote"]', quote.text || quote.reason);
       const buy = el.querySelector('#trade-execute'); buy.disabled = !quote.ok;
       buy.textContent = quote.ok ? `确认支付 ${quote.cost} ${G.RES[quote.payment].name}` : '确认交易';
+      for (const option of el.querySelector('#trade-good').querySelectorAll('option')) {
+        const good = option.value, stock = merchant ? b.merchant.stock[good] || 0 : 0;
+        const text = `${G.TRADE_GOODS[good].name}（单价 ${G.merchantPrice(b, good)}${merchant && order.arrivedGood === good ? ' · 订货价' : ''} · 本船 ${stock}）`;
+        if (option.textContent !== text) option.textContent = text;
+      }
+      for (const option of el.querySelector('#trade-payment').querySelectorAll('option')) option.disabled = !!merchant && !G.merchantAccepts(b, option.value);
+      const pending = merchant && order.pending;
+      const returnText = merchant && Number.isFinite(order.returnDay) ? `同一商人预计约 ${Math.max(0, order.returnDay - G.game.day)} 天后回访（下一艘船可能不同）。` : '';
+      set('[data-economy-live="merchant-order"]', merchant ? (pending ? `待到货：${G.TRADE_GOODS[pending.good].name} × ${pending.qty}。` : '这位商人暂无待到货订单。') + returnText + (order.arrivedGood ? `本次已带到${G.TRADE_GOODS[order.arrivedGood].name}，订单已清除；购买仍需手动确认。` : '') : '商人未停靠，暂不能订货、替换或取消订单。');
+      const otherOrders = (order.pendingOrders || []).filter(item => !merchant || item.merchantId !== order.merchantId);
+      set('[data-economy-live="merchant-orders"]', otherOrders.length ? '等待其他商人回访：' + otherOrders.map(item => `${item.name} · ${G.TRADE_GOODS[item.good].name} × ${item.qty}（订货单价 ${item.unitPrice}）`).join('；') + '。须等该商人停靠后才能修改。' : '');
+      const orderQuote = this.merchantOrderQuote(b), confirm = el.querySelector('#trade-order-confirm'), cancel = el.querySelector('#trade-order-cancel');
+      set('[data-economy-live="order-quote"]', orderQuote.text || orderQuote.reason);
+      confirm.disabled = !orderQuote.ok; confirm.textContent = pending ? '确认替换一次订货' : '确认一次订货';
+      cancel.disabled = !pending;
+      const orderGood = el.querySelector('#trade-order-good'), orderQuantity = el.querySelector('#trade-order-quantity');
+      orderGood.disabled = !merchant; orderQuantity.disabled = !merchant;
+      orderQuantity.max = String(G.TRADE_GOODS[orderGood.value]?.stock || 400);
     } else if (b.type === 'pasture') {
       const d=G.pastureSummary(b),bank=G.game.livestock;
       set('[data-economy-live="animals"]', `${d.name}群 ${d.animals}/${d.cap} 头 · 当前保留 ${d.target} 头`);

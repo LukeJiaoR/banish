@@ -2342,8 +2342,64 @@ G.tradeFreeSpace=(b,exclude=null)=>Math.max(0,G.TRADE_CAPACITY-G.tradeStored(b)-
 
 G.TRADE_VALUES = {wood:2,stone:7,iron:5,tools:8,firewood:4,meat:1,vegetables:1,grain:1,leather:10,wool:5,clothes:15,warmCoats:20,herbs:4,coal:6,steelTools:10};
 G.TRADE_GOODS = {coal:{name:'煤',price:6,stock:100},steelTools:{name:'钢工具',price:10,stock:20},sheep:{name:'羊',price:600,stock:4},cattle:{name:'牛',price:800,stock:4},orchardSeed:{name:'果树种子',price:2500,stock:1},cabbageSeed:{name:'卷心菜种子',price:2500,stock:1},grain:{name:'主食',price:1,stock:400},iron:{name:'铁',price:5,stock:100},leather:{name:'皮革',price:10,stock:80}};
+// Profile selection and visit timing are compact-map adaptations. Orders follow
+// the original same-merchant / pay-on-purchase / floor(1.25*price) rules.
+G.MERCHANT_CYCLE=['general','supplies','seeds'];
+G.MERCHANT_INTERVAL=16;
+G.MERCHANTS={
+  general:{id:'general',name:'河湾杂货商',goods:Object.keys(G.TRADE_GOODS),acceptsFood:true,assortment:4},
+  supplies:{id:'supplies',name:'山路物资商',goods:['coal','steelTools','iron','leather'],acceptsFood:false,assortment:2},
+  seeds:{id:'seeds',name:'绿篱种子商',goods:['orchardSeed','cabbageSeed'],acceptsFood:false,assortment:1}
+};
+G.merchantProfile=b=>G.MERCHANTS[b?.merchant?.id]||G.MERCHANTS.general;
+G.merchantPrice=(b,good)=>Object.hasOwn(G.TRADE_GOODS,good)?(b?.merchant?.orderedGood===good?Math.floor(G.TRADE_GOODS[good].price*1.25):G.TRADE_GOODS[good].price):0;
+G.merchantAccepts=(b,payment)=>Object.hasOwn(G.TRADE_VALUES,payment)&&(G.merchantProfile(b).acceptsFood||!G.FOOD_KEYS.includes(payment));
+G.currentMerchant=(b,expected)=>!!(b&&G.world.bmap[b.id]===b&&b.type==='tradingpost'&&b.state==='ok'&&b.merchant&&b.merchant.leaveDay>G.game.day&&(expected===undefined||expected===b.merchant));
+G.merchantOrderSummary=function(b){
+  const p=G.merchantProfile(b),m=b?.merchant;
+  return {merchantId:p.id,name:p.name,pending:b?.merchantOrders?.[p.id]||null,
+    pendingOrders:Object.entries(b?.merchantOrders||{}).map(([id,o])=>({merchantId:id,name:G.MERCHANTS[id].name,good:o.good,qty:o.qty,unitPrice:Math.floor(G.TRADE_GOODS[o.good].price*1.25)})),
+    returnDay:m?(m.arrivedDay===undefined?m.leaveDay-G.SEASON_DAYS:m.arrivedDay)+G.MERCHANT_INTERVAL*G.MERCHANT_CYCLE.length:null,
+    arrivedGood:m?.orderedGood||null};
+};
+G.orderMerchantGoods=function(b,good,qty,expectedMerchant){
+  if(!G.currentMerchant(b,expectedMerchant))return {ok:false,reason:'商人已离港或已经换船，请重新查看'};
+  const p=G.merchantProfile(b);
+  if(typeof good!=='string'||!p.goods.includes(good)||!Number.isInteger(qty)||qty<1||qty>G.TRADE_GOODS[good].stock)return {ok:false,reason:'订货超出本商人的目录或数量上限'};
+  const reason=G.seedTradeReason(good,qty);if(reason)return {ok:false,reason};
+  if(!b.merchantOrders)b.merchantOrders={};
+  b.merchantOrders[p.id]={good,qty};return {ok:true};
+};
+G.cancelMerchantOrder=function(b,expectedMerchant){
+  if(!G.currentMerchant(b,expectedMerchant))return {ok:false,reason:'商人已离港或已经换船，请重新查看'};
+  const id=G.merchantProfile(b).id;if(!b.merchantOrders?.[id])return {ok:false,reason:'本商人没有待回访订单'};
+  delete b.merchantOrders[id];return {ok:true};
+};
+G.arriveMerchant=function(b){
+  const visit=b.merchantVisits||0,id=G.MERCHANT_CYCLE[visit%G.MERCHANT_CYCLE.length],p=G.MERCHANTS[id];
+  const goods=visit===0?p.goods:p.goods.map(good=>({good,r:G.rng()})).sort((a,b)=>a.r-b.r).slice(0,p.assortment).map(v=>v.good);
+  const m={id,arrivedDay:G.game.day,leaveDay:G.game.day+G.SEASON_DAYS,stock:Object.fromEntries(goods.map(k=>[k,G.TRADE_GOODS[k].stock]))};
+  const order=b.merchantOrders?.[id];
+  if(order){m.stock[order.good]=order.qty;m.orderedGood=order.good;delete b.merchantOrders[id];}
+  b.merchant=m;b.merchantVisits=visit+1;
+  G.ui.toast(`⛵ ${p.name}到访贸易站${order?'，上次订货已带到，请手动成交':''}`,'good');
+};
+G.tradeQuote=function(b,good,qty,payment){
+  const q={ok:false,good,qty,payment,merchant:b?.merchant,cost:0,unitPrice:G.merchantPrice(b,good)};
+  const fail=reason=>({...q,reason});
+  if(!G.currentMerchant(b))return fail('商船尚未停靠或已经离港');
+  const offer=typeof good==='string'&&Object.hasOwn(G.TRADE_GOODS,good)?G.TRADE_GOODS[good]:null,value=typeof payment==='string'&&Object.hasOwn(G.TRADE_VALUES,payment)?G.TRADE_VALUES[payment]:0;
+  if(!offer||!value||!Number.isInteger(qty)||qty<=0)return fail('交易数量或货物无效');
+  const seedReason=G.seedTradeReason(good,qty);if(seedReason)return fail(seedReason);
+  if(qty>(b.merchant.stock[good]||0))return fail('本船未带、已售完或商船现货不足');
+  if(!G.merchantAccepts(b,payment))return fail(`${G.merchantProfile(b).name}不收食物，请改用其他待售物资`);
+  q.cost=Math.ceil(q.unitPrice*qty/value);
+  if((b.tradeInventory[payment]||0)<q.cost)return fail(`待售库存不足，还缺 ${Math.ceil(q.cost-(b.tradeInventory[payment]||0))} ${G.RES[payment].name}，请先搬入`);
+  if(!G.isLivestockType(good)&&!G.seedUnlockKey(good)&&G.tradeStored(b)+G.tradeIncoming(b)-q.cost+qty>G.TRADE_CAPACITY)return fail('贸易站容量不足（含在途占位，共2000）');
+  return {...q,ok:true};
+};
 G.ensureEconomyBuilding = function(b) {
-  if(b.type==='tradingpost'){b.tradeInventory=b.tradeInventory||{};b.tradeTargets=b.tradeTargets||{};if(!Number.isFinite(b.nextMerchantDay))b.nextMerchantDay=G.game.day+G.SEASON_DAYS;}
+  if(b.type==='tradingpost'){b.tradeInventory=b.tradeInventory||{};b.tradeTargets=b.tradeTargets||{};if(!Number.isFinite(b.nextMerchantDay))b.nextMerchantDay=G.game.day+G.SEASON_DAYS;if(!Number.isInteger(b.merchantVisits))b.merchantVisits=b.merchant?1:0;b.merchantOrders=b.merchantOrders||{};}
   if(b.type==='pasture'){b.animalType=G.pastureTypeOf(b);b.animals=b.animals||0;b.animalGrowth=b.animalGrowth||0;b.woolReady=b.woolReady||0;b.pastureProducts=b.pastureProducts||{meat:0,leather:0};if(!Number.isFinite(b.animalTarget))b.animalTarget=8;}
   if(b.type==='orchard')G.ensureOrchard(b);
 };
@@ -2395,18 +2451,14 @@ G.completeTradeTask = function(c,t){
   }
   G.requestTask(c);
 };
-G.executeTrade = function(b,good,qty,payment){
-  if(G.world.bmap[b.id]!==b||b.type!=='tradingpost'||b.state!=='ok'||!b.merchant||b.merchant.leaveDay<=G.game.day)return {ok:false,reason:'没有停靠商人'};
-  const offer=typeof good==='string'&&Object.hasOwn(G.TRADE_GOODS,good)?G.TRADE_GOODS[good]:null,value=typeof payment==='string'&&Object.hasOwn(G.TRADE_VALUES,payment)?G.TRADE_VALUES[payment]:0;
-  if(!offer||!value||!Number.isInteger(qty)||qty<=0||qty>(b.merchant.stock[good]||0))return {ok:false,reason:'交易数量或货物无效'};
-  const seedReason=G.seedTradeReason(good,qty);if(seedReason)return {ok:false,reason:seedReason};
-  const cost=Math.ceil(offer.price*qty/value);if((b.tradeInventory[payment]||0)<cost)return {ok:false,reason:'待售库存不足，请先让商人搬入'};
-  if(!G.isLivestockType(good)&&!G.seedUnlockKey(good)&&G.tradeStored(b)+G.tradeIncoming(b)-cost+qty>G.TRADE_CAPACITY)return {ok:false,reason:'贸易站容量不足（含在途占位，共2000）'};
-  b.tradeInventory[payment]-=cost;b.merchant.stock[good]-=qty;
+G.executeTrade = function(b,good,qty,payment,expectedMerchant){
+  if(expectedMerchant!==undefined&&!G.currentMerchant(b,expectedMerchant))return {ok:false,reason:'商人已离港或已经换船，请重新查看'};
+  const q=G.tradeQuote(b,good,qty,payment);if(!q.ok)return q;
+  b.tradeInventory[payment]-=q.cost;b.merchant.stock[good]-=qty;
   if(G.isLivestockType(good))G.game.livestock[good]=(G.game.livestock[good]||0)+qty;
   else if(G.seedUnlockKey(good))G.game.unlocks[G.seedUnlockKey(good)]=true;
   else b.tradeInventory[good]=(b.tradeInventory[good]||0)+qty;
-  G.game.schedT=0;return {ok:true,paid:cost};
+  G.game.schedT=0;return {ok:true,paid:q.cost};
 };
 // Fixed 6x6 pens and yields are small-map adaptations, not original tile density.
 G.LIVESTOCK={sheep:{name:'羊',cap:12,meat:24,leather:0},cattle:{name:'牛',cap:10,meat:36,leather:4}};
@@ -2484,8 +2536,8 @@ G.advanceTownEconomy = function(){
   const g=G.game;g.unlocks=g.unlocks||{orchard:false};g.livestock=g.livestock||{sheep:0,cattle:0};
   for(const b of G.world.buildings){if(b.state!=='ok')continue;G.ensureEconomyBuilding(b);
     if(b.type==='tradingpost'){
-      if(b.merchant&&g.day>=b.merchant.leaveDay){b.merchant=null;b.nextMerchantDay=g.day+G.YEAR_DAYS-G.SEASON_DAYS;}
-      if(!b.merchant&&g.day>=b.nextMerchantDay){b.merchant={leaveDay:g.day+G.SEASON_DAYS,stock:Object.fromEntries(Object.entries(G.TRADE_GOODS).map(([k,v])=>[k,v.stock]))};G.ui.toast('⛵ 商船已到贸易站，可换物资、羊、牛和种子','good');}
+      if(b.merchant&&g.day>=b.merchant.leaveDay){b.merchant=null;b.merchantVisits=Math.max(1,b.merchantVisits);b.nextMerchantDay=g.day+G.MERCHANT_INTERVAL-G.SEASON_DAYS;}
+      if(!b.merchant&&g.day>=b.nextMerchantDay)G.arriveMerchant(b);
     }
     if(b.type==='pasture'&&b.animals>0&&b.tendedDay>=g.day-2){
       if(b.animals>=2)b.animalGrowth+=b.animals/(G.YEAR_DAYS*2);while(b.animalGrowth>=1&&b.animals<G.LIVESTOCK[G.pastureTypeOf(b)].cap){b.animals++;b.animalGrowth--;}
