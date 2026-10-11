@@ -72,7 +72,7 @@ G.newGameState = function () {
     h: 6, day: 0, season: 0, year: 1,
     speed: 1, paused: false,
     res: { wood: 80, stone: 48, iron: 0, tools: 15, food: 500, meat: 0, vegetables: 0, grain: 500, leather: 0, wool: 0, clothes: 0, warmCoats: 0, herbs: 0, coal: 0, steelTools: 0, ale: 0, firewood: 50 }, // 开局（原版中难度 5 家庭，工具 15 件≈第一轮磨损周期）；存粮较原版加厚：15 人 6 天食物跑道撑不到第一座采集屋建成
-    heating:{allowCoal:false,coalReserve:20},
+    heating:{allowCoal:false,coalReserve:20}, fishingRules:'shared',
     fireDisasters:{enabled:false,startedDay:null,graceUntil:0,lastDay:-1,nextIgnitionDay:0,serial:0,incidentHomes:[]},
     healthStartDay: 0, farmPests:{enabled:false,graceUntil:0,lastDay:-1}, challenges:{v:1,completed:{}},
     nomads: {nextDay:G.YEAR_DAYS,serial:0,offer:null,accepted:0,declined:0},
@@ -1501,6 +1501,31 @@ G.taskYield = function (base) {
   return Math.max(1, Math.round(base * m));
 };
 
+/* Town-wide fishing water: estimates and actual new tasks share this read-only
+ * calculation. Existing task yields stay locked; no finite fish stock is added. */
+G.fishingDockActive=function(b){const w=G.world;return b?.type==='dock'&&b.state==='ok'&&G.workerLimitOf(b)>0&&(b.workers||[]).some(id=>{const c=w.cmap[id];return c&&!c.dead&&c.adult&&!c.student&&c.job===b.id;});};
+G.fishingWaterSummary=function(b,opt={}){const w=G.world,p=G.PROD.dock,r=p.waterR,shared=opt.shared===undefined?G.game.fishingRules==='shared':opt.shared;
+ const others=w.buildings.filter(x=>x!==b&&(b.id==null||x.id!==b.id)&&G.fishingDockActive(x));
+ if(opt.extraDock)others.push(opt.extraDock);
+ let raw=0,blocked=0,sharedTiles=0,effective=0;const peers=new Set();
+ for(let y=Math.max(0,b.y-r);y<=Math.min(w.N-1,b.y+r);y++)for(let x=Math.max(0,b.x-r);x<=Math.min(w.N-1,b.x+r);x++){
+  const i=y*w.N+x;if(w.water[i]!==1)continue;raw++;if(w.bgrid[i]>=0){blocked++;continue;}
+  const covering=others.filter(d=>Math.abs(d.x-x)<=r&&Math.abs(d.y-y)<=r);if(covering.length)sharedTiles++;
+  for(const d of covering)if(d.id!=null)peers.add(d.id);effective+=1/(1+covering.length);
+ }
+ const counted=shared?effective:raw,baseCatch=shared&&counted===0?0:Math.max(1,Math.round(p.yield.qty*(.5+.5*Math.min(1,counted/p.fullWater))));
+ return {rule:shared?'shared':'classic',raw,blocked,free:raw-blocked,sharedTiles,effective,competitors:[...peers].sort((a,b)=>a-b),staffed:G.fishingDockActive(b),baseCatch,catch:baseCatch?G.taskYield(baseCatch):0,
+ reason:!shared?'经典规则：按原始水格计渔获，全村尚未启用共享水域':!counted?'没有未被桥梁占用的可捕鱼水格，暂停新捕鱼':'新批次按空闲水域与已配渔民的重叠码头分摊；已接批次不倒扣'};
+};
+G.fishingPlacementSummary=function(x,y){const candidate={type:'dock',x,y,state:'ok',workers:[]},info=G.fishingWaterSummary(candidate,{preview:true}),affected=[];
+ for(const b of G.world.buildings.filter(G.fishingDockActive)){const before=G.fishingWaterSummary(b),after=G.fishingWaterSummary(b,{extraDock:candidate});if(after.sharedTiles>before.sharedTiles||after.effective<before.effective)affected.push({id:b.id,before:before.baseCatch,after:after.baseCatch});}
+ return {...info,affected};
+};
+G.fishingPolicyQuote=function(){const rows=G.world.buildings.filter(b=>b.type==='dock'&&b.state==='ok').map(b=>{const before=G.fishingWaterSummary(b,{shared:false}),after=G.fishingWaterSummary(b,{shared:true});return {id:b.id,x:b.x,y:b.y,staffed:after.staffed,raw:after.raw,blocked:after.blocked,sharedTiles:after.sharedTiles,effective:after.effective,before:before.baseCatch,after:after.baseCatch};}).sort((a,b)=>a.id-b.id);
+ return {ok:G.game.fishingRules==='classic',rows,key:JSON.stringify([G.game.fishingRules,rows]),reason:'全村一次启用共享渔场：桥面占水和重叠渔民可能降低以后每批渔获，不能切回经典规则；当前工作与已背鱼不倒扣。'};
+};
+G.enableSharedFishing=function(key,expectedGame=G.game){const q=G.fishingPolicyQuote();if(expectedGame!==G.game||!q.ok||q.key!==key)return false;G.game.fishingRules='shared';return true;};
+
 /* 砍树原木数：未受教育 2、受教育 3（原版 Forester/散工的教育加成） */
 G.taskLogYield = function (c) { return c.educated ? G.PROD.forester.eduLogsYield : G.TREE_LOGS; };
 
@@ -1637,8 +1662,8 @@ G.makeTask = function (b, c) {
       const spot = G.workSpot(w, b, c.x, c.y);
       if (!spot) return null;
       // 渔获随水域大小浮动：一片小水洼撑不起满产
-      const waterN = G.countWaterInRadius(w, b.x, b.y, P.dock.waterR);
-      const qty = G.taskYield(Math.max(1, Math.round(P.dock.yield.qty * (0.5 + 0.5 * Math.min(1, waterN / P.dock.fullWater)))));
+      const fish=G.fishingWaterSummary(b),qty=fish.catch;
+      if(!qty){b.noWork=true;b.warnText=fish.reason;return null;}
       return G.withTaskRoute({
         kind: 'work', b, tx: spot.x, ty: spot.y,
         work: G.taskWork(c, P.dock.workH), workLeft: 0, yield: { type: P.dock.yield.type, qty },
@@ -1932,6 +1957,7 @@ G.jobCanProduce = function (b) {
   if (b.type === 'herbalist') return true; // A staffed hut also provides preventive care when gathering pauses.
   if (G.productionLimited(b)) return false;
   if (b.type === 'farm') return G.farmHasWork(b);
+  if (b.type === 'dock') return G.fishingWaterSummary(b).catch>0;
   if (b.type === 'woodcutter') return r.wood >= p.woodcutter.logsIn;
   if (b.type === 'tradingpost') return G.tradeHasWork(b);
   if (b.type === 'pasture') return (b.animals || 0)>0||G.pastureHasProducts(b);
@@ -3533,6 +3559,7 @@ G.workforceBlockReason=function(b){
   if(b.type==='tailor')return G.tailorProductionStatus(b).reason;
   if(b.type==='tavern')return G.tavernBrewStatus(b).reason;
   if(b.type==='hospital')return '暂无病人需要接诊';
+  if(b.type==='dock'&&G.fishingWaterSummary(b).catch===0)return G.fishingWaterSummary(b).reason;
   if(b.type==='farm')return G.farmSummary(b).status;
   if(b.type==='tradingpost')return '待售目标已满足，或仓库没有所需备货';
   if(b.type==='pasture')return G.pastureSummary(b).status;

@@ -727,7 +727,11 @@ G.ui = {
     if (!el) return null;
     if (!type) { el.classList.add('hidden'); this._placementKey = null; return null; }
     // Avoid a path search on every animation frame; refresh moving terrain/resources regularly.
+    // Fishing staffing and bridge changes must be visible even while paused.
+    const fishingKey = type === 'dock' ? JSON.stringify([G.game.fishingRules, G.hasTools(), G.world.buildings
+      .filter(b => ['dock', 'bridge'].includes(b.type)).map(b => [b.id, b.type, b.state, b.x, b.y, b.w, b.h, b.type === 'dock' && G.fishingDockActive(b)])]) : '';
     const key = [type, x, y, G.world.seed, G.world.buildings.map(b => b.id).join(','), Math.floor(G.game.h * 2), G.game.day,
+      fishingKey,
       ...G.RES_KEYS.map(k => Math.floor(G.game.res[k]))].join(':');
     if (key !== this._placementKey || this._placementWorld !== G.world) {
       this._placementWorld = G.world;
@@ -746,6 +750,8 @@ G.ui = {
     this.renderInfo();
   },
   hideInfo: function () {
+    const fishing = this.el.info.querySelector && this.el.info.querySelector('[data-fishing-panel]');
+    if (fishing) this.resetFishingConfirmation(fishing);
     const panel = this.el.info.querySelector && this.el.info.querySelector('[data-mineral-removal-panel]');
     if (panel) this.resetMineralRemoval(panel);
     for (const kind of ['fire-rules', 'fire-rebuild']) {
@@ -913,6 +919,116 @@ G.ui = {
       const n=reserve.value.trim()===''?NaN:Number(reserve.value),ok=['wood','coal'].includes(mode.value)&&G.setHeatingPolicy(mode.value==='coal',n);
       panel.querySelector('[data-heating-message]').textContent=ok?'已应用全镇策略，从下一次冬季日界扣料生效。':'请输入有效燃料策略与非负整数煤底线。';this.refreshHeatingInfo(b);
     });
+  },
+  fishingNumber: function (n) { return Number(n).toFixed(2).replace(/\.?0+$/, ''); },
+  fishingInfoData: function (b) {
+    if (!['dock', 'townhall'].includes(b.type) || b.state !== 'ok') return null;
+    const shared = G.game.fishingRules === 'shared', quote = shared ? { ok: false, rows: [], key: null } : G.fishingPolicyQuote();
+    const data = {
+      rule: `全镇渔业规则：${shared ? '共享可用水域' : '经典水域（旧档保留）'}。${shared ? '新局默认采用；全镇所有渔屋统一生效，无切回按钮。' : '仍按原始水域计产；查看详情不会改变旧档规则。'}`,
+      scope: '共享规则：桥梁工地和完工桥占用的水格不计；同一水格由覆盖它的已完工、有在岗渔民且用工上限大于0的渔屋均分。搬运或休息仍占份额；空屋、工地和0上限不占份额。全镇产量目标暂停本身不释放份额。',
+      timing: '只影响之后新接的捕鱼批次。当前任务、夜间暂停的渔获和已背起的货物保持已锁定数量；读档仍按既有规则重启未完成任务，不保留未产出的批次。',
+      adaptation: '沿用建筑原点±10格方形范围、40格满产参考；均分与产量曲线为本作适配，并非有限鱼群库存。单批估计不等于年度产量，工具影响每批数量，教育缩短劳动时间；行走、劳动和送仓时间仍影响实际入库。',
+    };
+    if (b.type === 'dock') {
+      const s = G.fishingWaterSummary(b, { preview: true });
+      data.water = `水域：原始 ${s.raw} 格 · 桥占 ${s.blocked} 格 · 可用 ${s.free} 格 · 重叠共享 ${s.sharedTiles} 格 · 共享口径有效 ${this.fishingNumber(s.effective)} 格。`;
+      data.staffing = `当前${s.staffed ? shared ? '有在岗渔民，参与共享' : '有在岗渔民，启用共享后计入竞争' : '未参与共享（无在岗渔民或用工上限为0）'}；另有 ${s.competitors.length} 座在岗渔屋覆盖同一片可用水域。下列估计假定本屋能接下一批，不代表现在已有人开工。`;
+      data.catch = `下一批估计：${s.catch} 肉类（基础 ${s.baseCatch}，已计当前工具规则）。${s.reason || ''}`;
+    }
+    data.transition = quote.rows.length ? quote.rows.map(row => `渔屋 #${row.id}（${row.x},${row.y}）${row.staffed ? '在岗' : '未在岗，假定接新批'}：${row.before} → ${row.after} 肉类/批；桥占 ${row.blocked} 格，共享 ${row.sharedTiles} 格，有效 ${this.fishingNumber(row.effective)} 格。`).join('\n') : '当前没有完工渔屋。之后新建渔屋也采用本镇统一规则。';
+    return { shared, quote, data };
+  },
+  fishingInfoMarkup: function (b) {
+    const f = this.fishingInfoData(b); if (!f) return '';
+    const row = key => `<p class="row desc" data-fishing="${key}">${this.escHtml(f.data[key])}</p>`;
+    return `<section class="economy-form" data-fishing-panel aria-labelledby="fishing-title">
+      <h3 id="fishing-title">渔屋与可用水域</h3>${['rule', ...(b.type === 'dock' ? ['water', 'staffing', 'catch'] : [])].map(row).join('')}
+      <details><summary>共享范围与批次规则</summary>${['scope', 'timing', 'adaptation'].map(row).join('')}</details>
+      ${f.shared ? '' : `<div data-fishing-migration><button type="button" id="fishing-start" aria-expanded="false" aria-controls="fishing-confirmation">查看全镇共享规则确认</button>
+        <div id="fishing-confirmation" class="hidden" data-fishing-confirm>
+          <p id="fishing-warning">确认后全镇所有渔屋永久改用共享可用水域，未来批次可能下降；免费且仅可开启一次。当前任务和携货不追溯扣除。取消不改变任何规则或库存。</p>
+          <p class="desc">逐屋基础预估（未计工具）：经典 → 共享；每屋均假定能接新批次，其他渔屋保持当前在岗状态。以下不是全镇同时增岗后的总产量。</p>
+          <div style="white-space:pre-line" data-fishing="transition">${this.escHtml(f.data.transition)}</div>
+          <div class="economy-actions"><button type="button" id="fishing-confirm" class="danger" aria-describedby="fishing-warning" disabled>确认全镇改用共享水域</button><button type="button" id="fishing-cancel">取消，保持经典规则</button></div>
+        </div></div>`}
+      <p data-fishing-message role="status" aria-live="polite"></p>
+    </section>`;
+  },
+  fishingControlValid: function (b, context, node, allowModal) {
+    if (!context) return false;
+    const { world, game, el, panel, type } = context;
+    return G.world === world && G.game === game && this.el.info === el && !el.classList.contains('hidden') &&
+      G.sel?.kind === 'b' && G.sel.id === b.id && world.bmap[b.id] === b && b.type === type && b.state === 'ok' &&
+      el.querySelector('[data-fishing-panel]') === panel && (!node || (!node.disabled && panel.querySelector('#' + node.id) === node)) &&
+      (allowModal || !(G.hasOpenModal && G.hasOpenModal()));
+  },
+  resetFishingConfirmation: function (panel, message, restoreFocus) {
+    const box = panel.querySelector('[data-fishing-confirm]'), start = panel.querySelector('#fishing-start'), confirm = panel.querySelector('#fishing-confirm');
+    panel._fishingPending = null;
+    if (box) box.classList.add('hidden');
+    if (start) start.setAttribute('aria-expanded', 'false');
+    if (confirm) confirm.disabled = true;
+    const status = panel.querySelector('[data-fishing-message]');
+    if (message !== undefined && status) status.textContent = message;
+    if (restoreFocus && box?.contains(document.activeElement) && start?.focus) start.focus();
+  },
+  refreshFishingInfo: function (b) {
+    const el = this.el.info, panel = el.querySelector?.('[data-fishing-panel]');
+    if (!panel || !this.fishingControlValid(b, panel._fishingContext, null, true)) { if (panel) this.resetFishingConfirmation(panel); return false; }
+    const f = this.fishingInfoData(b); if (!f) return false;
+    for (const [key, text] of Object.entries(f.data)) {
+      const node = panel.querySelector(`[data-fishing="${key}"]`);
+      if (node && node.textContent !== text) node.textContent = text;
+    }
+    const modal = G.hasOpenModal && G.hasOpenModal();
+    if (panel._fishingPending && (modal || !f.quote.ok || panel._fishingPending.key !== f.quote.key))
+      this.resetFishingConfirmation(panel, modal ? '确认已取消，请关闭弹窗后重新查看。' : '规则、在岗渔民或水域已变化，请核对最新逐屋预估后重新确认。', !modal);
+    const start = panel.querySelector('#fishing-start'), confirm = panel.querySelector('#fishing-confirm'), controls = panel.querySelector('[data-fishing-migration]');
+    if (f.shared && !modal && controls?.contains(document.activeElement)) { const close = el.querySelector('#info-close'); if (close?.focus) close.focus(); }
+    if (controls) controls.classList.toggle('hidden', f.shared);
+    if (start) start.disabled = !f.quote.ok;
+    if (confirm) confirm.disabled = !panel._fishingPending || !f.quote.ok;
+    if (b.type === 'dock') {
+      const names = b.workers.map(id => G.world.cmap[id]).filter(c => c && !c.dead).map(c => c.name).join('、');
+      const workers = el.querySelector('[data-fishing-workers]'); if (workers && workers.textContent !== (names || '无')) workers.textContent = names || '无';
+      const status = el.querySelector('[data-fishing-status]');
+      const text = G.productionLimited(b) && G.buildingGoalStatus(b) || (G.workerLimitOf(b) <= 0 ? '用工上限为0，停止接新批次' : !G.jobCanProduce(b) ? '停工：' + (G.fishingWaterSummary(b).reason || b.warnText || '当前无法捕鱼') : b.workers.length ? '运作中' : '等待可用工人');
+      if (status && status.textContent !== text) status.textContent = text;
+    }
+    return true;
+  },
+  initFishingInfo: function (b) {
+    const el = this.el.info, panel = el.querySelector('[data-fishing-panel]'); if (!panel) return;
+    const context = { world: G.world, game: G.game, el, panel, type: b.type }; panel._fishingContext = context;
+    const start = panel.querySelector('#fishing-start'), confirm = panel.querySelector('#fishing-confirm'), cancel = panel.querySelector('#fishing-cancel');
+    if (!start || !confirm || !cancel) { this.refreshFishingInfo(b); return; }
+    this.resetFishingConfirmation(panel, '');
+    for (const button of [start, confirm, cancel]) button.addEventListener('keydown', e => { if (e.repeat && ['Enter', ' '].includes(e.key)) e.preventDefault(); });
+    start.addEventListener('click', e => {
+      if (e.detail > 1 || !this.fishingControlValid(b, context, start)) { this.resetFishingConfirmation(panel); return; }
+      this.refreshFishingInfo(b); const quote = G.fishingPolicyQuote();
+      if (!quote.ok) return;
+      panel._fishingPending = { key: quote.key };
+      panel.querySelector('[data-fishing-confirm]').classList.remove('hidden'); start.setAttribute('aria-expanded', 'true'); confirm.disabled = false;
+      panel.querySelector('[data-fishing-message]').textContent = '尚未更改规则。请核对全镇各渔屋的下一批预估。';
+      if (confirm.focus) confirm.focus();
+    });
+    cancel.addEventListener('click', () => {
+      if (!this.fishingControlValid(b, context, cancel)) { this.resetFishingConfirmation(panel); return; }
+      this.resetFishingConfirmation(panel, '已取消，全镇仍使用经典规则，库存和任务不变。'); if (start.focus) start.focus();
+    });
+    confirm.addEventListener('click', e => {
+      if (e.detail > 1 || !this.fishingControlValid(b, context, confirm) || !panel._fishingPending) { this.resetFishingConfirmation(panel); return; }
+      const pending = panel._fishingPending; this.refreshFishingInfo(b);
+      if (!panel._fishingPending || pending.key !== G.fishingPolicyQuote().key) return;
+      this.resetFishingConfirmation(panel);
+      const ok = G.enableSharedFishing(pending.key, context.game);
+      this.refreshFishingInfo(b);
+      this.resetFishingConfirmation(panel, ok ? '已为全镇开启共享可用水域，仅影响之后新接的捕鱼批次；当前任务和携货数量不变。' : '条件已变化，未更改规则，请重新核对。');
+      const focus = ok ? el.querySelector('#info-close') : start; if (focus?.focus) focus.focus();
+    });
+    this.refreshFishingInfo(b);
   },
   fireRulesInfoData: function (b) {
     if (b.type !== 'townhall' || b.state !== 'ok' || !G.fireRulesSummary || !G.fireToggleQuote) return null;
@@ -1351,7 +1467,7 @@ G.ui = {
     const data = facts.data;
     return `<section class="townhall-details" data-townhall-panel>
       ${['population', 'housing', 'education', 'health', 'medical', 'food', 'fuel', 'tools', 'arriving', 'schedule', 'decisions'].map(key => `<p class="row" data-townhall="${key}">${this.escHtml(data[key])}</p>`).join('')}
-      ${this.fireActionMarkup('fire-rules', this.fireRulesInfoData(b))}
+      ${this.fireActionMarkup('fire-rules', this.fireRulesInfoData(b))}${this.fishingInfoMarkup(b)}
       <div data-townhall-offer></div>
       <p class="economy-message" data-townhall-message role="status" aria-live="polite"></p>
       <details class="townhall-ledger" data-town-challenges><summary>发展挑战（本作适配）</summary>
@@ -1378,6 +1494,7 @@ G.ui = {
       if (node && node.textContent !== data[key]) node.textContent = data[key];
     }
     this.refreshFireAction(b, 'fire-rules');
+    this.refreshFishingInfo(b);
     const holder = el.querySelector('[data-townhall-offer]'), offerId = s.offer ? s.offer.id : null;
     // Leave active controls intact on timed refreshes. Only a genuinely different
     // offer gets new controls, whose handlers capture that offer's immutable ID.
@@ -2188,6 +2305,8 @@ G.ui = {
       const panel = el.querySelector && el.querySelector(`[data-${kind}-panel]`);
       if (panel && (!sameSelection || !this.fireActionValid(selected, panel._fireContext, null, true))) this.resetFireAction(panel);
     }
+    const fishingPanel = el.querySelector?.('[data-fishing-panel]');
+    if (fishingPanel && (!sameSelection || !this.fishingControlValid(selected, fishingPanel._fishingContext, null, true))) this.resetFishingConfirmation(fishingPanel);
     const homeFire = G.sel.kind === 'b' ? this.homeFireInfoData(selected) : null;
     const firePresentationChanged = sameSelection && (!!homeFire !== !!el.querySelector?.('[data-home-fire-panel]') || (homeFire && this._infoBuildType !== selected.type));
     if (firePresentationChanged) force = true;
@@ -2208,6 +2327,7 @@ G.ui = {
     // selection or a site finishing construction still gets its own full panel.
     if (!force && sameSelection && homeFire?.summary.ruin && this._infoBuildType === selected.type && this._infoBuildState === selected.state && this.refreshHomeFireInfo(selected)) return;
     if (!force && sameSelection && selected.state === 'ok' && this._townHallInfoState === selected.state && this.refreshTownHallInfo(selected)) return;
+    if (!force && sameSelection && selected.type === 'dock' && this._infoBuildState === 'ok' && selected.state === 'ok' && this.refreshFishingInfo(selected)) return;
     if (sameSelection && selected.state === 'ok' && this._tavernInfoState === selected.state && this.refreshTavernInfo(selected)) return;
     if (sameSelection && selected.state === 'ok' && this._tailorInfoState === selected.state && this.refreshTailorInfo(selected)) return;
     if (sameSelection && selected.state === 'ok' && this._farmInfoState === selected.state && this.refreshFarmInfo(selected)) return;
@@ -2290,7 +2410,7 @@ G.ui = {
       let workers = '';
       if ((def.jobs > 0 || b.state === 'site') && !schoolData) {
         const names = b.workers.map(id => w.cmap[id]).filter(Boolean).map(c => this.escHtml(c.name)).join('、');
-        workers = `<div class="row">${medicalData ? b.type === 'hospital' ? '医师' : '采药员' : tavernData ? '酿酒工（需 18 岁以上且健康）' : '工人'}：<span${siteData ? ' data-site-workers' : ''}${fuelData ? ' data-fuel="workers"' : ''}${medicalData ? ' data-medical="workers"' : ''}${chainData ? ' data-resource-chain-live="workers"' : ''}${tavernData ? ' data-tavern="workers"' : ''}${tailorData ? ' data-tailor="workers"' : ''}${farmData ? ' data-farm="workers"' : ''}${b.state === 'ok' && ['tradingpost', 'pasture', 'orchard'].includes(b.type) ? ' data-economy-workers' : ''}>${names || (b.state === 'site' ? '等待建筑工人' : '无')}</span></div>`;
+        workers = `<div class="row">${medicalData ? b.type === 'hospital' ? '医师' : '采药员' : tavernData ? '酿酒工（需 18 岁以上且健康）' : '工人'}：<span${b.type === 'dock' && b.state === 'ok' ? ' data-fishing-workers' : ''}${siteData ? ' data-site-workers' : ''}${fuelData ? ' data-fuel="workers"' : ''}${medicalData ? ' data-medical="workers"' : ''}${chainData ? ' data-resource-chain-live="workers"' : ''}${tavernData ? ' data-tavern="workers"' : ''}${tailorData ? ' data-tailor="workers"' : ''}${farmData ? ' data-farm="workers"' : ''}${b.state === 'ok' && ['tradingpost', 'pasture', 'orchard'].includes(b.type) ? ' data-economy-workers' : ''}>${names || (b.state === 'site' ? '等待建筑工人' : '无')}</span></div>`;
       }
       let extra = '';
       if (pit) extra = `<div class="row" data-mineral-pit-source>原址：${this.escHtml(G.BDEF[mineral?.source]?.name || '矿点')} · 永久占地 3×3；没有岗位和产出。</div><div class="row desc" data-mineral-pit-reserve>拆除时丢弃的剩余矿藏：${Number(mineral?.remaining) || 0} 储量单位，永久不可恢复。</div>`;
@@ -2326,6 +2446,7 @@ G.ui = {
       }
       if (chainData) extra += this.resourceChainInfoMarkup(b, chainData);
       if (hallData) extra += this.townHallInfoMarkup(b, hallData);
+      if (b.type === 'dock' && b.state === 'ok') extra += this.fishingInfoMarkup(b);
       if (tavernData) extra += this.tavernInfoMarkup(tavernData);
       if (tailorData) extra += this.tailorInfoMarkup(tailorData);
       if (farmData) extra += this.farmInfoMarkup(farmData);
@@ -2350,7 +2471,7 @@ G.ui = {
       }
       el.innerHTML = `
         <div class="info-head"><span>${def.icon} ${def.name}</span><button id="info-close">✕</button></div>
-        <div class="row"${siteData ? ' data-site-status' : ''}${homeData ? ' data-home-status' : ''}${fuelData ? ' data-fuel="status"' : ''}${medicalData ? ' data-medical="status"' : ''}${chainData ? ' data-resource-chain-live="status"' : ''}${hallData ? ' data-townhall="status"' : ''}${tavernData ? ' data-tavern="status"' : ''}${tailorData ? ' data-tailor="status"' : ''}${farmData ? ' data-farm="status"' : ''}${cemeteryData?' data-cemetery="status"':''}${schoolData?' data-school="status"':''}${b.state === 'ok' && ['tradingpost', 'pasture', 'orchard'].includes(b.type) ? ' data-economy-status' : ''}>${this.escHtml(status)}</div>
+        <div class="row"${b.type === 'dock' && b.state === 'ok' ? ' data-fishing-status' : ''}${siteData ? ' data-site-status' : ''}${homeData ? ' data-home-status' : ''}${fuelData ? ' data-fuel="status"' : ''}${medicalData ? ' data-medical="status"' : ''}${chainData ? ' data-resource-chain-live="status"' : ''}${hallData ? ' data-townhall="status"' : ''}${tavernData ? ' data-tavern="status"' : ''}${tailorData ? ' data-tailor="status"' : ''}${farmData ? ' data-farm="status"' : ''}${cemeteryData?' data-cemetery="status"':''}${schoolData?' data-school="status"':''}${b.state === 'ok' && ['tradingpost', 'pasture', 'orchard'].includes(b.type) ? ' data-economy-status' : ''}>${this.escHtml(status)}</div>
         ${workers}${this.workforceInfoMarkup(b, workforceData)}${extra}
         <div class="row desc">${def.desc}</div>
         ${pit ? '' : `<div class="row desc" data-info-refund${fuelData ? ' data-fuel="refund"' : ''}>${ruin ? '清理烧毁废墟退还 0 材料；不能回收原屋材料。' : fireData?.summary.active ? '火灾进行中，暂不能拆除；关闭新增火灾也不会停止当前损伤。' : fuelData ? fuelData.refund : siteData ? siteData.refund : '已开工：拆除退还一半已付建材，已砍树不恢复'}</div>
@@ -2369,6 +2490,7 @@ G.ui = {
       if (upgradeData) this.initHouseUpgradeInfo(b);
       const workforceField = el.querySelector && el.querySelector('#worker-limit-input');
       if (workforceField && workforceDraft !== null) workforceField.value = workforceDraft;
+      if (hallData || (b.type === 'dock' && b.state === 'ok')) this.initFishingInfo(b);
       if (hallData) { this.initFireAction(b, 'fire-rules'); this.refreshTownHallInfo(b); }
       if (rebuildData) this.initFireAction(b, 'fire-rebuild');
       if (tavernData) this.initTavernInfo(b);
@@ -3252,9 +3374,15 @@ G.placementInfo = function (type, x, y) {
     if (type === 'forester') lines.push('砍伐会降低重叠食物林产量；可在建筑面板关闭砍伐育林。');
   }
   if (type === 'dock') {
-    result.water = G.countWaterInRadius(w, x, y, p.waterR);
-    lines.push(`工作范围 ±${p.waterR} 格（方形） · 水域 ${result.water} 格 / 满产参考 ${p.fullWater}`);
-    if (result.water < p.fullWater) { result.warning = true; lines.push('△ 可建但水域较少，单次渔获降低'); }
+    const fish = G.fishingPlacementSummary(x, y); result.fishing = fish; result.water = fish.raw;
+    lines.push(`全镇渔业：${fish.rule === 'shared' ? '共享可用水域' : '经典水域（旧档保留）'} · 工作范围 ±${p.waterR} 格（方形，建筑原点） · 满产参考 ${p.fullWater} 格`);
+    lines.push(`水域：原始 ${fish.raw} · 桥占 ${fish.blocked} · 可用 ${fish.free} · 重叠共享 ${fish.sharedTiles} · 共享口径有效 ${G.ui.fishingNumber(fish.effective)} 格`);
+    lines.push(`新屋下一批估计 ${fish.catch} 肉类（基础 ${fish.baseCatch}，已计当前工具规则）；假定本屋完工并配渔民，其他渔屋按当前实际在岗估算。`);
+    if (fish.affected.length) lines.push('相邻在岗渔屋基础每批（未计工具）：' + fish.affected.map(row => `#${row.id} ${row.before} → ${row.after}`).join('；'));
+    else lines.push('当前没有受此处新增在岗渔屋影响的邻屋。');
+    lines.push(fish.rule === 'shared' ? '桥梁工地即占水；0人/0上限/工地不竞争，休息和搬运仍计。只影响之后新接批次，当前任务与携货不变。' : '当前经典规则仍按原始水域计产，新建不会自动切换；可在渔屋或市政厅详情查看全镇一次性启用确认。');
+    lines.push('这是单批估计，不是年度或入库保证；教育影响工时，真实行走、劳动、送仓仍须完成。');
+    if ((fish.rule === 'shared' ? fish.effective : fish.raw) < p.fullWater) { result.warning = true; lines.push(fish.catch === 0 ? '⚠ 无可捕鱼水域，无法接新捕鱼批次' : '△ 有效水域不足满产参考，单次渔获较低'); }
   }
   if(type==='stockpile')lines.push('完工后：仅木/石/铁/煤/柴各增加250公共仓容，零常驻工人；不是独立地方库存。');
   if (check.ok) {
