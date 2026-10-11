@@ -2015,6 +2015,13 @@ G.ui = {
         <label for="pasture-stock-quantity">放入数量</label><input id="pasture-stock-quantity" type="number" min="1" max="12" step="1" value="2" inputmode="numeric"><button type="submit" id="pasture-stock">放入牧场</button></form>
       <form id="pasture-target-form" class="economy-form"><h3>繁殖与保留数量</h3><label for="pasture-target-quantity" data-economy-live="pasture-target-range"></label><input id="pasture-target-quantity" type="number" min="2" max="12" step="1" value="${Number(b.animalTarget) || 8}" inputmode="numeric"><button type="submit">应用保留数量</button>
         <p class="desc" data-economy-live="pasture-rule"></p><p class="desc">至少两头同种牲畜且牧人实际照料才繁殖。保留数只控制超额屠宰。已屠宰产物逐批搬运，库存满则保留；牧场内待送产物未搬空不能拆场。</p></form>
+      <section data-pasture-split><h3>分群扩场</h3>
+        <label for="pasture-split-target">同种空牧场（确认时检查通路）</label><select id="pasture-split-target"></select>
+        <p class="desc" data-pasture-split-status></p>
+        <div class="economy-actions"><button type="button" id="pasture-split-start">查看分群方案</button></div>
+        <div class="hidden" data-pasture-split-confirm role="group" aria-label="确认牲畜分群"><p class="desc" data-pasture-split-quote></p><div class="economy-actions"><button type="button" id="pasture-split-confirm">确认分群</button><button type="button" id="pasture-split-cancel">取消</button></div></div>
+        <p class="desc">满10头后可分出一半到同种空场。沿用按畜群数量直接安置的规则，不模拟逐头赶路；两场必须连通。保留量与工人不自动调整，新场需牧人实际照料。已产羊毛、肉皮和在途货留原场。</p>
+      </section>
       <p class="economy-message" data-economy-message role="status" aria-live="polite"></p>
     </section>`;
     if (b.type === 'orchard') return `<section class="economy-details" data-economy="orchard"><p data-economy-live="orchard-age"></p><p data-economy-live="orchard-harvest"></p><p class="desc">种子永久解锁后，工人照料幼树约 4 年才结果。秋季采收，果实归入蔬菜；冬季未收果实损失。</p></section>`;
@@ -2068,8 +2075,31 @@ G.ui = {
         const qty = Number(el.querySelector('#pasture-target-quantity').value);
         message(G.setPastureTarget(b, qty) ? `保留数量已设为 ${qty} 头，超出部分由牧人屠宰。` : `请输入 2–${G.pastureSummary(b).cap} 的整数。`);
       });
+      this.initPastureSplit(b);
     }
     this.refreshEconomyInfo(b);
+  },
+
+  pastureSplitOptions:function(b){return G.world.buildings.filter(x=>x!==b&&x.type==='pasture'&&x.state==='ok'&&G.pastureTypeOf(x)===G.pastureTypeOf(b)&&!(x.animals>0));},
+  refreshPastureSplit:function(b){
+    const el=this.el.info,panel=el.querySelector('[data-pasture-split]');if(!panel)return;
+    const select=panel.querySelector('#pasture-split-target'),start=panel.querySelector('#pasture-split-start'),box=panel.querySelector('[data-pasture-split-confirm]'),status=panel.querySelector('[data-pasture-split-status]');if(!select||!start||!box||!status)return;
+    const options=this.pastureSplitOptions(b),signature=options.map(x=>x.id+':'+G.pastureTypeOf(x)).join(',');
+    if(panel._splitOptions!==signature){const previous=select.value;select.innerHTML=options.length?options.map(x=>`<option value="${x.id}">牧场 #${x.id}（${x.x},${x.y}）</option>`).join(''):'<option value="">没有同种已建成空场</option>';select.value=options.some(x=>String(x.id)===previous)?previous:options.length?String(options[0].id):'';panel._splitOptions=signature;}
+    const target=G.world.bmap[Number(select.value)],q=G.pastureSplitFacts(b,target);start.disabled=!q.ok;
+    status.textContent=q.ok?`本场${q.sourceCount}头，可分${q.qty}头，留下${q.left}头种畜。新场按现有保留量${target.animalTarget||8}头运行；实际连通性在查看与确认时检查。`:q.reason;
+    if(panel._splitQuote&&(!q.ok||q.key!==panel._splitQuote.key||(G.hasOpenModal&&G.hasOpenModal()))){panel._splitQuote=null;box.classList.add('hidden');const msg=el.querySelector('[data-economy-message]');if(msg&&!(G.hasOpenModal&&G.hasOpenModal()))msg.textContent='畜群、保留量或通路已变，请重新查看分群方案。';if(box.contains&&box.contains(document.activeElement)&&!(G.hasOpenModal&&G.hasOpenModal())){const focus=q.ok?start:el.querySelector('#info-close');if(focus&&focus.focus)focus.focus();}}
+  },
+  initPastureSplit:function(b){
+    const el=this.el.info,w=G.world,g=G.game,panel=el.querySelector('[data-pasture-split]');if(!panel)return;
+    const select=panel.querySelector('#pasture-split-target'),start=panel.querySelector('#pasture-split-start'),confirm=panel.querySelector('#pasture-split-confirm'),cancel=panel.querySelector('#pasture-split-cancel'),box=panel.querySelector('[data-pasture-split-confirm]'),quote=panel.querySelector('[data-pasture-split-quote]'),msg=el.querySelector('[data-economy-message]');
+    if(!select||!start||!confirm||!cancel||!box||!quote)return;
+    const reset=()=>{panel._splitQuote=null;box.classList.add('hidden');};reset();
+    const valid=()=>G.world===w&&G.game===g&&this.el.info===el&&!el.classList.contains('hidden')&&G.sel?.kind==='b'&&G.sel.id===b.id&&w.bmap[b.id]===b&&b.state==='ok'&&el.querySelector('[data-pasture-split]')===panel&&!(G.hasOpenModal&&G.hasOpenModal());
+    select.addEventListener('change',()=>{reset();if(valid())this.refreshPastureSplit(b);});
+    start.addEventListener('click',e=>{if(!valid()||e.detail>1){reset();return;}const target=w.bmap[Number(select.value)],q=G.pastureSplitQuote(b,target);if(!q.ok){reset();if(msg)msg.textContent=q.reason;return;}panel._splitQuote={key:q.key,target};quote.textContent=`将${q.qty}头${G.LIVESTOCK[q.type].name}直接分入牧场 #${target.id}（${target.x},${target.y}），本场留下${q.left}头。总头数不增加，繁殖进度守恒；不移动羊毛、肉皮、携货和工人。目标保留量${target.animalTarget||8}头，超过时会由牧人正常屠宰。新场须实际照料才继续繁殖。`;box.classList.remove('hidden');if(confirm.focus)confirm.focus();});
+    cancel.addEventListener('click',()=>{reset();if(valid()&&start.focus)start.focus();});
+    confirm.addEventListener('click',e=>{if(!valid()||!panel._splitQuote||e.detail>1){reset();return;}const pending=panel._splitQuote;reset();const result=G.splitPasture(b,pending.target,pending.key);if(msg)msg.textContent=result.ok?`已分${result.qty}头${G.LIVESTOCK[result.type].name}到另一牧场；请分别检查保留量和用工。`:result.reason;this.refreshEconomyInfo(b);const close=el.querySelector('#info-close');if(result.ok&&close&&close.focus)close.focus();});
   },
 
   tradeQuote: function (b) {
@@ -2122,6 +2152,7 @@ G.ui = {
       el.querySelector('#pasture-stock').disabled=d.bank<=0||d.animals>=d.cap;
       el.querySelector('#pasture-type-apply').disabled=!!d.switchReason;
       el.querySelector('#pasture-stock-quantity').max=String(d.cap);el.querySelector('#pasture-target-quantity').max=String(d.cap);
+      this.refreshPastureSplit(b);
       const output=el.querySelector('[data-pasture-output]');if(output){const html='产出：'+G.productionOutputsOf(b).filter(k=>k!=='food').map(k=>`${this.resourceIcon(k)}${G.RES[k].name}`).join(' · ');if(output.innerHTML!==html)output.innerHTML=html;}
     } else {
       const unlocked = G.game.unlocks && G.game.unlocks.orchard, age = b.orchardAge || 0;

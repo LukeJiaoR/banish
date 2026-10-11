@@ -2315,6 +2315,40 @@ G.stockPasture = function(b,qty,type=G.pastureTypeOf(b)){
   G.ensureEconomyBuilding(b);if(qty>(G.game.livestock[type]||0)||b.animals+qty>G.LIVESTOCK[type].cap)return false;
   G.game.livestock[type]-=qty;b.animals+=qty;G.game.schedT=0;return true;
 };
+/* Herd counts use the existing direct-placement abstraction, not a new animal
+ * courier. Quotes are pure; expensive reachability runs only on preview/commit. */
+G.pastureSplitFacts=function(source,target){
+  const w=G.world,live=b=>b&&w.bmap[b.id]===b&&b.type==='pasture'&&b.state==='ok';
+  if(!live(source))return {ok:false,reason:'源牧场尚不可用'};
+  const type=G.pastureTypeOf(source),count=source.animals||0,qty=Math.floor(count/2);
+  if(count<10)return {ok:false,reason:'至少10头同种牲畜才能分群；请先调高保留量并等待繁殖'};
+  if(!live(target)||target===source)return {ok:false,reason:'请选择另一座已建成的同种空牧场'};
+  if(G.pastureTypeOf(target)!==type)return {ok:false,reason:'目标物种不同，请先在空场设置为同种牲畜'};
+  if(target.animals>0)return {ok:false,reason:'分群目标必须是空牧场'};
+  const pending=G.pastureSwitchReason(target);if(pending)return {ok:false,reason:'目标仍有旧产物或任务：'+pending};
+  if(qty>G.LIVESTOCK[type].cap||count-qty<2)return {ok:false,reason:'目标容量不足或源场种畜不足'};
+  const fromGrowth=source.animalGrowth||0,toGrowth=target.animalGrowth||0,sourceTarget=source.animalTarget||8,targetTarget=target.animalTarget||8;
+  return {ok:true,type,qty,left:count-qty,sourceCount:count,fromGrowth,toGrowth,sourceTarget,targetTarget,
+    key:[source.id,target.id,type,count,fromGrowth,toGrowth,sourceTarget,targetTarget,G.game.day,w.navigationRevision||0].join(':')};
+};
+G.pastureSplitQuote=function(source,target){
+  const q=G.pastureSplitFacts(source,target);if(!q.ok)return q;
+  const x=source.x+Math.floor(source.w/2),y=source.y+Math.floor(source.h/2);
+  if(G.tileBlocked(G.world,x,y)||!G.workSpot(G.world,target,x,y))return {ok:false,reason:'两座牧场之间没有可达通路，请先修通道路或完成桥梁'};
+  return q;
+};
+G.splitPasture=function(source,target,key){
+  const q=G.pastureSplitQuote(source,target);if(!q.ok)return q;
+  if(typeof key!=='string'||key!==q.key)return {ok:false,reason:'畜群、日期或通路已变，请重新查看并确认分群'};
+  const totalGrowth=q.fromGrowth+q.toGrowth;
+  target.animalGrowth=Math.min(1,q.toGrowth+q.fromGrowth*q.qty/q.sourceCount);
+  source.animalGrowth=Math.max(0,totalGrowth-target.animalGrowth);
+  source.animals-=q.qty;target.animals=q.qty;
+  // New occupants must be tended here; source care is not a destination receipt.
+  delete target.tendedDay;
+  source.noWork=target.noWork=false;source.warnText=target.warnText='';G.game.schedT=0;
+  return {ok:true,qty:q.qty,type:q.type};
+};
 G.setPastureTarget = function(b,qty){if(!b||G.world.bmap[b.id]!==b||b.type!=='pasture'||b.state!=='ok'||!Number.isInteger(qty)||qty<2||qty>G.LIVESTOCK[G.pastureTypeOf(b)].cap)return false;b.animalTarget=qty;return true;};
 G.pastureTaskCurrent=(c,t)=>!!(t?.economy==='pasture'&&t.b?.type==='pasture'&&G.world.bmap[t.b.id]===t.b&&t.b.state==='ok'&&c.job===t.b.id&&(!t.pastureType||t.pastureType===G.pastureTypeOf(t.b)));
 G.atPastureWork=(c,t)=>G.pastureTaskCurrent(c,t)&&G.atMedicalDoor(c,t.b)&&G.d2(c.x,c.y,t.tx,t.ty)<.04&&!G.tileBlocked(G.world,t.tx,t.ty);
