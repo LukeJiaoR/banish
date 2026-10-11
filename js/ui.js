@@ -1900,7 +1900,8 @@ G.ui = {
     const merchantChanged = tradePanel && tradePanel._merchant !== selected.merchant;
     // A new boat gets new callbacks. Keep drafts, but never reuse a previous
     // merchant's pay/order button or carry its keyboard focus onto a new deal.
-    const tradeDraft = merchantChanged ? Object.fromEntries(['trade-target-resource', 'trade-target-quantity', 'trade-good', 'trade-buy-quantity', 'trade-payment', 'trade-order-good', 'trade-order-quantity'].map(id => [id, el.querySelector('#' + id)?.value])) : null;
+    const tradeDraft = merchantChanged ? Object.fromEntries(['trade-target-resource', 'trade-target-quantity', 'trade-good', 'trade-buy-quantity', 'trade-payment', 'trade-order-good', 'trade-order-quantity', 'auto-trade-enabled', 'auto-trade-good', 'auto-trade-quantity', 'auto-trade-payment', 'auto-trade-price'].map(id => [id, el.querySelector('#' + id)?.value])) : null;
+    const autoTradeOpen = merchantChanged && el.querySelector('[data-auto-trade]')?.open;
     if (merchantChanged) force = true;
     // Workforce facts must update before every specialized panel's early return.
     if (sameSelection && G.sel.kind === 'b' && this._infoBuildState === selected.state) this.refreshWorkforceInfo(selected);
@@ -1935,7 +1936,8 @@ G.ui = {
     const workforceInput = sameSelection && this._infoBuildState === selected.state && el.querySelector && el.querySelector('#worker-limit-input');
     const workforceDraft = workforceInput ? workforceInput.value : null;
     const merchantActionChanged = merchantChanged && active && ['trade-execute', 'trade-order-confirm', 'trade-order-cancel'].includes(active.id);
-    const focusSelector = destructiveActionChanged ? '#info-close' : merchantActionChanged ? '#trade-good' : hadFocus ? (active.id ? '#' + active.id : active.dataset.tl ? '[data-tl="' + active.dataset.tl + '"]' : active.dataset.fl ? '[data-fl="' + active.dataset.fl + '"]' : active.dataset.k ? '[data-k="' + active.dataset.k + '"]' : null) : null;
+    const autoTradeActionChanged = merchantChanged && active && ['auto-trade-confirm', 'auto-trade-cancel'].includes(active.id);
+    const focusSelector = destructiveActionChanged ? '#info-close' : merchantActionChanged ? '#trade-good' : autoTradeActionChanged ? '#auto-trade-apply' : hadFocus ? (active.id ? '#' + active.id : active.dataset.tl ? '[data-tl="' + active.dataset.tl + '"]' : active.dataset.fl ? '[data-fl="' + active.dataset.fl + '"]' : active.dataset.k ? '[data-k="' + active.dataset.k + '"]' : null) : null;
     this._infoWorld = w;
     this._infoGame = G.game;
     this._infoElement = el;
@@ -2071,6 +2073,8 @@ G.ui = {
           const node = el.querySelector('#' + id);
           if (node && value !== undefined && (id !== 'trade-order-good' || G.merchantProfile(b)?.goods.includes(value))) node.value = value;
         }
+        const autoPanel = el.querySelector('[data-auto-trade]');
+        if (autoPanel) autoPanel.open = !!autoTradeOpen;
         this.refreshEconomyInfo(b);
       }
     } else {
@@ -2179,8 +2183,9 @@ G.ui = {
           <label for="trade-order-quantity">订货数量</label><input id="trade-order-quantity" type="number" min="1" max="400" step="1" value="1" inputmode="numeric" aria-describedby="trade-order-note">
           <p data-economy-live="order-quote" role="status" aria-live="polite"></p>
           <div class="economy-actions"><button type="submit" id="trade-order-confirm">确认一次订货</button><button type="button" id="trade-order-cancel">取消待到货订单</button></div>
-          <p class="desc" id="trade-order-note">无需预付款，不会自动交易。每站每位商人只保留一份一次性订单；只能在该商人停靠时替换或取消。订单在同一商人下次到达时带来并清除，下一艘船可能是别的商人。到货单价为原价 × 1.25 向下取整，须手动支付购买；其他货物仍按普通价。未买货物会随船离开。</p>
+          <p class="desc" id="trade-order-note">订单本身无需预付款，不会自动交易。每站每位商人只保留一份一次性订单；只能在该商人停靠时替换或取消。订单在同一商人下次到达时带来并清除，下一艘船可能是别的商人。到货单价为原价 × 1.25 向下取整，须手动支付购买（另行启用下方自动购买时会按规则检查）；其他货物仍按普通价。未买货物会随船离开。</p>
         </form>
+        ${this.autoTradeInfoMarkup(b)}
         <p class="economy-message" data-economy-message role="status" aria-live="polite"></p>
       </section>`;
     }
@@ -2263,7 +2268,7 @@ G.ui = {
         const quote = this.merchantOrderQuote(b);
         if (!quote.ok) { message(quote.reason); return; }
         const result = G.orderMerchantGoods(b, quote.good, quote.qty, renderedMerchant);
-        message(result.ok ? `已向${G.merchantProfile(b).name}订${G.TRADE_GOODS[quote.good].name} × ${quote.qty}，无需预付款；由同一商人下次带来，到货后需手动交易。` : result.reason || '订货未完成。');
+        message(result.ok ? `已向${G.merchantProfile(b).name}订${G.TRADE_GOODS[quote.good].name} × ${quote.qty}，无需预付款；由同一商人下次带来，${b.autoTrade?.enabled ? '到货后可手动交易；已启用的自动购买会另按规则检查。' : '到货后需手动交易。'}` : result.reason || '订货未完成。');
       });
       const cancelOrder = el.querySelector('#trade-order-cancel');
       cancelOrder.addEventListener('click', () => {
@@ -2272,6 +2277,7 @@ G.ui = {
         message(result.ok ? '已取消这位商人的待到货订单；未扣除任何待售物资。' : result.reason || '没有可取消的订单。');
         this.refreshEconomyInfo(b);
       });
+      this.initAutoTradeInfo(b);
     }
     if(b.type==='orchard')onSubmit('orchard-replant-form',()=>{const value=el.querySelector('#orchard-replant').value;message(['on','off'].includes(value)&&G.setOrchardReplant(b,value==='on')?value==='on'?'允许新补种；需农夫到空树位劳动。':'已暂停新补种；现果、养护与已开始的工作继续。':'补种设置无效');});
     if (b.type === 'pasture') {
@@ -2311,6 +2317,120 @@ G.ui = {
     confirm.addEventListener('click',e=>{if(!valid()||!panel._splitQuote||e.detail>1){reset();return;}const pending=panel._splitQuote;reset();const result=G.splitPasture(b,pending.target,pending.key);if(msg)msg.textContent=result.ok?`已分${result.qty}头${G.LIVESTOCK[result.type].name}到另一牧场；请分别检查保留量和用工。`:result.reason;this.refreshEconomyInfo(b);const close=el.querySelector('#info-close');if(result.ok&&close&&close.focus)close.focus();});
   },
 
+  autoTradeInfoMarkup: function (b) {
+    if (!G.autoTradeSummary || !G.autoTradeConfigReason || !G.setAutoTrade) return '';
+    const rule = G.autoTradeSummary(b).rule;
+    const options = (catalog, selected, label) => Object.keys(catalog).map(key => `<option value="${key}"${key === selected ? ' selected' : ''}>${this.escHtml(label(key))}</option>`).join('');
+    return `<p class="row" data-auto-trade-status role="status" aria-live="polite"></p>
+      <p class="row" data-auto-trade-receipt></p>
+      <details class="trade-inventory" data-auto-trade>
+        <summary id="auto-trade-summary">④ 自动购买设置（默认关闭）</summary>
+        <form id="auto-trade-form" class="economy-form">
+          <p class="desc">本站只保留一条规则。编辑草稿不会改变已应用规则；数量上限只限每船自动购买，手动交易仍可另买，自行选货、数量和付款物资。</p>
+          <label for="auto-trade-enabled">规则状态</label><select id="auto-trade-enabled"><option value="off"${!rule.enabled ? ' selected' : ''}>关闭</option><option value="on"${rule.enabled ? ' selected' : ''}>启用：仅未来商船到达时</option></select>
+          <label for="auto-trade-good">购买一种货物</label><select id="auto-trade-good">${options(G.TRADE_GOODS, rule.good, key => G.TRADE_GOODS[key].name + '（每船上限 ' + G.TRADE_GOODS[key].stock + '）')}</select>
+          <label for="auto-trade-quantity">每船自动购买数量（整批）</label><input id="auto-trade-quantity" type="number" min="1" max="${G.TRADE_GOODS[rule.good].stock}" step="1" value="${rule.qty}" inputmode="numeric">
+          <label for="auto-trade-payment">只用本站一种库存支付</label><select id="auto-trade-payment">${options(G.TRADE_VALUES, rule.payment, key => G.RES[key].name + '（价值 ' + G.TRADE_VALUES[key] + '）')}</select>
+          <label for="auto-trade-price">最高货物单价（1–1000000 整数价值）</label><input id="auto-trade-price" type="number" min="1" max="1000000" step="1" value="${rule.maxPrice}" inputmode="numeric">
+          <p data-auto-trade-draft class="trade-quote" role="status" aria-live="polite"></p>
+          <div class="economy-actions"><button type="submit" id="auto-trade-apply">查看启用方案</button><button type="button" id="auto-trade-disable">关闭已应用规则</button></div>
+          <div data-auto-trade-confirm class="hidden">
+            <p data-auto-trade-terms role="status" aria-live="polite"></p>
+            <div class="economy-actions"><button type="button" id="auto-trade-confirm" disabled>确认应用，仅未来商船生效</button><button type="button" id="auto-trade-cancel">取消应用</button></div>
+          </div>
+          <p class="desc">只在未来每艘船到达时检查一次，当前停靠船不补买，离港不执行。按含订货溢价的实际单价检查；超价、缺货、拒收付款、库存或容量不足时跳过整批，不分批、不重试。只扣已搬入本站的游戏库存，不动全镇库存或在途货。普通买入物资占本站容量（含在途占位），种子永久解锁，牲畜进入待安置数量。工人上限 0 会停止备货与运回，但自动规则仍可用现有站内库存成交；要停止自动成交请关闭规则。</p>
+        </form>
+      </details>`;
+  },
+
+  autoTradeDraft: function () {
+    const el = this.el.info, find = id => el.querySelector('#auto-trade-' + id);
+    const state = find('enabled')?.value;
+    if (!['off', 'on'].includes(state)) return { ok: false, reason: '请选择启用或关闭。' };
+    const number = id => { const value = find(id)?.value; return value && value.trim() !== '' ? Number(value) : NaN; };
+    const rule = { enabled: state === 'on', good: find('good')?.value, qty: number('quantity'), payment: find('payment')?.value, maxPrice: number('price') };
+    const reason = G.autoTradeConfigReason(rule);
+    return { ok: !reason, reason, rule, key: JSON.stringify(rule) };
+  },
+
+  autoTradeTerms: function (rule) {
+    const cap = G.TRADE_GOODS[rule.good].stock, paymentValue = G.TRADE_VALUES[rule.payment];
+    const maximum = Math.ceil(rule.maxPrice * rule.qty / paymentValue);
+    return `仅未来商船到达时：每船整批购买${G.TRADE_GOODS[rule.good].name} × ${rule.qty}（货物每船上限 ${cap}），最高单价 ${rule.maxPrice}，只用本站${G.RES[rule.payment].name}库存支付。每船最多支付 ${maximum} ${G.RES[rule.payment].name}（${rule.maxPrice} × ${rule.qty} ÷ ${paymentValue}，向上取整）；实际按到货单价结算。只使用已搬入本站的游戏库存，不动全镇库存或在途货。当前停靠船不会补买；不足整批或其他条件不符就跳过，本船不再重试。`;
+  },
+
+  refreshAutoTradeInfo: function (b) {
+    const el = this.el.info, panel = el.querySelector('[data-auto-trade]');
+    if (!panel) return;
+    const set = (selector, text) => { const node = el.querySelector(selector); if (node && node.textContent !== text) node.textContent = text; };
+    const summary = G.autoTradeSummary(b), rule = summary.rule, last = summary.last, draft = this.autoTradeDraft();
+    set('[data-auto-trade-status]', rule.enabled ? `已应用：自动购买已启用，每船${G.TRADE_GOODS[rule.good].name} × ${rule.qty}，最高单价 ${rule.maxPrice}，最多支付本站${G.RES[rule.payment].name} × ${summary.maxPayment}。仅未来到达时生效，当前船不补买。` : '已应用：自动购买已关闭。不会自动扣库存；手动交易和订货仍可使用。');
+    if (last) {
+      const date = `第 ${last.day + 1} 天（历史回执）`, merchant = G.MERCHANTS[last.merchantId]?.name || '商船';
+      const goods = `${G.TRADE_GOODS[last.good]?.name || last.good} × ${last.qty}`, payment = G.RES[last.payment]?.name || last.payment;
+      set('[data-auto-trade-receipt]', `最近自动购买：${date}，${merchant}，当时规则${goods}，${last.ok ? `已成交，单价 ${last.unitPrice}，支付${payment} × ${last.paid}` : `当时拟用${payment}支付，已跳过，未扣库存：${last.reason}`}。此为当时结果，修改或关闭规则不会改写。`);
+    } else set('[data-auto-trade-receipt]', '最近自动购买：尚无到访执行记录。当前船不会因启用或修改规则而补买。');
+    const qty = panel.querySelector('#auto-trade-quantity');
+    if (qty) qty.max = String(G.TRADE_GOODS[draft.rule?.good]?.stock || 1);
+    set('[data-auto-trade-draft]', draft.ok ? `${draft.rule.enabled ? '待确认的草稿' : '关闭状态草稿'}：${this.autoTradeTerms(draft.rule)}` : draft.reason);
+    const apply = panel.querySelector('#auto-trade-apply'), disable = panel.querySelector('#auto-trade-disable');
+    apply.disabled = !draft.ok;
+    apply.textContent = draft.ok && !draft.rule.enabled ? '保存关闭的规则' : rule.enabled ? '查看更改方案' : '查看启用方案';
+    disable.disabled = !rule.enabled;
+    if (panel._autoTradePending && (!draft.ok || draft.key !== panel._autoTradePending.key || JSON.stringify(rule) !== panel._autoTradePending.applied || !panel._autoTradeValid())) panel._autoTradeReset();
+  },
+
+  initAutoTradeInfo: function (b) {
+    const el = this.el.info, w = G.world, game = G.game, panel = el.querySelector('[data-auto-trade]');
+    if (!panel) return;
+    const economy = el.querySelector('[data-economy="tradingpost"]'), merchant = b.merchant;
+    const find = id => panel.querySelector('#auto-trade-' + id), form = find('form'), apply = find('apply'), confirm = find('confirm'), cancel = find('cancel'), disable = find('disable');
+    const box = panel.querySelector('[data-auto-trade-confirm]');
+    const message = text => { const node = el.querySelector('[data-economy-message]'); if (node) node.textContent = text; };
+    const valid = () => G.world === w && G.game === game && this.el.info === el && !el.classList.contains('hidden') &&
+      G.sel?.kind === 'b' && G.sel.id === b.id && w.bmap[b.id] === b && b.type === 'tradingpost' && b.state === 'ok' &&
+      el.querySelector('[data-auto-trade]') === panel && el.querySelector('[data-economy="tradingpost"]') === economy && b.merchant === merchant && !(G.hasOpenModal && G.hasOpenModal());
+    const reset = () => {
+      panel._autoTradePending = null; box.classList.add('hidden'); confirm.disabled = true;
+      if (box.contains(document.activeElement) && valid()) { const target = panel.open ? apply : find('summary'); if (target && target.focus) target.focus(); }
+    };
+    panel._autoTradeReset = reset; panel._autoTradeValid = valid; reset();
+    const guard = () => { if (valid()) return true; reset(); return false; };
+    const save = rule => {
+      const result = G.setAutoTrade(b, rule, game);
+      message(result.ok ? rule.enabled ? '自动购买规则已应用，仅未来到达的商船生效；当前船不会补买，未扣库存。' : '自动购买已关闭；只更改规则，未扣库存，也不退回已完成的交易。' : result.reason || '规则未应用。');
+      this.refreshAutoTradeInfo(b);
+      return result.ok;
+    };
+    for (const id of ['enabled', 'good', 'quantity', 'payment', 'price']) {
+      const node = find(id);
+      for (const event of ['input', 'change']) node.addEventListener(event, () => { reset(); if (guard()) this.refreshAutoTradeInfo(b); });
+    }
+    panel.addEventListener('toggle', () => { if (!panel.open) reset(); });
+    form.addEventListener('submit', e => {
+      e.preventDefault(); if (!guard()) return;
+      reset(); const draft = this.autoTradeDraft();
+      if (!draft.ok) { message(draft.reason); this.refreshAutoTradeInfo(b); return; }
+      if (!draft.rule.enabled) { save(draft.rule); return; }
+      panel._autoTradePending = { key: draft.key, applied: JSON.stringify(G.autoTradeSummary(b).rule), rule: { ...draft.rule } };
+      panel.querySelector('[data-auto-trade-terms]').textContent = '确认应用：' + this.autoTradeTerms(draft.rule);
+      box.classList.remove('hidden'); confirm.disabled = false; if (confirm.focus) confirm.focus();
+    });
+    confirm.addEventListener('click', e => {
+      if (!guard() || e.detail > 1) { reset(); return; }
+      const pending = panel._autoTradePending, draft = this.autoTradeDraft();
+      reset();
+      if (!pending || !draft.ok || pending.key !== draft.key || pending.applied !== JSON.stringify(G.autoTradeSummary(b).rule)) return;
+      save(pending.rule);
+    });
+    cancel.addEventListener('click', () => { reset(); if (guard() && apply.focus) apply.focus(); });
+    disable.addEventListener('click', () => {
+      if (!guard()) return;
+      reset(); const rule = G.autoTradeSummary(b).rule;
+      if (rule.enabled && save({ ...rule, enabled: false })) { find('enabled').value = 'off'; this.refreshAutoTradeInfo(b); }
+    });
+  },
+
   tradeQuote: function (b) {
     const el = this.el.info;
     const find = id => el.querySelector ? el.querySelector('#' + id) : document.getElementById(id);
@@ -2338,7 +2458,7 @@ G.ui = {
     const seedReason = G.seedTradeReason(good, qty);
     if (seedReason) return { ok: false, reason: seedReason };
     const unitPrice = Math.floor(offer.price * 1.25);
-    return { ok: true, good, qty, unitPrice, text: `${profile.name}下次回访将带来${offer.name} × ${qty}，订货单价 ${unitPrice}（原价 ${offer.price} × 1.25 向下取整）。无需预付款；到货后手动交易。` };
+    return { ok: true, good, qty, unitPrice, text: `${profile.name}下次回访将带来${offer.name} × ${qty}，订货单价 ${unitPrice}（原价 ${offer.price} × 1.25 向下取整）。无需预付款；${b.autoTrade?.enabled ? '到货后可手动交易，已启用的自动购买会另按规则检查。' : '到货后手动交易。'}` };
   },
 
   refreshEconomyInfo: function (b) {
@@ -2375,7 +2495,7 @@ G.ui = {
       for (const option of el.querySelector('#trade-payment').querySelectorAll('option')) option.disabled = !!merchant && !G.merchantAccepts(b, option.value);
       const pending = merchant && order.pending;
       const returnText = merchant && Number.isFinite(order.returnDay) ? `同一商人预计约 ${Math.max(0, order.returnDay - G.game.day)} 天后回访（下一艘船可能不同）。` : '';
-      set('[data-economy-live="merchant-order"]', merchant ? (pending ? `待到货：${G.TRADE_GOODS[pending.good].name} × ${pending.qty}。` : '这位商人暂无待到货订单。') + returnText + (order.arrivedGood ? `本次已带到${G.TRADE_GOODS[order.arrivedGood].name}，订单已清除；购买仍需手动确认。` : '') : '商人未停靠，暂不能订货、替换或取消订单。');
+      set('[data-economy-live="merchant-order"]', merchant ? (pending ? `待到货：${G.TRADE_GOODS[pending.good].name} × ${pending.qty}。` : '这位商人暂无待到货订单。') + returnText + (order.arrivedGood ? `本次已带到${G.TRADE_GOODS[order.arrivedGood].name}，订单已清除；${b.autoTrade?.enabled ? '自动购买结果见下方历史回执，剩余货物可手动确认购买。' : '购买仍需手动确认。'}` : '') : '商人未停靠，暂不能订货、替换或取消订单。');
       const otherOrders = (order.pendingOrders || []).filter(item => !merchant || item.merchantId !== order.merchantId);
       set('[data-economy-live="merchant-orders"]', otherOrders.length ? '等待其他商人回访：' + otherOrders.map(item => `${item.name} · ${G.TRADE_GOODS[item.good].name} × ${item.qty}（订货单价 ${item.unitPrice}）`).join('；') + '。须等该商人停靠后才能修改。' : '');
       const orderQuote = this.merchantOrderQuote(b), confirm = el.querySelector('#trade-order-confirm'), cancel = el.querySelector('#trade-order-cancel');
@@ -2385,6 +2505,7 @@ G.ui = {
       const orderGood = el.querySelector('#trade-order-good'), orderQuantity = el.querySelector('#trade-order-quantity');
       orderGood.disabled = !merchant; orderQuantity.disabled = !merchant;
       orderQuantity.max = String(G.TRADE_GOODS[orderGood.value]?.stock || 400);
+      this.refreshAutoTradeInfo(b);
     } else if (b.type === 'pasture') {
       const d=G.pastureSummary(b),bank=G.game.livestock;
       set('[data-economy-live="animals"]', `${d.name}群 ${d.animals}/${d.cap} 头 · 当前保留 ${d.target} 头`);
