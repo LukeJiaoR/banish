@@ -220,8 +220,7 @@ G.endDay = function () {
   }
   if (G.hasTools()) g.warned.noTools = false;
   if (g.warned.storageFull) { // 满仓提示在腾出空间后复位
-    const fullest = Math.max(...G.RES_KEYS.filter(k => !G.isTool(k)).map(k => g.res[k]));
-    if (fullest < G.storageCap() - 50) g.warned.storageFull = false;
+    if (G.RES_KEYS.filter(k=>!G.isTool(k)).every(k=>g.res[k]<G.storageCap(k)-50)) g.warned.storageFull = false;
   }
 
   g.foodNet = g.res.food - g.prevFood;
@@ -607,7 +606,7 @@ G.alternateTaskEndpoint = function (c, t) {
   if (t.kind === 'clearSite' && (!t.tree || G.world.trees[G.world.treeIdx[t.tree.i]] !== t.tree)) return null;
   if (['care', 'clinic', 'arrival', 'leisure', 'host', 'study', 'teach'].includes(t.kind)) return G.workSpot(G.world, t.b, c.x, c.y, true);
   if (t.kind === 'clearSite') return G.siteClearSpot(c, t.b, t.tree);
-  if (['firewood', 'trade', 'brew'].includes(t.kind) && t.phase === 'fetch') return G.storageRoute(c.x, c.y)?.spot || null;
+  if (['firewood', 'trade', 'brew'].includes(t.kind) && t.phase === 'fetch') return G.storageRoute(c.x,c.y,G.fetchStorageTypes(t))?.spot || null;
   if (t.kind === 'build' || t.kind === 'firewood' || t.kind === 'trade' || t.kind === 'brew' ||
       (t.kind === 'work' && ['dock', 'mine', 'stonequarry', 'blacksmith', 'pasture', 'orchard'].includes(t.b.type)))
     return G.workSpot(G.world, t.b, c.x, c.y, true);
@@ -721,10 +720,17 @@ G.resumeTask = function (c) {
 };
 
 /* 最近的可用仓库 */
-G.nearestStorage = function (x, y) {
+G.STOCKPILE_TYPES=['wood','stone','iron','coal','firewood'];
+G.STOCKPILE_CAP=250;
+G.storageAccepts=(b,types)=>!!b&&b.state==='ok'&&(b.type==='storage'||(b.type==='stockpile'&&types!=null&&(Array.isArray(types)?types:[types]).length>0&&(Array.isArray(types)?types:[types]).every(t=>G.STOCKPILE_TYPES.includes(t))));
+G.cargoStorageTypes=cargo=>[cargo.type,...Object.keys(cargo.extra||{}).filter(k=>cargo.extra[k]>0)];
+G.fetchStorageTypes=t=>t.kind==='trade'?t.resource:t.kind==='brew'?'grain':G.taskIngredients(t).map(x=>x.type);
+G.hasStorageBuilding=()=>G.world.buildings.some(b=>b.state==='ok'&&['storage','stockpile'].includes(b.type));
+G.atStorageDoor=(c,types)=>G.world.buildings.some(b=>G.storageAccepts(b,types)&&G.atMedicalDoor(c,b)&&!G.tileBlocked(G.world,Math.round(c.x),Math.round(c.y)));
+G.nearestStorage = function (x, y, types) {
   let best = null, bd = Infinity;
   for (const s of G.world.buildings) {
-    if (s.type !== 'storage' || s.state !== 'ok') continue;
+    if (!G.storageAccepts(s,types)) continue;
     const d = G.d2(x, y, s.x + s.w / 2, s.y + s.h / 2);
     if (d < bd) { bd = d; best = s; }
   }
@@ -732,10 +738,10 @@ G.nearestStorage = function (x, y) {
 };
 
 /* 找最近可达的交货点。直线最近仓库可能隔河，不能让它挡住其他可用仓库。 */
-G.storageRoute = function (x, y) {
+G.storageRoute = function (x, y, types) {
   const w = G.world, targets = [];
   for (const storage of w.buildings) {
-    if (storage.type !== 'storage' || storage.state !== 'ok') continue;
+    if (!G.storageAccepts(storage,types)) continue;
     for (let sy=storage.y-1;sy<=storage.y+storage.h;sy++)
       for (let sx=storage.x-1;sx<=storage.x+storage.w;sx++)
         if ((sx<storage.x||sx>=storage.x+storage.w||sy<storage.y||sy>=storage.y+storage.h)&&!G.tileBlocked(w,sx,sy)) targets.push({x:sx,y:sy,storage});
@@ -749,7 +755,7 @@ G.storageRoute = function (x, y) {
  * on staffing withdrawal share this bounded path. Ordinary unmarked cargo
  * keeps its existing delivery policy; the marker dies with its cargo object. */
 G.isMineralCargo = function (c) { return !!c.carry && (c.carry.staffingReturn===true || ['stone','iron','coal','ale','clothes','warmCoats'].includes(c.carry.type) || (c.carry.type==='grain' && c.carry.brewIngredient===true) || (Number.isInteger(c.carry.pastureId)&&['meat','leather','wool'].includes(c.carry.type))); };
-G.mineralStorageSpace = function (type) { return G.isTool(type) ? Infinity : Math.max(0, G.storageCap() - G.game.res[G.isFood(type)?'food':type]); };
+G.mineralStorageSpace = function (type) { return G.isTool(type) ? Infinity : Math.max(0, G.storageCap(type) - G.game.res[G.isFood(type)?'food':type]); };
 // Ordinary in-flight minerals remain eligible as before; only an already
 // blocked delivery cannot count as available labour or occupy a productive slot.
 G.mineralDeliveryBlocked = function (c) {
@@ -784,8 +790,8 @@ G.startMineralHaul = function (c) {
   c.haulPending = true;
   if(c.carry.qty<=0){G.finishMineralHaul(c);return;}
   if (G.mineralStorageSpace(c.carry.type) <= 0) { G.warnMineralStorage(); G.waitForMineralStorage(c, 'space'); return; }
-  if (!G.nearestStorage(c.x, c.y)) { G.finishMineralHaul(c); return; } // legacy no-warehouse save
-  const route = G.storageRoute(c.x, c.y);
+  if (!G.hasStorageBuilding()) { G.finishMineralHaul(c); return; } // legacy no-warehouse save
+  const route = G.storageRoute(c.x,c.y,G.cargoStorageTypes(c.carry));
   if (!route) { G.waitForMineralStorage(c, 'route'); return; }
   c.haulWait = ''; c.haulTo = route.storage.id; c.path = route.path; c.pi = 0; c.task = null;
   if (!c.path.length) G.finishMineralHaul(c);
@@ -793,28 +799,28 @@ G.startMineralHaul = function (c) {
 };
 /* Full minerals remain marked in the ground, without reserving food workers. */
 G.availableRockMarks = function (w) {
-  const cap = G.storageCap(), r = G.game.res;
-  if (r.stone < cap && r.iron < cap) return w.markedRocks;
-  return new Set([...(w.markedRocks || [])].filter(i => w.rock[i] === 2 ? r.iron < cap : r.stone < cap));
+  const r = G.game.res;
+  if (r.stone < G.storageCap('stone') && r.iron < G.storageCap('iron')) return w.markedRocks;
+  return new Set([...(w.markedRocks || [])].filter(i => {const type=w.rock[i]===2?'iron':'stone';return r[type]<G.storageCap(type);}));
 };
 
 /* 开始搬运去仓库 */
 G.startHaul = function (c) {
   if(c.staffingRelease!=null&&c.staffingRelease===c.job)G.markStaffingCargo(c);
   if (G.isMineralCargo(c)) { G.startMineralHaul(c); return; }
-  if (!G.nearestStorage(c.x, c.y)) { // 兼容旧的无仓存档：仍受仓储上限约束
+  if (!G.hasStorageBuilding()) { // 兼容旧的无仓存档：仍受仓储上限约束
     G.depositCargo(c.carry);
-    c.carry = null;
+    c.carry = null; c.haulTo=null;
     G.requestTask(c);
     return;
   }
-  const route = G.storageRoute(c.x, c.y);
-  if (!route) { c.task = null; c.path = null; c.state = 'idle'; c.wanderT = 2; return; }
+  const route = G.storageRoute(c.x,c.y,G.cargoStorageTypes(c.carry));
+  if (!route) { c.haulTo=null; c.task = null; c.path = null; c.state = 'idle'; c.wanderT = 2; return; }
   c.haulTo = route.storage.id;
   c.path = route.path; c.pi = 0; c.task = null;
   if (!c.path.length) {
     G.depositCargo(c.carry);
-    c.carry = null;
+    c.carry = null; c.haulTo=null;
     G.requestTask(c);
   } else c.state = 'haul';
 };
@@ -907,10 +913,10 @@ G.productionLimited = function (b) {
   if (b.type === 'forester') return G.goalPaused('wood') && !b.doPlant;
   if (b.type === 'stonequarry' || (b.type === 'mine' && G.mineModeOf(b) !== 'legacy')) {
     const type = b.type === 'stonequarry' ? 'stone' : G.mineModeOf(b);
-    return G.goalPaused(type) || G.game.res[type] >= G.storageCap();
+    return G.goalPaused(type) || G.game.res[type] >= G.storageCap(type);
   }
-  if (b.type === 'mine' && (G.productionGoalOf('stone') !== null || G.productionGoalOf('iron') !== null)) return (G.goalPaused('stone') || G.game.res.stone >= G.storageCap()) &&
-    (G.goalPaused('iron') || G.game.res.iron >= G.storageCap());
+  if (b.type === 'mine' && (G.productionGoalOf('stone') !== null || G.productionGoalOf('iron') !== null)) return (G.goalPaused('stone') || G.game.res.stone >= G.storageCap('stone')) &&
+    (G.goalPaused('iron') || G.game.res.iron >= G.storageCap('iron'));
   return false;
 };
 G.buildingGoalStatus = function (b) {
@@ -923,7 +929,7 @@ G.buildingGoalStatus = function (b) {
     const target = G.effectiveProductionGoal(type, b), local = ['woodcutter', 'blacksmith'].includes(b.type);
     const source = local ? `（全镇 ${G.productionGoalOf(type)} 与本屋 ${type === 'firewood' ? G.fuelLimitOf(b) : G.toolLimitOf(b)} 取较低值）` : '（全镇）';
     const state = G.goalPaused(type, b) ? (target === 0 ? '已关闭新生产' : `暂停新生产，库存≤${G.productionResumeAt(target)}恢复`)
-      : !G.isTool(type) && G.game.res[type] >= G.storageCap() ? '硬仓容已满' : '可接新生产';
+      : !G.isTool(type) && G.game.res[type] >= G.storageCap(type) ? '硬仓容已满' : '可接新生产';
     return `${G.RES[type].name}目标 ${target}${source}：${state}${b.type === 'forester' && G.goalPaused(type) && b.doPlant ? '；仍可补种育林' : ''}`;
   }).join('；');
 };
@@ -955,9 +961,10 @@ G.goalCommitment = function (c) {
 };
 
 /* 仓储上限：每座（建成的）仓库 +STORAGE_CAP，至少按 1 座计 */
-G.storageCap = function () {
+G.storageCap = function (type) {
   const n = G.world.buildings.filter(b => b.type === 'storage' && b.state === 'ok').length;
-  return G.STORAGE_CAP * Math.max(1, n);
+  const piles=G.STOCKPILE_TYPES.includes(type)?G.world.buildings.filter(b=>b.type==='stockpile'&&b.state==='ok').length:0;
+  return G.STORAGE_CAP * Math.max(1,n) + piles*G.STOCKPILE_CAP;
 };
 
 /* Food categories share the existing total food capacity. The total stays a
@@ -991,7 +998,7 @@ G.deposit = function (type, qty, retain=false) {
   if (type === 'food') type = 'grain'; // old carried food retains its quantity
   if (G.FOOD_KEYS.includes(type)) G.reconcileFood();
   const stock = G.FOOD_KEYS.includes(type) ? g.res.food : g.res[type];
-  const space = G.isTool(type) ? Infinity : Math.max(0, G.storageCap() - stock);
+  const space = G.isTool(type) ? Infinity : Math.max(0, G.storageCap(type) - stock);
   const got = Math.min(qty, space); g.res[type] = (g.res[type] || 0) + got;
   if (G.FOOD_KEYS.includes(type)) g.res.food += got;
   G.ledgerRecord('received',type,got);
@@ -1004,6 +1011,7 @@ G.deposit = function (type, qty, retain=false) {
 
 /* 背料到达仓库：转入回屋加工段。返回 false = 仓库没料（白跑） */
 G.firewoodFetchDone = function (c, t) {
+  if(G.hasStorageBuilding()&&!G.atStorageDoor(c,G.fetchStorageTypes(t)))return false;
   if (G.taskIngredients(t).some(item=>G.game.res[item.type]<item.qty)) return false;
   const spot = G.workSpot(G.world, t.b, c.x, c.y);
   if (!spot) return false;
@@ -1072,7 +1080,10 @@ G.detourCitizen = function (c, dtH) {
     if(c.task&&['study','teach'].includes(c.task.kind)){const b=c.task.b;b.warnText='上学路线受阻';G.clearSchoolTasks(c);c.schoolWaitReason='上学路线受阻，保留学籍等待通路';c.wanderT=4;return;}
     if (c.task && c.task.kind === 'care') { G.cancelMedicalCare(c); return; }
     if(G.isLeisureVisitor(c)){G.cancelLeisure(c);return;}
-    if (c.state === 'haul' && G.isMineralCargo(c)) { c.haulPending = true; G.waitForMineralStorage(c, 'route'); }
+    // A route to the old door may be lost while another compatible store is
+    // still reachable. Replan the destination, not just the same door. If none
+    // works, startHaul keeps this cargo and the existing 2h wait/retry cadence.
+    if (c.state === 'haul' && c.carry) { G.startHaul(c); return; }
     return;
   }
   if (path.length && G.pathStepBlocked(G.world, c, path[0])) return;
@@ -1156,6 +1167,10 @@ G.stepCitizen = function (c, dtH) {
 G.arrive = function (c) {
   c.path = null;
   if (c.state === 'haul') {
+    if(c.carry&&G.hasStorageBuilding()){
+      const target=G.world.bmap[c.haulTo];
+      if(!G.storageAccepts(target,G.cargoStorageTypes(c.carry))||!G.atMedicalDoor(c,target)||G.tileBlocked(G.world,Math.round(c.x),Math.round(c.y))){G.startHaul(c);return;}
+    }
     if (G.isMineralCargo(c)) {
       const storage = G.world.bmap[c.haulTo];
       if (!storage || storage.state !== 'ok') G.startMineralHaul(c);
@@ -1164,7 +1179,7 @@ G.arrive = function (c) {
     }
     if (c.carry) {
       G.depositCargo(c.carry);
-      c.carry = null;
+      c.carry = null; c.haulTo=null;
     }
     G.requestTask(c);
   } else if (c.state === 'walk') {
@@ -1384,8 +1399,8 @@ G.makeTask = function (b, c) {
       if (g.res.wood >= P.woodcutter.logsIn) {
         // Plan only the current leg. The return workshop route is chosen from
         // the warehouse at fetchDone, against the then-current map.
-        const st = G.nearestStorage(c.x, c.y);
-        const route = st ? G.storageRoute(c.x, c.y) : null;
+        const st = G.hasStorageBuilding();
+        const route = st ? G.storageRoute(c.x,c.y,'wood') : null;
         if (st && !route) { b.noWork = true; b.warnText = '仓库不可达'; return null; }
         const target = route ? route.spot : G.workSpot(w, b, c.x, c.y);
         if (!target) { b.noWork = true; b.warnText = '工作入口不可达'; return null; }
@@ -1500,7 +1515,7 @@ G.makeTask = function (b, c) {
     case 'tailor': {
       const status=G.tailorProductionStatus(b);
       if(!status.ok){b.noWork=true;b.warnText=status.reason;return null;}
-      const route=G.storageRoute(c.x,c.y);
+      const route=G.storageRoute(c.x,c.y,status.materials.map(x=>x.type));
       if(!route){b.noWork=true;b.warnText='取料仓库不可达';return null;}
       // Snapshot ingredients and output now. Selection changes never rewrite
       // an accepted batch; the established tailor contract charges at completion.
@@ -1802,7 +1817,7 @@ G.jobCanProduce = function (b) {
   if (b.type === 'forester') return (b.doCut && !G.goalPaused('wood') && G.treesInRadius(w, b.x, b.y, p.forester.radius, true).length > p.forester.minMature) ||
     (b.doPlant && !!G.nearestPlantSpot(w, b.x, b.y, p.forester.radius));
   if (b.type === 'gatherer' || b.type === 'hunting') return G.foodForestCanWork(b);
-  if (['mine', 'stonequarry'].includes(b.type)) return G.productionOutputsOf(b).some(type => !G.goalPaused(type) && r[type] < G.storageCap());
+  if (['mine', 'stonequarry'].includes(b.type)) return G.productionOutputsOf(b).some(type => !G.goalPaused(type) && r[type] < G.storageCap(type));
   return true;
 };
 
@@ -2172,6 +2187,8 @@ G.removeBuilding = function (b) {
   }
   // 住户搬出（独栋住宅与宿舍都以 fam.houseId 指向本建筑）
   for (const fam of w.families) if (fam.houseId === b.id) fam.houseId = null;
+  const displacedHaulers=b.type==='stockpile'?w.citizens.filter(c=>c.carry&&c.haulTo===b.id):[];
+  for(const c of displacedHaulers)G.markStaffingCargo(c);
   w.buildings = w.buildings.filter(x => x !== b);
   delete w.bmap[b.id];
   if (G.game && G.game.buildLog) {
@@ -2183,6 +2200,7 @@ G.removeBuilding = function (b) {
     for (let i = b.x; i < b.x + b.w; i++)
       w.bgrid[j * w.N + i] = -1;
   G.bumpNavigation(w);
+  for(const c of displacedHaulers)G.startHaul(c);
   if (G.sel && G.sel.kind === 'b' && G.sel.id === b.id) G.ui.hideInfo();
   G.ui.toast(`🚧 已拆除 ${def.name}${refund.length ? `，返还 ${refund.join(' ')}` : ''}`, 'info');
   G.scheduleJobs();
@@ -2231,7 +2249,7 @@ G.makeTradeTask = function(b,c){
     const stock=b.tradeInventory[type]||0,target=b.tradeTargets[type]||0;
     const returning=stock>target;
     if(!returning&&!(stock<target&&G.game.res[type]>0&&G.tradeStored(b)<G.TRADE_CAPACITY))continue;
-    const route=returning?null:G.storageRoute(c.x,c.y),spot=returning?G.workSpot(G.world,b,c.x,c.y):route&&route.spot;
+    const route=returning?null:G.storageRoute(c.x,c.y,type),spot=returning?G.workSpot(G.world,b,c.x,c.y):route&&route.spot;
     if(!spot){b.noWork=true;b.warnText='搬运路线不可达';return null;}
     return G.withTaskRoute({kind:'trade',b,tx:spot.x,ty:spot.y,phase:returning?'return':'fetch',resource:type,work:0.25,workLeft:0},spot.route);
   }
@@ -2241,6 +2259,7 @@ G.completeTradeTask = function(c,t){
   const b=t.b;if(G.world.bmap[b.id]!==b||b.state!=='ok'){G.requestTask(c);return;}
   G.ensureEconomyBuilding(b);const type=t.resource;
   if(t.phase==='fetch'){
+    if(!G.atStorageDoor(c,type)){G.requestTask(c);return;}
     const room=Math.min(Math.max(0,(b.tradeTargets[type]||0)-(b.tradeInventory[type]||0)),Math.max(0,G.TRADE_CAPACITY-G.tradeStored(b)));
     const spot=G.workSpot(G.world,b,c.x,c.y);if(!spot){G.requestTask(c);return;}
     const qty=G.withdrawResource(type,Math.min(20,room));if(!qty){G.requestTask(c);return;}
@@ -2528,9 +2547,9 @@ G.setToolRecipe = function (b, recipe) {
   b.toolRecipe=recipe; delete b.productionPaused; b.noWork=false; b.warnText=''; G.updateProductionGoals(); G.game.schedT=0; return true;
 };
 G.makeMineralTask = function (b, c) {
-  const w=G.world, g=G.game, cap=G.storageCap(), p=b.type==='stonequarry'?G.PROD.stonequarry:G.PROD.mine;
+  const w=G.world, g=G.game, p=b.type==='stonequarry'?G.PROD.stonequarry:G.PROD.mine;
   let type=b.type==='stonequarry'?'stone':G.mineModeOf(b);
-  const blocked = k => g.res[k]>=cap || G.goalPaused(k);
+  const blocked = k => g.res[k]>=G.storageCap(k) || G.goalPaused(k);
   if (type==='legacy') {
     if (blocked('stone') && blocked('iron')) { b.noWork=true; b.warnText='仓库已满'; return null; }
     b.mineTick=(b.mineTick || 0)+1;
