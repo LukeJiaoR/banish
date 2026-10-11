@@ -123,7 +123,7 @@ G.serializeGame = function () {
       sownAll: b.sownAll, growth: b.growth, harvestDone: b.harvestDone, cropType:b.cropType, cropChoice:b.cropChoice,
       sowingCommitted: b.sowingCommitted, productionPaused: b.productionPaused,
       tradeInventory: b.tradeInventory, tradeTargets: b.tradeTargets, merchant: b.merchant, nextMerchantDay: b.nextMerchantDay,
-      animals: b.animals, animalGrowth: b.animalGrowth, animalTarget: b.animalTarget, woolReady: b.woolReady,
+      animalType:b.animalType, pastureProducts:b.pastureProducts, animals: b.animals, animalGrowth: b.animalGrowth, animalTarget: b.animalTarget, woolReady: b.woolReady,
       orchardAge: b.orchardAge, orchardYield: b.orchardYield, orchardSeason: b.orchardSeason, tendedDay: b.tendedDay,
     })),
     families: w.families.map(f => ({ id: f.id, members: f.members, houseId: f.houseId, coupleIds: f.coupleIds })),
@@ -248,7 +248,7 @@ G.prepareSaveData = function (d) {
   if (hasFoodClasses && Math.abs(G.FOOD_KEYS.reduce((n,k) => n + g.res[k], 0) - g.res.food) > 0.00001) bad('食物分类合计');
   if (!hasFoodClasses) g.res.grain = g.res.food; // legacy stock is preserved once
   if (gd.unlocks !== undefined) {record(gd.unlocks,'产业解锁');if(typeof gd.unlocks.orchard !== 'boolean')bad('果树种子解锁');if(gd.unlocks.cabbage!==undefined&&typeof gd.unlocks.cabbage!=='boolean')bad('卷心菜种子解锁');g.unlocks={orchard:gd.unlocks.orchard,cabbage:gd.unlocks.cabbage===true};}
-  if (gd.livestock !== undefined) {record(gd.livestock,'待安置牲畜');g.livestock={sheep:integer(gd.livestock.sheep,'待安置羊',0,1000000)};}
+  if (gd.livestock !== undefined) {record(gd.livestock,'待安置牲畜');g.livestock={sheep:integer(gd.livestock.sheep,'待安置羊',0,1000000),cattle:gd.livestock.cattle===undefined?0:integer(gd.livestock.cattle,'待安置牛',0,1000000)};}
   if (gd.productionGoals !== undefined) {
     const goals = record(gd.productionGoals, '自动生产目标');
     const paused = gd.productionPaused === undefined ? {} : record(gd.productionPaused, '生产暂停状态');
@@ -381,10 +381,13 @@ G.prepareSaveData = function (d) {
       }
     }
     if(bd.type==='pasture'){
-      b.animals=bd.animals===undefined?0:integer(bd.animals,'羊数',0,12);
-      b.animalTarget=bd.animalTarget===undefined?8:integer(bd.animalTarget,'保留羊数',2,12);
+      if(bd.animalType!==undefined&&!G.isLivestockType(bd.animalType))bad('牧场物种');
+      b.animalType=bd.animalType||'sheep';const cap=G.LIVESTOCK[b.animalType].cap;
+      b.animals=bd.animals===undefined?0:integer(bd.animals,'牲畜数量',0,cap);
+      b.animalTarget=bd.animalTarget===undefined?8:integer(bd.animalTarget,'保留牲畜数量',2,cap);
+      b.pastureProducts={meat:0,leather:0};if(bd.pastureProducts!==undefined){record(bd.pastureProducts,'待送牧场产物');for(const type of Object.keys(bd.pastureProducts)){if(!['meat','leather'].includes(type))bad('牧场产物类型');b.pastureProducts[type]=number(bd.pastureProducts[type],'牧场待送'+type,0,G.LIVESTOCK[b.animalType][type]);}}
       b.animalGrowth=bd.animalGrowth===undefined?0:number(bd.animalGrowth,'繁殖进度',0,1);
-      b.woolReady=bd.woolReady===undefined?0:number(bd.woolReady,'待剪羊毛',0,48);
+      b.woolReady=bd.woolReady===undefined?0:number(bd.woolReady,'待剪羊毛',0,b.animalType==='sheep'?48:0);
     }
     if(bd.type==='orchard'){
       b.orchardAge=bd.orchardAge===undefined?0:integer(bd.orchardAge,'果树树龄',0,G.YEAR_DAYS*4);
@@ -434,6 +437,7 @@ G.prepareSaveData = function (d) {
     if (cd.carry != null) {
       record(cd.carry, '随身资源'); if (!G.RES_KEYS.includes(cd.carry.type)) bad('随身资源类型');
       carry = { type: cd.carry.type === 'food' ? 'grain' : cd.carry.type, qty: number(cd.carry.qty, '随身资源数量', 0) };
+      if(cd.carry.pastureId!==undefined){if(!['meat','leather','wool'].includes(carry.type)||cd.carry.extra!==undefined)bad('牧场携货类型');carry.pastureId=integer(cd.carry.pastureId,'牧场携货来源',1);}
       if(cd.carry.brewIngredient!==undefined){if(cd.carry.brewIngredient!==true||carry.type!=='grain')bad('酿造原粮标记');carry.brewIngredient=true;}
       if (cd.carry.extra !== undefined) {
         if(cd.carry.type!=='meat')bad('副产物携带类型');

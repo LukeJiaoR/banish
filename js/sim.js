@@ -14,7 +14,7 @@ G.newGameState = function () {
     over: false,
     stats: { born: 0, died: 0, deadReasons: {} },
     prevFood: 200,
-    unlocks: { orchard: false, cabbage:false }, livestock: { sheep: 0 },
+    unlocks: { orchard: false, cabbage:false }, livestock: { sheep: 0, cattle: 0 },
     foodNet: 0,
     foodUrgent: false,
     warned: {},
@@ -698,7 +698,7 @@ G.storageRoute = function (x, y) {
 /* Limited minerals retain one ordinary carried batch when a warehouse rejects
  * part of a delivery. Tavern output and refundable raw grain share this bounded
  * delivery path; other ordinary resource delivery policy is unchanged. */
-G.isMineralCargo = function (c) { return !!c.carry && (['stone','iron','coal','ale','clothes','warmCoats'].includes(c.carry.type) || (c.carry.type==='grain' && c.carry.brewIngredient===true)); };
+G.isMineralCargo = function (c) { return !!c.carry && (['stone','iron','coal','ale','clothes','warmCoats'].includes(c.carry.type) || (c.carry.type==='grain' && c.carry.brewIngredient===true) || (Number.isInteger(c.carry.pastureId)&&['meat','leather','wool'].includes(c.carry.type))); };
 G.mineralStorageSpace = function (type) { return Math.max(0, G.storageCap() - G.game.res[G.isFood(type)?'food':type]); };
 // Ordinary in-flight minerals remain eligible as before; only an already
 // blocked delivery cannot count as available labour or occupy a productive slot.
@@ -713,7 +713,7 @@ G.waitForMineralStorage = function (c, reason) {
 G.warnMineralStorage = function () {
   if (G.game.warned.mineralStorageFull) return;
   G.game.warned.mineralStorageFull = true;
-  G.ui.toast('⚠ 仓位已满，矿物、麦酒、成衣或退回原粮由市民随身保留；使用库存或建成新仓库后继续送仓', 'warn');
+  G.ui.toast('⚠ 仓位已满，矿物、麦酒、成衣、牧场产物或退回原粮由市民随身保留；使用库存或建成新仓库后继续送仓', 'warn');
 };
 G.cargoWaitReason = function (c) {
   if (!G.isMineralCargo(c) || !c.haulPending || c.state === 'haul') return '';
@@ -925,7 +925,7 @@ G.consumeFood = function (qty) {
   r.food = G.FOOD_KEYS.reduce((n,k) => n + r[k], 0); return [...eaten];
 };
 G.depositCargo = function (cargo) {
-  const accepted = G.deposit(cargo.type, cargo.qty, cargo.brewIngredient===true);
+  const accepted = G.deposit(cargo.type, cargo.qty, cargo.brewIngredient===true||Number.isInteger(cargo.pastureId));
   if (cargo.extra) { for (const [type, qty] of Object.entries(cargo.extra)) G.deposit(type, qty); delete cargo.extra; }
   return accepted;
 };
@@ -1068,6 +1068,11 @@ G.stepCitizen = function (c, dtH) {
       return;
     }
     case 'work': {
+      if(c.task?.economy==='pasture'&&!G.atPastureWork(c,c.task)){
+        if(G.pastureTaskCurrent(c,c.task))G.sendTo(c,c.task.tx,c.task.ty);
+        else{c.task=null;c.state='idle';c.wanderT=0;}
+        return;
+      }
       if(c.task&&['study','teach'].includes(c.task.kind)){G.stepSchool(c,dtH);return;}
       if(G.isLeisureVisitor(c)){G.stepLeisure(c,dtH);return;}
       if(c.task?.kind==='brew'&&c.task.phase==='process'&&(G.isSick(c)||!G.tavernBrewStatus(c.task.b,true).ok)){G.returnBrewGrain(c);return;}
@@ -1413,9 +1418,9 @@ G.makeTask = function (b, c) {
     case 'tradingpost': return G.makeTradeTask(b,c);
     case 'pasture': {
       G.ensureEconomyBuilding(b);
-      if (!b.animals) { b.noWork=true; b.warnText='需购买羊并移入牧场'; return null; }
+      if (!b.animals&&!G.pastureHasProducts(b)) { b.noWork=true; b.warnText='需贸易购买牲畜并放入同种牧场'; return null; }
       const spot=G.workSpot(w,b,c.x,c.y); if(!spot)return null;
-      return G.withTaskRoute({kind:'work',b,tx:spot.x,ty:spot.y,work:G.taskWork(c,8),workLeft:0,economy:'pasture'},spot.route);
+      return G.withTaskRoute({kind:'work',b,tx:spot.x,ty:spot.y,work:G.taskWork(c,8),workLeft:0,economy:'pasture',pastureType:G.pastureTypeOf(b)},spot.route);
     }
     case 'orchard': {
       G.ensureEconomyBuilding(b);
@@ -1722,7 +1727,7 @@ G.jobCanProduce = function (b) {
   if (b.type === 'farm') return G.farmHasWork(b);
   if (b.type === 'woodcutter') return r.wood >= p.woodcutter.logsIn;
   if (b.type === 'tradingpost') return G.tradeHasWork(b);
-  if (b.type === 'pasture') return (b.animals || 0)>0;
+  if (b.type === 'pasture') return (b.animals || 0)>0||G.pastureHasProducts(b);
   if (b.type === 'orchard') return G.game.unlocks.orchard && ((b.orchardAge || 0)<G.YEAR_DAYS*4 ? b.tendedDay!==G.game.day : (b.orchardYield || 0)>0 && G.game.season===2);
   if (b.type === 'tailor') return G.tailorProductionStatus(b).ok;
   if (b.type === 'blacksmith') return G.blacksmithRecipe(b).every(c => r[c.type] >= c.qty);
@@ -2023,7 +2028,8 @@ G.removeBuilding = function (b) {
   if(b.type==='townhall'&&G.game.nomads.offer?.hallId===b.id)G.game.nomads.offer=null;
   if (b.type === 'bridge') { const check=G.bridgeRemovalStatus(w,b); if(!check.ok){G.ui.toast(check.reason,'warn');return;} }
   if (b.type === 'tradingpost' && Object.values(b.tradeInventory || {}).some(q => q > 0)) { G.ui.toast('先把待售目标设0，搬空贸易库存再拆除','warn'); return; }
-  if (b.type === 'pasture' && b.animals) { G.game.livestock.sheep += b.animals; b.animals = 0; }
+  if(b.type==='pasture'&&G.pastureHasProducts(b)){G.ui.toast('牧场还有已屠宰产物，请先搬空再拆除','warn');return;}
+  if (b.type === 'pasture' && b.animals) { const type=G.pastureTypeOf(b);G.game.livestock[type]=(G.game.livestock[type]||0)+b.animals; b.animals = 0; }
   if (b.type === 'storage') {
     const left = w.buildings.filter(x => x.type === 'storage').length;
     if (left <= 1) { G.ui.toast('不能拆除最后一座仓库', 'warn'); return; }
@@ -2081,10 +2087,10 @@ G.demolishAt = function (tx, ty) {
 G.TRADE_CAPACITY = 2000;
 G.tradeStored = b => Object.values(b.tradeInventory || {}).reduce((n,q) => n + q, 0);
 G.TRADE_VALUES = {wood:2,stone:7,iron:5,tools:8,firewood:4,meat:1,vegetables:1,grain:1,leather:10,wool:5,clothes:15,warmCoats:20,herbs:4,coal:6,steelTools:10};
-G.TRADE_GOODS = {coal:{name:'煤',price:6,stock:100},steelTools:{name:'钢工具',price:10,stock:20},sheep:{name:'羊',price:600,stock:4},orchardSeed:{name:'果树种子',price:2500,stock:1},cabbageSeed:{name:'卷心菜种子',price:2500,stock:1},grain:{name:'主食',price:1,stock:400},iron:{name:'铁',price:5,stock:100},leather:{name:'皮革',price:10,stock:80}};
+G.TRADE_GOODS = {coal:{name:'煤',price:6,stock:100},steelTools:{name:'钢工具',price:10,stock:20},sheep:{name:'羊',price:600,stock:4},cattle:{name:'牛',price:800,stock:4},orchardSeed:{name:'果树种子',price:2500,stock:1},cabbageSeed:{name:'卷心菜种子',price:2500,stock:1},grain:{name:'主食',price:1,stock:400},iron:{name:'铁',price:5,stock:100},leather:{name:'皮革',price:10,stock:80}};
 G.ensureEconomyBuilding = function(b) {
   if(b.type==='tradingpost'){b.tradeInventory=b.tradeInventory||{};b.tradeTargets=b.tradeTargets||{};if(!Number.isFinite(b.nextMerchantDay))b.nextMerchantDay=G.game.day+G.SEASON_DAYS;}
-  if(b.type==='pasture'){b.animals=b.animals||0;b.animalGrowth=b.animalGrowth||0;b.woolReady=b.woolReady||0;if(!Number.isFinite(b.animalTarget))b.animalTarget=8;}
+  if(b.type==='pasture'){b.animalType=G.pastureTypeOf(b);b.animals=b.animals||0;b.animalGrowth=b.animalGrowth||0;b.woolReady=b.woolReady||0;b.pastureProducts=b.pastureProducts||{meat:0,leather:0};if(!Number.isFinite(b.animalTarget))b.animalTarget=8;}
   if(b.type==='orchard'){b.orchardAge=b.orchardAge||0;b.orchardYield=b.orchardYield||0;}
 };
 G.withdrawResource = function(type,qty){
@@ -2131,33 +2137,65 @@ G.completeTradeTask = function(c,t){
 };
 G.executeTrade = function(b,good,qty,payment){
   if(G.world.bmap[b.id]!==b||b.type!=='tradingpost'||b.state!=='ok'||!b.merchant||b.merchant.leaveDay<=G.game.day)return {ok:false,reason:'没有停靠商人'};
-  const offer=Object.hasOwn(G.TRADE_GOODS,good)?G.TRADE_GOODS[good]:null,value=Object.hasOwn(G.TRADE_VALUES,payment)?G.TRADE_VALUES[payment]:0;
+  const offer=typeof good==='string'&&Object.hasOwn(G.TRADE_GOODS,good)?G.TRADE_GOODS[good]:null,value=typeof payment==='string'&&Object.hasOwn(G.TRADE_VALUES,payment)?G.TRADE_VALUES[payment]:0;
   if(!offer||!value||!Number.isInteger(qty)||qty<=0||qty>(b.merchant.stock[good]||0))return {ok:false,reason:'交易数量或货物无效'};
   const seedReason=G.seedTradeReason(good,qty);if(seedReason)return {ok:false,reason:seedReason};
   const cost=Math.ceil(offer.price*qty/value);if((b.tradeInventory[payment]||0)<cost)return {ok:false,reason:'待售库存不足，请先让商人搬入'};
-  if(good!=='sheep'&&!G.seedUnlockKey(good)&&G.tradeStored(b)-cost+qty>G.TRADE_CAPACITY)return {ok:false,reason:'贸易站库存容量不足（共2000）'};
+  if(!G.isLivestockType(good)&&!G.seedUnlockKey(good)&&G.tradeStored(b)-cost+qty>G.TRADE_CAPACITY)return {ok:false,reason:'贸易站库存容量不足（共2000）'};
   b.tradeInventory[payment]-=cost;b.merchant.stock[good]-=qty;
-  if(good==='sheep')G.game.livestock.sheep+=qty;
+  if(G.isLivestockType(good))G.game.livestock[good]=(G.game.livestock[good]||0)+qty;
   else if(G.seedUnlockKey(good))G.game.unlocks[G.seedUnlockKey(good)]=true;
   else b.tradeInventory[good]=(b.tradeInventory[good]||0)+qty;
   G.game.schedT=0;return {ok:true,paid:cost};
 };
-G.stockPasture = function(b,qty){
-  if(G.world.bmap[b.id]!==b||b.type!=='pasture'||b.state!=='ok'||!Number.isInteger(qty)||qty<=0)return false;
-  G.ensureEconomyBuilding(b);if(qty>G.game.livestock.sheep||b.animals+qty>12)return false;
-  G.game.livestock.sheep-=qty;b.animals+=qty;G.game.schedT=0;return true;
+// Fixed 6x6 pens and yields are small-map adaptations, not original tile density.
+G.LIVESTOCK={sheep:{name:'羊',cap:12,meat:24,leather:0},cattle:{name:'牛',cap:10,meat:36,leather:4}};
+G.isLivestockType=type=>typeof type==='string'&&Object.hasOwn(G.LIVESTOCK,type);
+G.pastureTypeOf=b=>b?.animalType==='cattle'?'cattle':'sheep';
+G.pastureHasProducts=b=>Object.values(b.pastureProducts||{}).some(q=>q>0);
+G.pastureSwitchReason=function(b){
+  if(b.animals>0)return '已有牲畜，禁止混养或转换物种';
+  if(G.pastureHasProducts(b)||b.woolReady>0)return '先搬空待送产物或剪完羊毛';
+  if(G.world.citizens.some(c=>!c.dead&&(c.carry?.pastureId===b.id||[c.task,c.pausedTask].some(t=>t?.economy==='pasture'&&t.b===b))))return '原物种任务或产物仍在途中，完成后再切换';
+  return '';
 };
-G.setPastureTarget = function(b,qty){if(G.world.bmap[b.id]!==b||b.type!=='pasture'||!Number.isInteger(qty)||qty<2||qty>12)return false;b.animalTarget=qty;return true;};
+G.setPastureType=function(b,type){
+  if(!b||G.world.bmap[b.id]!==b||b.type!=='pasture'||b.state!=='ok'||!G.isLivestockType(type))return false;
+  G.ensureEconomyBuilding(b);if(type===G.pastureTypeOf(b))return true;
+  if(G.pastureSwitchReason(b))return false;
+  b.animalType=type;b.animalGrowth=0;b.animalTarget=Math.min(b.animalTarget||8,G.LIVESTOCK[type].cap);G.game.schedT=0;return true;
+};
+G.stockPasture = function(b,qty,type=G.pastureTypeOf(b)){
+  if(!b||G.world.bmap[b.id]!==b||b.type!=='pasture'||b.state!=='ok'||!Number.isInteger(qty)||qty<=0||!G.isLivestockType(type)||type!==G.pastureTypeOf(b))return false;
+  G.ensureEconomyBuilding(b);if(qty>(G.game.livestock[type]||0)||b.animals+qty>G.LIVESTOCK[type].cap)return false;
+  G.game.livestock[type]-=qty;b.animals+=qty;G.game.schedT=0;return true;
+};
+G.setPastureTarget = function(b,qty){if(!b||G.world.bmap[b.id]!==b||b.type!=='pasture'||b.state!=='ok'||!Number.isInteger(qty)||qty<2||qty>G.LIVESTOCK[G.pastureTypeOf(b)].cap)return false;b.animalTarget=qty;return true;};
+G.pastureTaskCurrent=(c,t)=>!!(t?.economy==='pasture'&&t.b?.type==='pasture'&&G.world.bmap[t.b.id]===t.b&&t.b.state==='ok'&&c.job===t.b.id&&(!t.pastureType||t.pastureType===G.pastureTypeOf(t.b)));
+G.atPastureWork=(c,t)=>G.pastureTaskCurrent(c,t)&&G.atMedicalDoor(c,t.b)&&G.d2(c.x,c.y,t.tx,t.ty)<.04&&!G.tileBlocked(G.world,t.tx,t.ty);
+G.pastureSlaughterReason=function(b){
+  if(G.pastureHasProducts(b))return '先搬完已屠宰的肉与皮革';
+  const d=G.LIVESTOCK[G.pastureTypeOf(b)],outputs=d.leather?['meat','leather']:['meat'];
+  for(const type of outputs){if(G.goalPaused(type))return G.RES[type].name+'达到目标，暂停新屠宰';if(G.mineralStorageSpace(type)<=0)return G.RES[type].name+'仓满，暂停新屠宰';}
+  return '';
+};
+G.pastureSummary=function(b){
+  const type=G.pastureTypeOf(b),d=G.LIVESTOCK[type],pending=b.pastureProducts||{};
+  return {type,name:d.name,cap:d.cap,animals:b.animals||0,target:b.animalTarget||8,bank:G.game.livestock[type]||0,
+    growth:b.animalGrowth||0,wool:b.woolReady||0,meat:pending.meat||0,leather:pending.leather||0,switchReason:G.pastureSwitchReason(b),
+    status:!b.animals?'空牧场：购买同种牲畜后放入':b.animals<2?'至少2头同种牲畜才能繁殖':!b.workers.length?'等待牧人照料':G.pastureSlaughterReason(b)||'牧人照料中；超保留量才屠宰',
+    rule:type==='cattle'?'牛不产羊毛；每次超额屠宰产36肉＋4皮革，逐批送仓后才可使用':'羊剪毛与超额屠宰产24肉；不会产皮革'};
+};
 G.advanceTownEconomy = function(){
-  const g=G.game;g.unlocks=g.unlocks||{orchard:false};g.livestock=g.livestock||{sheep:0};
+  const g=G.game;g.unlocks=g.unlocks||{orchard:false};g.livestock=g.livestock||{sheep:0,cattle:0};
   for(const b of G.world.buildings){if(b.state!=='ok')continue;G.ensureEconomyBuilding(b);
     if(b.type==='tradingpost'){
       if(b.merchant&&g.day>=b.merchant.leaveDay){b.merchant=null;b.nextMerchantDay=g.day+G.YEAR_DAYS-G.SEASON_DAYS;}
-      if(!b.merchant&&g.day>=b.nextMerchantDay){b.merchant={leaveDay:g.day+G.SEASON_DAYS,stock:Object.fromEntries(Object.entries(G.TRADE_GOODS).map(([k,v])=>[k,v.stock]))};G.ui.toast('⛵ 商船已到贸易站，可换物资、羊和种子','good');}
+      if(!b.merchant&&g.day>=b.nextMerchantDay){b.merchant={leaveDay:g.day+G.SEASON_DAYS,stock:Object.fromEntries(Object.entries(G.TRADE_GOODS).map(([k,v])=>[k,v.stock]))};G.ui.toast('⛵ 商船已到贸易站，可换物资、羊、牛和种子','good');}
     }
     if(b.type==='pasture'&&b.animals>0&&b.tendedDay>=g.day-2){
-      if(b.animals>=2)b.animalGrowth+=b.animals/(G.YEAR_DAYS*2);while(b.animalGrowth>=1&&b.animals<12){b.animals++;b.animalGrowth--;}
-      b.animalGrowth=Math.min(1,b.animalGrowth);b.woolReady=Math.min(48,b.woolReady+b.animals/G.SEASON_DAYS);
+      if(b.animals>=2)b.animalGrowth+=b.animals/(G.YEAR_DAYS*2);while(b.animalGrowth>=1&&b.animals<G.LIVESTOCK[G.pastureTypeOf(b)].cap){b.animals++;b.animalGrowth--;}
+      b.animalGrowth=Math.min(1,b.animalGrowth);if(G.pastureTypeOf(b)==='sheep')b.woolReady=Math.min(48,b.woolReady+b.animals/G.SEASON_DAYS);
     }
     if(b.type==='orchard'&&g.unlocks.orchard){
       if(b.orchardAge<G.YEAR_DAYS*4&&b.tendedDay>=g.day-2)b.orchardAge++;
@@ -2167,10 +2205,22 @@ G.advanceTownEconomy = function(){
   }
 };
 G.completeEconomyWork = function(c,t){
-  const b=t.b;if(G.world.bmap[b.id]!==b||b.state!=='ok')return;G.ensureEconomyBuilding(b);b.tendedDay=G.game.day;
+  const b=t.b;if(G.world.bmap[b.id]!==b||b.state!=='ok')return;
+  if(t.economy==='pasture'&&!G.atPastureWork(c,t))return;
+  G.ensureEconomyBuilding(b);b.tendedDay=G.game.day;
   if(t.economy==='pasture'){
-    if(b.animals>b.animalTarget&&!G.goalPaused('meat')){b.animals--;c.carry={type:'meat',qty:24};}
-    else if(b.woolReady>=1&&!G.goalPaused('wool')){const qty=Math.min(8,Math.floor(b.woolReady));b.woolReady-=qty;c.carry={type:'wool',qty};}
+    if(c.carry||(t.pastureType&&t.pastureType!==G.pastureTypeOf(b)))return;
+    const d=G.LIVESTOCK[G.pastureTypeOf(b)];
+    // Commit both products together once, then move one bounded batch per trip.
+    if(b.animals>b.animalTarget&&!G.pastureSlaughterReason(b)){
+      b.animals--;G.recordProduction(b,'meat',d.meat);
+      if(!d.leather){c.carry={type:'meat',qty:d.meat,pastureId:b.id};return;} // Existing sheep keep their one-trip 24-meat batch.
+      b.pastureProducts.meat+=d.meat;b.pastureProducts.leather+=d.leather;G.recordProduction(b,'leather',d.leather);
+    }
+    for(const type of ['meat','leather'])if(b.pastureProducts[type]>0&&G.mineralStorageSpace(type)>0){
+      const qty=Math.min(20,b.pastureProducts[type]);b.pastureProducts[type]-=qty;c.carry={type,qty,pastureId:b.id};return;
+    }
+    if(G.pastureTypeOf(b)==='sheep'&&b.woolReady>=1&&!G.goalPaused('wool')&&G.mineralStorageSpace('wool')>0){const qty=Math.min(8,Math.floor(b.woolReady));b.woolReady-=qty;c.carry={type:'wool',qty,pastureId:b.id};G.recordProduction(b,'wool',qty);}
   }else if(t.economy==='orchard'&&G.game.season===2&&b.orchardAge>=G.YEAR_DAYS*4&&b.orchardYield>0){const qty=Math.min(20,b.orchardYield);b.orchardYield-=qty;c.carry={type:'vegetables',qty};}
 };
 
@@ -2343,6 +2393,7 @@ G.blacksmithOutput = b => b && b.toolRecipe === 'steel' ? 'steelTools' : 'tools'
 G.blacksmithRecipe = b => G.blacksmithOutput(b) === 'steelTools' ? [...G.PROD.blacksmith.consume,{type:'coal',qty:2}] : G.PROD.blacksmith.consume;
 G.productionOutputsOf = function (b) {
   if(b.type==='farm')return ['food',G.farmOutput(b)];
+  if(b.type==='pasture')return ['food','meat',G.pastureTypeOf(b)==='cattle'?'leather':'wool'];
   if(b.type==='tailor')return [G.tailorOutput(b)];
   if (b.type === 'mine') return G.mineModeOf(b) === 'legacy' ? ['stone','iron'] : [G.mineModeOf(b)];
   if (b.type === 'blacksmith') return [G.blacksmithOutput(b)];
