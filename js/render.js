@@ -644,7 +644,7 @@ G.citizenFacing = function (c, workTarget) {
 };
 
 G.drawCitizen = function (ctx, c, time, homes) {
-  if (G.citizenIndoorHome(c, homes) || (G.inMedicalCare && G.inMedicalCare(c))) return;
+  if (G.citizenIndoorHome(c, homes) || (G.inMedicalCare && G.inMedicalCare(c)) || (G.inSchool && G.inSchool(c))) return;
   const [sx0, sy0] = G.T2S(c.x, c.y);
   const sy = sy0 + 16 - (G.bridgeAt(G.world,Math.round(c.x),Math.round(c.y))?.state==='ok'?8:0);
   const child = c.age < G.ADULT_AGE;
