@@ -935,6 +935,87 @@ G.ui = {
     });
     this.refreshHouseUpgradeInfo(b);
   },
+  townLedgerInfoData: function () {
+    // A summary is a read-only view. Never initialize/backfill a ledger from UI
+    // reads or reuse facts cached for another loaded game with the same hall ID.
+    const s = G.townLedgerSummary ? G.townLedgerSummary() : null;
+    const windowDays = s ? s.windowDays : 12, retentionDays = s ? s.retentionDays : 48;
+    const number = (value, signed = false) => {
+      if (!Number.isFinite(value)) return '—';
+      if (value === 0) return '0';
+      const magnitude = Math.abs(value), prefix = value < 0 ? '−' : signed ? '+' : '';
+      return prefix + (magnitude < .01 ? '<0.01' : String(Number(magnitude.toFixed(2))));
+    };
+    const hour = value => {
+      const minute = Math.floor(value * 60 + 1e-7);
+      return `${String(Math.floor(minute / 60)).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`;
+    };
+    const seasonDate = day => `${Math.floor(day / G.YEAR_DAYS) + 1}年${G.SEASON_NAMES[Math.floor(day / G.SEASON_DAYS) % 4]}${day % G.SEASON_DAYS + 1}日`;
+    const range = period => !period || !period.days ? '尚无完整日记录（不是零产出）'
+      : `第 ${period.fromDay + 1}–${period.toDay + 1} 天（${seasonDate(period.fromDay)} → ${seasonDate(period.toDay)}），${period.days} 个完整日${period.days < windowDays ? `，未满 ${windowDays} 天` : ''}`;
+    const current = s && s.current;
+    const comparable = !!(s && s.comparable && s.recent.days === windowDays && s.previous.days === windowDays);
+    const data = {
+      flowTitle: `食物与柴火流水 · ${s ? s.completeDays : 0} 个完整日`,
+      flowCoverage: s ? `自第 ${s.startedDay + 1} 天 ${hour(s.startedHour)} 起记账；更早流水未知。已结算 ${s.recordedDays} 天，其中 ${s.completeDays} 个完整日；最多保留 ${retentionDays} 个已结算日。${s.startedHour > 0 ? '首日不足全天，不纳入完整日比较。' : ''}`
+        : '流水尚未开始记录；旧库存快照不能还原产出。',
+      flowRecentRange: `近期：${range(s && s.recent)}`,
+      flowPreviousRange: `前期：${range(s && s.previous)}`,
+      flowComparison: comparable ? `差额 = 近期 − 前期（各 ${windowDays} 天）；仅作算术比较，季节不同会影响产出与取暖。`
+        : `比较待记录：需两个各 ${windowDays} 天的完整窗口；— 表示未知或不可比较，0 表示已记录的零。`,
+      flowTodayRange: current ? `今日 · 第 ${current.day + 1} 天（${seasonDate(current.day)}） ${hour(current.fromHour)}–${hour(current.toHour)}` : '今日 · 尚无流水记录',
+      flowTodayCoverage: current ? `${current.partial ? '从本日记账起点开始，首日不足全天。' : ''}今日尚未结算，未折算全天，也不纳入上方比较。` : '尚未记录的时段不能视为零产出。',
+    };
+    for (const resource of ['food', 'firewood', 'meat', 'vegetables', 'grain']) {
+      for (const metric of ['produced', 'received', 'used', 'withdrawn', 'discarded', 'delta', 'opening', 'closing']) {
+        for (const period of ['recent', 'previous', 'current']) {
+          const p = s && s[period], known = p && (period === 'current' || p.days > 0);
+          data[`flow-${resource}-${period}-${metric}`] = number(known && p.totals[resource] ? p.totals[resource][metric] : NaN, metric === 'delta');
+        }
+        data[`flow-${resource}-difference-${metric}`] = number(comparable ? s.recent.totals[resource][metric] - s.previous.totals[resource][metric] : NaN, true);
+      }
+    }
+    return data;
+  },
+  townLedgerInfoMarkup: function (data) {
+    const text = key => `<span data-townhall="${key}">${this.escHtml(data[key])}</span>`;
+    const metrics = resource => [['produced', '真实产出'], ['received', '实际入库'], ['used', resource === 'firewood' ? '住宅燃烧' : '居民食用'], ['withdrawn', '出库转运'], ['discarded', '仓满弃货'], ['delta', '库存净变']];
+    const history = resource => `<div class="townledger-table-wrap" tabindex="0" role="region" aria-label="${G.RES[resource].name}历史流水表，可横向滚动"><table class="townledger-table">
+      <caption>${G.RES[resource].name}${resource === 'food' ? '合计（三类相加）' : ''}</caption>
+      <thead><tr><th scope="col">项目</th><th scope="col">近期</th><th scope="col">前期</th><th scope="col">差额</th></tr></thead>
+      <tbody>${metrics(resource).map(([metric, label]) => `<tr><th scope="row">${label}</th>${['recent', 'previous', 'difference'].map(period => `<td>${text(`flow-${resource}-${period}-${metric}`)}</td>`).join('')}</tr>`).join('')}
+        <tr class="townledger-stock"><th scope="row">期初库存</th><td>${text(`flow-${resource}-recent-opening`)}</td><td>${text(`flow-${resource}-previous-opening`)}</td><td>—</td></tr>
+        <tr class="townledger-stock"><th scope="row">期末库存</th><td>${text(`flow-${resource}-recent-closing`)}</td><td>${text(`flow-${resource}-previous-closing`)}</td><td>—</td></tr>
+      </tbody></table></div>`;
+    const today = resources => `<div class="townledger-table-wrap" tabindex="0" role="region" aria-label="今日已记录流水表，可横向滚动"><table class="townledger-table">
+      <thead><tr><th scope="col">今日已记录</th>${resources.map(resource => `<th scope="col">${G.RES[resource].name}</th>`).join('')}</tr></thead>
+      <tbody>${[['produced', '真实产出'], ['received', '实际入库'], ['used', resources.includes('firewood') ? '居民食用 / 住宅燃烧' : '居民食用'], ['withdrawn', '出库转运'], ['discarded', '仓满弃货'], ['delta', '库存净变'], ['opening', '起点库存'], ['closing', '当前库存']].map(([metric, label]) => `<tr><th scope="row">${label}</th>${resources.map(resource => `<td>${text(`flow-${resource}-current-${metric}`)}</td>`).join('')}</tr>`).join('')}</tbody>
+      </table></div>`;
+    return `<details class="townhall-ledger townledger-flows" data-townledger-panel>
+      <summary data-townhall="flowTitle">${this.escHtml(data.flowTitle)}</summary>
+      <p class="desc" data-townhall="flowCoverage">${this.escHtml(data.flowCoverage)}</p>
+      <p data-townhall="flowRecentRange">${this.escHtml(data.flowRecentRange)}</p>
+      <p data-townhall="flowPreviousRange">${this.escHtml(data.flowPreviousRange)}</p>
+      <p class="townledger-note" data-townhall="flowComparison">${this.escHtml(data.flowComparison)}</p>
+      ${history('food')}${history('firewood')}
+      <section class="townledger-today" aria-label="今日部分时段流水">
+        <h3 data-townhall="flowTodayRange">${this.escHtml(data.flowTodayRange)}</h3>
+        <p class="townledger-note" data-townhall="flowTodayCoverage">${this.escHtml(data.flowTodayCoverage)}</p>
+        ${today(['food', 'firewood'])}
+      </section>
+      <details data-townledger-food><summary>展开三类食物明细</summary>
+        <p class="townledger-note">近期、前期和差额使用上方相同日期；食物合计仅为肉类、蔬菜、主食之和。</p>
+        ${['meat', 'vegetables', 'grain'].map(history).join('')}${today(['meat', 'vegetables', 'grain'])}
+      </details>
+      <details data-townledger-help><summary>这些数字怎样记账？</summary>
+        <p>真实产出只计实际制成或收获；实际入库只计仓库接收，包含贸易运回与酿酒退料，并非全是本地生产。</p>
+        <p>居民食用、住宅燃烧只计实际吃掉或烧掉，未满足的需求不计入；缺粮缺柴仍须结合上方库存和需求判断。</p>
+        <p>出库转运指贸易或酿酒取料，不等于已卖出或永久消耗。仓满弃货只计因仓满未保留的弃货，等待空位的保留货物不算损失。</p>
+        <p>库存净变 = 实际入库 − 居民食用（或住宅燃烧）− 出库转运 = 期末库存 − 期初库存。真实产出与仓满弃货不加入这个库存等式。</p>
+        <p>产出减入库不等于携带中的货物。数值为游戏物资单位，最多显示两位小数，非零微量显示 &lt;0.01；差额先按原始数值相减再显示。窗口为本作的 12 天，留存为 48 天。</p>
+      </details>
+    </details>`;
+  },
   townHallInfoData: function (b) {
     if (b.type !== 'townhall' || b.state !== 'ok' || !G.townHallSummary) return null;
     const s = G.townHallSummary(b), g = G.game, heat = this.heatDemand();
@@ -957,10 +1038,11 @@ G.ui = {
         : s.arriving ? '已接纳的家庭正在赶来。'
         : Number.isFinite(s.nextDay) ? `暂无本厅申请，最早再访第 ${s.nextDay} 天；只在春夏来访。` : '暂无迁入申请。',
       decisions: `已接纳 ${s.accepted} 人 · 主动婉拒 ${s.declined} 人（逾期离开不计）`,
-      historyTitle: `最近 60 天账本 · 已记录 ${rows.length} 天`,
+      historyTitle: `最近 60 天人口与库存 · 已记录 ${rows.length} 天`,
       historySummary: rows.length ? `第 ${rows[0].d}–${rows[rows.length - 1].d} 天：出生 ${born} · 死亡 ${died}；人口 ${rows[0].pop} → ${rows[rows.length - 1].pop}` : '尚无每日记录；结束第一天后开始记账。',
       historyRows: rows.map(row => `第 ${row.d} 天 · 人口 ${Number(row.pop) || 0} · 出生 ${Number(row.born) || 0} · 死亡 ${Number(row.died) || 0} · ${[['food','粮'],['firewood','柴'],['wood','木'],['stone','石'],['iron','铁']].map(([key,label]) => label + (Number.isFinite(row[key]) ? row[key] : '—')).join(' / ')}`).join('\n'),
     };
+    Object.assign(data, this.townLedgerInfoData());
     const offer = s.offer;
     if (offer) {
       const needed = s.offerFamilies + s.homelessFamilies, free = s.freeHomes + s.boardingSlots;
@@ -979,10 +1061,11 @@ G.ui = {
       ${['population', 'housing', 'education', 'health', 'medical', 'food', 'fuel', 'tools', 'arriving', 'schedule', 'decisions'].map(key => `<p class="row" data-townhall="${key}">${this.escHtml(data[key])}</p>`).join('')}
       <div data-townhall-offer></div>
       <p class="economy-message" data-townhall-message role="status" aria-live="polite"></p>
+      ${this.townLedgerInfoMarkup(data)}
       <details class="townhall-ledger"><summary data-townhall="historyTitle">${this.escHtml(data.historyTitle)}</summary>
         <p data-townhall="historySummary">${this.escHtml(data.historySummary)}</p>
         <div class="townhall-ledger-rows" data-townhall="historyRows">${this.escHtml(data.historyRows)}</div>
-        <p class="desc">仅保留实际记录的最近 60 天；出生、死亡与迁入分别计数，人口变化不等于出生减死亡。</p>
+        <p class="desc">仅保留实际记录的最近 60 天。库存为日终快照，不是产出或消耗；出生、死亡与迁入分别计数，人口变化不等于出生减死亡。</p>
       </details>
     </section>`;
   },

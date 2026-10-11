@@ -435,6 +435,22 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .townhall-ledger summary { cursor: pointer; color: #e5c88c; }
 .townhall-ledger p { margin: 6px 0; }
 .townhall-ledger-rows { max-height: 180px; overflow-y: auto; white-space: pre-line; font-size: 11px; font-variant-numeric: tabular-nums; }
+/* Flow facts share stable cells; disclosures and scroll/focus survive live refresh. */
+.townledger-flows { overflow-wrap: anywhere; }
+.townledger-flows details { margin-top: 9px; }
+.townledger-flows summary { min-height: 28px; }
+.townledger-table-wrap { overflow-x: auto; margin: 7px 0; scrollbar-color: #b79b64 #302619; }
+.townledger-table-wrap:focus-visible { outline: 2px solid #ffe4a0; outline-offset: 2px; }
+.townledger-table { width: 100%; border-collapse: collapse; font-size: 11px; font-variant-numeric: tabular-nums; }
+.townledger-table caption { text-align: left; color: #efd7a4; font-size: 12px; font-weight: bold; }
+.townledger-table th, .townledger-table td { padding: 3px 4px; border-bottom: 1px solid rgba(216,178,90,.15); text-align: right; }
+.townledger-table th:first-child { text-align: left; width: 30%; min-width: 52px; font-weight: normal; }
+.townledger-table td { white-space: nowrap; }
+.townledger-table thead th { color: #c8b891; font-weight: normal; }
+.townledger-stock { color: #c8b891; }
+.townledger-note { color: #c8b891; font-size: 11px; }
+.townledger-today { margin-top: 10px; padding-top: 5px; border-top: 1px dashed #79643e; }
+.townledger-today h3 { margin: 3px 0; font-size: 12px; color: #efd7a4; }
 
 /* Food-first brewing controls stay mounted while stock and visitors change. */
 .tavern-details, .citizen-leisure { margin-top: 7px; padding-top: 5px; border-top: 1px solid rgba(216,178,90,.3); }

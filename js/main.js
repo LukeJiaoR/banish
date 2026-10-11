@@ -103,7 +103,7 @@ G.serializeGame = function () {
       v: G.VERSION,
       h: g.h, day: g.day, season: g.season, year: g.year,
       res: g.res, stats: g.stats, prevFood: g.prevFood, foodNet: g.foodNet, foodUrgent: g.foodUrgent, warned: g.warned,
-      hist: g.hist, buildLog: g.buildLog, toolWear: g.toolWear, steelToolWear: g.steelToolWear, healthStartDay: g.healthStartDay, nomads:g.nomads, unlocks: g.unlocks, livestock: g.livestock,
+      townLedger:g.townLedger, hist: g.hist, buildLog: g.buildLog, toolWear: g.toolWear, steelToolWear: g.steelToolWear, healthStartDay: g.healthStartDay, nomads:g.nomads, unlocks: g.unlocks, livestock: g.livestock,
       productionGoals: g.productionGoals && { ...g.productionGoals }, productionPaused: g.productionPaused && { ...g.productionPaused },
     },
     roads: Array.from(w.road).flatMap((road, i) => road ? [i] : []),
@@ -281,6 +281,29 @@ G.prepareSaveData = function (d) {
       g.nomads.offer={id:id(o.id,'来访序号'),hallId:id(o.hallId,'申请市政厅'),expiresDay:integer(o.expiresDay,'申请截止日'),families,sickCount:integer(o.sickCount,'来访热病人数',0,1)};
       if(o.id>g.nomads.serial)bad('来访序号超前');
     }
+  }
+
+  if(gd.townLedger===undefined)g.townLedger=G.newTownLedger(g); // Legacy history is unknown, not zero production.
+  else {
+    const l=record(gd.townLedger,'经营流水');if(l.v!==1)bad('经营流水版本');
+    const startDay=integer(l.startDay,'流水起始日',0,g.day),startHour=number(l.startHour,'流水起始小时',0,G.DAY_H);
+    if(startHour>=G.DAY_H)bad('流水起始小时');
+    const exactKeys=(obj,keys,field)=>{record(obj,field);if(Object.keys(obj).length!==keys.length||Object.keys(obj).some(k=>!keys.includes(k)))bad(field+'字段');};
+    const stock=(value,field)=>{exactKeys(value,G.LEDGER_RES,field);return Object.fromEntries(G.LEDGER_RES.map(k=>[k,number(value[k],field,0)]));};
+    const bucket=(value,closed)=>{
+      const r=record(value,'流水日记录'),day=integer(r.day,'流水日',startDay,g.day),fromHour=number(r.fromHour,'流水日开始小时',0,G.DAY_H);
+      if(fromHour>=G.DAY_H||fromHour!==(day===startDay?startHour:0)||r.partial!==(fromHour>0))bad('流水部分日');
+      if(closed?(day>=g.day||r.toHour!==G.DAY_H):(day!==g.day||fromHour>g.h))bad('流水日范围');
+      exactKeys(r.flows,G.LEDGER_RES,'流水资源');const flows={};
+      for(const k of G.LEDGER_RES){exactKeys(r.flows[k],G.LEDGER_METRICS,'流水计量');flows[k]=Object.fromEntries(G.LEDGER_METRICS.map(m=>[m,number(r.flows[k][m],'流水数量',0)]));}
+      return {day,fromHour,partial:r.partial,opening:stock(r.opening,'期初库存'),flows,...(closed?{toHour:G.DAY_H,closing:stock(r.closing,'期末库存')}:{})};
+    };
+    const input=array(l.days,'流水历史');if(input.length>48)bad('流水历史过长');
+    const days=input.map(r=>bucket(r,true));
+    for(let i=1;i<days.length;i++)if(days[i].day!==days[i-1].day+1)bad('流水日期顺序');
+    if(days.length?days[days.length-1].day!==g.day-1:g.day!==startDay)bad('流水日期缺失');
+    if(days.length<48&&days.length&&days[0].day!==startDay)bad('流水起始记录缺失');
+    g.townLedger={v:1,startDay,startHour,current:bucket(l.current,false),days};
   }
 
   g.toolWear = Number.isFinite(gd.toolWear) && gd.toolWear >= 0 ? gd.toolWear : 0;
