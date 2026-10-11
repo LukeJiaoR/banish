@@ -1370,14 +1370,14 @@ G.ui = {
   },
   farmInfoData: function (b) {
     if (b.type !== 'farm' || b.state !== 'ok' || !G.farmSummary) return null;
-    const s = G.farmSummary(b), crops = G.CROPS;
+    const s = G.farmSummary(b), pests = G.farmPestSummary(b), crops = G.CROPS;
     const crop = crops[s.crop], choice = crops[s.choice];
     const workerNames = b.workers.map(id => G.world.cmap[id]).filter(c => c && !c.dead && c.job === b.id).map(c => c.name);
     const target = type => {
       const value = G.productionGoalOf(type);
       return `${G.RES[type].name} ${value === null ? '未设置' : value === 0 ? '0（关闭新一季）' : value + (G.goalPaused(type) ? '（达标暂停新一季）' : '（可开始新一季）')}`;
     };
-    return { summary: s, data: {
+    return { summary: s, pests, data: {
       status: s.status,
       workers: `${s.workers} 人${workerNames.length ? ' · ' + workerNames.join('、') : '（等待可用农夫）'}`,
       plot: `地块 ${b.w}×${b.h} · ${s.total}格 · 成熟满收理论 ${s.total*G.PROD.farm.perTile} 食物；实际受种收工时、工具、冬损和仓容影响`,
@@ -1385,7 +1385,9 @@ G.ui = {
       choice: `下季 / 空田选择：${choice.name} → ${G.RES[s.choiceOutput].name}${s.pending ? '（下一春生效）' : '（与本季一致）'}`,
       reason: s.reason,
       seeds: `种子：小麦已解锁 · 卷心菜${s.unlocked.cabbage ? '已永久解锁' : '未解锁，需贸易购买卷心菜种子'}（永久解锁，不是库存物品，不占仓位）`,
-      progress: `播种 ${s.sown}/${s.total} · 成长 ${Math.floor(s.growth * 100)}% · 收获 ${s.harvested}/${s.total}`,
+      progress: `播种 ${s.sown}/${s.total} · 成长 ${Math.floor(s.growth * 100)}% · 实际收获 ${s.harvested}/${s.total} · 虫害损失 ${pests.lost}/${s.total}`,
+      pestField: this.farmPestFieldText(pests),
+      rotation: this.farmRotationText(pests),
       yield: `收获产出：按当前工具状态，每格 ${G.taskYield(G.farmHarvestBase(b))} ${G.RES[s.output].name}；每筐达到 ${G.PROD.farm.haulCap} 后送仓，入仓后才可用`,
       stock: `全镇可用库存：主食 ${Math.floor(s.grain || 0)} · 蔬菜 ${Math.floor(s.vegetables || 0)}（在途未入库不计）`,
       targets: `全镇目标：${['food', 'grain', 'vegetables'].map(target).join(' · ')}`,
@@ -1399,6 +1401,15 @@ G.ui = {
         <p class="desc" id="farm-crop-note">春、夏尚未开始播种的空田立即应用；已接第一播种任务、已播种、生长或已收获的本季作物锁定，改选留到下一春。已背起的粮食不变。新局与旧农田默认小麦。</p>
       </div>
       ${Object.keys(facts.data).filter(key => !['status', 'workers'].includes(key)).map(key => `<p class="row" data-farm="${key}">${this.escHtml(facts.data[key])}</p>`).join('')}
+      <div class="farm-pests-setting" data-farm-pests-setting>
+        <p class="row" data-farm-pests-status>${this.escHtml(this.farmPestSettingText(facts.pests))}</p>
+        <div class="economy-actions"><button type="button" id="farm-pests-toggle" aria-describedby="farm-pests-note" aria-expanded="false">${facts.pests.enabled ? '关闭全镇农田虫害' : '开启全镇农田虫害…'}</button></div>
+        <p class="desc" id="farm-pests-note">可选全镇规则，新局和旧档默认关闭。仅影响农田未收作物，邻近同种作物田可互相传播；仓内库存和已背起的粮食不受影响；果园、牧场不受影响。关闭即停止新感染与后续损失、清除活动虫害，已损失作物不返还。</p>
+        <div class="hidden" data-farm-pests-confirm role="group" aria-label="确认开启全镇农田虫害">
+          <p class="desc">开启会影响全镇所有农田。本作适配：先有12天宽限；之后新感染先预警2天，再逐日损失未收作物。损失不会自动返还，仍可在此关闭。</p>
+          <div class="economy-actions"><button type="button" id="farm-pests-confirm">确认全镇开启</button><button type="button" id="farm-pests-cancel">保持关闭</button></div>
+        </div>
+      </div>
       <div class="economy-actions"><button type="button" id="early-harvest-start">提前抢收</button></div>
       <p class="desc" data-early-harvest-status></p>
       <div class="hidden" data-early-harvest-confirm role="group" aria-label="确认提前抢收">
@@ -1406,7 +1417,7 @@ G.ui = {
         <div class="economy-actions"><button type="button" id="early-harvest-confirm">确认本季抢收</button><button type="button" id="early-harvest-cancel">继续等待</button></div>
       </div>
       <p class="economy-message" data-farm-message role="status" aria-live="polite"></p>
-      <p class="desc">全田播完才开始成长；默认秋季成熟后收获，也可确认提前抢收，按当时成熟度锁定较低产量并停止继续成长，本季不能复种。冬季未收作物损失；农夫仍须收割并实际搬运入仓。</p>
+      <p class="desc">全田播完才开始成长；默认秋季成熟后收获，也可确认提前抢收，按当时成熟度锁定较低产量并停止继续成长，本季不能复种。等待能提高成熟产量；若开启虫害，等候和收割期间仍可能损失未收格。冬季未收作物损失；农夫仍须收割并实际搬运入仓。</p>
       <p class="desc">食物仍分肉类、蔬菜、主食三类。小麦产主食，卷心菜产蔬菜；多种作物不额外增加饮食类别，也不产肉。</p>
     </section>`;
   },
@@ -1432,6 +1443,7 @@ G.ui = {
       // Native selects may hold a keyboard draft before firing change.
       if (document.activeElement !== select) select.value = facts.summary.choice;
     }
+    this.refreshFarmPests(b);
     this.refreshEarlyHarvest(b);
     return true;
   },
@@ -1451,8 +1463,77 @@ G.ui = {
       const message = el.querySelector('[data-farm-message]');
       if (message) message.textContent = accepted ? G.farmSummary(b).pending ? '选择已保存，将在下一春生效；本季作物和在途粮食保留。' : '选择已保存，本季作物与下季选择一致。' : '作物未更改，请先购买对应种子并检查农田是否仍可用。';
     });
+    this.initFarmPests(b);
     this.initEarlyHarvest(b);
     this.refreshFarmInfo(b);
+  },
+  farmPestSettingText: function (p) {
+    return p.enabled ? `全镇农田虫害：已开启${p.graceDays > 0 ? ` · 宽限还剩 ${p.graceDays} 天` : ''}` : '全镇农田虫害：已关闭';
+  },
+  farmPestFieldText: function (p) {
+    const state = !p.enabled ? '已关闭，不再新增感染或虫损' : p.graceDays > 0 ? '宽限中，暂不新增感染或虫损' :
+      p.active ? p.warningDays > 0 ? `预警中，距开始损失还有 ${p.warningDays} 天；之后每天最多损失 ${p.damagePerDay} 格` :
+        `正在损失，每天最多损失 ${p.damagePerDay} 格` : '当前无活动虫害';
+    return `本田虫害：${state} · 已虫损 ${p.lost} 格 · 尚未收割 ${p.remaining} 格（虫损不计入实际收获）`;
+  },
+  farmRotationText: function (p) {
+    const crop = G.CROPS[p.crop].name, choice = G.CROPS[p.choice].name;
+    const action = !p.rotationAvailable ? '卷心菜未解锁，须在贸易站购买种子后才能选择不同作物' :
+      p.rotationPlanned ? `已选下一春种${choice}，本季仍是${crop}，当前虫害不会因改选消失` : `可用上方作物选择安排不同于本季${crop}的作物`;
+    return `轮作：${action}。${p.recurrence ? `本田已有${crop}虫害记录，继续同种会提高未来复发风险。` : ''}连续种受过虫害的同种作物会提高风险；实际播下不同作物才重置复发风险，只改下季选择不会重置。`;
+  },
+  refreshFarmPests: function (b) {
+    const el = this.el.info, panel = el.querySelector('[data-farm-panel]');
+    if (!panel) return;
+    const toggle = panel.querySelector('#farm-pests-toggle'), box = panel.querySelector('[data-farm-pests-confirm]'), status = panel.querySelector('[data-farm-pests-status]');
+    if (!toggle || !box || !status) return;
+    const p = G.farmPestSummary(b), modal = G.hasOpenModal && G.hasOpenModal();
+    const label = p.enabled ? '关闭全镇农田虫害' : '开启全镇农田虫害…';
+    if (toggle.textContent !== label) toggle.textContent = label;
+    const text = this.farmPestSettingText(p);
+    if (status.textContent !== text) status.textContent = text;
+    const pending = panel._pestEnable;
+    if (pending && (p.enabled || pending.game !== G.game || pending.settings !== G.game.farmPests || modal)) {
+      panel._pestEnable = null; box.classList.add('hidden'); toggle.setAttribute('aria-expanded', 'false');
+      if (!modal && box.contains && box.contains(document.activeElement) && toggle.focus) toggle.focus();
+    }
+  },
+  initFarmPests: function (b) {
+    const el = this.el.info, w = G.world, g = G.game, panel = el.querySelector('[data-farm-panel]');
+    if (!panel) return;
+    const toggle = panel.querySelector('#farm-pests-toggle'), confirm = panel.querySelector('#farm-pests-confirm'), cancel = panel.querySelector('#farm-pests-cancel'), box = panel.querySelector('[data-farm-pests-confirm]'), msg = panel.querySelector('[data-farm-message]');
+    if (!toggle || !confirm || !cancel || !box) return;
+    panel._pestEnable = null;
+    const reset = () => { panel._pestEnable = null; box.classList.add('hidden'); toggle.setAttribute('aria-expanded', 'false'); };
+    const valid = () => G.world === w && G.game === g && this.el.info === el && !el.classList.contains('hidden') &&
+      G.sel?.kind === 'b' && G.sel.id === b.id && w.bmap[b.id] === b && b.type === 'farm' && b.state === 'ok' &&
+      el.querySelector('[data-farm-panel]') === panel && panel.querySelector('#farm-pests-toggle') === toggle &&
+      panel.querySelector('#farm-pests-confirm') === confirm && panel.querySelector('#farm-pests-cancel') === cancel &&
+      !(G.hasOpenModal && G.hasOpenModal());
+    toggle.addEventListener('click', e => {
+      if (!valid() || e.detail > 1) { reset(); return; }
+      if (G.farmPestSummary(b).enabled) {
+        reset();
+        if (G.setFarmPests(false, g)) {
+          if (msg) msg.textContent = '已关闭全镇农田虫害：不再新增感染或虫损，活动虫害已清除；已损失作物不返还，库存和在途粮食不变。';
+          this.refreshFarmInfo(b);
+        }
+        return;
+      }
+      panel._pestEnable = { game: g, settings: g.farmPests };
+      box.classList.remove('hidden'); toggle.setAttribute('aria-expanded', 'true');
+      if (confirm.focus) confirm.focus();
+    });
+    cancel.addEventListener('click', () => { if (!valid()) { reset(); return; } reset(); if (toggle.focus) toggle.focus(); });
+    confirm.addEventListener('click', e => {
+      const pending = panel._pestEnable;
+      if (!valid() || !pending || pending.game !== g || pending.settings !== g.farmPests || G.farmPestSummary(b).enabled || e.detail > 1) { reset(); return; }
+      reset();
+      const accepted = G.setFarmPests(true, g);
+      if (msg) msg.textContent = accepted ? '已开启全镇农田虫害，先有12天宽限；新感染预警2天后才开始损失，农夫仍须实际收割送仓。' : '设置未更改，请重新打开农田详情后确认。';
+      this.refreshFarmInfo(b);
+      if (toggle.focus) toggle.focus();
+    });
   },
   earlyHarvestText:function(q){
     if(!q.ok)return q.reason;
