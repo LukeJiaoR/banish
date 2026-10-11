@@ -69,7 +69,7 @@ function fixture(pointerEvents = false) {
   const status = controls.appendChild(element('harvest-cancel-status'));
   const placement = panel.appendChild(element('placement-info'));
   const toolbar = hud.appendChild(element('toolbar'));
-  for (const kind of ['fell', 'quarry', 'demolish', 'farm', 'road']) {
+  for (const kind of ['fell', 'quarry', 'demolish', 'farm', 'road', 'stoneroad', 'bridge']) {
     const btn = toolbar.appendChild(element('tool-' + kind, 'BUTTON')); btn.dataset.tool = kind;
     btn.addEventListener('click', () => { if (!G.hasOpenModal()) G.setTool(kind); });
   }
@@ -174,5 +174,12 @@ test('middle button pans camera without road planning; invalid drag start stays 
  const{G,doc}=roadFixture(),cv=doc.getElementById('game'),x=G.cam.x;
  cv.emit('mousedown',{button:1,clientX:3,clientY:3});cv.emit('mousemove',{clientX:20,clientY:3});cv.emit('mouseup',{button:1,clientX:20,clientY:3});assert.equal(G.cam.x,x+17);assert.equal(G.roadPlan,null);
  G.world.water[3*G.world.N+3]=1;cv.emit('mousedown',{clientX:3,clientY:3});cv.emit('mousemove',{clientX:20,clientY:3});cv.emit('mouseup',{clientX:20,clientY:3});assert.equal(G.roadPlan.start,null);assert.equal(G.roadPlanStatus().ok,false);assert.equal(G.world.road.some(Boolean),false);
+});
+test('stone road UI previews upgrade cost, preserves focus and guards stale mode confirmation',()=>{
+ const f=roadFixture(),{G,doc}=f;G.setTool('stoneroad');assert.equal(doc.getElementById('tool-stoneroad').getAttribute('aria-pressed'),'true');f.tap(3,3);f.tap(8,3);G.ui.refreshRoadControls();assert.match(doc.getElementById('road-plan-status').textContent,/合计 6 石/);const button=doc.getElementById('road-confirm');button.focus();const stone=G.game.res.stone;f.click(button);assert.equal(G.game.res.stone,stone-6);assert.equal(G.world.road[3*G.world.N+5],2);assert.equal(doc.activeElement,button);
+ f.tap(3,4);f.tap(8,4);G.ui.refreshRoadControls();button.emit('mousedown');G.setTool('road');f.tap(3,5);f.tap(8,5);G.ui.refreshRoadControls();button.emit('click');assert.equal(G.world.road[5*G.world.N+5],0);
+});
+test('bridge UI reports snapped banks and construction cost before committing real blocked worksite',()=>{
+ const f=roadFixture(),{G,doc}=f,w=G.world;w.buildings=[];w.bmap={};w.citizens.forEach(c=>{c.x=8;c.y=10;c.job=null;c.task=null;c.pausedTask=null});for(let y=0;y<w.N;y++)for(let x=10;x<=12;x++)w.water[y*w.N+x]=1;G.setTool('bridge');f.tap(9,10);f.tap(13,11);G.ui.refreshRoadControls();assert.equal(G.roadPlan.end.y,10);assert.match(doc.getElementById('road-plan-status').textContent,/木材 20 \/ 石头 5/);const button=doc.getElementById('road-confirm');assert.equal(button.textContent,'确认建桥');f.click(button);const b=w.buildings.find(b=>b.type==='bridge');assert(b);assert.equal(b.state,'site');assert.equal(G.tileBlocked(w,11,10),true);assert.equal(G.roadPlan,null);
 });
 console.log(`Road plan UI: ${passed} passed (DOM/event fixtures, not real browser/mobile acceptance)`);

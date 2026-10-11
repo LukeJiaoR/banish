@@ -42,3 +42,12 @@ for file, size in resource_sizes.items():
         foot = [x for x in range(im.width) if a.getpixel((x, im.height-1)) > 32]
         assert foot and abs((min(foot)+max(foot))/2 - im.width/2) <= 2, file
     print(file, size, "resource sprite alpha, size and anchor: OK")
+
+transport_sizes = {"bridges/bridge_x": (128,96), "bridges/bridge_y": (128,96), "icons/tool_bridge": (128,128), "icons/tool_stoneroad": (128,128)}
+for file, size in transport_sizes.items():
+    im = Image.open(ROOT / "assets" / (file + ".png"))
+    assert im.mode == "RGBA" and im.size == size, file
+    a = im.getchannel("A")
+    assert a.getextrema() == (0, 255), file
+    assert all(a.getpixel(p) == 0 for p in [(0,0),(im.width-1,0),(0,im.height-1),(im.width-1,im.height-1)]), file
+    print(file, size, "transport sprite size and alpha: OK")

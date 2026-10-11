@@ -315,6 +315,8 @@ G.areaLand = function (w, x, y, ww, hh) {
 G.tileBlocked = function (w, x, y) {
   if (x < 0 || y < 0 || x >= w.N || y >= w.N) return true;
   const i = y * w.N + x;
+  const bridge = G.bridgeAt(w, x, y);
+  if (bridge) return bridge.state !== 'ok';
   if (w.water[i] === 1) return true;
   const bid = w.bgrid[i];
   if (bid >= 0) {
@@ -325,19 +327,19 @@ G.tileBlocked = function (w, x, y) {
 };
 G.onRoad = function (w, x, y) {
   if (x < 0 || y < 0 || x >= w.N || y >= w.N) return false;
-  return w.road[y * w.N + x] === 1;
+  return w.road[y * w.N + x] > 0 || G.bridgeAt(w, x, y)?.state === 'ok';
 };
 
 // All normal road writes go through this helper. Unknown maps keep the
 // conservative road-speed lower bound rather than guessing a cached count.
 G.bumpNavigation = function (w) { w.navigationRevision = (w.navigationRevision || 0) + 1; };
 G.setRoad = function (w, x, y, present) {
-  const i = y * w.N + x, next = present ? 1 : 0, previous = w.road[i] ? 1 : 0;
+  const i = y * w.N + x, next = present === 2 ? 2 : present ? 1 : 0, previous = w.road[i] || 0;
   if (next === previous) return;
   w.road[i] = next;
   G.bumpNavigation(w);
   if (Number.isInteger(w.roadCount)) {
-    w.roadCount += next - previous;
+    w.roadCount += Number(!!next) - Number(!!previous);
     // Half-tile expansion matches round(position) surface boundaries. Removing
     // roads may leave a wider box: that only weakens, never raises, the bound.
     if (next) {
@@ -356,7 +358,7 @@ const PF_DIRS = [[1, 0, 1], [-1, 0, 1], [0, 1, 1], [0, -1, 1], [1, 1, Math.SQRT2
 G.travelEdgeHours = function (w, sx, sy, tx, ty) {
   const v = G.TRAVEL_SPEED;
   return Math.hypot(tx - sx, ty - sy) * 0.5 *
-    (1 / (w.road[sy * w.N + sx] ? v.road : v.field) + 1 / (w.road[ty * w.N + tx] ? v.road : v.field));
+    (1 / G.surfaceSpeed(w,sx,sy) + 1 / G.surfaceSpeed(w,tx,ty));
 };
 G.travelGridDistance = function (dx, dy) {
   dx = Math.abs(dx); dy = Math.abs(dy);
@@ -367,7 +369,7 @@ G.roadExitDistance = function (w, x, y) {
   if (!Number.isInteger(w.roadCount) || !b) return 0;
   return G.travelGridDistance(Math.max(b.minX - x, 0, x - b.maxX), Math.max(b.minY - y, 0, y - b.maxY));
 };
-G.travelLowerBound = function (dx, dy, fastest = Math.max(G.TRAVEL_SPEED.road, G.TRAVEL_SPEED.field), fieldTail = 0) {
+G.travelLowerBound = function (dx, dy, fastest = Math.max(G.TRAVEL_SPEED.stone, G.TRAVEL_SPEED.road, G.TRAVEL_SPEED.field), fieldTail = 0) {
   const distance = G.travelGridDistance(dx, dy), field = G.TRAVEL_SPEED.field;
   // Either never use a road, or eventually leave the road envelope. Taking the
   // minimum also protects short all-field routes outside that envelope.
@@ -460,8 +462,9 @@ G.findPath = function (w, sx, sy, tx, ty, destinations = null) {
     }
     return top;
   };
-  const fastest = w.roadCount === 0 ? G.TRAVEL_SPEED.field : Math.max(G.TRAVEL_SPEED.road, G.TRAVEL_SPEED.field);
-  const fieldTail = bounds ? G.destinationFieldTail(w, bounds) : G.roadExitDistance(w, tx, ty);
+  const bridges = (w.buildings||[]).some(b => b.type === 'bridge' && b.state === 'ok');
+  const fastest = w.roadCount === 0 && !bridges ? G.TRAVEL_SPEED.field : Math.max(G.TRAVEL_SPEED.stone, G.TRAVEL_SPEED.road, G.TRAVEL_SPEED.field);
+  const fieldTail = bridges ? 0 : bounds ? G.destinationFieldTail(w, bounds) : G.roadExitDistance(w, tx, ty);
   const heuristic = bounds
     ? (x, y) => G.destinationLowerBound(x, y, bounds, fastest, fieldTail)
     : (x, y) => G.travelLowerBound(tx - x, ty - y, fastest, fieldTail);
@@ -486,7 +489,7 @@ G.findPath = function (w, sx, sy, tx, ty, destinations = null) {
       }
       const ni = ny * N + nx;
       if (pf.closed[ni] === gen) continue;
-      const ng = pf.g[cur] + base * 0.5 * (1 / (w.road[cur] ? G.TRAVEL_SPEED.road : G.TRAVEL_SPEED.field) + 1 / (w.road[ni] ? G.TRAVEL_SPEED.road : G.TRAVEL_SPEED.field));
+      const ng = pf.g[cur] + base * 0.5 * (1 / G.surfaceSpeed(w,cx,cy) + 1 / G.surfaceSpeed(w,nx,ny));
       if (pf.gen[ni] !== gen || ng < pf.g[ni]) {
         pf.gen[ni] = gen;
         pf.g[ni] = ng;
@@ -675,4 +678,55 @@ G.planRoad = function (w, start, end, options) {
     if (j) { const d = [p.x - path[j - 1].x, p.y - path[j - 1].y]; if (previous && (d[0] !== previous[0] || d[1] !== previous[1])) turns++; previous = d; }
   }
   return { ok: true, path, steps: path.length - 1, turns, newTiles, reusedTiles, clearTrees, materials: { wood: 0, stone: 0 }, expanded, maxSteps };
+};
+
+/* Bridges occupy ordinary building footprints but open water only on completion.
+ * Explicit 1-cell modules retain the existing no-corner-cutting route contract. */
+G.bridgeAt = function(w,x,y) {
+  if(x<0||y<0||x>=w.N||y>=w.N)return null;
+  const b=w.bmap[w.bgrid[y*w.N+x]];return b&&b.type==='bridge'?b:null;
+};
+G.surfaceSpeed = function(w,x,y) {
+  const road=w.road[y*w.N+x];
+  if(road===2)return G.TRAVEL_SPEED.stone;
+  return road || G.bridgeAt(w,x,y)?.state==='ok' ? G.TRAVEL_SPEED.road : G.TRAVEL_SPEED.field;
+};
+G.bridgeEnd = function(start,end) {
+  return Math.abs(end.x-start.x)>=Math.abs(end.y-start.y)?{x:end.x,y:start.y}:{x:start.x,y:end.y};
+};
+G.planBridge = function(w,start,end,options={}) {
+  const valid=p=>p&&Number.isInteger(p.x)&&Number.isInteger(p.y)&&p.x>=0&&p.y>=0&&p.x<w.N&&p.y<w.N;
+  if(!valid(start)||!valid(end))return {ok:false,reason:'桥两端必须在地图内'};
+  if(start.x!==end.x&&start.y!==end.y)return {ok:false,reason:'木桥必须沿一个网格轴平直跨水'};
+  const length=Math.abs(end.x-start.x)+Math.abs(end.y-start.y)+1;
+  if(length<3||length>24)return {ok:false,reason:'木桥需两岸陆地与中间水面，总长3～24格'};
+  const dx=Math.sign(end.x-start.x),dy=Math.sign(end.y-start.y),path=[];
+  for(let n=0;n<length;n++){
+    const p={x:start.x+dx*n,y:start.y+dy*n},i=p.y*w.N+p.x,bank=n===0||n===length-1;
+    if(bank?w.water[i]===1:w.water[i]!==1)return {ok:false,reason:bank?'桥头必须落在陆地；请在对岸选择端点':'两岸之间必须连续水面，不能穿陆地或转弯'};
+    if(w.rock[i]||w.treeIdx[i]>=0)return {ok:false,reason:'桥头需先清除树木或矿石，再重新预览'};
+    if(w.bgrid[i]>=0&&w.bgrid[i]!==options.ignoreId)return {ok:false,reason:'桥线被已有建筑或桥工地占用'};
+    path.push(p);
+  }
+  return {ok:true,path,length,steps:length-1,turns:0,newTiles:length,reusedTiles:0,clearTrees:[],materials:{wood:4*length,stone:length},axis:dx?'x':'y',start,end};
+};
+G.bridgeRemovalStatus = function(w,b) {
+  if(b.state!=='ok')return {ok:true};
+  if(w.citizens.some(c=>!c.dead&&Math.round(c.x)>=b.x&&Math.round(c.x)<b.x+b.w&&Math.round(c.y)>=b.y&&Math.round(c.y)<b.y+b.h))return {ok:false,reason:'桥上有人，请等居民离桥后再拆除'};
+  const copy={...w,bmap:{...w.bmap}};delete copy.bmap[b.id];
+  // A bridge may also connect a side island. Preserve every adjacent land
+  // component, not only its two named endpoints. Four-neighbour connectivity
+  // equals our no-corner-cutting eight-way walk graph's connectivity.
+  const seen=new Uint8Array(w.N*w.N),queue=new Int32Array(w.N*w.N),dirs=[[1,0],[-1,0],[0,1],[0,-1]];
+  let head=0,tail=0;const first=b.y*w.N+b.x;queue[tail++]=first;seen[first]=1;
+  while(head<tail){const i=queue[head++],x=i%w.N,y=Math.floor(i/w.N);for(const[dx,dy]of dirs){const nx=x+dx,ny=y+dy;if(G.tileBlocked(copy,nx,ny))continue;const ni=ny*w.N+nx;if(!seen[ni]){seen[ni]=1;queue[tail++]=ni;}}}
+  if(!seen[(b.y+b.h-1)*w.N+b.x+b.w-1])return {ok:false,reason:'这是唯一跨岸通道；请先建成替代桥，避免把居民困在对岸'};
+  for(let y=b.y;y<b.y+b.h;y++)for(let x=b.x;x<b.x+b.w;x++)for(const[dx,dy]of dirs){const nx=x+dx,ny=y+dy;if(!G.tileBlocked(copy,nx,ny)&&!seen[ny*w.N+nx])return {ok:false,reason:'拆桥会断开旁接岛屿或岸边通路；请先建成替代通道'};}
+  return {ok:true};
+};
+G.bridgeStartStatus = function(w,p) {
+  if(!p||p.x<0||p.y<0||p.x>=w.N||p.y>=w.N)return {ok:false,reason:'桥头必须在地图内'};
+  const i=p.y*w.N+p.x;
+  if(w.water[i]===1||w.rock[i]||w.treeIdx[i]>=0||w.bgrid[i]>=0)return {ok:false,reason:'请选择已清场且无建筑的陆地桥头'};
+  return {ok:true,path:[p]};
 };
