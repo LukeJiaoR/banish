@@ -762,8 +762,8 @@ G.ui = {
         // Fixed positions give each gesture one intent. A double click on Pause
         // cannot land on a newly renamed Resume button and reverse the action.
         holder._bound = true;
-        holder.innerHTML = '<div class="economy-actions"><button type="button" id="construction-pause">暂停工地</button><button type="button" id="construction-resume">恢复工地</button></div>';
-        for (const [id, desired] of [['construction-pause', true], ['construction-resume', false]]) {
+        holder.innerHTML = '<div class="economy-actions"><button type="button" id="construction-pause">暂停工地</button><button type="button" id="construction-resume">恢复工地</button><button type="button" id="construction-priority">优先施工</button><button type="button" id="construction-normal">恢复普通</button></div>';
+        for (const [id,desired,priority] of [['construction-pause',true,false],['construction-resume',false,false],['construction-priority',true,true],['construction-normal',false,true]]) {
           const button = holder.querySelector('#' + id), context = panel._workforceContext;
           button.addEventListener('keydown', e => {
             if (e.repeat && (e.key === 'Enter' || e.key === ' ')) e.preventDefault();
@@ -775,10 +775,10 @@ G.ui = {
                   el.querySelector('[data-workforce-panel]') === panel && !el.classList.contains('hidden') && !(G.hasOpenModal && G.hasOpenModal())) this.renderInfo();
               return;
             }
-            if (G.workforceSummary(b).paused === desired) { this.refreshWorkforceInfo(b); return; }
-            if (G.setConstructionPaused(b, desired)) {
+            if ((priority?!!b.sitePriority:G.workforceSummary(b).paused) === desired) { this.refreshWorkforceInfo(b); return; }
+            if ((priority?G.setConstructionPriority:G.setConstructionPaused)(b,desired)) {
               const message = panel.querySelector('[data-workforce-message]');
-              if (message) message.textContent = desired ? '工地已暂停。已完成工段和已付建材保留；携货者仍需送仓。' : '工地已恢复，等待建筑工人；不会再次扣除已付建材。';
+              if (message) message.textContent = priority?(desired?'已设为优先施工。当前工作段和携货先结清，不会凭空增加工人。':'已恢复普通顺序；不会取消已完成工段或扣取新建材。'):desired ? '工地已暂停。已完成工段和已付建材保留；携货者仍需送仓。' : '工地已恢复，等待建筑工人；不会再次扣除已付建材。';
             }
             this.renderInfo();
           });
@@ -786,11 +786,14 @@ G.ui = {
       }
       const pause = holder.querySelector('#construction-pause'), resume = holder.querySelector('#construction-resume');
       pause.disabled = s.paused; resume.disabled = !s.paused;
+      const high=holder.querySelector('#construction-priority'),normal=holder.querySelector('#construction-normal');
+      high.disabled=!!b.sitePriority;normal.disabled=!b.sitePriority;
       const active = document.activeElement;
       if ((active === pause || active === resume) && active.disabled) {
         const next = s.paused ? resume : pause;
         if (next.focus) next.focus();
       }
+      if((active===high||active===normal)&&active.disabled){const next=b.sitePriority?normal:high;if(next.focus)next.focus();}
     }
     return true;
   },
@@ -799,7 +802,7 @@ G.ui = {
     const upgrade = b.type === 'stonehouse' && b.upgradeFrom === 'house';
     const untouched = !b.constructionStarted && b.progress === 0 && b.workLeft >= b.totalWork;
     return {
-      status: (upgrade ? '木屋升级石屋 · ' : '') + (trees ? `清理工地：还需砍 ${trees} 棵树（工人搬运入仓）` : `建造中 ${Math.floor(b.progress * 100)}%`),
+      status: (b.sitePriority?'优先施工 · ':'') + (upgrade ? '木屋升级石屋 · ' : '') + (trees ? `清理工地：还需砍 ${trees} 棵树（工人搬运入仓）` : `建造中 ${Math.floor(b.progress * 100)}%`),
       workers: b.workers.map(id => w.cmap[id]).filter(Boolean).map(c => c.name).join('、') || '等待建筑工人',
       refund: upgrade ? `${untouched ? '未开工：取消退还全部' : '已开工：取消退还一半'}石屋已付建材（包含旧屋回收材料）。原木屋已拆除，取消升级不会还原木屋。`
         : untouched ? '未开工：取消退还全部已付建材，保留树木' : '已开工：拆除退还一半已付建材，已砍树不恢复'
@@ -1737,7 +1740,7 @@ G.ui = {
       }
       return;
     }
-    const destructiveActionChanged = sameSelection && this._infoBuildState === 'site' && selected.state !== 'site' && active && ['info-demolish', 'construction-pause', 'construction-resume'].includes(active.id);
+    const destructiveActionChanged = sameSelection && this._infoBuildState === 'site' && selected.state !== 'site' && active && ['info-demolish', 'construction-pause', 'construction-resume','construction-priority','construction-normal'].includes(active.id);
     const workforceInput = sameSelection && this._infoBuildState === selected.state && el.querySelector && el.querySelector('#worker-limit-input');
     const workforceDraft = workforceInput ? workforceInput.value : null;
     const focusSelector = destructiveActionChanged ? '#info-close' : hadFocus ? (active.id ? '#' + active.id : active.dataset.tl ? '[data-tl="' + active.dataset.tl + '"]' : active.dataset.fl ? '[data-fl="' + active.dataset.fl + '"]' : active.dataset.k ? '[data-k="' + active.dataset.k + '"]' : null) : null;

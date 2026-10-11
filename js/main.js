@@ -114,7 +114,7 @@ G.serializeGame = function () {
     rockCleared: w.rockCleared,
     buildings: w.buildings.map(b => ({
       id: b.id, type: b.type, x: b.x, y: b.y, state: b.state,
-      upgradeFrom:b.upgradeFrom, workerLimit:b.workerLimit, sitePaused:b.sitePaused, progress: b.progress, workLeft: b.workLeft, totalWork: b.totalWork, paidCost: b.paidCost, constructionStarted: b.constructionStarted,
+      upgradeFrom:b.upgradeFrom, workerLimit:b.workerLimit, sitePaused:b.sitePaused, sitePriority:b.sitePriority, progress: b.progress, workLeft: b.workLeft, totalWork: b.totalWork, paidCost: b.paidCost, constructionStarted: b.constructionStarted,
       workers: b.workers, family: b.family, noWork: b.noWork, warnText: b.warnText,
       bridgeAxis: b.bridgeAxis, bridgeLength: b.type === 'bridge' ? b.w + b.h - 1 : undefined,
       mineMode: b.mineMode, legacyMine: b.legacyMine, mineTick: b.mineTick, toolRecipe: b.toolRecipe, reserveDays:b.reserveDays, coatRecipe:b.coatRecipe,
@@ -379,6 +379,7 @@ G.prepareSaveData = function (d) {
     };
     if(bd.upgradeFrom!==undefined){if(bd.upgradeFrom!=='house'||bd.type!=='stonehouse')bad('住房升级来源');b.upgradeFrom='house';}
     if(bd.workerLimit!==undefined)b.workerLimit=integer(bd.workerLimit,'建筑用工上限',0,def.jobs||0);
+    if(bd.sitePriority!==undefined){if(typeof bd.sitePriority!=='boolean'||b.state!=='site')bad('施工优先级');b.sitePriority=bd.sitePriority;}
     if(bd.sitePaused!==undefined){if(typeof bd.sitePaused!=='boolean'||(bd.sitePaused&&b.state!=='site'))bad('工地暂停状态');b.sitePaused=bd.sitePaused;}
     if (bd.type === 'bridge') {
       b.bridgeAxis=bd.bridgeAxis;

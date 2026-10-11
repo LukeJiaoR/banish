@@ -806,6 +806,7 @@ G.availableRockMarks = function (w) {
 
 /* 开始搬运去仓库 */
 G.startHaul = function (c) {
+  G.protectConstructionPriorityCargo(c);
   if(c.staffingRelease!=null&&c.staffingRelease===c.job)G.markStaffingCargo(c);
   if (G.isMineralCargo(c)) { G.startMineralHaul(c); return; }
   if (!G.hasStorageBuilding()) { // 兼容旧的无仓存档：仍受仓储上限约束
@@ -1167,6 +1168,8 @@ G.stepCitizen = function (c, dtH) {
 G.arrive = function (c) {
   c.path = null;
   if (c.state === 'haul') {
+    // Connectivity may change during this trip. Check once at delivery, not per tick.
+    G.protectConstructionPriorityCargo(c);
     if(c.carry&&G.hasStorageBuilding()){
       const target=G.world.bmap[c.haulTo];
       if(!G.storageAccepts(target,G.cargoStorageTypes(c.carry))||!G.atMedicalDoor(c,target)||G.tileBlocked(G.world,Math.round(c.x),Math.round(c.y))){G.startHaul(c);return;}
@@ -1276,6 +1279,7 @@ G.requestTask = function (c) {
   }
   if(G.workerLimitOf(b)<=0){G.detachStaffingRole(c);G.requestTask(c);return;}
   if (b.state === 'site') {
+    if(!c.carry&&!c.pausedTask&&G.tryConstructionPriorityHandoff(c,b))return;
     const trees = G.siteTrees(b);
     if (trees.length) {
       const claimed = new Set();
@@ -1904,13 +1908,14 @@ G.scheduleJobs = function () {
   // 第一优先：建筑工地（人手不足时抽调：先抽非粮食岗位；
   // 粮食岗位仅在有富余时抽调 —— 保留约 pop/4 的粮食劳动力。
   // 注意：非收获季的农田没有产出，其工人视为普通劳动力可被抽调）
-  for (const b of w.buildings) {
-    if (b.state !== 'site') continue;
+  const sites=w.buildings.filter(b=>b.state==='site').sort((a,z)=>Number(!!z.sitePriority)-Number(!!a.sitePriority));
+  for (const b of sites) {
     let guard = 0;
     while (b.workers.length < G.workerLimitOf(b) && guard++ < 8) {
       // 有标记待处理时给「砍伐/清石」保留 wantLabor 名无业散工——不够额就改抽在岗者（否则扩张期清石永远停摆）
       const free = jobless();
-      let c = free.length > wantLabor ? G.pickNearest(free, b) : null;
+      const reachable=xs=>b.sitePriority?xs.filter(c=>G.workSpot(w,b,c.x,c.y)):xs;
+      let c = free.length > wantLabor ? G.pickNearest(reachable(free), b) : null;
       if (!c) {
         const busyAll = w.citizens.filter(ci => {
           if (ci.dead || !ci.adult || ci.job == null || G.goalCommitment(ci)) return false;
@@ -1924,7 +1929,7 @@ G.scheduleJobs = function () {
           const foodWorkers = busyAll.filter(ci => FOOD_JOBS.includes(w.bmap[ci.job].type));
           if (foodWorkers.length > needFood) pool = foodWorkers;
         }
-        c = G.pickNearest(pool, b);
+        c = G.pickNearest(reachable(pool), b);
         if (!c) break;
         G.releaseWorker(c);
       }
@@ -2121,7 +2126,7 @@ G.upgradeHouse=function(b,expectedKey){
   for(const [k,qty]of Object.entries(q.due))g.res[k]-=qty;
   b.type='stonehouse';b.state='site';b.upgradeFrom='house';b.progress=0;
   b.workLeft=b.totalWork=G.BDEF.stonehouse.buildWork;b.paidCost={...q.cost};b.constructionStarted=false;
-  b.family=null;b.workers=[];b.noWork=false;b.warnText='';b.sitePaused=false;delete b.workerLimit;delete b.unheated;delete b.lastHeating;
+  b.family=null;b.workers=[];b.noWork=false;b.warnText='';b.sitePaused=false;delete b.sitePriority;delete b.workerLimit;delete b.unheated;delete b.lastHeating;
   for(const f of families)f.houseId=null;
   G.bumpNavigation(w);G.assignHousing();
   // A resident walking to the old wooden home must not finish that stale route
@@ -2137,7 +2142,7 @@ G.upgradeHouse=function(b,expectedKey){
 
 G.finishBuilding = function (b) {
   if (b.state !== 'site' || G.siteTrees(b).length) return;
-  b.state = 'ok';
+  b.state = 'ok';delete b.sitePriority;
   if(b.type==='townhall')G.game.nomads.nextDay=Math.max(G.game.nomads.nextDay,G.game.day+G.SEASON_DAYS);
   b.progress = 1;
   G.bumpNavigation(G.world);
@@ -2992,6 +2997,33 @@ G.setWorkerLimit=function(b,limit){
   if(!b||G.world.bmap[b.id]!==b||b.state!=='ok'||!max||!Number.isInteger(limit)||limit<0||limit>max)return false;
   b.workerLimit=limit;G.enforceWorkerLimit(b);G.syncStoppedServices(b);G.game.schedT=0;return true;
 };
+/* Only construction peers participate. Current work is settled at its normal
+ * requestTask boundary, not cancelled by a priority toggle. No slot reservation. */
+G.higherConstructionSites=function(b){
+  if(!b||b.state!=='site'||b.sitePriority)return [];
+  return G.world.buildings.filter(x=>x!==b&&x.state==='site'&&x.sitePriority&&!x.sitePaused&&x.workers.length<G.workerLimitOf(x));
+};
+G.reachableConstructionPriority=function(c,b){
+  return G.higherConstructionSites(b).find(x=>G.workSpot(G.world,x,c.x,c.y));
+};
+G.protectConstructionPriorityCargo=function(c){
+  if(c.carry&&!c.carry.staffingReturn&&G.reachableConstructionPriority(c,G.world.bmap[c.job]))G.markStaffingCargo(c);
+};
+G.tryConstructionPriorityHandoff=function(c,b){
+  if(c.carry||c.pausedTask||c.job!==b.id||!c.adult||c.student||c.dead)return false;
+  const target=G.reachableConstructionPriority(c,b);
+  if(!target)return false;
+  G.releaseWorker(c);G.assignWorker(target,c);return c.job===target.id;
+};
+G.setConstructionPriority=function(b,priority){
+  if(!b||G.world.bmap[b.id]!==b||b.state!=='site'||typeof priority!=='boolean')return false;
+  if(!!b.sitePriority===priority)return true;
+  b.sitePriority=priority;
+  // Only the already-existing cargo object gets protection. It disappears on
+  // full unloading and does not transfer to later ordinary collection.
+  if(priority)for(const c of G.world.citizens)G.protectConstructionPriorityCargo(c);
+  G.game.schedT=0;return true;
+};
 G.setConstructionPaused=function(b,paused){
   if(!b||G.world.bmap[b.id]!==b||b.state!=='site'||typeof paused!=='boolean')return false;
   if(!!b.sitePaused===paused)return true;
@@ -3024,7 +3056,7 @@ G.workforceSummary=function(b){
   const maximum=b.state==='site'?4:G.BDEF[b.type]?.jobs||0,limit=G.workerLimitOf(b),draining=workers.filter(finishing),paused=b.state==='site'&&!!b.sitePaused;
   const wait=draining.map(c=>G.cargoWaitReason(c)).find(Boolean);
   const reason=paused?'施工已暂停，已完成工段与已付建材保留':draining.length?(wait||'本批工作/送仓结清后释放，不再接新批次'):limit===0?'已停用：不再分配工人':b.state==='ok'&&!G.jobCanProduce(b)?G.workforceBlockReason(b):workers.length<limit?(global.available?'等待自动调度或可达工作路线':'可用成人不足，已有岗位、送仓或个人服务占用劳力'):'当前人数已达上限';
-  const rule=b.state==='site'?'暂停立即停派；已完成工段保留，未完成小工段取消。恢复不重复扣建材，既有道路/桥梁通行不变。':
+  const rule=b.state==='site'?(b.sitePriority?'优先施工：':'普通施工：')+'优先级不保证配足人数，仍保留粮食救急与采运散工。其他工地完成当前小工段并送清货后才转入可达优先工地；暂停优先于排位。暂停保留已完成工段，恢复不重复扣建材。':
     '上限不是保证人数；保持原单工效率和自动调度。降额先放空闲者，有限生产批次结清后释放；教师/医师/接待停止服务时立即释放。粮柴岗位调低可能断供，缺粮时也不会越过上限。'+
     (b.type==='school'?'停教后学生保留课时并尝试转校。':['hospital','herbalist'].includes(b.type)?'停用后不再治疗或提供草药服务。':'');
   return {supported:maximum>0,current:workers.length,limit,maximum,draining:draining.length,paused,reason,rule,global};
