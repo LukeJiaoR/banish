@@ -74,7 +74,7 @@ G.BDEF = {
     id: 'orchard', name: '果园', icon: '🍎', w: 6, h: 6,
     cost: { wood: 12 }, buildWork: 36, jobs: 2, passable: true,
     wall: '#8b7958', wallD: '#695936', roof: '#77924d',
-    desc: '贸易购入果树种子后永久解锁。约4年长成，每年秋收，果实并入蔬菜类；需工人照料和搬运，不会建成即产粮。',
+    desc: '贸易果树种子永久解锁。9株逐株种植、养护4年，成熟每株秋收20蔬菜。老树12–20岁错峰枯尽，农夫可补种；已有果实实际送仓，空位不再凭空产粮。',
   },
   tavern: {
     id: 'tavern', name: '酒馆', icon: '🍺', w: 3, h: 3,
