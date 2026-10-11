@@ -385,4 +385,67 @@ test('physical survival guide includes distributed food and qualifies household 
   G.ui.refreshGuide(); assert.match(f.guide.textContent, /全村粮食合计约 4.0 天.*逐户现货才可食用/);
 });
 
+
+test('fully funded startup avoids floating-point shortage warnings while real shortages remain visible', () => {
+  for (const type of ['townhall', 'market']) {
+    const f = setup(type), G = f.G, q = G.supplyModeQuote(), before = state(f);
+    assert(q.foodDays >= 2 - 1e-8);
+    assert.doesNotMatch(live(f, 'supply-mode', 'coverage'), /库存不足/);
+    assert.doesNotMatch(f.info.querySelector('[data-supply-mode-rows]').textContent, /不足两日/);
+    begin(f); assert.equal(state(f), before); control(f, 'cancel').click();
+    Object.assign(G.game.res, { grain: G.LIFE.eatPerDay * 1.5, vegetables: 0, meat: 0 });
+    G.game.res.food = G.game.res.grain; G.ui.renderInfo();
+    assert.match(live(f, 'supply-mode', 'coverage'), /1.5 天.*库存不足/);
+    assert.match(f.info.querySelector('[data-supply-mode-rows]').textContent, /1.5 天，不足两日/);
+  }
+});
+
+test('real mixed household pickup is shown as full supply transit, separate from production awaiting public deposit', () => {
+  const f = setup(), G = f.G; begin(f); confirm(f); G.game.h = 8;
+  for (let n = 0; n < 2; n++) G.eatHousehold(f.c, G.LIFE.eatPerDay);
+  assert(G.tryHouseholdSupply(f.c));
+  for (let n = 0; n < 2000 && !f.c.carry; n++) G.stepCitizen(f.c, .1);
+  assert(f.c.carry?.supplyBatch); const basket = G.supplyCargoItems(f.c.carry);
+  assert(Object.keys(basket).length > 1);
+  const before = state(f); G.ui.refreshHUD(); assert.equal(state(f), before);
+  for (const [type, qty] of Object.entries(basket)) {
+    const title = f.doc.getElementById('res-' + type).title;
+    assert(title.includes('配送在途 ' + G.ui.supplyNumber(qty)));
+    assert.doesNotMatch(title, /随身待入库/);
+  }
+  assert(f.doc.getElementById('res-food').title.includes('配送在途 ' + G.ui.supplyNumber(G.supplyFood(basket))));
+  const producer = f.resident(f.home); producer.carry = { type: 'grain', qty: 6 }; producer.state = 'haul';
+  G.ui.refreshHUD(); assert.match(f.doc.getElementById('res-food').title, /另有 6 随身待入库.*配送在途 8.33/);
+  const held = f.c.carry; G.returnSupplyCargo(f.c); G.ui.refreshHUD();
+  assert.equal(f.c.carry, held); assert.match(f.doc.getElementById('res-grain').title, /配送在途 2.78.*退仓/);
+});
+
+test('production goals explain distributed counting and preserve the automatic/public-only contract', () => {
+  const f = setup(), G = f.G;
+  f.mount('production-goals');
+  for (const type of G.RES_KEYS) { f.mount('goal-stock-' + type); f.mount('goal-status-' + type); }
+  G.ui.refreshProductionGoals();
+  assert.match(f.doc.getElementById('goal-stock-food').textContent, /^库存 120/);
+  assert.doesNotMatch(f.doc.getElementById('goal-stock-food').textContent, /目标计量/);
+  f.doc.getElementById('production-goals').classList.add('hidden'); begin(f); confirm(f);
+  f.doc.getElementById('production-goals').classList.remove('hidden');
+  for (const k of G.FOOD_KEYS) f.home.supplyStock[k] += G.withdrawResource(k, G.game.res[k]);
+  f.home.supplyStock.firewood += G.withdrawResource('firewood', G.game.res.firewood);
+  for (const type of ['food', ...G.FOOD_KEYS, 'firewood']) G.setProductionGoal(type, 1);
+  const before = state(f); G.ui.refreshProductionGoals(); assert.equal(state(f), before);
+  for (const type of ['food', ...G.FOOD_KEYS, 'firewood']) {
+    const text = f.doc.getElementById('goal-stock-' + type).textContent;
+    assert.match(text, /^公共库存 0/);
+    assert(text.includes('目标计量 ' + G.ui.supplyNumber(G.supplyEconomyStock(type))));
+    assert.match(text, /不含火情封存.*逐户现货/);
+    assert.match(f.doc.getElementById('goal-status-' + type).textContent, /达标暂停/);
+  }
+  assert.doesNotMatch(f.doc.getElementById('goal-stock-coal').textContent, /目标计量/);
+  G.setProductionGoal('food', G.storageCap('food') + 1); G.ui.refreshProductionGoals();
+  assert.match(f.doc.getElementById('goal-status-food').textContent, /高于公共仓容.*已配送存量也计入/);
+  assert.doesNotMatch(f.doc.getElementById('goal-status-food').textContent, /需扩建仓库/);
+  const fuel = f.building('woodcutter');
+  assert.match(G.ui.fuelInfoData(fuel).stock, /公共库存：柴火 0.*目标计量柴火 1/);
+});
+
 console.log(`Household supply UI: ${passed} suites passed (headless DOM with real migration/save APIs; browser/mobile visual acceptance not performed).`);

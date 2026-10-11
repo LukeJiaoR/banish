@@ -129,7 +129,7 @@ G.ui = {
     else status = b.workers.length ? '运作中' : '等待可用工人';
     return {
       target: `本屋燃料目标：${G.fuelLimitOf(b)}` + (G.productionGoalOf('firewood') !== null ? '；' + G.buildingGoalStatus(b) : ''),
-      stock: `${G.supplyEnabled && G.supplyEnabled() ? '公共库存' : '全镇库存'}：柴火 ${Math.floor(stock)} · 原木 ${Math.floor(G.game.res.wood)}`,
+      stock: `${G.supplyEnabled && G.supplyEnabled() ? '公共库存' : '全镇库存'}：柴火 ${Math.floor(stock)} · 原木 ${Math.floor(G.game.res.wood)}` + (G.supplyEnabled?.() ? `；目标计量柴火 ${this.supplyNumber(G.supplyEconomyStock('firewood'))}（含已配送与待回收，不含火情封存）` : ''),
       batches:this.fuelBatchText(b),
       heat: this.heatDemandText(heat),
       gap: usable < need ? `${G.heatingPolicy?.().allowCoal?'可用燃料':'柴火库存'}比${heat.winter ? '本冬后续' : '整冬'}取暖估算少约 ${Math.ceil(need - usable)}。` : '取暖估算会随住房入住情况变化。',
@@ -597,6 +597,11 @@ G.ui = {
     this.refreshGuide();
     this.refreshProductionGoals();
     const hauling = G.harvestFeedback();
+    // Household/vendor cargo already left public stock and may contain several
+    // resources. Exclude its primary slot from the legacy inbound-stock count;
+    // the full mixed basket is displayed separately from supplyInventory below.
+    if (physical) for (const c of G.world.citizens) if (!c.dead && c.carry?.supplyBatch)
+      hauling.carry[c.carry.type] = Math.max(0, (hauling.carry[c.carry.type] || 0) - c.carry.qty);
     hauling.carry.food += (G.FOOD_KEYS || []).reduce((sum, type) => sum + (hauling.carry[type] || 0), 0);
     for (const k of G.RES_KEYS) {
       const el = document.getElementById('res-' + k);
@@ -609,7 +614,9 @@ G.ui = {
         if (label) label.textContent = (physical ? '公共' : '') + (k === 'food' ? '总食物' : G.RES[k].name);
         el.title = `${physical ? '公共库存 · ' : ''}${G.RES[k].name}：${Math.floor(g.res[k])}${tool ? '（工具不限仓储）' : foodClass ? '（三类食物共享总食物仓容 ' + cap + '）' : ' / ' + cap}`;
         if (k === 'food' && G.FOOD_KEYS) el.title += ' · ' + G.FOOD_KEYS.map(type => `${G.RES[type].name} ${Math.floor(g.res[type] || 0)}`).join(' + ') + '（分类之和，不重复计入库存）';
-        if (hauling.carry[k]) el.title += ` · 另有 ${hauling.carry[k]} 随身待入库（尚不可用）`;
+        if (hauling.carry[k]) el.title += ` · 另有 ${this.supplyNumber(hauling.carry[k])} 随身待入库（尚不可用）`;
+        const supplyTransit = physical ? (k === 'food' ? G.supplyFood(supplies.transit) : supplies.transit[k] || 0) : 0;
+        if (supplyTransit > 1e-8) el.title += ` · 配送在途 ${this.supplyNumber(supplyTransit)}（送往市场/住处或退仓，不是新产出）`;
         if (['stone', 'iron', 'coal'].includes(k) && hauling.carry[k] && g.res[k] >= cap) el.title += ' · 仓满保留余矿，使用库存或建成新仓库后送仓';
         if (physical && ['food', ...G.SUPPLY.types].includes(k)) el.title += ` · 已配送至市场/住处和在途物资另计；全村${k === 'food' ? '食物' : G.RES[k].name} ${this.supplyNumber(k === 'food' ? G.supplyFood(supplies.available) : supplies.available[k])}（含散落待回收，不含火情封存；各家能否食用看本地储备）`;
         if (!physical && k === 'food' && G.world.citizens.length) el.title += ` · 可供 ${(g.res.food / (G.world.citizens.length * G.LIFE.eatPerDay)).toFixed(1)} 天（不计新产出）`;
@@ -1000,7 +1007,7 @@ G.ui = {
       mode: enabled ? '本存档已启用全村真实配送，不能切回自动供给。' : '当前全村自动供给；真实配送为一次性、不可逆的整村规则切换。',
       rule: quote.rule || '已分配的物资不会重复领取；以后由货商与家庭采购者实际搬运。',
       cost: enabled ? '一次性启动分配已结束，不再扣取或赠送启动物资。' : `确认后从公共库存实际扣除：${this.supplyStockText(quote.cost, true)}。这些物资逐项移入下列住处，不是赠送。`,
-      coverage: enabled ? '库存位置、在途与消耗请看实物分布和家庭详情。' : `本次实际启动口粮 ${this.supplyNumber(quote.foodDays)} 天（最多 2 天）；距两日口粮还缺 ${this.supplyNumber(quote.foodShortfall)}，冷季取暖还缺 ${this.supplyNumber(quote.fuelShortfall)} 柴火当量。${quote.foodDays < 2 ? '库存不足，不能保证两日供给。' : ''}`,
+      coverage: enabled ? '库存位置、在途与消耗请看实物分布和家庭详情。' : `本次实际启动口粮 ${this.supplyNumber(quote.foodDays)} 天（最多 2 天）；距两日口粮还缺 ${this.supplyNumber(quote.foodShortfall)}，冷季取暖还缺 ${this.supplyNumber(quote.fuelShortfall)} 柴火当量。${quote.foodDays < 2 - 1e-8 ? '库存不足，不能保证两日供给。' : ''}`,
       buyers: enabled ? '无健康成人的家庭需空闲散工协助；配送需要可达道路和真实库存。' : `无健康成人采购者 ${quote.familiesWithoutBuyer || 0} 户；完工通用仓 ${quote.readyStores || 0} 座。无采购者家庭依赖空闲散工，市场需另外安排货商。`,
     } };
   },
@@ -1048,7 +1055,7 @@ G.ui = {
       const node = panel.querySelector(`[data-supply-mode="${k}"]`);
       if (node && node.textContent !== value) node.textContent = value;
     }
-    const rows = quote.rows.map(row => `${row.name} #${row.id}（${row.x}, ${row.y}；${row.families.length} 户 / ${row.people} 人）：${this.supplyStockText(row.stock, true)}；实际口粮 ${this.supplyNumber(row.foodDays)} 天${row.foodDays < 2 ? '，不足两日' : ''}；冷季两日需 ${this.supplyNumber(row.fuelNeed)} 柴火当量，还缺 ${this.supplyNumber(Math.max(0, row.fuelNeed - row.stock.firewood - row.stock.coal * G.COAL_HEAT))}。`);
+    const rows = quote.rows.map(row => `${row.name} #${row.id}（${row.x}, ${row.y}；${row.families.length} 户 / ${row.people} 人）：${this.supplyStockText(row.stock, true)}；实际口粮 ${this.supplyNumber(row.foodDays)} 天${row.foodDays < 2 - 1e-8 ? '，不足两日' : ''}；冷季两日需 ${this.supplyNumber(row.fuelNeed)} 柴火当量，还缺 ${this.supplyNumber(Math.max(0, row.fuelNeed - row.stock.firewood - row.stock.coal * G.COAL_HEAT))}。`);
     const holder = panel.querySelector('[data-supply-mode-rows]'), rowKey = JSON.stringify(rows);
     // Only replace noninteractive quote rows when facts change, never controls.
     if (holder._supplyRows !== rowKey) { holder._supplyRows = rowKey; holder.innerHTML = rows.map(text => `<li>${this.escHtml(text)}</li>`).join(''); }
@@ -3259,6 +3266,7 @@ G.ui = {
   refreshProductionGoals: function () {
     const modal = document.getElementById('production-goals');
     if (!modal || modal.classList.contains('hidden')) return;
+    const physical = G.supplyEnabled?.(), supplies = physical ? G.supplyInventory().available : null;
     for (const type of G.RES_KEYS) {
       const cap=G.storageCap(type);
       const stock = document.getElementById('goal-stock-' + type), status = document.getElementById('goal-status-' + type);
@@ -3266,10 +3274,12 @@ G.ui = {
       const target = G.productionGoalOf(type);
       const foodClass = (G.FOOD_KEYS || []).includes(type);
       const tool = type === 'tools' || type === 'steelTools';
-      stock.textContent = `库存 ${Math.floor(G.game.res[type])} · ${foodClass ? '与其他食物共享总仓容 ' + cap + '（总食物 ' + Math.floor(G.game.res.food) + '）' : '硬仓容 ' + (tool ? '不限' : cap)}`;
+      const distributedGoal = physical && (type === 'food' || foodClass || type === 'firewood');
+      stock.textContent = `${physical ? '公共库存' : '库存'} ${Math.floor(G.game.res[type])} · ${foodClass ? '与其他食物共享总仓容 ' + cap + '（总食物 ' + Math.floor(G.game.res.food) + '）' : '硬仓容 ' + (tool ? '不限' : cap)}`;
+      if (distributedGoal) stock.textContent += `；目标计量 ${this.supplyNumber(type === 'food' ? G.supplyFood(supplies) : supplies[type])}（公共 + 市场/住处/配送在途/待回收，不含火情封存；逐户现货才可使用）`;
       status.textContent = target === null ? '未设置全镇目标，继承原规则' :
         `已应用目标 ${target} · ${target === 0 ? '关闭新自动生产' : `恢复线 ≤${G.productionResumeAt(target)} · ${G.goalPaused(type) ? '达标暂停' : '可生产'}`}`;
-      if (target !== null && !tool && target > cap) status.textContent += '；目标高于仓容，需扩建仓库；' + (type === 'ale' ? '余麦酒保留随身，等待空间' : ['stone', 'iron', 'coal'].includes(type) ? '余矿保留随身，等待空间' : '满仓交货仍可能损失');
+      if (target !== null && !tool && target > cap) status.textContent += distributedGoal ? '；目标高于公共仓容，但已配送存量也计入目标；公共仓满仍需腾位，未保护的普通交货可能损失' : '；目标高于仓容，需扩建仓库；' + (type === 'ale' ? '余麦酒保留随身，等待空间' : ['stone', 'iron', 'coal'].includes(type) ? '余矿保留随身，等待空间' : '满仓交货仍可能损失');
       if (type === 'firewood' || tool) status.textContent += '；各屋原目标保留，实际按全镇与本屋较低值执行（见建筑详情）';
       if (tool) status.textContent += '；只限制正在生产本类工具的铁匠，另一类工具有独立目标';
       if (type === 'food') status.textContent += '；总量目标与三类各自目标同时生效，总量达标会暂停食物新生产';
