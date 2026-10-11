@@ -50,6 +50,7 @@ G.newGameState = function () {
     h: 6, day: 0, season: 0, year: 1,
     speed: 1, paused: false,
     res: { wood: 80, stone: 48, iron: 0, tools: 15, food: 500, meat: 0, vegetables: 0, grain: 500, leather: 0, wool: 0, clothes: 0, warmCoats: 0, herbs: 0, coal: 0, steelTools: 0, ale: 0, firewood: 50 }, // 开局（原版中难度 5 家庭，工具 15 件≈第一轮磨损周期）；存粮较原版加厚：15 人 6 天食物跑道撑不到第一座采集屋建成
+    heating:{allowCoal:false,coalReserve:20},
     healthStartDay: 0,
     nomads: {nextDay:G.YEAR_DAYS,serial:0,offer:null,accepted:0,declined:0},
     schedT: 1,
@@ -149,9 +150,7 @@ G.endDay = function () {
   if (winter && houses.length) {
     for (const h of houses) {
       const perHouse = G.BDEF[h.type].warmWoodPerYear / G.SEASON_DAYS;
-      G.ledgerRecord('used','firewood',Math.min(g.res.firewood,perHouse));
-      if (g.res.firewood >= perHouse) g.res.firewood -= perHouse;
-      else { h.unheated = true; g.res.firewood = 0; }
+      G.heatHome(h,perHouse);
     }
   }
 
@@ -198,10 +197,10 @@ G.endDay = function () {
   if (pop > 0 && g.season === 2) {
     // 按实际取暖需求警告：需求 ≈ Σ 有人住的房屋年取暖量（冬季集中烧完）
     const warmNeed = w.buildings.reduce((s, b) => s + (G.isOccupiedHome(w, b) ? G.BDEF[b.type].warmWoodPerYear : 0), 0);
-    if (g.res.firewood >= warmNeed) g.warned.firewood = false;
+    if (G.usableHeatingFuel() >= warmNeed) g.warned.firewood = false;
     else if (!g.warned.firewood) {
       g.warned.firewood = true;
-      G.ui.toast(`⚠ 冬天将至，柴火不足（现有 ${Math.floor(g.res.firewood)}，需求约 ${warmNeed}）`, 'warn');
+      G.ui.toast(G.heatingPolicy().allowCoal?`⚠ 冬天将至，取暖燃料不足（可用约 ${Math.floor(G.usableHeatingFuel())} 柴火当量，需求约 ${warmNeed}）`:`⚠ 冬天将至，柴火不足（现有 ${Math.floor(g.res.firewood)}，需求约 ${warmNeed}）`, 'warn');
     }
   } else g.warned.firewood = false;
   if (pop > 0 && !g.warned.foodLow && g.res.food < pop * G.LIFE.eatPerDay * 3) {
@@ -1979,7 +1978,7 @@ G.scheduleJobs = function () {
     if (harvestSeason && b.type === 'farm') {
       const winterNeed = w.buildings.reduce((n, x) => n + (G.isOccupiedHome(w, x) ? G.BDEF[x.type].warmWoodPerYear : 0), 0);
       const d = w.buildings.find(x => x.state === 'ok' && x.type === 'forester' && x.workers.length > 0 && available(x)) ||
-        w.buildings.find(x => x.state === 'ok' && x.type === 'woodcutter' && x.workers.length > 0 && G.game.res.firewood >= winterNeed && available(x));
+        w.buildings.find(x => x.state === 'ok' && x.type === 'woodcutter' && x.workers.length > 0 && G.usableHeatingFuel() >= winterNeed && available(x));
       if (d) { give(d); return; }
     }
   }
@@ -2107,7 +2106,7 @@ G.upgradeHouse=function(b,expectedKey){
   for(const [k,qty]of Object.entries(q.due))g.res[k]-=qty;
   b.type='stonehouse';b.state='site';b.upgradeFrom='house';b.progress=0;
   b.workLeft=b.totalWork=G.BDEF.stonehouse.buildWork;b.paidCost={...q.cost};b.constructionStarted=false;
-  b.family=null;b.workers=[];b.noWork=false;b.warnText='';b.sitePaused=false;delete b.workerLimit;delete b.unheated;
+  b.family=null;b.workers=[];b.noWork=false;b.warnText='';b.sitePaused=false;delete b.workerLimit;delete b.unheated;delete b.lastHeating;
   for(const f of families)f.houseId=null;
   G.bumpNavigation(w);G.assignHousing();
   // A resident walking to the old wooden home must not finish that stale route
@@ -3056,4 +3055,28 @@ G.cemeterySummary=function(b){
   return {used:graves.length,capacity:G.MEMORIAL.capacity,free:G.MEMORIAL.capacity-graves.length,nextDays:next===null?null:next-G.game.day,
     status:b.state!=='ok'?'施工中，尚不能安葬':graves.length>=G.MEMORIAL.capacity?'墓位已满，需等自然释放或新建墓园':'有空墓位；死亡时仍需检查实际可达路线',
     graves:graves.map(r=>({slot:r.slot,name:r.name,daysLeft:r.expiresDay-G.game.day})),canRemove:graves.length===0};
+};
+
+
+/* Coal can replace missing firewood only after an explicit town policy choice.
+ * Reserve is a heating floor, not a reservation against industry or trade. */
+G.COAL_HEAT=2;
+G.heatingPolicy=()=>G.game.heating||{allowCoal:false,coalReserve:20};
+G.heatingCoalAvailable=function(){const p=G.heatingPolicy();return p.allowCoal?Math.max(0,G.game.res.coal-p.coalReserve):0;};
+G.usableHeatingFuel=()=>G.game.res.firewood+G.heatingCoalAvailable()*G.COAL_HEAT;
+G.setHeatingPolicy=function(allowCoal,coalReserve){
+  if(typeof allowCoal!=='boolean'||!Number.isSafeInteger(coalReserve)||coalReserve<0||coalReserve>G.PRODUCTION_GOAL_MAX)return false;
+  G.game.heating={allowCoal,coalReserve};G.game.warned.firewood=false;return true;
+};
+G.heatHome=function(b,need){
+  const r=G.game.res,wood=Math.min(r.firewood,need),coal=Math.min(G.heatingCoalAvailable(),Math.max(0,need-wood)/G.COAL_HEAT);
+  G.ledgerRecord('used','firewood',wood);r.firewood-=wood;r.coal-=coal;
+  b.lastHeating={day:G.game.day,wood,coal,need};b.unheated=wood+coal*G.COAL_HEAT+1e-8<need;
+};
+G.homeHeatingSummary=function(b){
+  if(!b||G.BDEF[b.type]?.warmWoodPerYear==null||b.state!=='ok')return null;
+  const p=G.heatingPolicy(),last=b.lastHeating;
+  return {allowCoal:p.allowCoal,coalReserve:p.coalReserve,coalStock:G.game.res.coal,coalAvailable:G.heatingCoalAvailable(),fuel:G.usableHeatingFuel(),
+    ratio:G.COAL_HEAT,occupied:G.isOccupiedHome(G.world,b),unheated:!!b.unheated,
+    last:last?{...last}:null,perDay:G.BDEF[b.type].warmWoodPerYear/G.SEASON_DAYS};
 };

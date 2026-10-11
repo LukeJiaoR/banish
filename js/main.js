@@ -103,7 +103,7 @@ G.serializeGame = function () {
       v: G.VERSION,
       h: g.h, day: g.day, season: g.season, year: g.year,
       res: g.res, stats: g.stats, prevFood: g.prevFood, foodNet: g.foodNet, foodUrgent: g.foodUrgent, warned: g.warned,
-      townLedger:g.townLedger, hist: g.hist, buildLog: g.buildLog, toolWear: g.toolWear, steelToolWear: g.steelToolWear, healthStartDay: g.healthStartDay, nomads:g.nomads, unlocks: g.unlocks, livestock: g.livestock,
+      heating:g.heating, townLedger:g.townLedger, hist: g.hist, buildLog: g.buildLog, toolWear: g.toolWear, steelToolWear: g.steelToolWear, healthStartDay: g.healthStartDay, nomads:g.nomads, unlocks: g.unlocks, livestock: g.livestock,
       productionGoals: g.productionGoals && { ...g.productionGoals }, productionPaused: g.productionPaused && { ...g.productionPaused },
     },
     roads: Array.from(w.road).flatMap((road, i) => road ? [i] : []),
@@ -123,7 +123,7 @@ G.serializeGame = function () {
       sownAll: b.sownAll, growth: b.growth, harvestDone: b.harvestDone, cropType:b.cropType, cropChoice:b.cropChoice,
       sowingCommitted: b.sowingCommitted, productionPaused: b.productionPaused,
       tradeInventory: b.tradeInventory, tradeTargets: b.tradeTargets, merchant: b.merchant, nextMerchantDay: b.nextMerchantDay,
-      graves:b.graves,
+      lastHeating:b.lastHeating, unheated:b.unheated, graves:b.graves,
       animalType:b.animalType, pastureProducts:b.pastureProducts, animals: b.animals, animalGrowth: b.animalGrowth, animalTarget: b.animalTarget, woolReady: b.woolReady,
       orchardAge: b.orchardAge, orchardYield: b.orchardYield, orchardSeason: b.orchardSeason, tendedDay: b.tendedDay,
     })),
@@ -284,6 +284,8 @@ G.prepareSaveData = function (d) {
     }
   }
 
+  if(gd.heating!==undefined){const p=record(gd.heating,'取暖策略');if(typeof p.allowCoal!=='boolean')bad('煤取暖开关');g.heating={allowCoal:p.allowCoal,coalReserve:integer(p.coalReserve,'取暖保留煤',0,G.PRODUCTION_GOAL_MAX)};}
+
   if(gd.townLedger===undefined)g.townLedger=G.newTownLedger(g); // Legacy history is unknown, not zero production.
   else {
     const l=record(gd.townLedger,'经营流水');if(l.v!==1)bad('经营流水版本');
@@ -406,6 +408,13 @@ G.prepareSaveData = function (d) {
       if(bd.merchant!=null){record(bd.merchant,'商船');record(bd.merchant.stock,'商船货物');b.merchant={leaveDay:integer(bd.merchant.leaveDay,'商船离港',0),stock:{}};
         for(const key of Object.keys(bd.merchant.stock)){if(!Object.hasOwn(G.TRADE_GOODS,key))bad('商船货物种类');b.merchant.stock[key]=integer(bd.merchant.stock[key],'商船库存',0,G.TRADE_GOODS[key].stock);}
       }
+    }
+    if(bd.unheated!==undefined){if(def.warmWoodPerYear==null||b.state!=='ok'||typeof bd.unheated!=='boolean')bad('住宅供暖状态');b.unheated=bd.unheated;}
+    if(bd.lastHeating!==undefined){
+      if(def.warmWoodPerYear==null||b.state!=='ok')bad('住宅取暖记录');const r=record(bd.lastHeating,'取暖记录'),day=integer(r.day,'取暖日期',0,g.day),need=def.warmWoodPerYear/G.SEASON_DAYS;
+      if(G.seasonOf(day)!==3||r.need!==need)bad('取暖季节或需求');const wood=number(r.wood,'已烧柴火',0,need),coal=number(r.coal,'已烧煤',0,need/G.COAL_HEAT);
+      if(wood+coal*G.COAL_HEAT>need+1e-8)bad('超额取暖记录');b.lastHeating={day,need,wood,coal};
+      if(bd.unheated===undefined)b.unheated=g.season===3&&day===g.day&&wood+coal*G.COAL_HEAT+1e-8<need;
     }
     if(bd.type==='cemetery'){
       const rows=bd.graves===undefined?[]:array(bd.graves,'墓位');if(rows.length>G.MEMORIAL.capacity||(b.state!=='ok'&&rows.length))bad('墓位容量或施工状态');

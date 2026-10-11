@@ -92,12 +92,12 @@ G.ui = {
   },
 
   heatDemandText: function (heat) {
-    return `当前已入住住房：整冬约需 ${heat.fullWinter} 柴火` +
+    return `当前已入住住房：整冬约需 ${heat.fullWinter} 柴火` + (G.heatingPolicy?.().allowCoal?`当量（煤补柴已开，可用煤 ${G.heatingCoalAvailable().toFixed(2)}，1煤=2柴）`:'') +
       (heat.winter ? `；本冬此后约需 ${Math.ceil(heat.futureWinter)}（还剩 ${heat.futureDays} 次扣除）` : '');
   },
 
   fuelInfoData: function (b) {
-    const heat = this.heatDemand(), stock = G.game.res.firewood;
+    const heat = this.heatDemand(), stock = G.game.res.firewood,usable=G.usableHeatingFuel?G.usableHeatingFuel():stock;
     const need = heat.winter ? heat.futureWinter : heat.fullWinter;
     let status;
     if (b.state === 'site') {
@@ -114,7 +114,7 @@ G.ui = {
       target: `本屋燃料目标：${G.fuelLimitOf(b)}` + (G.productionGoalOf('firewood') !== null ? '；' + G.buildingGoalStatus(b) : ''),
       stock: `全镇库存：柴火 ${Math.floor(stock)} · 原木 ${Math.floor(G.game.res.wood)}`,
       heat: this.heatDemandText(heat),
-      gap: stock < need ? `柴火库存比${heat.winter ? '本冬后续' : '整冬'}取暖估算少约 ${Math.ceil(need - stock)}。` : '取暖估算会随住房入住情况变化。',
+      gap: usable < need ? `${G.heatingPolicy?.().allowCoal?'可用燃料':'柴火库存'}比${heat.winter ? '本冬后续' : '整冬'}取暖估算少约 ${Math.ceil(need - usable)}。` : '取暖估算会随住房入住情况变化。',
       status,
       workers: b.workers.map(id => G.world.cmap[id]).filter(Boolean).map(c => c.name).join('、') ||
         (b.state === 'site' ? '等待建筑工人' : '无'),
@@ -612,7 +612,7 @@ G.ui = {
       else if (harvest.trees) risks.push(`木材库存耗尽：${harvest.trees} 棵已标记，查看采运进度；砍倒后仍需送仓。`);
       else risks.push('木材耗尽：向更远可达森林标记砍伐，后续护林补种；避开食物林。');
     }
-    if (g.season >= 2 && g.res.firewood < remainingHeat) risks.push(`柴火不足：现有 ${Math.floor(g.res.firewood)} / ${heat.winter ? '本冬此后' : '整冬'}约需 ${Math.ceil(remainingHeat)}，伐木屋需原木。`);
+    if (g.season >= 2 && G.usableHeatingFuel() < remainingHeat) risks.push(G.heatingPolicy().allowCoal?`取暖燃料不足：可用 ${Math.floor(G.usableHeatingFuel())} 柴火当量 / ${heat.winter ? '本冬此后' : '整冬'}约需 ${Math.ceil(remainingHeat)}，伐木屋需原木；住房可设煤补柴。`:`柴火不足：现有 ${Math.floor(g.res.firewood)} / ${heat.winter ? '本冬此后' : '整冬'}约需 ${Math.ceil(remainingHeat)}，伐木屋需原木。`);
     const stage = !food ? '① 先保持续食物：在近仓森林建采集小屋；不要先连盖五屋耗尽木石。'
       : !fuel ? '② 近仓建伐木屋备柴；在食物林外标记砍伐和矿石，保留散工。'
       : homeless ? `③ 入冬前安家：还有 ${homeless} 家无房；逐步补住房和取暖柴。`
@@ -806,13 +806,42 @@ G.ui = {
     };
   },
   homeInfoData: function (b) {
-    if (!['house', 'stonehouse'].includes(b.type) || b.state !== 'ok') return null;
+    if (!['house', 'stonehouse','boarding'].includes(b.type) || b.state !== 'ok') return null;
     const families = G.world.families.filter(f => f.houseId === b.id);
     const residents = families.flatMap(f => f.members.map(id => G.world.cmap[id]).filter(c => c && !c.dead));
     return {
-      status: residents.length ? '有人居住' : '空置',
+      status: b.type==='boarding'?`入住 ${families.length} / ${G.LIFE.boardingCap} 家`:residents.length ? '有人居住' : '空置',
       residents: residents.length ? `住户：${residents.map(c => `${c.name}(${Math.floor(c.age)}岁)`).join('、')}` : '住户：暂无',
     };
+  },
+  heatingInfoData:function(b){
+    const s=G.homeHeatingSummary(b);if(!s)return null;
+    const last=s.last;
+    return {summary:s,data:{policy:`全镇策略：${s.allowCoal?'柴火不足时允许煤补足':'仅烧柴火，不动用煤'}；取暖保留煤底线 ${s.coalReserve}`,
+      stock:`煤库存 ${s.coalStock.toFixed(2)} · 可用于取暖 ${s.coalAvailable.toFixed(2)} · 当前燃料约 ${s.fuel.toFixed(2)} 柴火当量`,
+      home:`本屋${s.occupied?'已入住':'空置不耗燃料'}，冬季每日需要 ${s.perDay.toFixed(2)} 柴火当量。${G.isWinter()&&s.occupied&&s.unheated?'当前未供暖，住户仍会受冻。':''}`,
+      receipt:last?`最近结算：第 ${last.day+1} 天，实际烧柴 ${last.wood.toFixed(2)}、煤 ${last.coal.toFixed(2)} / 需求 ${last.need.toFixed(2)} 柴火当量${last.wood+last.coal*s.ratio+1e-8<last.need?'（当时燃料未足）':''}`:'暂无本屋冬季取暖结算记录；旧档不编造用量',
+      rule:'全镇先烧柴再用底线以上的煤补缺，1煤=2柴热量为本作适配。底线只约束取暖，钢工具/贸易仍能使用煤。修改仅影响下一次冬季日界扣料，不会立即暖屋；粮柴账本不包含煤耗。'}};
+  },
+  heatingInfoMarkup:function(b){
+    const f=this.heatingInfoData(b);if(!f)return '';const s=f.summary;
+    return `<section class="economy-form" data-heating-panel><h3>全镇取暖策略</h3>${Object.keys(f.data).map(k=>`<p class="row desc" data-heating="${k}">${this.escHtml(f.data[k])}</p>`).join('')}
+      <label>燃料<select id="heating-mode"><option value="wood"${s.allowCoal?'':' selected'}>仅柴火</option><option value="coal"${s.allowCoal?' selected':''}>允许煤补柴</option></select></label>
+      <label>取暖保留煤底线<input id="heating-reserve" type="number" min="0" max="${G.PRODUCTION_GOAL_MAX}" step="1" value="${s.coalReserve}"></label>
+      <button type="button" id="heating-apply">应用全镇策略</button><p data-heating-message role="status" aria-live="polite"></p></section>`;
+  },
+  refreshHeatingInfo:function(b){
+    const f=this.heatingInfoData(b),el=this.el.info;if(!f||!el.querySelector)return;
+    for(const k of Object.keys(f.data)){const node=el.querySelector(`[data-heating="${k}"]`);if(node&&node.textContent!==f.data[k])node.textContent=f.data[k];}
+  },
+  initHeatingInfo:function(b){
+    const el=this.el.info,panel=el.querySelector('[data-heating-panel]');if(!panel)return;
+    const w=G.world,g=G.game,type=b.type,mode=panel.querySelector('#heating-mode'),reserve=panel.querySelector('#heating-reserve'),button=panel.querySelector('#heating-apply');
+    button.addEventListener('click',()=>{
+      if(G.world!==w||G.game!==g||this.el.info!==el||el.classList.contains('hidden')||G.sel?.kind!=='b'||G.sel.id!==b.id||w.bmap[b.id]!==b||b.type!==type||b.state!=='ok'||el.querySelector('[data-heating-panel]')!==panel||(G.hasOpenModal&&G.hasOpenModal()))return;
+      const n=reserve.value.trim()===''?NaN:Number(reserve.value),ok=['wood','coal'].includes(mode.value)&&G.setHeatingPolicy(mode.value==='coal',n);
+      panel.querySelector('[data-heating-message]').textContent=ok?'已应用全镇策略，从下一次冬季日界扣料生效。':'请输入有效燃料策略与非负整数煤底线。';this.refreshHeatingInfo(b);
+    });
   },
   houseUpgradeInfoData: function (b) {
     if (b.type !== 'house' || b.state !== 'ok' || !G.houseUpgradeQuote) return null;
@@ -886,6 +915,7 @@ G.ui = {
       if (node && node.textContent !== data[key]) node.textContent = data[key];
     }
     this.refreshHouseUpgradeInfo(b, upgradeFacts);
+    this.refreshHeatingInfo(b);
     return true;
   },
   initHouseUpgradeInfo: function (b) {
@@ -1751,6 +1781,7 @@ G.ui = {
       }
       let extra = '';
       if (homeData) extra = `<div class="row" data-home-residents>${this.escHtml(homeData.residents)}</div>`;
+      if(homeData)extra+=this.heatingInfoMarkup(b);
       if (upgradeData) extra += this.houseUpgradeInfoMarkup(upgradeData);
       if (b.type === 'school' && !schoolData) {
         const n = w.citizens.filter(cc => cc.school === b.id).length;
@@ -1814,6 +1845,7 @@ G.ui = {
       this._farmInfoState = b.state;
       this._schoolInfoState=b.state;
       this.initWorkforceInfo(b);
+      if(homeData)this.initHeatingInfo(b);
       if (upgradeData) this.initHouseUpgradeInfo(b);
       const workforceField = el.querySelector && el.querySelector('#worker-limit-input');
       if (workforceField && workforceDraft !== null) workforceField.value = workforceDraft;
