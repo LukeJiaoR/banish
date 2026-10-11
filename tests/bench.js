@@ -109,7 +109,7 @@ G.completeTask = function (c) {
     const carried = (c.carry && c.carry.type === 'wood') ? c.carry.qty : 0;
     add(t.b ? t.b.type : 'laborer', deposited + carried);
   }
-  if (t && t.kind === 'firewood' && phase === 'work')
+  if (t && t.kind === 'fuel' && phase === 'process')
     add('woodcutter', (G.game.res.firewood - fwBefore) + (c.carry && c.carry.type === 'firewood' ? c.carry.qty : 0));
 };
 

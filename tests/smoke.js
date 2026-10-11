@@ -245,7 +245,7 @@ G.ui = { toast() {}, refreshHUD() {} };
     (a.job == null) !== (b2.job == null) && fo.workers.length === 1);
 }
 
-/* ---- 伐木屋：完工才扣料 + 两段式背料 ---- */
+/* ---- 伐木屋：实际取料、携木加工、真实送柴 ---- */
 {
   freshGame();
   const w = G.world;
@@ -254,16 +254,16 @@ G.ui = { toast() {}, refreshHUD() {} };
   c.job = b.id;
   G.game.res.wood = 2;
   const t = G.makeTask(b, c);
-  check('无仓库时就地加工（phase work）', !!t && t.kind === 'firewood' && t.phase === 'work' && t.consume && G.game.res.wood === 2);
+  check('无仓库旧村先到本屋领取原木', !!t && t.kind === 'fuel' && t.phase === 'fetch' && t.consume && G.game.res.wood === 2);
   G.game.res.wood = 0;
-  c.task = t; t.workLeft = 0;
+  c.task = t; t.workLeft = 0; c.x=t.tx;c.y=t.ty;
   G.completeTask(c);
   check('材料耗尽 → 不凭空产柴', c.carry == null);
   G.game.res.wood = 2; b.noWork = false; c.job = b.id;
   const t2 = G.makeTask(b, c);
-  c.task = t2; t2.workLeft = 0;
-  G.completeTask(c);
-  check('完工扣 2 木产 6 柴入仓', G.game.res.wood === 0 && G.game.res.firewood === 50 + 6);
+  c.task = t2;G.sendTo(c,t2.tx,t2.ty);
+  for(let i=0;i<500&&G.game.res.firewood<56;i++)G.stepCitizen(c,.1);
+  check('本屋领取一次2木，实际加工产6柴入仓', G.game.res.wood === 0 && G.game.res.firewood === 50 + 6);
 }
 {
   freshGame();
@@ -274,13 +274,12 @@ G.ui = { toast() {}, refreshHUD() {} };
   c.job = b.id;
   G.game.res.wood = 10;
   const t = G.makeTask(b, c);
-  check('有仓库 → 先去仓库背料（phase fetch）', !!t && t.kind === 'firewood' && t.phase === 'fetch');
-  c.task = t; c.x=t.tx; c.y=t.ty; // This direct-completion fixture must stand at the actual storage endpoint.
-  G.completeTask(c); // 到仓库
-  check('背料段不扣木材、转入加工段', t.phase === 'work' && G.game.res.wood === 10 && t.workLeft === t.work);
-  t.workLeft = 0;c.x=t.tx;c.y=t.ty; // The direct fixture has now reached its workshop.
-  G.completeTask(c); // 加工完成
-  check('加工完扣 2 木、6 柴背着去仓库', G.game.res.wood === 8 && c.carry && c.carry.type === 'firewood' && c.carry.qty === 6);
+  check('有仓库 → 先去仓库背料（phase fetch）', !!t && t.kind === 'fuel' && t.phase === 'fetch');
+  c.task=t;G.sendTo(c,t.tx,t.ty);
+  for(let i=0;i<500&&!c.carry?.fuelInput;i++)G.stepCitizen(c,.1);
+  check('到库扣2木并实际携回，转入加工段',t.phase==='process'&&G.game.res.wood===8&&c.carry?.qty===2&&t.workLeft===t.work);
+  for(let i=0;i<500&&c.carry?.type!=='firewood';i++)G.stepCitizen(c,.1);
+  check('加工不再重复扣料、6柴背着去仓库', G.game.res.wood === 8 && c.carry && c.carry.type === 'firewood' && c.carry.qty === 6);
   for (let k = 0; k < 100 && c.carry; k++) G.stepCitizen(c, 0.5);
   check('柴火送达仓库', G.game.res.firewood === 50 + 6 && !c.carry);
 }
@@ -407,10 +406,10 @@ G.ui = { toast() {}, refreshHUD() {} };
   edu.educated = true;
   G.game.res.wood = 10;
   const t = G.makeTask(b, edu);
-  check('受教育伐木工：配比加成 2 木 → 8 柴，工时为3.5小时', t && t.yield.qty === 8 && t.work === 3.5);
+  check('受教育伐木工：配比加成 2 木 → 8 柴，工时为3.5小时', t && t.yield.qty === 8 && t.craftWork === 3.5);
   const plain = G.spawnCitizen({ x: 5, y: 5, sex: 'f', age: 25, adult: true });
   const t2 = G.makeTask(b, plain);
-  check('未受教育伐木工：2 木 → 6 柴', t2 && t2.yield.qty === 6 && t2.work === 3.5);
+  check('未受教育伐木工：2 木 → 6 柴', t2 && t2.yield.qty === 6 && t2.craftWork === 3.5);
 }
 {
   freshGame();
@@ -902,7 +901,7 @@ G.markGroundDirty = G.markGroundDirty || (() => {}); // render.js 未加载时�
   G.game.res.firewood = 80;
   b.noWork = false;
   const t2 = G.makeTask(b, c);
-  check('低于上限 → 正常接活', !!t2 && t2.kind === 'firewood');
+  check('低于上限 → 正常接活', !!t2 && t2.kind === 'fuel');
   b.fuelLimit = 50; // 自定义上限
   const t3 = G.makeTask(b, c);
   check('自定义上限生效（50）', t3 === null && G.fuelLimited(b) === true);

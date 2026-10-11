@@ -38,6 +38,7 @@ G.ui = {
     }
     if (c.state === 'work') {
       if (c.task && c.task.kind === 'firewood' && c.task.b && c.task.b.type === 'tailor') return c.task.phase === 'fetch' ? '核对仓库衣料（完成时才扣原料）' : `制作${G.RES[c.task.yield && c.task.yield.type || 'clothes'].name}`;
+      if(c.task?.kind==='fuel')return c.task.phase==='fetch'?'在库领取原木（整批出库）':'劈柴中（使用随身已取原木）';
       if(c.task?.kind==='smith')return c.task.phase==='fetch'?'在库取铁匠原料（整批出库）':`锻造${G.RES[c.task.yield.type].name}（使用随身已取原料）`;
       if (c.task && c.task.kind === 'brew') return c.task.phase === 'fetch' ? '取主食酿酒' : '加工麦酒';
       if (c.task && c.task.kind === 'host') return '酒馆在岗接待';
@@ -48,6 +49,7 @@ G.ui = {
       return c.task ? (labels[c.task.kind] || (b && b.type === 'tailor' ? '制作衣物' : b && b.type === 'orchard' ? '果园劳作' : b && b.type === 'pasture' ? `照料${G.LIVESTOCK[G.pastureTypeOf(b)].name}群` : '工作中')) : '等待下一项任务';
     }
     if (c.state === 'walk' || c.state === 'haul') {
+      if(c.carry?.fuelInput)return c.state==='haul'?'退回未使用的原木':c.walkKind==='home'?'带原木回家休息':'携原木返回伐木屋';
       if(c.carry?.smithInput)return c.state==='haul'?'退回铁匠原料（已出库，未消耗）':c.walkKind==='home'?'带铁匠原料回家休息':c.task?.kind==='smith'?'携铁、木或煤返回铁匠铺':'铁匠原料待退仓';
       if (c.carry) return c.carry.brewIngredient ? `搬运酿酒主食（${c.state === 'haul' ? '退回仓库' : '送往酒馆'}）` : `搬运${G.RES[c.carry.type].name}（${c.state === 'haul' ? '送仓' : '途中'}）`;
       if (c.walkKind === 'home') return '回家途中';
@@ -55,6 +57,7 @@ G.ui = {
       if (c.task && c.task.kind === 'firewood' && c.task.b && c.task.b.type === 'tailor') return c.task.phase === 'fetch' ? '前往仓库核对衣料（完成时才扣原料）' : `返回裁缝铺制作${G.RES[c.task.yield && c.task.yield.type || 'clothes'].name}`;
       if (c.task && c.task.kind === 'firewood' && c.task.phase === 'fetch') return c.task.consume && G.RES[c.task.consume.type] ? `前往仓库取${G.RES[c.task.consume.type].name}` : '前往仓库取原木';
       if(c.task?.kind==='orchard')return ({plant:'前往空树位种植',tend:'前往幼树照料',harvest:'前往成熟果树采果'})[c.task.phase]+'（第'+(c.task.ti+1)+'株）';
+      if(c.task?.kind==='fuel')return '前往堆料场或仓库取原木（尚未扣料）';
       if(c.task?.kind==='smith')return '前往堆料场或仓库取铁匠原料（尚未扣料）';
       if (c.task && c.task.kind === 'brew') return c.task.phase === 'fetch' ? '前往仓库取酿酒主食' : '前往酒馆加工麦酒';
       if (c.task && c.task.kind === 'trade') return c.task.phase === 'fetch' ? '前往仓库备货' : '运送贸易物资';
@@ -118,6 +121,7 @@ G.ui = {
     return {
       target: `本屋燃料目标：${G.fuelLimitOf(b)}` + (G.productionGoalOf('firewood') !== null ? '；' + G.buildingGoalStatus(b) : ''),
       stock: `全镇库存：柴火 ${Math.floor(stock)} · 原木 ${Math.floor(G.game.res.wood)}`,
+      batches:this.fuelBatchText(b),
       heat: this.heatDemandText(heat),
       gap: usable < need ? `${G.heatingPolicy?.().allowCoal?'可用燃料':'柴火库存'}比${heat.winter ? '本冬后续' : '整冬'}取暖估算少约 ${Math.ceil(need - usable)}。` : '取暖估算会随住房入住情况变化。',
       status,
@@ -126,6 +130,15 @@ G.ui = {
       refund: b.state === 'site' && !b.constructionStarted && b.progress === 0 && b.workLeft >= b.totalWork
         ? '未开工：取消退还全部已付建材，保留树木' : '已开工：拆除退还一半已付建材，已砍树不恢复',
     };
+  },
+
+  fuelBatchText: function(b){
+    const rows=G.world.citizens.filter(c=>!c.dead&&(c.carry?.firewoodId===b.id||c.job===b.id&&c.carry?.fuelInput||[c.task,c.pausedTask].some(t=>t?.kind==='fuel'&&t.b===b))).map(c=>{
+      const t=[c.task,c.pausedTask].find(t=>t?.kind==='fuel'&&t.b===b);
+      if(c.carry?.type==='firewood')return `${c.name}：已产柴火 ${c.carry.qty.toFixed(2)}，${G.cargoWaitReason(c)||'送仓途中，尚不可使用'}`;
+      if(c.carry?.fuelInput)return `${c.name}：原木 ${c.carry.qty.toFixed(2)} 已出库，${t?.phase==='process'?(c.pausedTask===t?'夜间暂停，次日续做':c.state==='work'?'在屋劈柴':'携木回屋'):'中断后退仓'}；不再重复扣料`;
+      return `${c.name}：前往可达仓库取2原木，尚未扣料`;
+    });return rows.join('；')||'暂无正在领料或送柴的批次';
   },
 
   refreshFuelInfo: function (b) {
@@ -1887,6 +1900,8 @@ G.ui = {
           <button class="mini-tog" data-fl="${step}" title="提高本屋目标 ${step}" aria-label="提高本屋燃料目标 ${step}">＋</button>
         </div>
         <div class="row" data-fuel="stock">${fuelData.stock}</div>
+        <div class="row" data-fuel="batches">${this.escHtml(fuelData.batches)}</div>
+        <div class="row desc">实际领2原木回屋，3.5小时产6柴（受教育8）。远途搬运会降低实际供暖产能，道路/近堆料场缩短往返；原料与这批成柴遇满仓保留，读档或取消加工会退回未用原木。</div>
         <div class="row" data-fuel="heat">${fuelData.heat}</div>
         <div class="row" data-fuel="gap">${fuelData.gap}</div>
         <div class="row desc">目标不是取暖需求。库存达到目标只阻止本屋接新批次；调低可给建设留木，但不会预留建材。已接批次仍可能耗木，其他伐木屋按各自目标继续。住房变化和户外受冻仍须留意。</div>`;
