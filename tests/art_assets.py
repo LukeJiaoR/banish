@@ -75,3 +75,10 @@ for file, size in tavern_sizes.items():
         foot = [x for x in range(im.width) if a.getpixel((x, im.height-1)) > 32]
         assert foot and abs((min(foot)+max(foot))/2 - im.width/2) <= 2, file
     print(file, size, 'tavern size, alpha and anchor: OK')
+
+im = Image.open(ROOT / 'assets/icons/res_warmCoats.png')
+assert im.mode == 'RGBA' and im.size == (128,128), 'warm coat icon size'
+a = im.getchannel('A')
+assert a.getextrema() == (0,255), 'warm coat alpha'
+assert all(a.getpixel(p) == 0 for p in [(0,0),(127,0),(0,127),(127,127)]), 'warm coat transparent corners'
+print('icons/res_warmCoats', im.size, 'warm coat size and alpha: OK')

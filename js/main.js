@@ -117,7 +117,7 @@ G.serializeGame = function () {
       progress: b.progress, workLeft: b.workLeft, totalWork: b.totalWork, paidCost: b.paidCost, constructionStarted: b.constructionStarted,
       workers: b.workers, family: b.family, noWork: b.noWork, warnText: b.warnText,
       bridgeAxis: b.bridgeAxis, bridgeLength: b.type === 'bridge' ? b.w + b.h - 1 : undefined,
-      mineMode: b.mineMode, legacyMine: b.legacyMine, mineTick: b.mineTick, toolRecipe: b.toolRecipe, reserveDays:b.reserveDays,
+      mineMode: b.mineMode, legacyMine: b.legacyMine, mineTick: b.mineTick, toolRecipe: b.toolRecipe, reserveDays:b.reserveDays, coatRecipe:b.coatRecipe,
       doCut: b.doCut, doPlant: b.doPlant, fuelLimit: b.fuelLimit, toolLimit: b.toolLimit,
       farm: b.farm ? b.farm.map(f => [f.sown ? 1 : 0, f.harvested ? 1 : 0]) : undefined,
       sownAll: b.sownAll, growth: b.growth, harvestDone: b.harvestDone,
@@ -132,7 +132,7 @@ G.serializeGame = function () {
       x: c.x, y: c.y, familyId: c.familyId, job: c.job,
       partnerId: c.partnerId, parentIds: c.parentIds, grandparentIds: c.grandparentIds, ancestorIds: c.ancestorIds, birthFamilyId: c.birthFamilyId,
       student: c.student ? 1 : 0, educated: c.educated ? 1 : 0, school: c.school != null ? c.school : null,
-      arrivalHallId:c.arrivalHallId, hunger: c.hunger, cold: c.cold, clothingLeft: c.clothingLeft, dietVariety: c.dietVariety, dietScore: c.dietScore, happiness: c.happiness, leisureDays:c.leisureDays, health: c.health, sickDays: c.sickDays, immunityDays: c.immunityDays, herbCooldown: c.herbCooldown, careHours: c.careHours, camped: c.camped ? 1 : 0, carry: c.carry,
+      arrivalHallId:c.arrivalHallId, hunger: c.hunger, cold: c.cold, clothingLeft: c.clothingLeft, clothingType:c.clothingType, dietVariety: c.dietVariety, dietScore: c.dietScore, happiness: c.happiness, leisureDays:c.leisureDays, health: c.health, sickDays: c.sickDays, immunityDays: c.immunityDays, herbCooldown: c.herbCooldown, careHours: c.careHours, camped: c.camped ? 1 : 0, carry: c.carry,
     })),
     nextUid: G._peekUid(),
   };
@@ -241,7 +241,7 @@ G.prepareSaveData = function (d) {
   g.day = integer(gd.day, '天数'); g.season = integer(gd.season, '季节', 0, 3); g.year = integer(gd.year, '年份', 1);
   record(gd.res, '资源');
   for (const key of G.RES_KEYS) {
-    const value = gd.res[key] === undefined && ['iron', ...G.FOOD_KEYS, 'leather', 'wool', 'clothes', 'herbs', 'coal', 'steelTools', 'ale'].includes(key) ? 0 : gd.res[key] === undefined && key === 'tools' ? 10 : gd.res[key];
+    const value = gd.res[key] === undefined && ['iron', ...G.FOOD_KEYS, 'leather', 'wool', 'clothes', 'herbs', 'coal', 'steelTools', 'ale', 'warmCoats'].includes(key) ? 0 : gd.res[key] === undefined && key === 'tools' ? 10 : gd.res[key];
     g.res[key] = number(value, '资源 ' + key, 0);
   }
   const hasFoodClasses = G.FOOD_KEYS.some(k => gd.res[k] !== undefined);
@@ -367,6 +367,7 @@ G.prepareSaveData = function (d) {
       b.toolRecipe = bd.toolRecipe === undefined ? 'iron' : bd.toolRecipe;
       if (!['iron', 'steel'].includes(b.toolRecipe)) bad('工具配方');
     }
+    if(bd.type==='tailor'){b.coatRecipe=bd.coatRecipe===undefined?'basic':bd.coatRecipe;if(!['basic','warm'].includes(b.coatRecipe))bad('衣物配方');}
     if (bd.type === 'tradingpost') {
       for(const field of ['tradeInventory','tradeTargets']){
         b[field]={};if(bd[field]!==undefined){record(bd[field],field);for(const key of Object.keys(bd[field])){
@@ -440,6 +441,7 @@ G.prepareSaveData = function (d) {
         }
       }
     }
+    if(cd.clothingType!=null&&!['basic','warm'].includes(cd.clothingType))bad('穿着衣物类型');
     const c = {
       id: uniqueId(cd.id, '市民 ID'), name: cd.name, sex: cd.sex, age: number(cd.age, '年龄', 0), adult: !!cd.adult,
       x: number(cd.x, '市民 x', 0, Math.min(oldN, w.N) - 1), y: number(cd.y, '市民 y', 0, Math.min(oldN, w.N) - 1),
@@ -454,6 +456,7 @@ G.prepareSaveData = function (d) {
       wanderT: 0, hunger: cd.hunger === undefined ? 0 : number(cd.hunger, '饥饿', 0),
       cold: cd.cold === undefined ? 0 : number(cd.cold, '寒冷', 0), animT: 0, dead: false,
       clothingLeft: cd.clothingLeft === undefined ? 0 : number(cd.clothingLeft, '衣物耐久天数', 0, G.YEAR_DAYS),
+      clothingType:cd.clothingType??(cd.clothingLeft>0?'basic':null),
       dietVariety: cd.dietVariety === undefined ? 0 : integer(cd.dietVariety, '饮食种类', 0, 3),
       dietScore: cd.dietScore === undefined ? 1 : number(cd.dietScore, '饮食多样性', 0, 3),
       happiness: cd.happiness === undefined ? 3 : number(cd.happiness, '幸福度', 1, 5),

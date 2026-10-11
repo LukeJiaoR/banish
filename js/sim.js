@@ -7,7 +7,7 @@ G.newGameState = function () {
   return {
     h: 6, day: 0, season: 0, year: 1,
     speed: 1, paused: false,
-    res: { wood: 80, stone: 48, iron: 0, tools: 15, food: 500, meat: 0, vegetables: 0, grain: 500, leather: 0, wool: 0, clothes: 0, herbs: 0, coal: 0, steelTools: 0, ale: 0, firewood: 50 }, // 开局（原版中难度 5 家庭，工具 15 件≈第一轮磨损周期）；存粮较原版加厚：15 人 6 天食物跑道撑不到第一座采集屋建成
+    res: { wood: 80, stone: 48, iron: 0, tools: 15, food: 500, meat: 0, vegetables: 0, grain: 500, leather: 0, wool: 0, clothes: 0, warmCoats: 0, herbs: 0, coal: 0, steelTools: 0, ale: 0, firewood: 50 }, // 开局（原版中难度 5 家庭，工具 15 件≈第一轮磨损周期）；存粮较原版加厚：15 人 6 天食物跑道撑不到第一座采集屋建成
     healthStartDay: 0,
     nomads: {nextDay:G.YEAR_DAYS,serial:0,offer:null,accepted:0,declined:0},
     schedT: 1,
@@ -83,8 +83,7 @@ G.endDay = function () {
       const meal = G.consumeFood(eat); c.hunger = 0; c.dietVariety = meal.length;
       c.dietScore = (c.dietScore ?? 1) * 0.9 + meal.length * 0.1;
     } else { c.hunger++; c.dietVariety = 0; }
-    c.clothingLeft = Math.max(0, (c.clothingLeft || 0) - 1);
-    if (c.clothingLeft <= 0 && g.res.clothes >= 1) { g.res.clothes--; c.clothingLeft = G.YEAR_DAYS; }
+    G.wearClothing(c);
     c.leisureDays=Math.max(0,G.leisureDaysOf(c)-1);
     c.happiness=G.clamp((c.happiness||3)+G.clamp(G.happinessTarget(c)-(c.happiness||3),-.1,.1),1,5);
   }
@@ -492,7 +491,7 @@ G.spawnCitizen = function (opt) {
     student: false, educated: false, school: null,
     state: 'idle', walkKind: '', path: null, pi: 0, camped: false,
     wanderT: G.rng() * 3,
-    hunger: 0, cold: 0, clothingLeft: 0, dietVariety: 0, dietScore: 1, happiness: 3, leisureDays:0, health: 4, sickDays: 0, immunityDays: 0, herbCooldown: 0, careHours: 0,
+    hunger: 0, cold: 0, clothingLeft: 0, clothingType:null, dietVariety: 0, dietScore: 1, happiness: 3, leisureDays:0, health: 4, sickDays: 0, immunityDays: 0, herbCooldown: 0, careHours: 0,
     animT: G.rng() * 10,
     dead: false,
   };
@@ -719,7 +718,7 @@ G.storageRoute = function (x, y) {
 /* Limited minerals retain one ordinary carried batch when a warehouse rejects
  * part of a delivery. Tavern output and refundable raw grain share this bounded
  * delivery path; other ordinary resource delivery policy is unchanged. */
-G.isMineralCargo = function (c) { return !!c.carry && (['stone','iron','coal','ale'].includes(c.carry.type) || (c.carry.type==='grain' && c.carry.brewIngredient===true)); };
+G.isMineralCargo = function (c) { return !!c.carry && (['stone','iron','coal','ale','clothes','warmCoats'].includes(c.carry.type) || (c.carry.type==='grain' && c.carry.brewIngredient===true)); };
 G.mineralStorageSpace = function (type) { return Math.max(0, G.storageCap() - G.game.res[G.isFood(type)?'food':type]); };
 // Ordinary in-flight minerals remain eligible as before; only an already
 // blocked delivery cannot count as available labour or occupy a productive slot.
@@ -734,7 +733,7 @@ G.waitForMineralStorage = function (c, reason) {
 G.warnMineralStorage = function () {
   if (G.game.warned.mineralStorageFull) return;
   G.game.warned.mineralStorageFull = true;
-  G.ui.toast('⚠ 仓位已满，矿物、麦酒或退回原粮由市民随身保留；使用库存或建成新仓库后继续送仓', 'warn');
+  G.ui.toast('⚠ 仓位已满，矿物、麦酒、成衣或退回原粮由市民随身保留；使用库存或建成新仓库后继续送仓', 'warn');
 };
 G.cargoWaitReason = function (c) {
   if (!G.isMineralCargo(c) || !c.haulPending || c.state === 'haul') return '';
@@ -867,7 +866,7 @@ G.productionLimited = function (b) {
   if (b.state !== 'ok') return false; // Construction and manual clearing never stop.
   if (G.fuelLimited(b) || G.toolLimited(b)) return true;
   if (['gatherer', 'dock', 'hunting'].includes(b.type)) return G.goalPaused(b.type === 'gatherer' ? 'vegetables' : 'meat');
-  if (b.type === 'tailor') return G.goalPaused('clothes');
+  if (b.type === 'tailor') return G.goalPaused(G.tailorOutput(b));
   if (b.type === 'farm') return G.goalPaused('grain') && !G.farmSeasonCommitted(b);
   if (b.type === 'forester') return G.goalPaused('wood') && !b.doPlant;
   if (b.type === 'stonequarry' || (b.type === 'mine' && G.mineModeOf(b) !== 'legacy')) {
@@ -904,7 +903,7 @@ G.goalCommitment = function (c) {
   const outputs = G.productionOutputsOf(b);
   // A player switching specialization must not make the old accepted batch
   // disposable to the scheduler merely because the new product is paused.
-  if (['mine', 'blacksmith'].includes(b.type)) {
+  if (['mine', 'blacksmith', 'tailor'].includes(b.type)) {
     const previousOutput = type => type && !outputs.includes(type);
     if (c.carry && previousOutput(c.carry.type)) return true;
     if ([c.task, c.pausedTask].some(t => t && t.b === b && t.yield && previousOutput(t.yield.type))) return true;
@@ -958,7 +957,7 @@ G.deposit = function (type, qty, retain=false) {
   const space = G.isTool(type) ? Infinity : Math.max(0, G.storageCap() - stock);
   const got = Math.min(qty, space); g.res[type] = (g.res[type] || 0) + got;
   if (G.FOOD_KEYS.includes(type)) g.res.food += got;
-  if (got < qty && !retain && !['stone', 'iron', 'coal', 'ale'].includes(type) && !g.warned.storageFull) {
+  if (got < qty && !retain && !['stone', 'iron', 'coal', 'ale', 'clothes', 'warmCoats'].includes(type) && !g.warned.storageFull) {
     g.warned.storageFull = true; G.ui.toast('⚠ 仓库满了，多出的资源只能丢弃——再建一座仓库吧', 'warn');
   }
   G.updateProductionGoals(); return got;
@@ -966,7 +965,7 @@ G.deposit = function (type, qty, retain=false) {
 
 /* 背料到达仓库：转入回屋加工段。返回 false = 仓库没料（白跑） */
 G.firewoodFetchDone = function (c, t) {
-  if (G.game.res[t.consume.type] < t.consume.qty) return false;
+  if (G.taskIngredients(t).some(item=>G.game.res[item.type]<item.qty)) return false;
   const spot = G.workSpot(G.world, t.b, c.x, c.y);
   if (!spot) return false;
   t.phase = 'work';
@@ -992,7 +991,7 @@ G.coldStep = function (c, dtH) {
       return;
     }
   }
-  c.cold += dtH * G.LIFE.coldOutdoor / 24 * childMul * (c.clothingLeft > 0 ? 0.6 : 1);
+  c.cold += dtH * G.LIFE.coldOutdoor / 24 * childMul * G.clothingColdMul(c);
 };
 
 /* Validate only the next segment after dispatch, including diagonal side
@@ -1440,14 +1439,15 @@ G.makeTask = function (b, c) {
       return G.withTaskRoute({kind:'work',b,tx:spot.x,ty:spot.y,work:G.taskWork(c,6),workLeft:0,economy:'orchard'},spot.route);
     }
     case 'tailor': {
-      if (g.res.clothes >= G.storageCap()) { b.noWork=true; b.warnText='衣物仓容已满'; return null; }
-      const material = g.res.leather >= 2 ? 'leather' : g.res.wool >= 2 ? 'wool' : null;
-      if (!material) { b.noWork = true; b.warnText = '缺皮革或羊毛（每件需2）'; return null; }
-      const route = G.storageRoute(c.x, c.y);
-      if (!route) { b.noWork = true; b.warnText = '仓库不可达'; return null; }
-      return G.withTaskRoute({ kind: 'firewood', b, tx: route.spot.x, ty: route.spot.y, phase: 'fetch',
-        work: G.taskWork(c, 8), workLeft: 0, consume: {type: material, qty: 2},
-        yield: {type: 'clothes', qty: c.educated ? 2 : 1} }, route.spot.route);
+      const status=G.tailorProductionStatus(b);
+      if(!status.ok){b.noWork=true;b.warnText=status.reason;return null;}
+      const route=G.storageRoute(c.x,c.y);
+      if(!route){b.noWork=true;b.warnText='取料仓库不可达';return null;}
+      // Snapshot ingredients and output now. Selection changes never rewrite
+      // an accepted batch; the established tailor contract charges at completion.
+      return G.withTaskRoute({kind:'firewood',b,tx:route.spot.x,ty:route.spot.y,phase:'fetch',
+        work:G.taskWork(c,8),workLeft:0,consume:status.materials.map(item=>({...item})),
+        yield:{type:G.tailorOutput(b),qty:c.educated?2:1}},route.spot.route);
     }
     case 'blacksmith': {
       if (G.toolLimited(b)) { b.noWork = true; b.warnText = '工具已达上限'; return null; }
@@ -1599,9 +1599,12 @@ G.completeTask = function (c) {
         if (!G.firewoodFetchDone(c, t)) break;
         return;
       }
-      if (G.game.res[t.consume.type] < t.consume.qty) break; // 加工期间料被挪用，这趟白干
-      G.game.res[t.consume.type] -= t.consume.qty;
+      if(b?.type==='tailor'&&(G.world.bmap[b.id]!==b||b.state!=='ok'||c.job!==b.id||!G.atMedicalDoor(c,b)||G.d2(c.x,c.y,t.tx,t.ty)>.04))break;
+      const ingredients=G.taskIngredients(t);
+      if(ingredients.some(item=>G.game.res[item.type]<item.qty))break; // all-or-nothing, no partial wool/leather charge
+      for(const item of ingredients)G.withdrawResource(item.type,item.qty);
       c.carry = { type: t.yield.type, qty: t.yield.qty };
+      if(b?.type==='tailor')G.recordProduction(b,t.yield.type,t.yield.qty);
       break;
     }
     case 'sow': {
@@ -1735,7 +1738,7 @@ G.jobCanProduce = function (b) {
   if (b.type === 'tradingpost') return G.tradeHasWork(b);
   if (b.type === 'pasture') return (b.animals || 0)>0;
   if (b.type === 'orchard') return G.game.unlocks.orchard && ((b.orchardAge || 0)<G.YEAR_DAYS*4 ? b.tendedDay!==G.game.day : (b.orchardYield || 0)>0 && G.game.season===2);
-  if (b.type === 'tailor') return r.clothes < G.storageCap() && (r.leather >= 2 || r.wool >= 2);
+  if (b.type === 'tailor') return G.tailorProductionStatus(b).ok;
   if (b.type === 'blacksmith') return G.blacksmithRecipe(b).every(c => r[c.type] >= c.qty);
   if (b.type === 'forester') return (b.doCut && !G.goalPaused('wood') && G.treesInRadius(w, b.x, b.y, p.forester.radius, true).length > p.forester.minMature) ||
     (b.doPlant && !!G.nearestPlantSpot(w, b.x, b.y, p.forester.radius));
@@ -1975,6 +1978,7 @@ G.addBuilding = function (type, x, y, opt) {
   if (type === 'mine') { b.mineMode = 'iron'; b.legacyMine = false; b.mineTick = 0; }
   if (type === 'blacksmith') { b.toolLimit = G.PROD.blacksmith.toolLimit; b.toolRecipe = 'iron'; }
   if(type==='tavern')b.reserveDays=12;
+  if(type==='tailor')b.coatRecipe='basic';
   if (type === 'woodcutter') b.fuelLimit = G.PROD.woodcutter.fuelLimit; // 燃料上限（原版 Fuel Limit）
   if (G.game && G.game.buildLog) { // 建造/拆除记录（反馈分析用；负号前缀 = 拆除）
     G.game.buildLog.push({ d: G.game.day, t: type });
@@ -2088,7 +2092,7 @@ G.demolishAt = function (tx, ty) {
 /* Town development: explicit inventories and worker trips, not global free production. */
 G.TRADE_CAPACITY = 2000;
 G.tradeStored = b => Object.values(b.tradeInventory || {}).reduce((n,q) => n + q, 0);
-G.TRADE_VALUES = {wood:2,stone:7,iron:5,tools:8,firewood:4,meat:1,vegetables:1,grain:1,leather:10,wool:5,clothes:15,herbs:4,coal:6,steelTools:10};
+G.TRADE_VALUES = {wood:2,stone:7,iron:5,tools:8,firewood:4,meat:1,vegetables:1,grain:1,leather:10,wool:5,clothes:15,warmCoats:20,herbs:4,coal:6,steelTools:10};
 G.TRADE_GOODS = {coal:{name:'煤',price:6,stock:100},steelTools:{name:'钢工具',price:10,stock:20},sheep:{name:'羊',price:600,stock:4},orchardSeed:{name:'果树种子',price:2500,stock:1},grain:{name:'主食',price:1,stock:400},iron:{name:'铁',price:5,stock:100},leather:{name:'皮革',price:10,stock:80}};
 G.ensureEconomyBuilding = function(b) {
   if(b.type==='tradingpost'){b.tradeInventory=b.tradeInventory||{};b.tradeTargets=b.tradeTargets||{};if(!Number.isFinite(b.nextMerchantDay))b.nextMerchantDay=G.game.day+G.SEASON_DAYS;}
@@ -2350,6 +2354,7 @@ G.mineModeOf = b => ['iron','coal'].includes(b.mineMode) ? b.mineMode : 'legacy'
 G.blacksmithOutput = b => b && b.toolRecipe === 'steel' ? 'steelTools' : 'tools';
 G.blacksmithRecipe = b => G.blacksmithOutput(b) === 'steelTools' ? [...G.PROD.blacksmith.consume,{type:'coal',qty:2}] : G.PROD.blacksmith.consume;
 G.productionOutputsOf = function (b) {
+  if(b.type==='tailor')return [G.tailorOutput(b)];
   if (b.type === 'mine') return G.mineModeOf(b) === 'legacy' ? ['stone','iron'] : [G.mineModeOf(b)];
   if (b.type === 'blacksmith') return [G.blacksmithOutput(b)];
   return G.PRODUCTION_OUTPUTS[b.type] || [];
@@ -2561,4 +2566,48 @@ G.tavernSummary=function(b){
   return {...s,canBrew:s.ok,visitors:G.tavernVisitors(b).length,ale:G.game.res.ale,
     workers:b.workers.filter(id=>G.world.cmap[id]&&!G.world.cmap[id].dead).length,onDuty:G.tavernStaff(b),
     capacity:G.LEISURE.capacity,eligibleAdults:cs.filter(c=>!c.dead&&c.adult&&c.age>=18).length,batchGrain:30,batchAle:3,workHours:6,aleLimit:G.productionGoalOf('ale')??30};
+};
+
+/* Ordinary clothes remain the legacy stock. Warm coats are an optional
+ * wool-and-leather upgrade, not a second food group or indoor heating source. */
+G.clothingTypeOf=c=>!(c.clothingLeft>0)?'none':c.clothingType==='warm'?'warm':'basic';
+G.clothingColdMul=c=>({none:1,basic:.6,warm:.3})[G.clothingTypeOf(c)];
+G.wearClothing=function(c){
+  c.clothingLeft=Math.max(0,(c.clothingLeft||0)-1);
+  if(c.clothingLeft>0)return;
+  c.clothingType=null;
+  const type=G.game.res.warmCoats>=1?'warmCoats':G.game.res.clothes>=1?'clothes':null;
+  if(!type)return;
+  G.game.res[type]--;c.clothingType=type==='warmCoats'?'warm':'basic';c.clothingLeft=G.YEAR_DAYS;
+};
+G.taskIngredients=t=>!t.consume?[]:Array.isArray(t.consume)?t.consume:[t.consume];
+G.tailorRecipeOf=b=>b.coatRecipe==='warm'?'warm':'basic';
+G.tailorOutput=b=>G.tailorRecipeOf(b)==='warm'?'warmCoats':'clothes';
+G.tailorProductionStatus=function(b){
+  const r=G.game.res,output=G.tailorOutput(b),warm=output==='warmCoats';
+  const material=r.leather>=2?'leather':r.wool>=2?'wool':'leather';
+  const materials=warm?[{type:'leather',qty:2},{type:'wool',qty:2}]:[{type:material,qty:2}];
+  let reason='材料齐备，可接新批次';
+  if(G.goalPaused(output))reason=`${G.RES[output].name}目标已达，暂停新批次`;
+  else if(r[output]>=G.storageCap())reason=`${G.RES[output].name}仓容已满`;
+  else if(materials.some(item=>r[item.type]<item.qty))reason=warm?'保暖外套缺料：每批同时需要2皮革+2羊毛':'普通衣缺料：每批需要2皮革或2羊毛';
+  else return {ok:true,reason,materials};
+  return {ok:false,reason,materials};
+};
+G.setCoatRecipe=function(b,recipe){
+  if(!b||G.world.bmap[b.id]!==b||b.type!=='tailor'||b.state!=='ok'||!['basic','warm'].includes(recipe))return false;
+  b.coatRecipe=recipe;b.noWork=false;b.warnText='';G.updateProductionGoals();G.game.schedT=0;return true;
+};
+G.tailorSummary=function(b){
+  const s=G.tailorProductionStatus(b),batches=[],seen=new Set(),wearers={basic:0,warm:0,ragged:0};
+  for(const c of G.world.citizens){
+    if(!c.dead)wearers[({none:'ragged',basic:'basic',warm:'warm'})[G.clothingTypeOf(c)]]++;
+    for(const task of [c.task,c.pausedTask]){
+      if(!task||task.b!==b||!task.yield||!['clothes','warmCoats'].includes(task.yield.type)||seen.has(task))continue;
+      seen.add(task);batches.push({type:task.yield.type,qty:task.yield.qty,phase:task===c.pausedTask?'paused':task.phase||'work',carrier:c.name});
+    }
+    if(c.job===b.id&&c.carry&&['clothes','warmCoats'].includes(c.carry.type))batches.push({type:c.carry.type,qty:c.carry.qty,phase:'haul',carrier:c.name});
+  }
+  return {recipe:G.tailorRecipeOf(b),output:G.tailorOutput(b),materials:s.materials,canProduce:s.ok,reason:s.reason,batches,
+    clothes:G.game.res.clothes,warmCoats:G.game.res.warmCoats,wearers};
 };
