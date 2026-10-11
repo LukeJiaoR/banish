@@ -107,6 +107,7 @@ G.BDEF = {
     wall: '#7a5a45', wallD: '#5c4334', roof: '#6b4a3a',
     desc: '1名铁匠，可选择铁/钢工具。铁配方1铁+2木→2件（受教育3）；钢配方额外2煤，产量相同。钢工具耐久是铁工具的2倍，生产速度相同。默认备当前种类30件；已接批次沿用原配方。',
   },
+  market: {id:'market',name:'市场',icon:'🧺',w:3,h:3,cost:{wood:58,stone:62,iron:40},buildWork:150,jobs:1,passable:false,wall:'#987850',wallD:'#73563b',roof:'#786040',desc:'货商集中搬运食物与取暖燃料，居民真实采购送回住房。'},
   gatherer: {
     id: 'gatherer', name: '采集小屋', icon: '🧺', w: 2, h: 2,
     cost: { wood: 30, stone: 12 }, buildWork: 70, jobs: 2, passable: false,
@@ -286,3 +287,10 @@ G.TREE_COLORS = {
   trunk: '#5d4a37',
   snowCap: '#e8edf2',
 };
+
+/* Serialized household-supply values, shared by the save validator. */
+G.SUPPLY={types:['grain','vegetables','meat','firewood','coal'],marketCap:240,homeCap:350,vendorCarry:80,homeCarry:40,marketRadius:18,foodDays:4,fuelDays:4,fetchH:.35,unloadH:.25};
+G.emptySupplyStock=()=>Object.fromEntries(G.SUPPLY.types.map(k=>[k,0]));
+G.supplySum=s=>G.SUPPLY.types.reduce((n,k)=>n+(s?.[k]||0),0);
+G.supplyFood=s=>G.FOOD_KEYS.reduce((n,k)=>n+(s?.[k]||0),0);
+G.supplyCargoItems=cargo=>cargo?{[cargo.type]:cargo.qty,...cargo.extra}:{};

@@ -6,7 +6,7 @@
 /* Measured town flows: bounded observations, never an economy controller.
  * Food total is derived from three groups; held goods are not warehouse stock. */
 G.LEDGER_RES=['meat','vegetables','grain','firewood'];
-G.LEDGER_METRICS=['produced','received','used','withdrawn','discarded'];
+G.LEDGER_METRICS=['produced','received','used','withdrawn','discarded','distributedUsed','distributedLost'];
 G.ledgerStock=g=>Object.fromEntries(G.LEDGER_RES.map(k=>[k,Math.max(0,Number(g.res[k])||0)]));
 G.ledgerBucket=(g,day=g.day,fromHour=g.h)=>({day,fromHour,partial:fromHour>0,opening:G.ledgerStock(g),
   flows:Object.fromEntries(G.LEDGER_RES.map(k=>[k,Object.fromEntries(G.LEDGER_METRICS.map(m=>[m,0]))]))});
@@ -29,7 +29,7 @@ G.closeTownLedgerDay=function(){
 G.ledgerTotals=function(rows){
   const totals={};
   for(const k of G.LEDGER_RES){
-    const n=Object.fromEntries(G.LEDGER_METRICS.map(m=>[m,rows.reduce((sum,r)=>sum+r.flows[k][m],0)]));
+    const n=Object.fromEntries(G.LEDGER_METRICS.map(m=>[m,rows.reduce((sum,r)=>sum+(r.flows[k][m]||0),0)]));
     n.opening=rows.length?rows[0].opening[k]:0;n.closing=rows.length?rows[rows.length-1].closing[k]:0;n.delta=n.closing-n.opening;totals[k]=n;
   }
   totals.food=Object.fromEntries([...G.LEDGER_METRICS,'opening','closing','delta'].map(m=>[m,G.FOOD_KEYS.reduce((n,k)=>n+totals[k][m],0)]));
@@ -57,8 +57,8 @@ G.townChallengeFacts=function(){
   const recent=available?G.townLedgerSummary().recent:{days:0,fromDay:null,toDay:null,totals:G.ledgerTotals([])},totals=recent.totals,groups=G.FOOD_KEYS.filter(k=>totals[k].produced>0).length;
   const contiguous=recent.days===12&&recent.toDay-recent.fromDay===11&&recent.toDay===G.game.day-1;
   return {settlement:{population:pop,homed,ready:pop>=30&&homed===pop},
-    food:{available,days:recent.days,contiguous,fromDay:recent.fromDay,toDay:recent.toDay,groups,produced:totals.food.produced,used:totals.food.used,
-      ready:contiguous&&groups===3&&totals.food.used>0&&totals.food.produced>=totals.food.used},
+    food:{available,days:recent.days,contiguous,fromDay:recent.fromDay,toDay:recent.toDay,groups,produced:totals.food.produced,used:totals.food.used+totals.food.distributedUsed,
+      ready:contiguous&&groups===3&&totals.food.used+totals.food.distributedUsed>0&&totals.food.produced>=totals.food.used+totals.food.distributedUsed},
     education:{educated,students,ready:educated>=3&&students>=1}};
 };
 G.observeTownChallenges=function(){
@@ -72,7 +72,7 @@ G.newGameState = function () {
     h: 6, day: 0, season: 0, year: 1,
     speed: 1, paused: false,
     res: { wood: 80, stone: 48, iron: 0, tools: 15, food: 500, meat: 0, vegetables: 0, grain: 500, leather: 0, wool: 0, clothes: 0, warmCoats: 0, herbs: 0, coal: 0, steelTools: 0, ale: 0, firewood: 50 }, // 开局（原版中难度 5 家庭，工具 15 件≈第一轮磨损周期）；存粮较原版加厚：15 人 6 天食物跑道撑不到第一座采集屋建成
-    heating:{allowCoal:false,coalReserve:20}, fishingRules:'shared',
+    heating:{allowCoal:false,coalReserve:20}, fishingRules:'shared', supplyMode:'automatic',
     fireDisasters:{enabled:false,startedDay:null,graceUntil:0,lastDay:-1,nextIgnitionDay:0,serial:0,incidentHomes:[]},
     healthStartDay: 0, farmPests:{enabled:false,graceUntil:0,lastDay:-1}, challenges:{v:1,completed:{}},
     nomads: {nextDay:G.YEAR_DAYS,serial:0,offer:null,accepted:0,declined:0},
@@ -154,8 +154,9 @@ G.endDay = function () {
   G.reconcileFood(g);
   const sorted = w.citizens.slice().sort((a, b) => (a.age >= G.ADULT_AGE && !a.student ? 1 : 0) - (b.age >= G.ADULT_AGE && !b.student ? 1 : 0));
   for (const c of sorted) {
-    if (g.res.food >= eat) {
-      const meal = G.consumeFood(eat); c.hunger = 0; c.dietVariety = meal.length;
+    const homeMeal=G.supplyEnabled&&G.supplyEnabled()?G.eatHousehold(c,eat):null;
+    if (homeMeal?homeMeal.length>0:g.res.food >= eat) {
+      const meal = homeMeal||G.consumeFood(eat); c.hunger = 0; c.dietVariety = meal.length;
       c.dietScore = (c.dietScore ?? 1) * 0.9 + meal.length * 0.1;
     } else { c.hunger++; c.dietVariety = 0; }
     G.wearClothing(c);
@@ -211,16 +212,18 @@ G.endDay = function () {
   if (g.day % G.LIFE.pairEvery === 0) G.formFamilies();
   // ---- 搬入空房 ----
   G.assignHousing();
+  if(G.reconcileSupplyHomes)G.reconcileSupplyHomes();
   // ---- 生育 ----
   if (g.season !== 3) G.tryBirths();
 
   // ---- 警告 ----
   const pop = w.citizens.length;
-  if (pop > 0 && !g.warned.hunger && g.res.food <= 0) {
+  const foodStock=G.supplyEconomyStock?G.supplyEconomyStock('food'):g.res.food;
+  if (pop > 0 && !g.warned.hunger && foodStock <= 0) {
     g.warned.hunger = true;
     G.ui.toast('⚠ 食物耗尽！镇民正在挨饿', 'bad');
   }
-  if (pop > 0 && g.res.food > pop * G.LIFE.eatPerDay * 8) g.warned.hunger = false;
+  if (pop > 0 && foodStock > pop * G.LIFE.eatPerDay * 8) g.warned.hunger = false;
   if (pop > 0 && g.season === 2) {
     // 按实际取暖需求警告：需求 ≈ Σ 有人住的房屋年取暖量（冬季集中烧完）
     const warmNeed = w.buildings.reduce((s, b) => s + (G.isOccupiedHome(w, b) ? G.BDEF[b.type].warmWoodPerYear : 0), 0);
@@ -230,11 +233,11 @@ G.endDay = function () {
       G.ui.toast(G.heatingPolicy().allowCoal?`⚠ 冬天将至，取暖燃料不足（可用约 ${Math.floor(G.usableHeatingFuel())} 柴火当量，需求约 ${warmNeed}）`:`⚠ 冬天将至，柴火不足（现有 ${Math.floor(g.res.firewood)}，需求约 ${warmNeed}）`, 'warn');
     }
   } else g.warned.firewood = false;
-  if (pop > 0 && !g.warned.foodLow && g.res.food < pop * G.LIFE.eatPerDay * 3) {
+  if (pop > 0 && !g.warned.foodLow && foodStock < pop * G.LIFE.eatPerDay * 3) {
     g.warned.foodLow = true;
     G.ui.toast('⚠ 食物储备不足 3 天', 'warn');
   }
-  if (g.res.food > pop * G.LIFE.eatPerDay * 8) g.warned.foodLow = false;
+  if (foodStock > pop * G.LIFE.eatPerDay * 8) g.warned.foodLow = false;
   const toolDays = G.toolDaysLeft(adultsNow);
   if (pop > 0 && G.hasTools() && toolDays <= G.YEAR_DAYS && !g.warned.toolsLow) {
     g.warned.toolsLow = true;
@@ -250,12 +253,13 @@ G.endDay = function () {
     if (G.RES_KEYS.filter(k=>!G.isTool(k)).every(k=>g.res[k]<G.storageCap(k)-50)) g.warned.storageFull = false;
   }
 
-  g.foodNet = g.res.food - g.prevFood;
-  g.prevFood = g.res.food;
+  if(G.supplyDailyWarnings)G.supplyDailyWarnings();
+  g.foodNet = foodStock - g.prevFood;
+  g.prevFood = foodStock;
   // 每日摘要（末 60 条）：反馈快照自带时间曲线，饥荒/寒冬可复盘
   g.hist.push({
     d: g.day, season: g.season, pop: w.citizens.length,
-    food: Math.round(g.res.food), firewood: Math.round(g.res.firewood),
+    food: Math.round(foodStock), firewood: Math.round(g.res.firewood),
     wood: Math.round(g.res.wood), stone: Math.round(g.res.stone), iron: Math.round(g.res.iron),
     born: g.stats.born - born0, died: g.stats.died - died0,
     warn: (g.warned.hunger ? 'h' : '') + (g.warned.firewood ? 'w' : '') + (g.warned.foodLow ? 'l' : ''),
@@ -411,6 +415,7 @@ G.joinFamilies = function (a, b) {
     old.members = old.members.filter(id => !members.includes(id));
     old.coupleIds = (old.coupleIds || []).filter(id => old.members.includes(id));
     if (!old.members.length) {
+      if(old.supplyCamp&&G.supplyCache)G.supplyCache(old.supplyCamp.supplyStock,old.supplyCamp);
       const h = w.bmap[old.houseId];
       if (h && h.family === old.id) h.family = null;
       w.families = w.families.filter(f => f !== old);
@@ -498,7 +503,7 @@ G.tryBirths = function () {
     if (mother.age < Math.max(18, G.MOTHER_MIN) || mother.age > G.MOTHER_MAX || father.age < 18) continue;
     const house = w.bmap[fam.houseId];
     if (!house || house.houseFire || house.state !== 'ok' || !['house', 'stonehouse', 'boarding'].includes(house.type)) continue;
-    if (g.res.food < pop * G.LIFE.eatPerDay * G.LIFE.birthFoodDays) continue; // 粮食紧张时不生育
+    if ((G.supplyEconomyStock?G.supplyEconomyStock('food'):g.res.food) < pop * G.LIFE.eatPerDay * G.LIFE.birthFoodDays) continue; // 粮食紧张时不生育
     if (G.chance(G.LIFE.birthChance)) {
       // 出生点必须在房屋脚印之外：占位格不可通行，站进去寻路全失败，
       // 夜里回不了家按露宿挨冻、白天也挪不动（冬季婴儿冻死的根源）
@@ -553,6 +558,7 @@ G.spawnCitizen = function (opt) {
 
 G.killCitizen = function (c, why) {
   if (!c || c.dead || G.world.cmap[c.id]!==c) return;
+  if(G.recoverCitizenSupply)G.recoverCitizenSupply(c);
   G.mournCitizen(c);
   c.dead = true;
   const w = G.world, g = G.game;
@@ -571,6 +577,7 @@ G.killCitizen = function (c, why) {
     fam.members = fam.members.filter(id => id !== c.id);
     if ((fam.coupleIds || []).includes(c.id)) fam.coupleIds = [];
     if (fam.members.length === 0) {
+      if(fam.supplyCamp&&G.supplyCache)G.supplyCache(fam.supplyCamp.supplyStock,fam.supplyCamp);
       if (fam.houseId != null) {
         const h = w.bmap[fam.houseId];
         if (h) h.family = null;
@@ -630,6 +637,7 @@ G.dropBlockedTask = function (c, t) {
 };
 G.alternateTaskEndpoint = function (c, t) {
   if(t?.kind==='firefight')return G.fireLegSpot(c,t);
+  if(t?.kind==='supply')return G.supplyLegSpot(c,t);
   if (!t || G.physicalTaskEndpoint(t) || !t.b || G.world.bmap[t.b.id] !== t.b) return null;
   if (['build','clearSite'].includes(t.kind) ? t.b.state !== 'site' : t.b.state !== 'ok') return null;
   if (t.kind === 'clearSite' && (!t.tree || G.world.trees[G.world.treeIdx[t.tree.i]] !== t.tree)) return null;
@@ -659,7 +667,7 @@ G.routeCanReuse = function (route, c, tx, ty) {
 G.sendTo = function (c, tx, ty, planned = null) {
   let route=planned||(c.task&&c.task.dispatchRoute);
   if(c.task) delete c.task.dispatchRoute;
-  const buildingTask=c.task && (['build','clearSite','firewood','trade','care','clinic','arrival','leisure','host','brew','smith','fuel','tailor','study','teach','firefight'].includes(c.task.kind) || (c.task.kind==='work' && c.task.b && ['dock','mine','stonequarry','blacksmith','pasture','orchard'].includes(c.task.b.type)));
+  const buildingTask=c.task && (['build','clearSite','firewood','trade','care','clinic','arrival','leisure','host','brew','smith','fuel','tailor','study','teach','firefight','supply'].includes(c.task.kind) || (c.task.kind==='work' && c.task.b && ['dock','mine','stonequarry','blacksmith','pasture','orchard'].includes(c.task.b.type)));
   if((route && !G.routeCanReuse(route,c,tx,ty)) || (!route && buildingTask)) {
     const spot=G.alternateTaskEndpoint(c,c.task);
     if(!spot){if(c.task)G.dropBlockedTask(c,c.task);c.path=null;c.state='idle';c.wanderT=.5;return false;}
@@ -674,7 +682,7 @@ G.sendTo = function (c, tx, ty, planned = null) {
   if (!p) { c.state = 'idle'; c.task = null; return false; }
   // The path planner rounds its start cell. Physically checked factory/mineral
   // tasks still walk the final fraction after an interrupted commute.
-  if((c.task?.mineral||c.task?.kind==='firefight'||['fuel','tailor'].includes(c.task?.kind)) && p.length===0 && G.d2(c.x,c.y,tx,ty)>1e-8) {
+  if((c.task?.mineral||['firefight','supply'].includes(c.task?.kind)||['fuel','tailor'].includes(c.task?.kind)) && p.length===0 && G.d2(c.x,c.y,tx,ty)>1e-8) {
     c.path=[{x:tx,y:ty}];c.pi=0;c.state='walk';c.walkKind='task';return true;
   }
   c.path = p; c.pi = 0;
@@ -718,6 +726,8 @@ G.resumeTask = function (c) {
   if(c.student){c.pausedTask=null;return G.startStudy(c);}
   const t = c.pausedTask;
   c.pausedTask = null;
+  if(t?.kind==='supply'){c.task=t;return G.planSupplyLeg(c,t);}
+  if(t&&['teach','clinic','host'].includes(t.kind)&&G.tryHouseholdSupply&&G.tryHouseholdSupply(c))return true;
   if (!t) return false;
   const w = G.world;
   // 建筑任务要求仍在原岗位；散工任务还须保留玩家标记，不能续接已取消的命令。
@@ -845,6 +855,7 @@ G.availableRockMarks = function (w) {
 
 /* 开始搬运去仓库 */
 G.startHaul = function (c) {
+  if(G.supplyCargo&&G.supplyCargo(c)){G.resumeSupplyCargo(c);return;}
   G.protectConstructionPriorityCargo(c);
   if(c.staffingRelease!=null&&c.staffingRelease===c.job)G.markStaffingCargo(c);
   if (G.isMineralCargo(c)) { G.startMineralHaul(c); return; }
@@ -867,7 +878,7 @@ G.startHaul = function (c) {
 
 /* 燃料上限（原版 Wood Cutter 的 Fuel Limit）：柴火库存达到上限即停产；旧档/测试无该字段时用默认值 */
 G.fuelLimitOf = function (b) { return Number.isFinite(b.fuelLimit) ? G.clamp(b.fuelLimit, 0, G.PROD.woodcutter.fuelMax) : G.PROD.woodcutter.fuelLimit; };
-G.fuelLimited = function (b) { return b.type === 'woodcutter' && (G.productionGoalOf('firewood') === null ? G.game.res.firewood >= G.fuelLimitOf(b) : G.goalPaused('firewood', b)); };
+G.fuelLimited = function (b) { return b.type === 'woodcutter' && (G.productionGoalOf('firewood') === null ? (G.supplyEconomyStock?G.supplyEconomyStock('firewood'):G.game.res.firewood) >= G.fuelLimitOf(b) : G.goalPaused('firewood', b)); };
 G.toolLimitOf = function (b) { return Number.isFinite(b.toolLimit) ? G.clamp(b.toolLimit, 0, G.PROD.blacksmith.toolMax) : G.PROD.blacksmith.toolLimit; };
 G.toolLimited = function (b) { const type = G.blacksmithOutput(b); return b.type === 'blacksmith' && (G.productionGoalOf(type) === null ? G.game.res[type] >= G.toolLimitOf(b) : G.goalPaused(type, b)); };
 
@@ -899,14 +910,14 @@ G.updateProductionGoals = function (game, world) {
   for (const type of G.RES_KEYS) {
     const target = G.productionGoalOf(type, g);
     if (target === null) { delete g.productionPaused[type]; continue; }
-    g.productionPaused[type] = G.nextGoalPause(g.res[type], target, g.productionPaused[type]);
+    g.productionPaused[type] = G.nextGoalPause(G.supplyEconomyStock?G.supplyEconomyStock(type,g,w):g.res[type], target, g.productionPaused[type]);
   }
   for (const b of w.buildings) {
     const type = b.type === 'woodcutter' ? 'firewood' : b.type === 'blacksmith' ? G.blacksmithOutput(b) : null;
     if (!type) continue;
     const target = G.effectiveProductionGoal(type, b, g);
     if (target === null) delete b.productionPaused;
-    else b.productionPaused = G.nextGoalPause(g.res[type], target, typeof b.productionPaused === 'boolean' ? b.productionPaused : g.productionPaused[type]);
+    else b.productionPaused = G.nextGoalPause(G.supplyEconomyStock?G.supplyEconomyStock(type,g,w):g.res[type], target, typeof b.productionPaused === 'boolean' ? b.productionPaused : g.productionPaused[type]);
   }
 };
 G.goalPaused = function (type, b) {
@@ -977,6 +988,7 @@ G.buildingGoalStatus = function (b) {
 // unset baseline, teachers, manual tasks, or construction scheduling here.
 G.goalCommitment = function (c) {
   if(G.fireTaskOf&&G.fireTaskOf(c))return true;
+  if(G.supplyTaskOf&&G.supplyTaskOf(c))return true;
   if(c.carry?.staffingReturn===true||(c.staffingRelease!=null&&c.staffingRelease===c.job))return true;
   if (G.isArriving(c) || G.isLeisureVisitor(c)) return true;
   if ([c.task,c.pausedTask].some(t=>t&&t.kind==='brew'&&t.phase==='process') && c.carry?.brewIngredient) return true;
@@ -1202,6 +1214,7 @@ G.pathStepBlocked = function (w, c, t) {
 };
 G.detourCitizen = function (c, dtH) {
   if(c.task?.kind==='firefight'){G.planFireLeg(c,c.task);return;}
+  if(c.task?.kind==='supply'){G.planSupplyLeg(c,c.task);return;}
   c.pathRetryH = Math.max(0, (c.pathRetryH || 0) - dtH);
   if (c.pathRetryH > 0) return;
   c.pathRetryH = 2;
@@ -1248,7 +1261,9 @@ G.stepCitizen = function (c, dtH) {
   if(c.task?.kind==='orchard'&&!G.orchardTaskCurrent(c,c.task))G.dropBlockedTask(c,c.task);
   if(c.task&&['study','teach'].includes(c.task.kind)&&!G.validSchoolTask(c)){G.clearSchoolTasks(c);c.wanderT=0;}
   G.coldStep(c, dtH);
+  if(G.supplyServiceBreak)G.supplyServiceBreak(c,dtH);
   if(G.stepFirefighting&&G.stepFirefighting(c,dtH))return;
+  if(G.stepSupply&&G.stepSupply(c,dtH))return;
   c.leisureRetryH=Math.max(0,(c.leisureRetryH||0)-dtH);
   if(G.isLeisureVisitor(c) && (!G.validLeisureTask(c) || G.isRestTime()))G.cancelLeisure(c);
   c.careRetryH = Math.max(0, (c.careRetryH || 0) - dtH);
@@ -1262,7 +1277,7 @@ G.stepCitizen = function (c, dtH) {
     return;
   }
   // 深夜：回家睡觉（正在搬货的先送完这趟）
-  if (G.isRestTime() && !(c.task && ['care','firefight'].includes(c.task.kind)) && c.state !== 'haul' && !(c.state === 'walk' && c.walkKind === 'home')) {
+  if (G.isRestTime() && !(c.task && ['care','firefight','supply'].includes(c.task.kind)) && c.state !== 'haul' && !(c.state === 'walk' && c.walkKind === 'home')) {
     G.goHome(c);
     if (c.state === 'rest') return;
   }
@@ -1399,6 +1414,7 @@ G.cancelResourceMarks = function (kind) {
 };
 
 G.requestTask = function (c) {
+  if(G.supplyTaskOf&&G.supplyTaskOf(c)){G.planSupplyLeg(c,G.supplyTaskOf(c));return;}
   if(G.fireTaskOf&&G.fireTaskOf(c)){G.planFireLeg(c,G.fireTaskOf(c));return;}
   const retiring=c.staffingRelease===c.job&&c.job!=null;
   // Requesting work also happens after rest and partial harvest. Only an empty
@@ -1410,6 +1426,7 @@ G.requestTask = function (c) {
   if (G.isRestTime()) { G.goHome(c); return; } // 深夜不接受新任务
   if(c.student){if(c.carry)G.startHaul(c);else G.startStudy(c);return;}
   if(!c.adult){G.wander(c);return;}
+  if(!c.carry&&G.tryHouseholdSupply&&G.tryHouseholdSupply(c))return;
   if(!c.carry && G.tryLeisure(c))return;
   const w = G.world;
   const b = c.job != null ? w.bmap[c.job] : null;
@@ -1585,6 +1602,7 @@ G.makeTask = function (b, c) {
     b.warnText = G.buildingGoalStatus(b); return null;
   }
   switch (b.type) {
+    case 'market': return G.makeVendorTask(b,c);
     case 'school': return G.makeTeachingTask(b,c);
     case 'herbalist': return G.makeHerbalistTask(b, c);
     case 'hospital': return G.makeClinicTask(b, c);
@@ -1888,7 +1906,7 @@ G.releaseWorker = function (c) {
 };
 
 G.assignWorker = function (b, c) {
-  if(!c||c.dead||!c.adult||c.student||c.job!=null||c.carry?.staffingReturn===true||(G.fireTaskOf&&G.fireTaskOf(c))||G.isArriving(c)||G.world.bmap[b.id]!==b||b.workers.length>=G.workerLimitOf(b))return;
+  if(!c||c.dead||!c.adult||c.student||c.job!=null||c.carry?.staffingReturn===true||(G.fireTaskOf&&G.fireTaskOf(c))||(G.supplyTaskOf&&G.supplyTaskOf(c))||G.isArriving(c)||G.world.bmap[b.id]!==b||b.workers.length>=G.workerLimitOf(b))return;
   if(b.type==='tavern'&&b.state==='ok'&&(c.age<18||G.isSick(c)))return;
   if (b.type === 'hospital' && b.state === 'ok' && G.isSick(c)) return;
   c.job = b.id;
@@ -1952,6 +1970,7 @@ G.farmHasWork = function (b) {
 G.jobCanProduce = function (b) {
   if(G.workerLimitOf(b)<=0)return false;
   const w = G.world, r = G.game.res, p = G.PROD;
+  if(b.type==='market')return G.supplyEnabled&&G.supplyEnabled()&&G.supplyRestockWanted(b);
   if (b.type === 'hospital') return G.world.citizens.some(G.isSick);
   if(b.type==='tavern')return G.tavernBrewStatus(b).ok || G.game.res.ale>0;
   if (b.type === 'herbalist') return true; // A staffed hut also provides preventive care when gathering pauses.
@@ -2004,11 +2023,12 @@ G.scheduleJobs = function () {
   const FOOD_JOBS = harvestSeason ? ['gatherer', 'dock', 'hunting', 'farm'] : ['gatherer', 'dock', 'hunting'];
   const isFoodRole=b=>FOOD_JOBS.includes(b.type)||(b.type==='farm'&&G.farmHarvestReady(b));
   const dailyFood = w.citizens.filter(x => !x.dead).length * G.LIFE.eatPerDay;
-  const foodDays = dailyFood ? G.game.res.food / dailyFood : Infinity;
+  const foodStock=G.supplyEconomyStock?G.supplyEconomyStock('food'):G.game.res.food;
+  const foodDays = dailyFood ? foodStock / dailyFood : Infinity;
   const foodLow = Math.min(dailyFood * 8, G.storageCap() * 0.5);
   const foodRecovered = Math.min(dailyFood * 12, G.storageCap() * 0.8);
-  if (G.game.res.food < foodLow) G.game.foodUrgent = true;
-  else if (G.game.res.food > foodRecovered) G.game.foodUrgent = false; // 滞回，避免在阈值附近反复打断工地
+  if (foodStock < foodLow) G.game.foodUrgent = true;
+  else if (foodStock > foodRecovered) G.game.foodUrgent = false; // 滞回，避免在阈值附近反复打断工地
   const needFood = Math.ceil(dailyFood / (G.game.foodUrgent ? 4 : 8));
   const forestEligibility = new Map();
   const hasForestWork = b => {
@@ -2277,6 +2297,7 @@ G.upgradeHouse=function(b,expectedKey){
   // All validation precedes the first deduction; state/type change is the
   // idempotency boundary before scheduling can call any gameplay callback.
   for(const [k,qty]of Object.entries(q.due))g.res[k]-=qty;
+  if(G.packBuildingSupply)G.packBuildingSupply(b);
   b.type='stonehouse';b.state='site';b.upgradeFrom='house';b.progress=0;
   b.workLeft=b.totalWork=G.BDEF.stonehouse.buildWork;b.paidCost={...q.cost};b.constructionStarted=false;
   b.family=null;b.workers=[];b.noWork=false;b.warnText='';b.sitePaused=false;delete b.sitePriority;delete b.workerLimit;delete b.unheated;delete b.lastHeating;
@@ -2351,6 +2372,7 @@ G.removeBuilding = function (b, confirmationKey) {
     const n = untouched ? paid[k] : Math.floor(paid[k] / 2);
     if (n > 0) { G.game.res[k] += n; refund.push(`${G.RES[k].icon}×${n}`); }
   }
+  if(G.packBuildingSupply)G.packBuildingSupply(b);
   // 住户搬出（独栋住宅与宿舍都以 fam.houseId 指向本建筑）
   for (const fam of w.families) if (fam.houseId === b.id) fam.houseId = null;
   const displacedHaulers=b.type==='stockpile'?w.citizens.filter(c=>c.carry&&c.haulTo===b.id):[];
@@ -3633,12 +3655,17 @@ G.cemeterySummary=function(b){
 G.COAL_HEAT=2;
 G.heatingPolicy=()=>G.game.heating||{allowCoal:false,coalReserve:20};
 G.heatingCoalAvailable=function(){const p=G.heatingPolicy();return p.allowCoal?Math.max(0,G.game.res.coal-p.coalReserve):0;};
-G.usableHeatingFuel=()=>G.game.res.firewood+G.heatingCoalAvailable()*G.COAL_HEAT;
+G.usableHeatingFuel=function(){
+  if(G.game.supplyMode!=='physical'||!G.supplyInventory)return G.game.res.firewood+G.heatingCoalAvailable()*G.COAL_HEAT;
+  const all=G.supplyInventory().available,p=G.heatingPolicy();
+  return all.firewood+(p.allowCoal?Math.max(0,all.coal-G.game.res.coal)+G.heatingCoalAvailable():0)*G.COAL_HEAT;
+};
 G.setHeatingPolicy=function(allowCoal,coalReserve){
   if(typeof allowCoal!=='boolean'||!Number.isSafeInteger(coalReserve)||coalReserve<0||coalReserve>G.PRODUCTION_GOAL_MAX)return false;
   G.game.heating={allowCoal,coalReserve};G.game.warned.firewood=false;return true;
 };
 G.heatHome=function(b,need){
+  if(G.supplyEnabled&&G.supplyEnabled()){G.heatSuppliedHome(b,need);return;}
   const r=G.game.res,wood=Math.min(r.firewood,need),coal=Math.min(G.heatingCoalAvailable(),Math.max(0,need-wood)/G.COAL_HEAT);
   G.ledgerRecord('used','firewood',wood);r.firewood-=wood;r.coal-=coal;
   b.lastHeating={day:G.game.day,wood,coal,need};b.unheated=wood+coal*G.COAL_HEAT+1e-8<need;

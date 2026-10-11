@@ -31,7 +31,7 @@ G.fireFootprintGap=(a,b)=>Math.max(Math.max(0,a.x-b.x-b.w,b.x-a.x-a.w),Math.max(
 G.cancelFireRescue=function(c){for(const k of ['task','pausedTask'])if(c[k]?.kind==='firefight')c[k]=null;c.path=null;c.pi=0;c.walkKind='';c.state='idle';c.wanderT=.5;};
 G.finishHouseFire=function(b,burned){if(!b?.houseFire||G.world.bmap[b.id]!==b)return false;
  const incident=b.houseFire.incident;delete b.houseFire;for(const c of G.world.citizens)if(G.fireTaskOf(c)?.b===b)G.cancelFireRescue(c);
- if(burned){b.ruinIncident=incident;b.ruinFrom=b.type;b.type='burntruins';b.progress=1;b.workLeft=0;b.paidCost={};b.family=null;b.workers=[];b.noWork=false;b.warnText='';delete b.workerLimit;delete b.upgradeFrom;delete b.lastHeating;delete b.unheated;G.bumpNavigation(G.world);G.ui.toast('住房已烧毁，留下可清理的废墟；可支付新建材原址重建，无旧建材退款','warn');}
+ if(burned){if(G.burnSupplyStock)G.burnSupplyStock(b);b.ruinIncident=incident;b.ruinFrom=b.type;b.type='burntruins';b.progress=1;b.workLeft=0;b.paidCost={};b.family=null;b.workers=[];b.noWork=false;b.warnText='';delete b.workerLimit;delete b.upgradeFrom;delete b.lastHeating;delete b.unheated;G.bumpNavigation(G.world);G.ui.toast('住房已烧毁，留下可清理的废墟；可支付新建材原址重建，无旧建材退款','warn');}
  else{G.assignHousing();G.ui.toast('火情已扑灭，房屋重新开放入住；按当前空床重新安置，不挤占其他家庭','good');}
  return true;};
 G.advanceHousingFires=function(dtH){for(const b of G.activeHouseFires()){

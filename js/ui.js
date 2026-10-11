@@ -25,6 +25,8 @@ G.ui = {
     const b = c.job != null ? G.world.bmap[c.job] : null;
     const fire = G.fireRescueState && G.fireRescueState(c);
     if (fire) return fire;
+    const supply = G.supplyCitizenStatus && G.supplyCitizenStatus(c);
+    if (supply) return supply;
     if (G.isArriving ? G.isArriving(c) : c.arrivalHallId != null) return '迁入途中：先步行到市政厅报到';
     if (c.task && c.task.kind === 'care' && G.medicalStatus) return G.medicalStatus(c);
     if(c.student&&G.studentSummary)return G.studentSummary(c).status;
@@ -127,7 +129,7 @@ G.ui = {
     else status = b.workers.length ? '运作中' : '等待可用工人';
     return {
       target: `本屋燃料目标：${G.fuelLimitOf(b)}` + (G.productionGoalOf('firewood') !== null ? '；' + G.buildingGoalStatus(b) : ''),
-      stock: `全镇库存：柴火 ${Math.floor(stock)} · 原木 ${Math.floor(G.game.res.wood)}`,
+      stock: `${G.supplyEnabled && G.supplyEnabled() ? '公共库存' : '全镇库存'}：柴火 ${Math.floor(stock)} · 原木 ${Math.floor(G.game.res.wood)}`,
       batches:this.fuelBatchText(b),
       heat: this.heatDemandText(heat),
       gap: usable < need ? `${G.heatingPolicy?.().allowCoal?'可用燃料':'柴火库存'}比${heat.winter ? '本冬后续' : '整冬'}取暖估算少约 ${Math.ceil(need - usable)}。` : '取暖估算会随住房入住情况变化。',
@@ -245,7 +247,7 @@ G.ui = {
       { id: 'homes', name: '住房', icon: '🏠', hint: '安家与过冬', tools: ['house', 'stonehouse', 'boarding'] },
       { id: 'food', name: '食物生产', icon: '🌾', hint: '肉类 · 蔬菜 · 主食', tools: ['gatherer', 'hunting', 'dock', 'farm', 'orchard', 'pasture'] },
       { id: 'industry', name: '资源与加工', icon: '⚒️', hint: '木石铁煤 · 工具 · 衣物 · 酿造', tools: ['forester', 'woodcutter', 'stonequarry', 'mine', 'blacksmith', 'tailor', 'tavern'] },
-      { id: 'services', name: '城镇服务', icon: '🏘️', hint: '储运 · 水源 · 教育 · 医疗 · 迁入 · 安葬', tools: ['storage', 'stockpile', 'well', 'school', 'herbalist', 'hospital', 'tradingpost', 'townhall', 'cemetery'] },
+      { id: 'services', name: '城镇服务', icon: '🏘️', hint: '储运 · 市场 · 水源 · 教育 · 医疗 · 迁入 · 安葬', tools: ['storage', 'stockpile', 'market', 'well', 'school', 'herbalist', 'hospital', 'tradingpost', 'townhall', 'cemetery'] },
       { id: 'land', name: '道路与采运', icon: '🛣️', hint: '修路 · 采集 · 拆除', tools: ['road', 'stoneroad', 'bridge', 'fell', 'quarry', 'demolish'] },
     ].map(group => ({ ...group, tools: group.tools.filter(available) })).filter(group => group.tools.length);
     const registered = new Set(this.toolGroups.flatMap(group => group.tools));
@@ -289,7 +291,7 @@ G.ui = {
 
   toolButton: function (t) {
     const icons = { stonehouse: 'tool_stonehouse', boarding: 'tool_boarding', mine: 'tool_mine', stonequarry: 'tool_stonequarry',
-      blacksmith: 'tool_blacksmith', hunting: 'tool_hunting', house: 'tool_house', storage: 'tool_storage', stockpile:'tool_stockpile',
+      blacksmith: 'tool_blacksmith', hunting: 'tool_hunting', house: 'tool_house', storage: 'tool_storage', stockpile:'tool_stockpile', market:'tool_market',
       gatherer: 'tool_gatherer', forester: 'tool_forester', woodcutter: 'tool_woodcutter', dock: 'tool_dock',
       school: 'tool_school', herbalist: 'tool_herbalist', hospital: 'tool_hospital', townhall: 'tool_townhall', tavern: 'tool_tavern', farm: 'tool_farm', road: 'tool_road', stoneroad: 'tool_stoneroad', bridge: 'tool_bridge', demolish: 'tool_demolish' };
     const special = {
@@ -591,7 +593,7 @@ G.ui = {
 
   refreshHUD: function () {
     if (!G.world) return;
-    const g = G.game;
+    const g = G.game, physical = G.supplyEnabled && G.supplyEnabled(), supplies = physical ? G.supplyInventory() : null;
     this.refreshGuide();
     this.refreshProductionGoals();
     const hauling = G.harvestFeedback();
@@ -603,11 +605,14 @@ G.ui = {
         const cap = G.storageCap(k);
         const foodClass = (G.FOOD_KEYS || []).includes(k);
         const tool = k === 'tools' || k === 'steelTools';
-        el.title = `${G.RES[k].name}：${Math.floor(g.res[k])}${tool ? '（工具不限仓储）' : foodClass ? '（三类食物共享总食物仓容 ' + cap + '）' : ' / ' + cap}`;
+        const label = el.querySelector('.res-label');
+        if (label) label.textContent = (physical ? '公共' : '') + (k === 'food' ? '总食物' : G.RES[k].name);
+        el.title = `${physical ? '公共库存 · ' : ''}${G.RES[k].name}：${Math.floor(g.res[k])}${tool ? '（工具不限仓储）' : foodClass ? '（三类食物共享总食物仓容 ' + cap + '）' : ' / ' + cap}`;
         if (k === 'food' && G.FOOD_KEYS) el.title += ' · ' + G.FOOD_KEYS.map(type => `${G.RES[type].name} ${Math.floor(g.res[type] || 0)}`).join(' + ') + '（分类之和，不重复计入库存）';
         if (hauling.carry[k]) el.title += ` · 另有 ${hauling.carry[k]} 随身待入库（尚不可用）`;
         if (['stone', 'iron', 'coal'].includes(k) && hauling.carry[k] && g.res[k] >= cap) el.title += ' · 仓满保留余矿，使用库存或建成新仓库后送仓';
-        if (k === 'food' && G.world.citizens.length) el.title += ` · 可供 ${(g.res.food / (G.world.citizens.length * G.LIFE.eatPerDay)).toFixed(1)} 天（不计新产出）`;
+        if (physical && ['food', ...G.SUPPLY.types].includes(k)) el.title += ` · 已配送至市场/住处和在途物资另计；全村${k === 'food' ? '食物' : G.RES[k].name} ${this.supplyNumber(k === 'food' ? G.supplyFood(supplies.available) : supplies.available[k])}（含散落待回收，不含火情封存；各家能否食用看本地储备）`;
+        if (!physical && k === 'food' && G.world.citizens.length) el.title += ` · 可供 ${(g.res.food / (G.world.citizens.length * G.LIFE.eatPerDay)).toFixed(1)} 天（不计新产出）`;
         if (tool) {
           const adults = G.world.citizens.filter(c => c.adult).length;
           el.title += ` · 单件寿命 ${k === 'steelTools' ? G.LIFE.steelToolLifeDays : G.LIFE.toolLifeDays} 成人天；两类工具生产效率相同，优先磨损钢工具`;
@@ -631,6 +636,7 @@ G.ui = {
       const net = Math.round(g.foodNet);
       netEl.textContent = net > 0 ? `+${net}` : (net < 0 ? `${net}` : '');
       netEl.className = net < 0 ? 'neg' : 'pos';
+      netEl.title = physical ? '全村食物净变（包括已配送物资）；左侧数字仅为公共库存' : '食物净变';
     }
     const hh = Math.floor(g.h);
     this.el.date.textContent = `${G.SEASON_ICONS[g.season]} 第 ${g.year} 年 · ${G.SEASON_NAMES[g.season]} 第 ${(g.day % G.SEASON_DAYS) + 1} 天 · ${G.isRestTime() ? '🌙' : '☀️'} ${String(hh).padStart(2, '0')}:00`;
@@ -658,8 +664,8 @@ G.ui = {
   refreshGuide: function () {
     const el = this.el.guide;
     if (!el || !G.world) return;
-    const g = G.game, w = G.world;
-    const days = w.citizens.length ? g.res.food / (w.citizens.length * G.LIFE.eatPerDay) : 0;
+    const g = G.game, w = G.world, physical = G.supplyEnabled && G.supplyEnabled(), supplies = physical ? G.supplyInventory().available : g.res;
+    const days = w.citizens.length ? (physical ? G.supplyFood(supplies) : g.res.food) / (w.citizens.length * G.LIFE.eatPerDay) : 0;
     const untilWinter = (G.SEASON_DAYS * 3 - g.day % G.YEAR_DAYS + G.YEAR_DAYS) % G.YEAR_DAYS;
     const food = w.buildings.some(b => ['gatherer', 'dock', 'hunting', 'farm', 'orchard', 'pasture'].includes(b.type) && b.state === 'ok');
     const fuel = w.buildings.some(b => b.type === 'woodcutter' && b.state === 'ok');
@@ -673,15 +679,15 @@ G.ui = {
       else if (harvest.trees) risks.push(`木材库存耗尽：${harvest.trees} 棵已标记，查看采运进度；砍倒后仍需送仓。`);
       else risks.push('木材耗尽：向更远可达森林标记砍伐，后续护林补种；避开食物林。');
     }
-    if (g.season >= 2 && G.usableHeatingFuel() < remainingHeat) risks.push(G.heatingPolicy().allowCoal?`取暖燃料不足：可用 ${Math.floor(G.usableHeatingFuel())} 柴火当量 / ${heat.winter ? '本冬此后' : '整冬'}约需 ${Math.ceil(remainingHeat)}，伐木屋需原木；住房可设煤补柴。`:`柴火不足：现有 ${Math.floor(g.res.firewood)} / ${heat.winter ? '本冬此后' : '整冬'}约需 ${Math.ceil(remainingHeat)}，伐木屋需原木。`);
+    if (g.season >= 2 && G.usableHeatingFuel() < remainingHeat) risks.push(G.heatingPolicy().allowCoal?`取暖燃料不足：可用 ${Math.floor(G.usableHeatingFuel())} 柴火当量 / ${heat.winter ? '本冬此后' : '整冬'}约需 ${Math.ceil(remainingHeat)}，伐木屋需原木；住房可设煤补柴。`:`柴火不足：${physical ? '全村实物合计' : '现有'} ${Math.floor(physical ? supplies.firewood : g.res.firewood)} / ${heat.winter ? '本冬此后' : '整冬'}约需 ${Math.ceil(remainingHeat)}，伐木屋需原木。`);
     const stage = !food ? '① 先保持续食物：在近仓森林建采集小屋；不要先连盖五屋耗尽木石。'
       : !fuel ? '② 近仓建伐木屋备柴；在食物林外标记砍伐和矿石，保留散工。'
       : homeless ? `③ 入冬前安家：还有 ${homeless} 家无房；逐步补住房和取暖柴。`
       : '④ 补齐肉、蔬菜、主食与衣物，再扩教育、医疗和贸易，为下一代留空房。';
-    const foodKinds = (G.FOOD_KEYS || []).filter(type => g.res[type] > 0);
+    const foodKinds = (G.FOOD_KEYS || []).filter(type => supplies[type] > 0);
     const variety = G.FOOD_KEYS && foodKinds.length < G.FOOD_KEYS.length ? ` · 食物种类 ${foodKinds.length}/${G.FOOD_KEYS.length}` : '';
     const progress = harvest.total ? `\n采运标记：待领 ${harvest.queued} · 执行 ${harvest.active} · 夜间保留 ${harvest.paused}${harvest.reason ? '；' + harvest.reason : ''}` : '';
-    el.textContent = (G.autosaveBlocked ? '⚠ 原自动档已保护：临时局不自动保存，请打开存档管理备份/手动保存。\n' : '') + `粮食约 ${days.toFixed(1)} 天（不计新产出）${variety} · ${G.isWinter() ? '寒冬中' : '距入冬 ' + untilWinter + ' 天'} · ${g.paused ? '已暂停' : '运行中'}\n${stage}${risks.length ? '\n⚠ ' + risks.join(' ') : ''}${progress}`;
+    el.textContent = (G.autosaveBlocked ? '⚠ 原自动档已保护：临时局不自动保存，请打开存档管理备份/手动保存。\n' : '') + `${physical ? '全村粮食合计' : '粮食'}约 ${days.toFixed(1)} 天（不计新产出${physical ? '，含在途与待回收，逐户现货才可食用' : ''}）${variety} · ${G.isWinter() ? '寒冬中' : '距入冬 ' + untilWinter + ' 天'} · ${g.paused ? '已暂停' : '运行中'}\n${stage}${risks.length ? '\n⚠ ' + risks.join(' ') : ''}${progress}`;
   },
 
   refreshHarvest: function () {
@@ -750,6 +756,8 @@ G.ui = {
     this.renderInfo();
   },
   hideInfo: function () {
+    const supply = this.el.info.querySelector && this.el.info.querySelector('[data-supply-mode-panel]');
+    if (supply) this.resetSupplyConfirmation(supply);
     const fishing = this.el.info.querySelector && this.el.info.querySelector('[data-fishing-panel]');
     if (fishing) this.resetFishingConfirmation(fishing);
     const panel = this.el.info.querySelector && this.el.info.querySelector('[data-mineral-removal-panel]');
@@ -891,14 +899,220 @@ G.ui = {
       residents: residents.length ? `住户：${residents.map(c => `${c.name}(${Math.floor(c.age)}岁)`).join('、')}` : '住户：暂无',
     };
   },
+  supplyNumber: function (n, exact = false) {
+    return exact ? String(Number(n) || 0) : String(Number((Number(n) || 0).toFixed(2)));
+  },
+  supplyStockText: function (stock, exact = false) {
+    return G.SUPPLY.types.map(k => `${G.RES[k].name} ${this.supplyNumber(stock?.[k], exact)}`).join(' · ');
+  },
+  householdSupplyInfoData: function (b) {
+    if (!G.householdSupplySummary || !b) return null;
+    const s = G.householdSupplySummary(b), physical = s.mode === 'physical';
+    const candidates = G.supplyResidents(b).filter(c => c.adult && !c.student && !G.isSick(c));
+    return {
+      stock: `${b.type === 'supplycamp' ? '临时补给点' : '屋内'}现货：${this.supplyStockText(s.stock)}`,
+      capacity: `本地存量 ${this.supplyNumber(G.supplySum(s.stock))} / ${G.SUPPLY.homeCap}；当前 ${s.people} 人`,
+      days: physical ? `${b.houseFire ? '火情封存，目前不可食用或取暖；以下仅按存量折算。' : ''}仅本地现货：口粮 ${this.supplyNumber(s.foodDays)} 天；取暖燃料 ${this.supplyNumber(s.fuelDays)} 个冬季日（临时补给点不能代替住房取暖）。在途未到不算可用。` : '自动供给：每日仍直接使用公共粮柴；本地储备天数尚不适用。',
+      incoming: `实际在途：${this.supplyStockText(s.incoming)}`,
+      buyers: `正在采购/送回：${s.buyers.length ? s.buyers.map(c => c.name).join('、') : '无人'}；本户健康成人候选 ${candidates.length} 人（先收尾当前任务，不代表已出发）。${!candidates.length && s.people ? '无健康成人采购者，需空闲散工协助；学生和病人不采购。' : ''}`,
+      reason: s.reason,
+    };
+  },
+  householdSupplyInfoMarkup: function (b) {
+    const data = this.householdSupplyInfoData(b);
+    if (!data) return '';
+    return `<section class="economy-form" data-household-supply-panel><h3>${b.type === 'supplycamp' ? '家庭临时补给' : '家庭生活物资'}</h3>${Object.keys(data).map(k => `<p class="row" data-household-supply="${k}">${this.escHtml(data[k])}</p>`).join('')}</section>`;
+  },
+  refreshCitizenSupplyInfo: function (c) {
+    const holder = this.el.info.querySelector?.('[data-citizen-household-supply]');
+    if (!holder || !G.supplyFamilyTarget) return;
+    const target = G.supplyFamilyTarget(G.familyOf(c), false);
+    if (holder._supplyTarget !== target) { holder.innerHTML = target ? this.householdSupplyInfoMarkup(target) : ''; holder._supplyTarget = target; }
+    else if (target) this.refreshHouseholdSupplyInfo(target);
+  },
+  refreshHouseholdSupplyInfo: function (b) {
+    const panel = this.el.info.querySelector?.('[data-household-supply-panel]'), data = this.householdSupplyInfoData(b);
+    if (!panel || !data) return false;
+    for (const [k, value] of Object.entries(data)) {
+      const node = panel.querySelector(`[data-household-supply="${k}"]`);
+      if (node && node.textContent !== value) node.textContent = value;
+    }
+    return true;
+  },
+  marketSupplyInfoData: function (b) {
+    if (!G.marketSupplySummary || b.type !== 'market' || b.state !== 'ok') return null;
+    const s = G.marketSupplySummary(b), names = G.workforceWorkers(b).map(c => c.name).join('、') || '无';
+    return {
+      status: s.reason,
+      stock: `市场现货：${this.supplyStockText(s.stock)}`,
+      capacity: `已存 ${this.supplyNumber(s.stored)} / ${s.capacity} 总容量；在途另列，到货才入市场`,
+      incoming: `实际送往市场：${this.supplyStockText(s.incoming)}`,
+      workers: `当前货商 ${s.workers} / 已应用上限 ${s.target}（最多 1 人）：${names}`,
+      rule: `3×3 占地 · 服务范围 ±${s.radius} 格（方形，建筑原点）。货商最多搬 ${G.SUPPLY.vendorCarry}，家庭成人最多搬 ${G.SUPPLY.homeCarry}。近仓家庭直接采购可能更快；市场只搬现有物资，不生产食物或燃料。`,
+    };
+  },
+  marketSupplyInfoMarkup: function (b) {
+    const data = this.marketSupplyInfoData(b);
+    return data ? `<section class="economy-form" data-market-supply-panel><h3>市场实物配送</h3>${Object.keys(data).filter(k => k !== 'status').map(k => `<p class="row" data-market-supply="${k}">${this.escHtml(data[k])}</p>`).join('')}</section>` : '';
+  },
+  refreshMarketSupplyInfo: function (b) {
+    const data = this.marketSupplyInfoData(b), panel = this.el.info.querySelector?.('[data-market-supply-panel]');
+    if (!panel || !data) return false;
+    for (const [k, value] of Object.entries(data)) {
+      const node = this.el.info.querySelector(`[data-market-supply="${k}"]`);
+      if (node && node.textContent !== value) node.textContent = value;
+    }
+    const names = this.el.info.querySelector('[data-market-workers]');
+    if (names) names.textContent = G.workforceWorkers(b).map(c => c.name).join('、') || '无';
+    this.refreshSupplyModeInfo(b);
+    return true;
+  },
+  villageSupplyInfoData: function () {
+    if (!G.supplyInventory) return null;
+    const s = G.supplyInventory(), homes = Object.fromEntries(G.SUPPLY.types.map(k => [k, s.home[k] + s.camp[k]]));
+    return {
+      mode: G.supplyEnabled() ? '真实配送：各家吃自己已到货的口粮、烧本地燃料；公共库存减少也可能只是配送转移。' : '自动供给（新旧存档默认）：居民每日从公共库存食用和取暖；切换须在下方单独确认。',
+      public: `公共库存：${this.supplyStockText(s.public)}`,
+      market: `市场现货：${this.supplyStockText(s.market)}`,
+      homes: `住房与临时补给点：${this.supplyStockText(homes)}`,
+      transit: `配送在途：${this.supplyStockText(s.transit)}`,
+      cache: `散落待回收：${this.supplyStockText(s.cache)}（需空闲成人沿可达路线回收，且公共仓库有空位）`,
+      locked: `火情封存：${this.supplyStockText(s.locked)}（暂不可取；烧毁才计火灾损失）`,
+      rule: '以上分栏互不重复。转入市场、住房或随身物资不算产出；在途与散落物资尚不能让家中居民直接食用。工业与贸易仍使用公共库存。',
+    };
+  },
+  villageSupplyInfoMarkup: function () {
+    const data = this.villageSupplyInfoData();
+    return data ? `<section class="economy-form" data-village-supply-panel><h3>全村生活物资分布</h3>${Object.keys(data).map(k => `<p class="row" data-village-supply="${k}">${this.escHtml(data[k])}</p>`).join('')}</section>` : '';
+  },
+  refreshVillageSupplyInfo: function () {
+    const panel = this.el.info.querySelector?.('[data-village-supply-panel]'), data = this.villageSupplyInfoData();
+    if (!panel || !data) return;
+    for (const [k, value] of Object.entries(data)) {
+      const node = panel.querySelector(`[data-village-supply="${k}"]`);
+      if (node && node.textContent !== value) node.textContent = value;
+    }
+  },
+  supplyModeInfoData: function () {
+    if (!G.supplyModeQuote) return null;
+    const quote = G.supplyModeQuote(), enabled = G.supplyEnabled();
+    return { quote, enabled, data: {
+      mode: enabled ? '本存档已启用全村真实配送，不能切回自动供给。' : '当前全村自动供给；真实配送为一次性、不可逆的整村规则切换。',
+      rule: quote.rule || '已分配的物资不会重复领取；以后由货商与家庭采购者实际搬运。',
+      cost: enabled ? '一次性启动分配已结束，不再扣取或赠送启动物资。' : `确认后从公共库存实际扣除：${this.supplyStockText(quote.cost, true)}。这些物资逐项移入下列住处，不是赠送。`,
+      coverage: enabled ? '库存位置、在途与消耗请看实物分布和家庭详情。' : `本次实际启动口粮 ${this.supplyNumber(quote.foodDays)} 天（最多 2 天）；距两日口粮还缺 ${this.supplyNumber(quote.foodShortfall)}，冷季取暖还缺 ${this.supplyNumber(quote.fuelShortfall)} 柴火当量。${quote.foodDays < 2 ? '库存不足，不能保证两日供给。' : ''}`,
+      buyers: enabled ? '无健康成人的家庭需空闲散工协助；配送需要可达道路和真实库存。' : `无健康成人采购者 ${quote.familiesWithoutBuyer || 0} 户；完工通用仓 ${quote.readyStores || 0} 座。无采购者家庭依赖空闲散工，市场需另外安排货商。`,
+    } };
+  },
+  supplyModeInfoMarkup: function () {
+    const facts = this.supplyModeInfoData();
+    if (!facts) return '';
+    return `<section class="economy-form" data-supply-mode-panel aria-labelledby="supply-mode-title"><h3 id="supply-mode-title">全村真实配送 · 不可逆切换</h3>
+      ${Object.keys(facts.data).map(k => `<p class="row" data-supply-mode="${k}">${this.escHtml(facts.data[k])}</p>`).join('')}
+      <div data-supply-mode-actions>
+        <p class="warn-txt">此存档启用后不能切回自动供给。若想保留原局，必须先导出当前存档，并自行确认下载文件已保存。</p>
+        <button type="button" id="supply-mode-export">先导出当前存档</button>
+        <p class="desc">下列是每栋住房/无房家庭的实际启动分配；共享宿舍按整栋分配。未确认前不扣料、不创建补给点。</p>
+        <ol data-supply-mode-rows></ol>
+        <button type="button" id="supply-mode-start" aria-expanded="false">查看整村切换确认</button>
+        <div class="hidden" data-supply-mode-confirm><p>确认后公共库存按上列数量转入各住处；今后必须实际配送。此存档不能返回自动供给，也不能再次领取启动物资。</p>
+          <div class="economy-actions"><button type="button" id="supply-mode-confirm" class="danger" disabled>确认永久启用真实配送</button><button type="button" id="supply-mode-cancel">取消，保留自动供给</button></div>
+        </div>
+      </div><p class="economy-message" data-supply-mode-message role="status" aria-live="polite"></p></section>`;
+  },
+  supplyModeControlValid: function (b, context, node, allowModal = false) {
+    if (!context) return false;
+    const { world, game, el, panel, type } = context;
+    return G.world === world && G.game === game && this.el.info === el && !el.classList.contains('hidden') &&
+      G.sel?.kind === 'b' && G.sel.id === b.id && world.bmap[b.id] === b && b.type === type && ['townhall', 'market'].includes(type) && b.state === 'ok' &&
+      el.querySelector('[data-supply-mode-panel]') === panel && (!node || (!node.disabled && panel.querySelector('#' + node.id) === node)) &&
+      (allowModal || !(G.hasOpenModal && G.hasOpenModal()));
+  },
+  resetSupplyConfirmation: function (panel, message, restoreFocus = false) {
+    const box = panel.querySelector('[data-supply-mode-confirm]'), start = panel.querySelector('#supply-mode-start'), confirm = panel.querySelector('#supply-mode-confirm');
+    panel._supplyPending = null;
+    if (box) box.classList.add('hidden');
+    if (start) start.setAttribute('aria-expanded', 'false');
+    if (confirm) confirm.disabled = true;
+    if (message !== undefined) panel.querySelector('[data-supply-mode-message]').textContent = message;
+    if (restoreFocus && box?.contains(document.activeElement) && start?.focus && !start.disabled) start.focus();
+  },
+  refreshSupplyModeInfo: function (b, facts) {
+    const panel = this.el.info.querySelector?.('[data-supply-mode-panel]');
+    if (!panel || !this.supplyModeControlValid(b, panel._supplyContext, null, true)) { if (panel) this.resetSupplyConfirmation(panel); return false; }
+    facts = facts || this.supplyModeInfoData();
+    if (!facts) return false;
+    const { data, quote, enabled } = facts;
+    const actions = panel.querySelector('[data-supply-mode-actions]'), actionFocused = actions.contains(document.activeElement);
+    for (const [k, value] of Object.entries(data)) {
+      const node = panel.querySelector(`[data-supply-mode="${k}"]`);
+      if (node && node.textContent !== value) node.textContent = value;
+    }
+    const rows = quote.rows.map(row => `${row.name} #${row.id}（${row.x}, ${row.y}；${row.families.length} 户 / ${row.people} 人）：${this.supplyStockText(row.stock, true)}；实际口粮 ${this.supplyNumber(row.foodDays)} 天${row.foodDays < 2 ? '，不足两日' : ''}；冷季两日需 ${this.supplyNumber(row.fuelNeed)} 柴火当量，还缺 ${this.supplyNumber(Math.max(0, row.fuelNeed - row.stock.firewood - row.stock.coal * G.COAL_HEAT))}。`);
+    const holder = panel.querySelector('[data-supply-mode-rows]'), rowKey = JSON.stringify(rows);
+    // Only replace noninteractive quote rows when facts change, never controls.
+    if (holder._supplyRows !== rowKey) { holder._supplyRows = rowKey; holder.innerHTML = rows.map(text => `<li>${this.escHtml(text)}</li>`).join(''); }
+    const modal = G.hasOpenModal && G.hasOpenModal();
+    if (modal || enabled || (panel._supplyPending !== null && (!quote.ok || panel._supplyPending !== quote.key)))
+      this.resetSupplyConfirmation(panel, enabled ? undefined : modal ? '确认已取消，请关闭弹窗后重新预览。' : '库存、家庭、取暖策略或配送条件已变化，请核对最新分配后重新确认。', !modal);
+    actions.classList.toggle('hidden', enabled);
+    for (const id of ['start', 'export', 'cancel']) panel.querySelector('#supply-mode-' + id).disabled = enabled;
+    panel.querySelector('#supply-mode-start').setAttribute('aria-disabled', String(enabled || !quote.ok));
+    panel.querySelector('#supply-mode-confirm').disabled = enabled || !quote.ok || panel._supplyPending === null;
+    if (enabled && actionFocused) this.el.info.querySelector('#info-close')?.focus?.();
+    return true;
+  },
+  initSupplyModeInfo: function (b) {
+    const el = this.el.info, panel = el.querySelector?.('[data-supply-mode-panel]');
+    if (!panel) return;
+    const context = { world: G.world, game: G.game, el, panel, type: b.type };
+    panel._supplyContext = context;
+    this.resetSupplyConfirmation(panel, '');
+    const button = id => panel.querySelector('#supply-mode-' + id), start = button('start'), confirm = button('confirm'), cancel = button('cancel'), exportButton = button('export');
+    for (const node of [start, confirm, cancel, exportButton]) node.addEventListener('keydown', e => { if (e.repeat && (e.key === 'Enter' || e.key === ' ')) e.preventDefault(); });
+    start.addEventListener('click', e => {
+      if (e.detail > 1 || !this.supplyModeControlValid(b, context, start)) { this.resetSupplyConfirmation(panel); return; }
+      const facts = this.supplyModeInfoData(); this.refreshSupplyModeInfo(b, facts);
+      if (!facts.quote.ok) { this.resetSupplyConfirmation(panel, facts.quote.reason); return; }
+      panel._supplyPending = facts.quote.key;
+      panel.querySelector('[data-supply-mode-confirm]').classList.remove('hidden'); start.setAttribute('aria-expanded', 'true'); confirm.disabled = false;
+      panel.querySelector('[data-supply-mode-message]').textContent = '尚未切换或扣料。请核对逐户分配和不足天数；保留原局须先导出，再重新预览。';
+      confirm.focus?.();
+    });
+    cancel.addEventListener('click', () => {
+      if (!this.supplyModeControlValid(b, context, cancel)) { this.resetSupplyConfirmation(panel); return; }
+      this.resetSupplyConfirmation(panel, '已取消；模式、库存与家庭补给均未改变。'); start.focus?.();
+    });
+    exportButton.addEventListener('click', e => {
+      if (e.detail > 1 || !this.supplyModeControlValid(b, context, exportButton)) { this.resetSupplyConfirmation(panel); return; }
+      this.resetSupplyConfirmation(panel, '已取消待确认切换，导出后需要重新预览。');
+      try {
+        G.exportSaveFile();
+        panel.querySelector('[data-supply-mode-message]').textContent = '已请求浏览器下载当前存档，请自行核对文件已保存；尚未切换，需要重新预览。';
+      } catch (error) {
+        panel.querySelector('[data-supply-mode-message]').textContent = '导出未完成，未切换供给模式。请重试并核对备份文件，再重新预览。';
+      }
+    });
+    confirm.addEventListener('click', e => {
+      if (e.detail > 1 || !this.supplyModeControlValid(b, context, confirm) || panel._supplyPending === null) { this.resetSupplyConfirmation(panel); return; }
+      const expectedKey = panel._supplyPending, facts = this.supplyModeInfoData(); this.refreshSupplyModeInfo(b, facts);
+      if (!facts.quote.ok || facts.quote.key !== expectedKey || panel._supplyPending === null) return;
+      this.resetSupplyConfirmation(panel);
+      const ok = G.enableHouseholdSupply(expectedKey, context.game);
+      this.refreshSupplyModeInfo(b); this.refreshVillageSupplyInfo(); this.refreshMarketSupplyInfo(b);
+      this.resetSupplyConfirmation(panel, ok ? '已永久启用全村真实配送；启动物资已按预览从公共库存转入各住处，未新增物资。本存档不能切回自动供给。' : '条件已变化，未切换；请重新预览。');
+      if (ok) { this.refreshHUD(); el.querySelector('#info-close')?.focus?.(); } else start.focus?.();
+    });
+    this.refreshSupplyModeInfo(b);
+  },
   heatingInfoData:function(b){
     const s=G.homeHeatingSummary(b);if(!s)return null;
-    const last=s.last;
+    const last=s.last,physical=G.supplyEnabled&&G.supplyEnabled(),local=physical?G.householdSupplySummary(b).stock:null;
     return {summary:s,data:{policy:`全镇策略：${s.allowCoal?'柴火不足时允许煤补足':'仅烧柴火，不动用煤'}；取暖保留煤底线 ${s.coalReserve}`,
-      stock:`煤库存 ${s.coalStock.toFixed(2)} · 可用于取暖 ${s.coalAvailable.toFixed(2)} · 当前燃料约 ${s.fuel.toFixed(2)} 柴火当量`,
+      stock:physical?`本屋柴火 ${this.supplyNumber(local.firewood)} · 煤 ${this.supplyNumber(local.coal)}；取暖只用本地现货，公共煤 ${s.coalStock.toFixed(2)} 不能直接暖屋`:`煤库存 ${s.coalStock.toFixed(2)} · 可用于取暖 ${s.coalAvailable.toFixed(2)} · 当前燃料约 ${s.fuel.toFixed(2)} 柴火当量`,
       home:`本屋${s.occupied?'已入住':'空置不耗燃料'}，冬季每日需要 ${s.perDay.toFixed(2)} 柴火当量。${G.isWinter()&&s.occupied&&s.unheated?'当前未供暖，住户仍会受冻。':''}`,
       receipt:last?`最近结算：第 ${last.day+1} 天，实际烧柴 ${last.wood.toFixed(2)}、煤 ${last.coal.toFixed(2)} / 需求 ${last.need.toFixed(2)} 柴火当量${last.wood+last.coal*s.ratio+1e-8<last.need?'（当时燃料未足）':''}`:'暂无本屋冬季取暖结算记录；旧档不编造用量',
-      rule:'全镇先烧柴再用底线以上的煤补缺，1煤=2柴热量为本作适配。底线只约束取暖，钢工具/贸易仍能使用煤。修改仅影响下一次冬季日界扣料，不会立即暖屋；粮柴账本不包含煤耗。'}};
+      rule:(physical?'真实配送只烧本屋现货，先柴后煤；煤底线仅限制公共库存向住宅配送，屋内已配送煤依当前策略使用。':'全镇先烧柴再用底线以上的煤补缺。')+'1煤=2柴热量为本作适配。底线只约束取暖，钢工具/贸易仍能使用煤。'+(physical?'修改影响后续配送和下一次冬季日界扣料':'修改仅影响下一次冬季日界扣料')+'，不会立即暖屋；粮柴账本不包含煤耗。'}};
   },
   heatingInfoMarkup:function(b){
     const f=this.heatingInfoData(b);if(!f)return '';const s=f.summary;
@@ -1263,6 +1477,7 @@ G.ui = {
     }
     this.refreshHouseUpgradeInfo(b, upgradeFacts);
     this.refreshHeatingInfo(b);
+    this.refreshHouseholdSupplyInfo(b);
     this.refreshHomeFireInfo(b);
     return true;
   },
@@ -1367,20 +1582,21 @@ G.ui = {
       flowTodayRange: current ? `今日 · 第 ${current.day + 1} 天（${seasonDate(current.day)}） ${hour(current.fromHour)}–${hour(current.toHour)}` : '今日 · 尚无流水记录',
       flowTodayCoverage: current ? `${current.partial ? '从本日记账起点开始，首日不足全天。' : ''}今日尚未结算，未折算全天，也不纳入上方比较。` : '尚未记录的时段不能视为零产出。',
     };
+    const valueOf = (totals, metric) => !totals ? NaN : metric === 'used' ? totals.used + (totals.distributedUsed || 0) : metric === 'publicUsed' ? totals.used : metric === 'distributedLost' ? totals.distributedLost || 0 : totals[metric];
     for (const resource of ['food', 'firewood', 'meat', 'vegetables', 'grain']) {
-      for (const metric of ['produced', 'received', 'used', 'withdrawn', 'discarded', 'delta', 'opening', 'closing']) {
+      for (const metric of ['produced', 'received', 'used', 'publicUsed', 'distributedLost', 'withdrawn', 'discarded', 'delta', 'opening', 'closing']) {
         for (const period of ['recent', 'previous', 'current']) {
           const p = s && s[period], known = p && (period === 'current' || p.days > 0);
-          data[`flow-${resource}-${period}-${metric}`] = number(known && p.totals[resource] ? p.totals[resource][metric] : NaN, metric === 'delta');
+          data[`flow-${resource}-${period}-${metric}`] = number(known ? valueOf(p.totals[resource], metric) : NaN, metric === 'delta');
         }
-        data[`flow-${resource}-difference-${metric}`] = number(comparable ? s.recent.totals[resource][metric] - s.previous.totals[resource][metric] : NaN, true);
+        data[`flow-${resource}-difference-${metric}`] = number(comparable ? valueOf(s.recent.totals[resource], metric) - valueOf(s.previous.totals[resource], metric) : NaN, true);
       }
     }
     return data;
   },
   townLedgerInfoMarkup: function (data) {
     const text = key => `<span data-townhall="${key}">${this.escHtml(data[key])}</span>`;
-    const metrics = resource => [['produced', '真实产出'], ['received', '实际入库'], ['used', resource === 'firewood' ? '住宅燃烧' : '居民食用'], ['withdrawn', '出库转运'], ['discarded', '仓满弃货'], ['delta', '库存净变']];
+    const metrics = resource => [['produced', '真实产出'], ['received', '实际入库'], ['used', resource === 'firewood' ? '住宅燃烧（实际合计）' : '居民食用（实际合计）'], ['publicUsed', '其中：公共直接消耗'], ['distributedLost', '实物火灾损失'], ['withdrawn', '出库转运'], ['discarded', '仓满弃货'], ['delta', '库存净变']];
     const history = resource => `<div class="townledger-table-wrap" tabindex="0" role="region" aria-label="${G.RES[resource].name}历史流水表，可横向滚动"><table class="townledger-table">
       <caption>${G.RES[resource].name}${resource === 'food' ? '合计（三类相加）' : ''}</caption>
       <thead><tr><th scope="col">项目</th><th scope="col">近期</th><th scope="col">前期</th><th scope="col">差额</th></tr></thead>
@@ -1390,7 +1606,7 @@ G.ui = {
       </tbody></table></div>`;
     const today = resources => `<div class="townledger-table-wrap" tabindex="0" role="region" aria-label="今日已记录流水表，可横向滚动"><table class="townledger-table">
       <thead><tr><th scope="col">今日已记录</th>${resources.map(resource => `<th scope="col">${G.RES[resource].name}</th>`).join('')}</tr></thead>
-      <tbody>${[['produced', '真实产出'], ['received', '实际入库'], ['used', resources.includes('firewood') ? '居民食用 / 住宅燃烧' : '居民食用'], ['withdrawn', '出库转运'], ['discarded', '仓满弃货'], ['delta', '库存净变'], ['opening', '起点库存'], ['closing', '当前库存']].map(([metric, label]) => `<tr><th scope="row">${label}</th>${resources.map(resource => `<td>${text(`flow-${resource}-current-${metric}`)}</td>`).join('')}</tr>`).join('')}</tbody>
+      <tbody>${[['produced', '真实产出'], ['received', '实际入库'], ['used', resources.includes('firewood') ? '居民食用 / 住宅燃烧（实际合计）' : '居民食用（实际合计）'], ['publicUsed', '其中：公共直接消耗'], ['distributedLost', '实物火灾损失'], ['withdrawn', '出库转运'], ['discarded', '仓满弃货'], ['delta', '库存净变'], ['opening', '起点库存'], ['closing', '当前库存']].map(([metric, label]) => `<tr><th scope="row">${label}</th>${resources.map(resource => `<td>${text(`flow-${resource}-current-${metric}`)}</td>`).join('')}</tr>`).join('')}</tbody>
       </table></div>`;
     return `<details class="townhall-ledger townledger-flows" data-townledger-panel>
       <summary data-townhall="flowTitle">${this.escHtml(data.flowTitle)}</summary>
@@ -1410,9 +1626,9 @@ G.ui = {
       </details>
       <details data-townledger-help><summary>这些数字怎样记账？</summary>
         <p>真实产出只计实际制成或收获；实际入库只计仓库接收，包含贸易运回与酿酒退料，并非全是本地生产。</p>
-        <p>居民食用、住宅燃烧只计实际吃掉或烧掉，未满足的需求不计入；缺粮缺柴仍须结合上方库存和需求判断。</p>
-        <p>出库转运指贸易或酿酒取料，不等于已卖出或永久消耗。仓满弃货只计因仓满未保留的弃货，等待空位的保留货物不算损失。</p>
-        <p>库存净变 = 实际入库 − 居民食用（或住宅燃烧）− 出库转运 = 期末库存 − 期初库存。真实产出与仓满弃货不加入这个库存等式。</p>
+        <p>居民食用、住宅燃烧为公共直接消耗 + 各家实际消耗，只计实际吃掉或烧掉，未满足的需求不计入；配送转移不算食用。实物火灾损失另列，未烧毁的封存物资不算损失；本账本不包含煤耗。</p>
+        <p>出库转运指贸易、酿酒取料或生活物资实际离开公共库存；转入市场、住房与携货不算生产，不等于已卖出或永久消耗。仓满弃货只计因仓满未保留的弃货，等待空位的保留货物不算损失。</p>
+        <p>公共库存净变 = 实际入库 − 公共直接消耗 − 出库转运 = 期末公共库存 − 期初公共库存。各家已配送物资的消耗和实物火灾损失不再重复扣公共库存。真实产出与仓满弃货不加入这个库存等式。</p>
         <p>产出减入库不等于携带中的货物。数值为游戏物资单位，最多显示两位小数，非零微量显示 &lt;0.01；差额先按原始数值相减再显示。窗口为本作的 12 天，留存为 48 天。</p>
       </details>
     </details>`;
@@ -1426,7 +1642,7 @@ G.ui = {
   },
   townHallInfoData: function (b) {
     if (b.type !== 'townhall' || b.state !== 'ok' || !G.townHallSummary) return null;
-    const s = G.townHallSummary(b), g = G.game, heat = this.heatDemand();
+    const s = G.townHallSummary(b), g = G.game, heat = this.heatDemand(), physical = G.supplyEnabled && G.supplyEnabled();
     const days = n => Number.isFinite(n) ? `${Math.max(0, n).toFixed(1)} 天` : n === Infinity ? '暂无消耗' : '暂无记录';
     const rows = (g.hist || []).filter(row => Number.isFinite(row.d) && row.d <= g.day && row.d > g.day - 60).slice(-60);
     const born = rows.reduce((n, row) => n + (Number(row.born) || 0), 0);
@@ -1438,8 +1654,8 @@ G.ui = {
       education: `已受教育 ${s.educated} 人 / 全镇 ${s.population} 人`,
       health: `平均健康 ${Number(s.averageHealth || 0).toFixed(1)} / 5 · 患病 ${s.sick} 人`,
       medical: `已任职健康医师 ${s.doctors} · 草药 ${Math.floor(s.herbs || 0)}；治疗仍需医师到岗、可达通路及接诊名额。`,
-      food: `食物 ${Math.floor(g.res.food)} · 现有人口约够 ${days(s.foodDays)}（不计新产出）`,
-      fuel: `柴火 ${Math.floor(g.res.firewood)} · ${this.heatDemandText(heat)}`,
+      food: physical ? `公共食物 ${Math.floor(g.res.food)}；全村食物 ${this.supplyNumber(G.supplyFood(G.supplyInventory().available))}（含在途和待回收，不含火情封存）。各家能吃几天请看家庭现货。` : `食物 ${Math.floor(g.res.food)} · 现有人口约够 ${days(s.foodDays)}（不计新产出）`,
+      fuel: `${physical ? '公共' : ''}柴火 ${Math.floor(g.res.firewood)} · ${this.heatDemandText(heat)}${physical ? '；住房只烧本地现货。' : ''}`,
       tools: `工具 ${Math.floor(G.toolStock())} 件 · 当前成人约可用 ${days(G.toolDaysLeft(s.adults))}（不计新产出）`,
       arriving: `迁入途中 ${s.arriving} 人；从地图边界步行到市政厅报到后再参加工作。`,
       schedule: s.offer ? `本批申请至第 ${s.offer.expiresDay} 天；等待你的接纳或婉拒。`
@@ -1457,7 +1673,7 @@ G.ui = {
       data.offerPeople = `申请迁入 ${s.offerPeople} 人 / ${s.offerFamilies} 户：成人 ${s.offerAdults} · 儿童 ${s.offerChildren}；全部未受教育。`;
       data.offerFamilies = offer.families.map((f, i) => `家庭 ${i + 1}：父亲 ${f.fatherAge} 岁、母亲 ${f.motherAge} 岁${f.childAges.length ? '；孩子 ' + f.childAges.map(age => `${age} 岁`).join('、') : '；无随行儿童'}`).join('\n');
       data.offerHousing = `住房：新来 ${s.offerFamilies} 户 + 现有无房 ${s.homelessFamilies} 户，共需 ${needed} 个家庭名额；空屋 ${s.freeHomes} + 宿舍空位 ${s.boardingSlots} = ${free}。${free < needed ? `还缺 ${needed - free} 户住处，可能露宿。` : '名额足够，入住仍需可达。'}`;
-      data.offerFood = `食物：新增约 ${Number(s.addedFoodPerDay).toFixed(1)} / 天；库存覆盖由 ${days(s.foodDays)} → ${days(s.foodDaysAfter)}，未计新增生产。`;
+      data.offerFood = `${physical ? '公共食物参考（不含已配送物资，不能保证逐户到货）：' : '食物：'}新增约 ${Number(s.addedFoodPerDay).toFixed(1)} / 天；库存覆盖由 ${days(s.foodDays)} → ${days(s.foodDaysAfter)}，未计新增生产。`;
       data.offerFuel = `取暖：若每户新家庭住木屋，整冬估计新增 ${Math.ceil(s.addedFuelPerWinter)} 柴火；现有柴火 ${Math.floor(g.res.firewood)}。石屋、宿舍与实际入住情况会改变需求。`;
       data.offerMedical = `医疗：已任职健康医师 ${s.doctors} 人 · 草药 ${Math.floor(s.herbs || 0)}。${s.doctors ? '治疗仍需医师到岗、可达诊所及接诊名额。' : '目前没有医师，可自然康复，也可另配医师治疗。'}${offer.sickCount ? ` 本批有 ${offer.sickCount} 人患季节热病：会拖慢劳动，有近距传播风险，本批疾病不会直接致死。` : ' 本批未发现热病。'}`;
     }
@@ -1467,6 +1683,7 @@ G.ui = {
     const data = facts.data;
     return `<section class="townhall-details" data-townhall-panel>
       ${['population', 'housing', 'education', 'health', 'medical', 'food', 'fuel', 'tools', 'arriving', 'schedule', 'decisions'].map(key => `<p class="row" data-townhall="${key}">${this.escHtml(data[key])}</p>`).join('')}
+      ${this.villageSupplyInfoMarkup()}${this.supplyModeInfoMarkup()}
       ${this.fireActionMarkup('fire-rules', this.fireRulesInfoData(b))}${this.fishingInfoMarkup(b)}
       <div data-townhall-offer></div>
       <p class="economy-message" data-townhall-message role="status" aria-live="polite"></p>
@@ -1495,6 +1712,8 @@ G.ui = {
     }
     this.refreshFireAction(b, 'fire-rules');
     this.refreshFishingInfo(b);
+    this.refreshSupplyModeInfo(b);
+    this.refreshVillageSupplyInfo();
     const holder = el.querySelector('[data-townhall-offer]'), offerId = s.offer ? s.offer.id : null;
     // Leave active controls intact on timed refreshes. Only a genuinely different
     // offer gets new controls, whose handlers capture that offer's immutable ID.
@@ -2305,6 +2524,8 @@ G.ui = {
       const panel = el.querySelector && el.querySelector(`[data-${kind}-panel]`);
       if (panel && (!sameSelection || !this.fireActionValid(selected, panel._fireContext, null, true))) this.resetFireAction(panel);
     }
+    const supplyPanel = el.querySelector?.('[data-supply-mode-panel]');
+    if (supplyPanel && (!sameSelection || !this.supplyModeControlValid(selected, supplyPanel._supplyContext, null, true))) this.resetSupplyConfirmation(supplyPanel);
     const fishingPanel = el.querySelector?.('[data-fishing-panel]');
     if (fishingPanel && (!sameSelection || !this.fishingControlValid(selected, fishingPanel._fishingContext, null, true))) this.resetFishingConfirmation(fishingPanel);
     const homeFire = G.sel.kind === 'b' ? this.homeFireInfoData(selected) : null;
@@ -2322,6 +2543,7 @@ G.ui = {
     if (merchantChanged) force = true;
     // Workforce facts must update before every specialized panel's early return.
     if (sameSelection && G.sel.kind === 'b' && this._infoBuildState === selected.state) this.refreshWorkforceInfo(selected);
+    if (!force && sameSelection && selected.type === 'market' && this._infoBuildState === selected.state && this.refreshMarketSupplyInfo(selected)) return;
     if (!force && sameSelection && G.sel.kind === 'b' && this._infoBuildState === selected.state && this._infoBuildType === selected.type && this.refreshHomeInfo(selected)) return;
     // Update only fuel text, never replace this panel's focused buttons. A new
     // selection or a site finishing construction still gets its own full panel.
@@ -2340,7 +2562,7 @@ G.ui = {
     if (sameSelection && selected.type === 'woodcutter' && this._fuelInfoState === selected.state && this.refreshFuelInfo(selected)) return;
     if (hadFocus && !force && sameSelection && selected.type !== 'woodcutter' &&
         !(selected.type === 'farm' && selected.state === 'ok' && G.farmSummary) && (G.sel.kind === 'c' || (this._infoBuildState === selected.state && this._infoBuildType === selected.type))) {
-      if (G.sel.kind === 'c') { this.refreshCitizenLeisure(selected); this.refreshCitizenClothing(selected); this.refreshStudentInfo(selected); }
+      if (G.sel.kind === 'c') { this.refreshCitizenSupplyInfo(selected); this.refreshCitizenLeisure(selected); this.refreshCitizenClothing(selected); this.refreshStudentInfo(selected); }
       // Patch changing site facts in place without stealing keyboard focus.
       if (G.sel.kind === 'b' && selected.state === 'site') {
         const data = this.siteInfoData(selected);
@@ -2371,7 +2593,7 @@ G.ui = {
       const siteData = b.state === 'site' ? this.siteInfoData(b) : null;
       const medicalData = this.medicalInfoData(b);
       const chainData = this.resourceChainInfoData(b);
-      const hallData = this.townHallInfoData(b);
+      const hallData = this.townHallInfoData(b), marketData = this.marketSupplyInfoData(b);
       const tavernData = this.tavernInfoData(b);
       const tailorData = this.tailorInfoData(b);
       const farmData = this.farmInfoData(b);
@@ -2393,6 +2615,7 @@ G.ui = {
       else if (medicalData) status = medicalData.status;
       else if (chainData) status = chainData.status;
       else if (hallData) status = hallData.data.status;
+      else if (marketData) status = marketData.status;
       else if (tavernData) status = tavernData.data.status;
       else if (tailorData) status = tailorData.data.status;
       else if (farmData) status = farmData.data.status;
@@ -2410,12 +2633,12 @@ G.ui = {
       let workers = '';
       if ((def.jobs > 0 || b.state === 'site') && !schoolData) {
         const names = b.workers.map(id => w.cmap[id]).filter(Boolean).map(c => this.escHtml(c.name)).join('、');
-        workers = `<div class="row">${medicalData ? b.type === 'hospital' ? '医师' : '采药员' : tavernData ? '酿酒工（需 18 岁以上且健康）' : '工人'}：<span${b.type === 'dock' && b.state === 'ok' ? ' data-fishing-workers' : ''}${siteData ? ' data-site-workers' : ''}${fuelData ? ' data-fuel="workers"' : ''}${medicalData ? ' data-medical="workers"' : ''}${chainData ? ' data-resource-chain-live="workers"' : ''}${tavernData ? ' data-tavern="workers"' : ''}${tailorData ? ' data-tailor="workers"' : ''}${farmData ? ' data-farm="workers"' : ''}${b.state === 'ok' && ['tradingpost', 'pasture', 'orchard'].includes(b.type) ? ' data-economy-workers' : ''}>${names || (b.state === 'site' ? '等待建筑工人' : '无')}</span></div>`;
+        workers = `<div class="row">${medicalData ? b.type === 'hospital' ? '医师' : '采药员' : tavernData ? '酿酒工（需 18 岁以上且健康）' : '工人'}：<span${b.type === 'dock' && b.state === 'ok' ? ' data-fishing-workers' : ''}${marketData ? ' data-market-workers' : ''}${siteData ? ' data-site-workers' : ''}${fuelData ? ' data-fuel="workers"' : ''}${medicalData ? ' data-medical="workers"' : ''}${chainData ? ' data-resource-chain-live="workers"' : ''}${tavernData ? ' data-tavern="workers"' : ''}${tailorData ? ' data-tailor="workers"' : ''}${farmData ? ' data-farm="workers"' : ''}${b.state === 'ok' && ['tradingpost', 'pasture', 'orchard'].includes(b.type) ? ' data-economy-workers' : ''}>${names || (b.state === 'site' ? '等待建筑工人' : '无')}</span></div>`;
       }
       let extra = '';
       if (pit) extra = `<div class="row" data-mineral-pit-source>原址：${this.escHtml(G.BDEF[mineral?.source]?.name || '矿点')} · 永久占地 3×3；没有岗位和产出。</div><div class="row desc" data-mineral-pit-reserve>拆除时丢弃的剩余矿藏：${Number(mineral?.remaining) || 0} 储量单位，永久不可恢复。</div>`;
       if (homeData) extra = `<div class="row" data-home-residents>${this.escHtml(homeData.residents)}</div>`;
-      if(homeData)extra+=this.heatingInfoMarkup(b);
+      if(homeData)extra+=this.heatingInfoMarkup(b) + this.householdSupplyInfoMarkup(b);
       if (upgradeData) extra += this.houseUpgradeInfoMarkup(upgradeData);
       if (fireData) extra += this.homeFireInfoMarkup(fireData);
       if (rebuildData) extra += this.fireActionMarkup('fire-rebuild', rebuildData);
@@ -2446,6 +2669,7 @@ G.ui = {
       }
       if (chainData) extra += this.resourceChainInfoMarkup(b, chainData);
       if (hallData) extra += this.townHallInfoMarkup(b, hallData);
+      if (marketData) extra += this.marketSupplyInfoMarkup(b) + this.supplyModeInfoMarkup();
       if (b.type === 'dock' && b.state === 'ok') extra += this.fishingInfoMarkup(b);
       if (tavernData) extra += this.tavernInfoMarkup(tavernData);
       if (tailorData) extra += this.tailorInfoMarkup(tailorData);
@@ -2471,7 +2695,7 @@ G.ui = {
       }
       el.innerHTML = `
         <div class="info-head"><span>${def.icon} ${def.name}</span><button id="info-close">✕</button></div>
-        <div class="row"${b.type === 'dock' && b.state === 'ok' ? ' data-fishing-status' : ''}${siteData ? ' data-site-status' : ''}${homeData ? ' data-home-status' : ''}${fuelData ? ' data-fuel="status"' : ''}${medicalData ? ' data-medical="status"' : ''}${chainData ? ' data-resource-chain-live="status"' : ''}${hallData ? ' data-townhall="status"' : ''}${tavernData ? ' data-tavern="status"' : ''}${tailorData ? ' data-tailor="status"' : ''}${farmData ? ' data-farm="status"' : ''}${cemeteryData?' data-cemetery="status"':''}${schoolData?' data-school="status"':''}${b.state === 'ok' && ['tradingpost', 'pasture', 'orchard'].includes(b.type) ? ' data-economy-status' : ''}>${this.escHtml(status)}</div>
+        <div class="row"${b.type === 'dock' && b.state === 'ok' ? ' data-fishing-status' : ''}${siteData ? ' data-site-status' : ''}${homeData ? ' data-home-status' : ''}${fuelData ? ' data-fuel="status"' : ''}${medicalData ? ' data-medical="status"' : ''}${chainData ? ' data-resource-chain-live="status"' : ''}${hallData ? ' data-townhall="status"' : ''}${marketData ? ' data-market-supply="status"' : ''}${tavernData ? ' data-tavern="status"' : ''}${tailorData ? ' data-tailor="status"' : ''}${farmData ? ' data-farm="status"' : ''}${cemeteryData?' data-cemetery="status"':''}${schoolData?' data-school="status"':''}${b.state === 'ok' && ['tradingpost', 'pasture', 'orchard'].includes(b.type) ? ' data-economy-status' : ''}>${this.escHtml(status)}</div>
         ${workers}${this.workforceInfoMarkup(b, workforceData)}${extra}
         <div class="row desc">${def.desc}</div>
         ${pit ? '' : `<div class="row desc" data-info-refund${fuelData ? ' data-fuel="refund"' : ''}>${ruin ? '清理烧毁废墟退还 0 材料；不能回收原屋材料。' : fireData?.summary.active ? '火灾进行中，暂不能拆除；关闭新增火灾也不会停止当前损伤。' : fuelData ? fuelData.refund : siteData ? siteData.refund : '已开工：拆除退还一半已付建材，已砍树不恢复'}</div>
@@ -2491,6 +2715,7 @@ G.ui = {
       const workforceField = el.querySelector && el.querySelector('#worker-limit-input');
       if (workforceField && workforceDraft !== null) workforceField.value = workforceDraft;
       if (hallData || (b.type === 'dock' && b.state === 'ok')) this.initFishingInfo(b);
+      if (hallData || marketData) this.initSupplyModeInfo(b);
       if (hallData) { this.initFireAction(b, 'fire-rules'); this.refreshTownHallInfo(b); }
       if (rebuildData) this.initFireAction(b, 'fire-rebuild');
       if (tavernData) this.initTavernInfo(b);
@@ -2516,19 +2741,22 @@ G.ui = {
       const status = this.citizenStatus(c);
       const jobB = c.job != null ? w.bmap[c.job] : null;
       const jobName = jobB ? G.BDEF[jobB.type].name : (c.student ? '学堂学生' : (c.adult ? '无业' : '儿童'));
-      const fam = G.familyOf(c);
+      const fam = G.familyOf(c), supplyHome = G.supplyFamilyTarget && G.supplyFamilyTarget(fam, false);
       el.innerHTML = `
         <div class="info-head"><span>🧑 ${this.escHtml(c.name)}</span><button id="info-close">✕</button></div>
         <div class="row" data-citizen-role>${c.sex === 'm' ? '男' : '女'} · ${Math.floor(c.age)} 岁 · ${c.student ? '学生' : c.adult ? '成人' : '儿童'}</div>
         <div class="row">职业：<span data-citizen-job>${jobName}</span> · <span data-citizen-status>${this.escHtml(status)}</span></div>
         ${c.carry ? `<div class="row">随身：${this.cargoText(c.carry)}（${c.carry.smithInput?'铁匠原料已出库、尚未消耗':'未入库'}）</div>` : ''}
         <div class="row">家庭：${fam ? (fam.houseId != null ? '有房' : '无房') : '单身'}</div>
+        <div data-citizen-household-supply>${supplyHome ? this.householdSupplyInfoMarkup(supplyHome) : ''}</div>
         ${this.studentInfoMarkup(c)}
         <div class="row">饥饿 ${'▕'.repeat(Math.min(4, c.hunger)) || '无'} · 受冻 ${c.cold > 1 ? '是' : '无'}</div>
         ${this.citizenClothingMarkup(c)}
         ${Number.isFinite(c.dietVariety) ? `<div class="row">最近饮食：${Math.max(0, Math.min(3, c.dietVariety))} / 3 类${Number.isFinite(c.dietScore) ? ' · 长期均衡 ' + c.dietScore.toFixed(1) + '/3' : ''}</div>` : ''}
         ${this.citizenHealthMarkup(c)}
         ${this.citizenLeisureMarkup(c)}`;
+      const supplyHolder = el.querySelector?.('[data-citizen-household-supply]');
+      if (supplyHolder) supplyHolder._supplyTarget = supplyHome;
       this.initStudentInfo(c);
     }
     document.getElementById('info-close').addEventListener('click', () => this.hideInfo());
@@ -3057,6 +3285,8 @@ G.ui = {
   enterDialog: function (id) {
     const el = document.getElementById(id);
     if (!el) return;
+    const supplyPanel = this.el.info && this.el.info.querySelector?.('[data-supply-mode-panel]');
+    if (supplyPanel) this.resetSupplyConfirmation(supplyPanel, '确认已取消，请关闭弹窗后重新预览。');
     const mineralPanel = this.el.info && this.el.info.querySelector && this.el.info.querySelector('[data-mineral-removal-panel]');
     if (mineralPanel) this.resetMineralRemoval(mineralPanel, '拆除确认已取消，请关闭弹窗后重新查看。');
     this._dialogFocus = this._dialogFocus || {};
@@ -3358,7 +3588,7 @@ G.placementInfo = function (type, x, y) {
   const w = G.world, def = G.BDEF[type], p = G.PROD[type] || {};
   const check = G.canPlace(w, type, x, y);
   const affordable = Object.keys(def.cost).every(k => G.game.res[k] >= def.cost[k]);
-  const result = { ok: check.ok && affordable, affordable, radius: p.radius || p.waterR || 0, warning: false };
+  const result = { ok: check.ok && affordable, affordable, radius: type === 'market' ? G.SUPPLY.marketRadius : p.radius || p.waterR || 0, warning: false };
   result.bounds = [Math.max(0,x-result.radius), Math.max(0,y-result.radius), Math.min(w.N,x+result.radius+1), Math.min(w.N,y+result.radius+1)];
   const lines = [`${def.name} · ${!check.ok ? '不能建：' + check.reason : !affordable ? '材料不足' : '可建造'}`];
   lines.push('材料（现有/需要）：' + (Object.keys(def.cost).map(k => `${G.RES[k].name} ${Math.floor(G.game.res[k])}/${def.cost[k]}`).join(' · ') || '无需建材，仍需施工'));
@@ -3384,12 +3614,13 @@ G.placementInfo = function (type, x, y) {
     lines.push('这是单批估计，不是年度或入库保证；教育影响工时，真实行走、劳动、送仓仍须完成。');
     if ((fish.rule === 'shared' ? fish.effective : fish.raw) < p.fullWater) { result.warning = true; lines.push(fish.catch === 0 ? '⚠ 无可捕鱼水域，无法接新捕鱼批次' : '△ 有效水域不足满产参考，单次渔获较低'); }
   }
+  if(type==='market')lines.push(`占地 3×3 · 服务范围 ±${G.SUPPLY.marketRadius} 格（方形，建筑原点） · 最多 1 名货商；货商搬 ${G.SUPPLY.vendorCarry}，家庭成人搬 ${G.SUPPLY.homeCarry}。近仓直接采购可能更快；市场只转运，不生产粮柴，自动供给模式下需先确认整村切换。`);
   if(type==='stockpile')lines.push('完工后：仅木/石/铁/煤/柴各增加250公共仓容，零常驻工人；不是独立地方库存。');
   if (check.ok) {
     const outputs=G.productionOutputsOf({type});
     const route = G.storageRoute(x,y,outputs.length?outputs:null);
     if (route) lines.push(`当前地形可达仓：约 ${route.path.length} 步；道路更快，完工后须保留出入口。`);
-    else { result.warning = true; lines.push('⚠ 当前找不到可达仓库，产物无法正常入库'); }
+    else { result.warning = true; lines.push(type === 'market' ? '⚠ 当前找不到可达仓库，货商无法从公共库存补货' : '⚠ 当前找不到可达仓库，产物无法正常入库'); }
   } else lines.push('物流：地块合法后显示可达仓；近仓且通路畅通，搬运更快。');
   let clearing = 0;
   for (let yy = Math.max(0,y); yy < Math.min(w.N,y+def.h); yy++) for (let xx = Math.max(0,x); xx < Math.min(w.N,x+def.w); xx++) if (w.treeIdx[yy*w.N+xx] >= 0) clearing++;

@@ -1,0 +1,11 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('fs'),path=require('path'),vm=require('vm');
+const root=path.resolve(__dirname,'..'),ctx={console,document:{},addEventListener(){}};ctx.window=ctx;vm.createContext(ctx);for(const n of ['core','defs','map','sim','fire','supply','sprites','render'])vm.runInContext(fs.readFileSync(path.join(root,'js',n+'.js'),'utf8'),ctx);
+const G=ctx.G;G.game=G.newGameState();G.world={N:32,bgrid:new Int32Array(1024).fill(-1),bmap:{},families:[],citizens:[],cmap:{}};
+const png=fs.readFileSync(path.join(root,'assets/buildings/market.png'));assert.equal(png.readUInt32BE(16),448);assert.equal(png.readUInt32BE(20),320);assert.equal(png[25],6);
+let draws=[];const canvas={save(){},restore(){},beginPath(){},closePath(){},moveTo(){},lineTo(){},fill(){},fillRect(){},ellipse(){},arc(){},stroke(){}};G.sprDraw=(c,key,x,y,opt={})=>(draws.push({key,x,y,...opt}),[opt.w||18,128]);
+const b={id:1,type:'market',x:10,y:10,w:3,h:3,state:'ok',workers:[]};G.world.bmap[1]=b;G.drawBuilding(canvas,b,0);let last=draws.at(-1);assert.equal(last.key,'market');assert.equal(last.w,224);assert.equal(last.y,G.T2S(13,13)[1]+1.5);
+b.state='site';G.drawBuilding(canvas,b,0);assert.equal(draws.at(-1).key,'site_3x3');b.state='ok';
+const c={id:2,age:30,adult:true,x:9,y:10,state:'work',animT:0,hunger:0,cold:0,carry:{type:'grain',qty:5,supplyBatch:{kind:'vendor',to:1}}};c.task={kind:'supply',phase:'deliver',to:b};G.world.cmap[2]=c;G.world.citizens=[c];draws=[];G.drawCitizen(canvas,c,0);assert(draws.some(d=>d.key==='adult_carry_idle'));assert(!draws.some(d=>d.key==='adult_work_0'));
+draws=[];G.drawSupplyPile(canvas,{x:5,y:5,supplyStock:{grain:2,firewood:1}});assert(draws.some(d=>d.key==='carry_grain'));assert(draws.some(d=>d.key==='carry_firewood'));draws=[];G.drawSupplyPile(canvas,{x:5,y:5,supplyStock:G.emptySupplyStock()});assert.equal(draws.length,0);
+console.log('Market/render: 50% 3x3 anchor, construction art, grocery carrier without axe, nonempty actual supply pile passed');

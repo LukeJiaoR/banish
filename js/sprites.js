@@ -47,7 +47,7 @@ G.SPRITE_SIZES = {
       'rock_a', 'rock_b', 'rock_a_snow', 'rock_b_snow',
       'crop_stage0', 'crop_stage1', 'crop_stage2', 'crop_ripe', 'crop_dead', 'cabbage_stage0', 'cabbage_stage1', 'cabbage_stage2', 'cabbage_ripe', 'bean_stage0', 'bean_stage1', 'bean_stage2', 'bean_ripe', 'sheep', 'cattle', 'orchard_leafy', 'grave'],
     bridges: ['bridge_x', 'bridge_y'],
-    buildings: ['house', 'stonehouse', 'well', 'burntruins', 'boarding', 'storage', 'stockpile', 'mine', 'stonequarry', 'mineralpit', 'gatherer',
+    buildings: ['house', 'stonehouse', 'well', 'burntruins', 'boarding', 'storage', 'market', 'stockpile', 'mine', 'stonequarry', 'mineralpit', 'gatherer',
       'forester', 'woodcutter', 'dock', 'school', 'townhall', 'blacksmith', 'hunting',
       'tailor', 'tavern', 'tradingpost', 'pasture', 'orchard', 'herbalist', 'hospital', 'site_2x2', 'site_3x3'],
     citizens: ['adult_walk_0', 'adult_walk_1', 'adult_walk_2', 'adult_walk_3',
