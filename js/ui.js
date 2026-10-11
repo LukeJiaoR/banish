@@ -25,6 +25,8 @@ G.ui = {
     const b = c.job != null ? G.world.bmap[c.job] : null;
     if (G.isArriving ? G.isArriving(c) : c.arrivalHallId != null) return '迁入途中：先步行到市政厅报到';
     if (c.task && c.task.kind === 'care' && G.medicalStatus) return G.medicalStatus(c);
+    if(c.student&&G.studentSummary)return G.studentSummary(c).status;
+    if(c.task?.kind==='teach')return c.state==='walk'?'教师步行到校':G.inSchool(c)?'教师已到校，实际授课':'教师尚未到校';
     if (c.task && c.task.kind === 'leisure' && c.state !== 'rest' && c.walkKind !== 'home') {
       if (c.state === 'walk') return '前往酒馆休闲（18 岁以上）';
       if (G.tavernStaff && !G.tavernStaff(c.task.b)) return '等待健康酿酒工到岗（最多等待 4 小时）';
@@ -865,6 +867,68 @@ G.ui = {
     });
     this.refreshTavernInfo(b);
   },
+  schoolInfoData: function(b){
+    if(b.type!=='school'||b.state!=='ok'||!G.schoolSummary)return null;
+    const v=G.schoolSummary(b);
+    return {status:v.status,staff:`分配教师 ${v.staffAssigned} 人 · ${v.teacherNames.join('、')||'无'}；实际在场：${v.teacherPresent?'是':'否'}`,
+      seats:`学生 ${v.enrolled}/${v.capacity} · 实际到校 ${v.onSite} 人`,
+      rule:`10岁入学，至少${G.EDUCATION.graduateAge}岁且修满${G.EDUCATION.totalHours}小时才毕业；每日最多${G.EDUCATION.dailyHours}小时。老师和学生均实际到校才记课，通勤不计。`,
+      students:v.students.map(c=>`${c.name}（${Math.floor(c.age)}岁） ${c.hours.toFixed(1)}/${G.EDUCATION.totalHours}h · 今日${c.today.toFixed(1)}h · ${c.status}`).join('；')||'暂无在读学生',
+      recovery:'教师离职或学堂拆除：优先转入可达且有教师、空座的学校；无处可去就保留学籍和课时，恢复后继续。教室只挡风，不代替住宅柴火取暖。'};
+  },
+  schoolInfoMarkup:function(b){const d=this.schoolInfoData(b);return d?`<section class="school-details" data-school-panel>${Object.keys(d).filter(k=>k!=='status').map(k=>`<p class="row" data-school="${k}">${this.escHtml(d[k])}</p>`).join('')}<div data-school-student-list></div></section>`:'';},
+  refreshSchoolInfo:function(b){
+    const el=this.el.info,d=this.schoolInfoData(b);if(!d||!el.querySelector||!el.querySelector('[data-school-panel]'))return false;
+    for(const key of Object.keys(d)){const node=el.querySelector(`[data-school="${key}"]`);if(!node)return false;if(node.textContent!==d[key])node.textContent=d[key];}this.refreshSchoolStudents(b);return true;
+  },
+  refreshSchoolStudents:function(b){
+    const el=this.el.info,list=el.querySelector&&el.querySelector('[data-school-student-list]');if(!list)return;
+    const w=G.world,g=G.game,teachers=G.schoolTeachers(b),students=[...teachers,...w.citizens.filter(c=>!c.dead&&c.student&&(c.school===b.id||c.school==null))];
+    const key=JSON.stringify(students.map(c=>[c.id,c.name,c.school,c.job,c.student]));if(list._studentKey===key)return;
+    const focused=list.contains&&list.contains(document.activeElement),focusedId=focused?document.activeElement.dataset.studentId:null;
+    list.innerHTML=students.map(c=>`<button type="button" class="medical-patient" data-student-id="${c.id}">查看${teachers.includes(c)?'教师 ':''}${this.escHtml(c.name)}${c.student&&c.school==null?'（待转校）':''}</button>`).join('');list._studentKey=key;
+    for(const button of list.querySelectorAll('[data-student-id]'))button.addEventListener('click',()=>{
+      if(G.world!==w||G.game!==g||this.el.info!==el||el.classList.contains('hidden')||G.sel?.kind!=='b'||G.sel.id!==b.id||w.bmap[b.id]!==b||el.querySelector('[data-school-student-list]')!==list||(G.hasOpenModal&&G.hasOpenModal()))return;
+      const c=w.cmap[Number(button.dataset.studentId)];if(!c||c.dead||!(G.schoolTeachers(b).includes(c)||(c.student&&(c.school===b.id||c.school==null))))return;G.sel={kind:'c',id:c.id};this.showInfo();
+    });
+    if(focused){const next=list.querySelector(`[data-student-id="${focusedId}"]`)||el.querySelector('#info-close');if(next&&next.focus)next.focus();}
+  },
+  studentInfoData:function(c){
+    if(!G.studentSummary)return null;const d=G.studentSummary(c);
+    return {knowledge:`学识：${c.student?'就读中':c.educated?'受过教育':'未受教育'}`,
+      status:d.status,school:`学校：${c.student?d.schoolName:'不在读'}`,
+      progress:`课程 ${d.hours.toFixed(1)}/${d.total} 小时（${Math.floor(d.progress*100)}%） · 今日 ${d.today.toFixed(1)}/${d.limit} 小时`,
+      graduation:`毕业需要年龄至少${d.graduateAge}岁且课时达标，两者缺一不可。近校正常就读通常17岁毕业，远路、疾病或停课会延后。`,
+      recovery:'失师或无可达空座不会自动永久退学，已有课时保留。旧档在读按已有年龄进度折算，已毕业和已工作的居民不倒退。'};
+  },
+  studentInfoMarkup:function(c){
+    const d=this.studentInfoData(c);if(!d)return '';
+    return `<section class="student-details" data-student-panel>${Object.keys(d).map(k=>`<p class="row" data-student="${k}">${this.escHtml(d[k])}</p>`).join('')}
+      <button id="school-leave-start" class="danger${G.studentSummary(c).canLeave?'':' hidden'}">结束学业并工作</button>
+      <div class="school-leave-confirm hidden" data-school-leave-confirm><p>永久退学：将作为未受教育工人，不会获得毕业生产加成，也不能重新入学。确定结束学业？</p><button id="school-leave-confirm" class="danger">确认永久退学</button><button id="school-leave-cancel">继续就读</button></div>
+      <p data-school-leave-message role="status" aria-live="polite"></p></section>`;
+  },
+  refreshStudentInfo:function(c){
+    const el=this.el.info,d=this.studentInfoData(c);if(!d||!el.querySelector)return;
+    const panel=el.querySelector('[data-student-panel]');if(!panel)return;
+    for(const key of Object.keys(d)){const node=el.querySelector(`[data-student="${key}"]`);if(node&&node.textContent!==d[key])node.textContent=d[key];}
+    const canLeave=G.studentSummary(c).canLeave,start=el.querySelector('#school-leave-start'),confirm=el.querySelector('[data-school-leave-confirm]');
+    if(start){start.disabled=!canLeave;start.classList.toggle('hidden',!canLeave);}
+    if(!canLeave||(G.hasOpenModal&&G.hasOpenModal())){panel._leavePending=false;if(confirm)confirm.classList.add('hidden');}
+    const status=el.querySelector('[data-citizen-status]');if(status)status.textContent=this.citizenStatus(c);
+    const role=el.querySelector('[data-citizen-role]');if(role)role.textContent=`${c.sex==='m'?'男':'女'} · ${Math.floor(c.age)} 岁 · ${c.student?'学生':c.adult?'成人':'儿童'}`;
+    const job=el.querySelector('[data-citizen-job]'),b=G.world.bmap[c.job];if(job)job.textContent=b?G.BDEF[b.type].name:c.student?'学堂学生':c.adult?'无业':'儿童';
+  },
+  initStudentInfo:function(c){
+    const w=G.world,g=G.game,el=this.el.info,panel=el.querySelector&&el.querySelector('[data-student-panel]');if(!panel)return;
+    const start=panel.querySelector('#school-leave-start'),confirm=panel.querySelector('#school-leave-confirm'),cancel=panel.querySelector('#school-leave-cancel'),box=panel.querySelector('[data-school-leave-confirm]'),message=panel.querySelector('[data-school-leave-message]');
+    if(!start||!confirm||!cancel||!box)return;panel._leavePending=false;
+    const reset=()=>{panel._leavePending=false;box.classList.add('hidden');};
+    const valid=()=>G.world===w&&G.game===g&&this.el.info===el&&!el.classList.contains('hidden')&&G.sel?.kind==='c'&&G.sel.id===c.id&&w.cmap[c.id]===c&&el.querySelector('[data-student-panel]')===panel&&!(G.hasOpenModal&&G.hasOpenModal());
+    start.addEventListener('click',()=>{if(!valid()||!G.studentSummary(c).canLeave){reset();return;}panel._leavePending=true;box.classList.remove('hidden');if(confirm.focus)confirm.focus();});
+    cancel.addEventListener('click',()=>{if(!valid()){reset();return;}reset();if(start.focus)start.focus();});
+    confirm.addEventListener('click',()=>{if(!valid()||!panel._leavePending||!G.studentSummary(c).canLeave){reset();return;}reset();const accepted=G.leaveSchool(c);message.textContent=accepted?'已确认永久结束学业，作为未受教育工人工作。':'学业未改变。';this.refreshStudentInfo(c);if(accepted){const close=el.querySelector('#info-close');if(close&&close.focus)close.focus();}});
+  },
   farmInfoData: function (b) {
     if (b.type !== 'farm' || b.state !== 'ok' || !G.farmSummary) return null;
     const s = G.farmSummary(b), crops = G.CROPS;
@@ -1273,13 +1337,14 @@ G.ui = {
     if (sameSelection && selected.state === 'ok' && this._tavernInfoState === selected.state && this.refreshTavernInfo(selected)) return;
     if (sameSelection && selected.state === 'ok' && this._tailorInfoState === selected.state && this.refreshTailorInfo(selected)) return;
     if (sameSelection && selected.state === 'ok' && this._farmInfoState === selected.state && this.refreshFarmInfo(selected)) return;
+    if(sameSelection&&selected.state==='ok'&&this._schoolInfoState===selected.state&&this.refreshSchoolInfo(selected))return;
     if (sameSelection && selected.state === 'ok' && this._economyInfoState === selected.state && this.refreshEconomyInfo(selected)) return;
     if (sameSelection && selected.state === 'ok' && this._medicalInfoState === selected.state && this.refreshMedicalInfo(selected)) return;
     if (sameSelection && selected.state === 'ok' && this._resourceChainInfoState === selected.state && this.refreshResourceChainInfo(selected)) return;
     if (sameSelection && selected.type === 'woodcutter' && this._fuelInfoState === selected.state && this.refreshFuelInfo(selected)) return;
     if (hadFocus && !force && sameSelection && selected.type !== 'woodcutter' &&
         !(selected.type === 'farm' && selected.state === 'ok' && G.farmSummary) && (G.sel.kind === 'c' || this._infoBuildState === selected.state)) {
-      if (G.sel.kind === 'c') { this.refreshCitizenLeisure(selected); this.refreshCitizenClothing(selected); }
+      if (G.sel.kind === 'c') { this.refreshCitizenLeisure(selected); this.refreshCitizenClothing(selected); this.refreshStudentInfo(selected); }
       // Patch changing site facts in place without stealing keyboard focus.
       if (G.sel.kind === 'b' && selected.state === 'site') {
         const data = this.siteInfoData(selected);
@@ -1309,9 +1374,11 @@ G.ui = {
       const tavernData = this.tavernInfoData(b);
       const tailorData = this.tailorInfoData(b);
       const farmData = this.farmInfoData(b);
+      const schoolData=this.schoolInfoData(b);
       let status;
       if (fuelData) status = fuelData.status;
       else if (siteData) status = siteData.status;
+      else if(schoolData)status=schoolData.status;
       else if (medicalData) status = medicalData.status;
       else if (chainData) status = chainData.status;
       else if (hallData) status = hallData.data.status;
@@ -1330,7 +1397,7 @@ G.ui = {
         status = '停工：' + (b.type === 'blacksmith' ? '缺铁或木材' : b.type === 'woodcutter' ? '缺木材' : b.type === 'mine' ? '仓库已满' : b.type === 'tailor' ? (G.game.res.clothes >= G.storageCap() ? '衣物仓容已满' : '缺皮革或羊毛') : (b.warnText || '工作圈内暂无可用资源'));
       } else status = (b.noWork || (b.warnText && !b.workers.length)) ? `停工：${b.warnText || '无法工作'}` : (def.jobs > 0 && !b.workers.length ? '等待可用工人' : '运作中');
       let workers = '';
-      if (def.jobs > 0 || b.state === 'site') {
+      if ((def.jobs > 0 || b.state === 'site') && !schoolData) {
         const names = b.workers.map(id => w.cmap[id]).filter(Boolean).map(c => this.escHtml(c.name)).join('、');
         workers = `<div class="row">${medicalData ? b.type === 'hospital' ? '医师' : '采药员' : tavernData ? '酿酒工（需 18 岁以上且健康）' : '工人'}：<span${siteData ? ' data-site-workers' : ''}${fuelData ? ' data-fuel="workers"' : ''}${medicalData ? ' data-medical="workers"' : ''}${chainData ? ' data-resource-chain-live="workers"' : ''}${tavernData ? ' data-tavern="workers"' : ''}${tailorData ? ' data-tailor="workers"' : ''}${farmData ? ' data-farm="workers"' : ''}${b.state === 'ok' && ['tradingpost', 'pasture', 'orchard'].includes(b.type) ? ' data-economy-workers' : ''}>${names || (b.state === 'site' ? '等待建筑工人' : '无')}</span></div>`;
       }
@@ -1339,7 +1406,7 @@ G.ui = {
         const fam = w.families.find(f => f.id === b.family);
         if (fam) extra = `<div class="row">住户：${fam.members.map(id => w.cmap[id]).filter(Boolean).map(c => `${this.escHtml(c.name)}(${Math.floor(c.age)}岁)`).join('、')}</div>`;
       }
-      if (b.type === 'school') {
+      if (b.type === 'school' && !schoolData) {
         const n = w.citizens.filter(cc => cc.school === b.id).length;
         extra = `<div class="row">学生：${n} / ${G.LIFE.schoolCap}</div>`;
       }
@@ -1366,6 +1433,7 @@ G.ui = {
       if (tavernData) extra += this.tavernInfoMarkup(tavernData);
       if (tailorData) extra += this.tailorInfoMarkup(tailorData);
       if (farmData) extra += this.farmInfoMarkup(farmData);
+      if(schoolData)extra+=this.schoolInfoMarkup(b);
       if (b.state === 'ok') extra += this.economyInfoMarkup(b);
       if (medicalData) extra += this.medicalInfoMarkup(b, medicalData);
       const outputs = { gatherer: ['vegetables'], hunting: ['meat', 'leather'], dock: ['meat'], farm: ['grain'], orchard: ['vegetables'], pasture: ['meat', 'wool'], tailor: ['clothes'], herbalist: ['herbs'] };
@@ -1383,7 +1451,7 @@ G.ui = {
       }
       el.innerHTML = `
         <div class="info-head"><span>${def.icon} ${def.name}</span><button id="info-close">✕</button></div>
-        <div class="row"${siteData ? ' data-site-status' : ''}${fuelData ? ' data-fuel="status"' : ''}${medicalData ? ' data-medical="status"' : ''}${chainData ? ' data-resource-chain-live="status"' : ''}${hallData ? ' data-townhall="status"' : ''}${tavernData ? ' data-tavern="status"' : ''}${tailorData ? ' data-tailor="status"' : ''}${farmData ? ' data-farm="status"' : ''}${b.state === 'ok' && ['tradingpost', 'pasture', 'orchard'].includes(b.type) ? ' data-economy-status' : ''}>${this.escHtml(status)}</div>
+        <div class="row"${siteData ? ' data-site-status' : ''}${fuelData ? ' data-fuel="status"' : ''}${medicalData ? ' data-medical="status"' : ''}${chainData ? ' data-resource-chain-live="status"' : ''}${hallData ? ' data-townhall="status"' : ''}${tavernData ? ' data-tavern="status"' : ''}${tailorData ? ' data-tailor="status"' : ''}${farmData ? ' data-farm="status"' : ''}${schoolData?' data-school="status"':''}${b.state === 'ok' && ['tradingpost', 'pasture', 'orchard'].includes(b.type) ? ' data-economy-status' : ''}>${this.escHtml(status)}</div>
         ${workers}${extra}
         <div class="row desc">${def.desc}</div>
         <div class="row desc" data-info-refund${fuelData ? ' data-fuel="refund"' : ''}>${fuelData ? fuelData.refund : siteData ? siteData.refund : '已开工：拆除退还一半已付建材，已砍树不恢复'}</div>
@@ -1396,10 +1464,12 @@ G.ui = {
       this._tavernInfoState = b.state;
       this._tailorInfoState = b.state;
       this._farmInfoState = b.state;
+      this._schoolInfoState=b.state;
       if (hallData) this.refreshTownHallInfo(b);
       if (tavernData) this.initTavernInfo(b);
       if (tailorData) this.initTailorInfo(b);
       if (farmData) this.initFarmInfo(b);
+      if(schoolData)this.refreshSchoolStudents(b);
       if (medicalData) this.refreshMedicalPatients(b);
       if (chainData) this.initResourceChainInfo(b);
       if (b.state === 'ok') this.initEconomyInfo(b);
@@ -1412,16 +1482,17 @@ G.ui = {
       const fam = G.familyOf(c);
       el.innerHTML = `
         <div class="info-head"><span>🧑 ${this.escHtml(c.name)}</span><button id="info-close">✕</button></div>
-        <div class="row">${c.sex === 'm' ? '男' : '女'} · ${Math.floor(c.age)} 岁 · ${c.student ? '学生' : c.adult ? '成人' : '儿童'}</div>
-        <div class="row">职业：${jobName} · <span data-citizen-status>${this.escHtml(status)}</span></div>
+        <div class="row" data-citizen-role>${c.sex === 'm' ? '男' : '女'} · ${Math.floor(c.age)} 岁 · ${c.student ? '学生' : c.adult ? '成人' : '儿童'}</div>
+        <div class="row">职业：<span data-citizen-job>${jobName}</span> · <span data-citizen-status>${this.escHtml(status)}</span></div>
         ${c.carry ? `<div class="row">随身：${G.RES[c.carry.type].name} ${Number(c.carry.qty)}（未入库）</div>` : ''}
         <div class="row">家庭：${fam ? (fam.houseId != null ? '有房' : '无房') : '单身'}</div>
-        <div class="row">学识：${c.student ? '🎓 就读中' : c.educated ? '📖 受过教育' : '未受教育'}</div>
+        ${this.studentInfoMarkup(c)}
         <div class="row">饥饿 ${'▕'.repeat(Math.min(4, c.hunger)) || '无'} · 受冻 ${c.cold > 1 ? '是' : '无'}</div>
         ${this.citizenClothingMarkup(c)}
         ${Number.isFinite(c.dietVariety) ? `<div class="row">最近饮食：${Math.max(0, Math.min(3, c.dietVariety))} / 3 类${Number.isFinite(c.dietScore) ? ' · 长期均衡 ' + c.dietScore.toFixed(1) + '/3' : ''}</div>` : ''}
         ${this.citizenHealthMarkup(c)}
         ${this.citizenLeisureMarkup(c)}`;
+      this.initStudentInfo(c);
     }
     document.getElementById('info-close').addEventListener('click', () => this.hideInfo());
     el.querySelectorAll('.mini-tog').forEach(btn => btn.addEventListener('click', () => {

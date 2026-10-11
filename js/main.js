@@ -131,7 +131,7 @@ G.serializeGame = function () {
       id: c.id, name: c.name, sex: c.sex, age: c.age, adult: c.adult,
       x: c.x, y: c.y, familyId: c.familyId, job: c.job,
       partnerId: c.partnerId, parentIds: c.parentIds, grandparentIds: c.grandparentIds, ancestorIds: c.ancestorIds, birthFamilyId: c.birthFamilyId,
-      student: c.student ? 1 : 0, educated: c.educated ? 1 : 0, school: c.school != null ? c.school : null,
+      student: c.student ? 1 : 0, educated: c.educated ? 1 : 0, school: c.school != null ? c.school : null, studyHours:G.studyHoursOf(c),studyToday:G.studyTodayOf(c),studyDay:g.day,
       arrivalHallId:c.arrivalHallId, hunger: c.hunger, cold: c.cold, clothingLeft: c.clothingLeft, clothingType:c.clothingType, dietVariety: c.dietVariety, dietScore: c.dietScore, happiness: c.happiness, leisureDays:c.leisureDays, health: c.health, sickDays: c.sickDays, immunityDays: c.immunityDays, herbCooldown: c.herbCooldown, careHours: c.careHours, camped: c.camped ? 1 : 0, carry: c.carry,
     })),
     nextUid: G._peekUid(),
@@ -455,6 +455,9 @@ G.prepareSaveData = function (d) {
       ancestorIds: cd.ancestorIds === undefined ? undefined : ids(cd.ancestorIds, '祖辈 ID'),
       birthFamilyId: cd.birthFamilyId === undefined ? undefined : nullableId(cd.birthFamilyId, '原生家庭'),
       student: !!cd.student, educated: !!cd.educated, school: nullableId(cd.school, '学校'),
+      studyHours:cd.studyHours===undefined?G.legacyStudyHours(cd):number(cd.studyHours,'已学习课时',0,G.EDUCATION.totalHours),
+      studyToday:cd.studyToday===undefined?0:number(cd.studyToday,'本日学习课时',0,G.EDUCATION.dailyHours),
+      studyDay:cd.studyDay===undefined?g.day:integer(cd.studyDay,'学习日期',0,g.day),
       arrivalHallId:nullableId(cd.arrivalHallId,'入村登记点'), task: null, pausedTask: null, carry, state: 'idle', walkKind: '', path: null, pi: 0, camped: !!cd.camped,
       wanderT: 0, hunger: cd.hunger === undefined ? 0 : number(cd.hunger, '饥饿', 0),
       cold: cd.cold === undefined ? 0 : number(cd.cold, '寒冷', 0), animT: 0, dead: false,
@@ -1098,7 +1101,7 @@ G.selectAt = function (tx, ty, p) {
   let best = null, bd = 18 * 18, citizenHomes = null;
   for (const c of w.citizens) {
     if (c.state === 'rest' && c.camped === false && !citizenHomes && G.citizenHomeLookup) citizenHomes = G.citizenHomeLookup(w);
-    if ((G.citizenIndoorHome && G.citizenIndoorHome(c, citizenHomes)) || G.inMedicalCare(c)) continue;
+    if ((G.citizenIndoorHome && G.citizenIndoorHome(c, citizenHomes)) || G.inMedicalCare(c) || G.inSchool(c)) continue;
     const [sx, sy] = G.T2S(c.x, c.y);
     const px = sx * G.cam.z + G.cam.x - p.x;
     const py = (sy + 16) * G.cam.z + G.cam.y - p.y;

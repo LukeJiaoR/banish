@@ -395,9 +395,9 @@ G.ui = { toast() {}, refreshHUD() {} };
   school.workers.push(teacher.id); teacher.job = school.id;
   const kid = G.spawnCitizen({ x: 6, y: 6, sex: 'm', age: 17, adult: false, student: false });
   // 手动置为在读学生（模拟多年前面入学）
-  kid.student = true; kid.school = school.id;
+  kid.student = true; kid.school = school.id; kid.studyHours = G.EDUCATION.totalHours;
   G.endDay();
-  check('17 岁毕业：受教育、成为劳动力', kid.adult === true && kid.educated === true && kid.student === false && kid.school == null);
+  check('17 岁且修满课程毕业：受教育、成为劳动力', kid.adult === true && kid.educated === true && kid.student === false && kid.school == null);
 }
 {
   freshGame();
@@ -728,7 +728,7 @@ G.markGroundDirty = G.markGroundDirty || (() => {}); // render.js 未加载时�
   check('预备：孩子已入学', kid.student === true && kid.school === school.id);
   school.workers = []; teacher.job = null; // 教师离职
   G.endDay();
-  check('教师离开 → 学生立即辍学当工人', kid.adult === true && kid.student === false && kid.school == null && !kid.educated);
+  check('教师离开 → 保留学籍待恢复，不自动永久辍学', kid.adult === false && kid.student === true && !kid.educated);
 }
 
 /* ---- 8.5 受教育砍树 3 原木（未受教育 2） ---- */

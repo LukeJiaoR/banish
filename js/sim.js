@@ -114,30 +114,7 @@ G.endDay = function () {
   const dead = [];
   for (const c of w.citizens) {
     c.age += 1 / G.YEAR_DAYS;
-    // 学堂停办（教师离职/学堂拆除）：在读学生立即辍学当工人，永久失去受教育机会（原版规则）
-    if (c.student) {
-      const sb = w.bmap[c.school];
-      if (!sb || sb.state !== 'ok' || sb.workers.length === 0) {
-        c.student = false; c.adult = true; c.school = null;
-        G.ui.toast(`📚 ${c.name} 所在学堂停办，辍学当了工人`, 'warn');
-      }
-    }
-    // 成长：有在办学堂就入学，否则直接当工人；学生毕业成为受教育工人
-    if (!c.adult && c.age >= G.ADULT_AGE && !c.student) {
-      const sc = G.pickSchool(schoolCount);
-      if (sc) {
-        c.student = true; c.school = sc.id;
-        schoolCount[sc.id] = (schoolCount[sc.id] || 0) + 1;
-        G.ui.toast(`🎓 ${c.name} 进入学堂读书`, 'good');
-      } else {
-        c.adult = true;
-        G.ui.toast(`${c.name} 长大成人，可以工作了`, 'good');
-      }
-    }
-    if (c.student && c.age >= G.LIFE.gradAge) {
-      c.student = false; c.adult = true; c.educated = true; c.school = null;
-      G.ui.toast(`🎓 ${c.name} 学成毕业`, 'good');
-    }
+    G.advanceEducation(c,schoolCount);
     // 冻死判定（受冻累积在 stepCitizen 的 coldStep 按小时结算：户外累积/暖屋恢复/冷屋缓冻）
     // 自然老死（原版市民多活到 70~85 岁；死亡率随年龄缓升，实测死亡多落在 71~85 区间）
     if (c.age > G.OLD_AGE && G.chance(Math.min(0.25, (c.age - G.OLD_AGE) * 0.002)))
@@ -488,7 +465,7 @@ G.spawnCitizen = function (opt) {
     ancestorIds: Array.isArray(opt.ancestorIds) ? opt.ancestorIds.slice() : [],
     birthFamilyId: opt.birthFamilyId != null ? opt.birthFamilyId : null,
     job: null, task: null, carry: null, pausedTask: null, arrivalHallId:opt.arrivalHallId??null,
-    student: false, educated: false, school: null,
+    student: false, educated: false, school: null, studyHours:0, studyToday:0, studyDay:0,
     state: 'idle', walkKind: '', path: null, pi: 0, camped: false,
     wanderT: G.rng() * 3,
     hunger: 0, cold: 0, clothingLeft: 0, clothingType:null, dietVariety: 0, dietScore: 1, happiness: 3, leisureDays:0, health: 4, sickDays: 0, immunityDays: 0, herbCooldown: 0, careHours: 0,
@@ -580,7 +557,7 @@ G.alternateTaskEndpoint = function (c, t) {
   if (!t || G.physicalTaskEndpoint(t) || !t.b || G.world.bmap[t.b.id] !== t.b) return null;
   if (['build','clearSite'].includes(t.kind) ? t.b.state !== 'site' : t.b.state !== 'ok') return null;
   if (t.kind === 'clearSite' && (!t.tree || G.world.trees[G.world.treeIdx[t.tree.i]] !== t.tree)) return null;
-  if (['care', 'clinic', 'arrival', 'leisure', 'host'].includes(t.kind)) return G.workSpot(G.world, t.b, c.x, c.y, true);
+  if (['care', 'clinic', 'arrival', 'leisure', 'host', 'study', 'teach'].includes(t.kind)) return G.workSpot(G.world, t.b, c.x, c.y, true);
   if (t.kind === 'clearSite') return G.siteClearSpot(c, t.b, t.tree);
   if (['firewood', 'trade', 'brew'].includes(t.kind) && t.phase === 'fetch') return G.storageRoute(c.x, c.y)?.spot || null;
   if (t.kind === 'build' || t.kind === 'firewood' || t.kind === 'trade' || t.kind === 'brew' ||
@@ -605,7 +582,7 @@ G.routeCanReuse = function (route, c, tx, ty) {
 G.sendTo = function (c, tx, ty, planned = null) {
   let route=planned||(c.task&&c.task.dispatchRoute);
   if(c.task) delete c.task.dispatchRoute;
-  const buildingTask=c.task && (['build','clearSite','firewood','trade','care','clinic','arrival','leisure','host','brew'].includes(c.task.kind) || (c.task.kind==='work' && c.task.b && ['dock','mine','stonequarry','blacksmith','pasture','orchard'].includes(c.task.b.type)));
+  const buildingTask=c.task && (['build','clearSite','firewood','trade','care','clinic','arrival','leisure','host','brew','study','teach'].includes(c.task.kind) || (c.task.kind==='work' && c.task.b && ['dock','mine','stonequarry','blacksmith','pasture','orchard'].includes(c.task.b.type)));
   if((route && !G.routeCanReuse(route,c,tx,ty)) || (!route && buildingTask)) {
     const spot=G.alternateTaskEndpoint(c,c.task);
     if(!spot){if(c.task)G.dropBlockedTask(c,c.task);c.path=null;c.state='idle';c.wanderT=.5;return false;}
@@ -656,6 +633,7 @@ G.goHome = function (c) {
 /* 天亮续接昨晚挂起的任务；目标已失效（树被砍/建筑拆了/换岗位）则放弃 */
 G.resumeTask = function (c) {
   if (G.isArriving(c)) {c.pausedTask=null;return G.startImmigration(c);}
+  if(c.student){c.pausedTask=null;return G.startStudy(c);}
   const t = c.pausedTask;
   c.pausedTask = null;
   if (!t) return false;
@@ -680,6 +658,8 @@ G.resumeTask = function (c) {
     ok = G.farmTaskCurrent(t) && !t.b.farm[t.ti].sown;
   } else if (ok && t.kind === 'harvest') {
     ok = G.farmTaskCurrent(t) && t.b.farm[t.ti].sown && !t.b.farm[t.ti].harvested;
+  } else if(ok&&t.kind==='teach'){
+    ok=G.schoolTeachers(t.b).includes(c)&&!G.isSick(c)&&c.hunger<1;
   } else if (ok && t.kind === 'firewood') {
     ok = t.b.state === 'ok';
   } else if (ok && t.kind === 'build') {
@@ -982,6 +962,7 @@ G.firewoodFetchDone = function (c, t) {
 G.coldStep = function (c, dtH) {
   if (!G.isWinter()) { c.cold = 0; return; }
   if (G.inMedicalCare(c)) { c.cold = Math.max(0, c.cold - dtH * G.LIFE.warmRecover / 24); return; }
+  if(G.inSchool(c)){c.cold+=dtH*G.LIFE.coldIndoors/24;return;} // Classroom shelters wind; it is not a heated home.
   const childMul = c.age < G.ADULT_AGE ? G.LIFE.coldChildMul : 1;
   if (c.state === 'rest' && !c.camped) {
     const home = G.homeOf(c);
@@ -1022,13 +1003,14 @@ G.detourCitizen = function (c, dtH) {
     if (G.physicalTaskEndpoint(t)) { G.dropBlockedTask(c, t); return; }
     if (t) {
       const spot = G.alternateTaskEndpoint(c, t);
-      if (!spot) { if (t.kind === 'care') G.cancelMedicalCare(c); else if(t.kind==='leisure')G.cancelLeisure(c); return; }
+      if (!spot) { if (t.kind === 'care') G.cancelMedicalCare(c); else if(t.kind==='leisure')G.cancelLeisure(c);else if(['study','teach'].includes(t.kind)){G.clearSchoolTasks(c);c.schoolWaitReason='上学路线受阻，保留学籍等待通路';c.wanderT=4;} return; }
       goal = spot; t.tx = spot.x; t.ty = spot.y;
     } else if (c.walkKind === 'wander') { c.path = null; c.state = 'idle'; c.wanderT = 2; return; }
     else return;
   }
   const path = G.routeCanReuse(goal.route,c,goal.x,goal.y) ? goal.route.path : G.findPath(G.world, Math.round(c.x), Math.round(c.y), goal.x, goal.y);
   if (!path) {
+    if(c.task&&['study','teach'].includes(c.task.kind)){const b=c.task.b;b.warnText='上学路线受阻';G.clearSchoolTasks(c);c.schoolWaitReason='上学路线受阻，保留学籍等待通路';c.wanderT=4;return;}
     if (c.task && c.task.kind === 'care') { G.cancelMedicalCare(c); return; }
     if(G.isLeisureVisitor(c)){G.cancelLeisure(c);return;}
     if (c.state === 'haul' && G.isMineralCargo(c)) { c.haulPending = true; G.waitForMineralStorage(c, 'route'); }
@@ -1042,6 +1024,8 @@ G.detourCitizen = function (c, dtH) {
 /* 市民每帧步进 */
 G.stepCitizen = function (c, dtH) {
   if (c.dead) return;
+  if(c.student)G.restrictStudentWork(c);
+  if(c.task&&['study','teach'].includes(c.task.kind)&&!G.validSchoolTask(c)){G.clearSchoolTasks(c);c.wanderT=0;}
   G.coldStep(c, dtH);
   c.leisureRetryH=Math.max(0,(c.leisureRetryH||0)-dtH);
   if(G.isLeisureVisitor(c) && (!G.validLeisureTask(c) || G.isRestTime()))G.cancelLeisure(c);
@@ -1084,6 +1068,7 @@ G.stepCitizen = function (c, dtH) {
       return;
     }
     case 'work': {
+      if(c.task&&['study','teach'].includes(c.task.kind)){G.stepSchool(c,dtH);return;}
       if(G.isLeisureVisitor(c)){G.stepLeisure(c,dtH);return;}
       if(c.task?.kind==='brew'&&c.task.phase==='process'&&(G.isSick(c)||!G.tavernBrewStatus(c.task.b,true).ok)){G.returnBrewGrain(c);return;}
       if (!c.task) { c.state = 'idle'; return; }
@@ -1168,6 +1153,8 @@ G.requestTask = function (c) {
   if (G.isArriving(c)) {if(G.isRestTime())G.goHome(c);else G.startImmigration(c);return;}
   if (!c.carry && G.tryMedicalCare(c)) return;
   if (G.isRestTime()) { G.goHome(c); return; } // 深夜不接受新任务
+  if(c.student){if(c.carry)G.startHaul(c);else G.startStudy(c);return;}
+  if(!c.adult){G.wander(c);return;}
   if(!c.carry && G.tryLeisure(c))return;
   const w = G.world;
   const b = c.job != null ? w.bmap[c.job] : null;
@@ -1314,6 +1301,7 @@ G.makeTask = function (b, c) {
     b.warnText = G.buildingGoalStatus(b); return null;
   }
   switch (b.type) {
+    case 'school': return G.makeTeachingTask(b,c);
     case 'herbalist': return G.makeHerbalistTask(b, c);
     case 'hospital': return G.makeClinicTask(b, c);
     case 'tavern': return G.makeTavernTask(b,c);
@@ -1685,12 +1673,7 @@ G.pickNearest = function (cands, b) {
 };
 
 /* 找一所还有空位的在办学堂（有教师才开学） */
-G.pickSchool = function (counts) {
-  const w = G.world;
-  for (const b of w.buildings)
-    if (b.type === 'school' && b.state === 'ok' && b.workers.length > 0 && (counts[b.id] || 0) < G.LIFE.schoolCap) return b;
-  return null;
-};
+G.pickSchool = function(counts,c){return G.schoolCandidate(c,counts)?.b||null;};
 
 /* 「砍伐/清石」标记的抽人对象：越闲的岗位越先出人（常规岗位保持至少 1 人留守）。
  * 顺序：超员 → 柴满伐木屋（燃料上限停产，纯闲）→ 石铁双满的矿井 → 非收获季农田 →
@@ -1752,6 +1735,7 @@ G.jobCanProduce = function (b) {
 
 G.scheduleJobs = function () {
   const w = G.world;
+  for(const c of w.citizens)if(c.student)G.restrictStudentWork(c);
   G.updateProductionGoals();
   // A held mineral batch is not a free pair of hands. Free only an empty job
   // slot; releaseWorker preserves cargo and retries the same bounded delivery.
@@ -2544,6 +2528,7 @@ G.validLeisureTask=function(c){
 };
 G.cancelLeisure=function(c){c.task=null;c.path=null;c.pi=0;c.state='idle';c.walkKind='';c.wanderT=1;c.leisureRetryH=G.LEISURE.retryHours;};
 G.tryLeisure=function(c){
+  const school=G.world.bmap[c.job];if(school?.type==='school'&&G.world.citizens.some(x=>x.student&&x.school===school.id&&!x.dead))return false;
   if(c.dead||c.age<18||!c.adult||c.carry||G.isArriving(c)||G.isSick(c)||G.isRestTime()||c.leisureRetryH>0||G.leisureDaysOf(c)>0||G.game.res.ale<1)return false;
   const w=G.world,pop=w.citizens.filter(x=>!x.dead).length;
   if(c.hunger>0||G.game.res.food<pop*G.LIFE.eatPerDay*8||G.game.res.ale<=w.citizens.filter(G.isLeisureVisitor).length)return false;
@@ -2656,4 +2641,118 @@ G.farmSummary=function(b){
   return {crop,choice,output:G.CROPS[crop].output,choiceOutput:G.CROPS[choice].output,pending:crop!==choice,committed,
     unlocked:{wheat:true,cabbage:G.cropUnlocked('cabbage')},status,reason,growth:b.growth,sown,harvested,total:b.farm.length,
     grain:g.res.grain,vegetables:g.res.vegetables,workers:b.workers.filter(id=>G.world.cmap[id]&&!G.world.cmap[id].dead&&G.world.cmap[id].job===b.id).length};
+};
+
+
+/* School ages/capacity follow the existing game. The 1344-hour curriculum and
+ * six-hour daily cap are explicit adaptations, with room for normal commuting. */
+G.EDUCATION={dailyHours:6,totalHours:1344,graduateAge:G.LIFE.gradAge};
+G.legacyStudyHours=c=>c.educated?G.EDUCATION.totalHours:c.student?G.clamp((c.age-G.ADULT_AGE)/(G.EDUCATION.graduateAge-G.ADULT_AGE),0,1)*G.EDUCATION.totalHours:0;
+G.studyHoursOf=c=>c.educated?G.EDUCATION.totalHours:G.clamp(Number.isFinite(c.studyHours)?c.studyHours:G.legacyStudyHours(c),0,G.EDUCATION.totalHours);
+G.studyTodayOf=c=>c.studyDay===G.game.day?G.clamp(c.studyToday||0,0,G.EDUCATION.dailyHours):0;
+G.schoolCounts=function(){const counts={};for(const c of G.world.citizens)if(!c.dead&&c.student&&c.school!=null)counts[c.school]=(counts[c.school]||0)+1;return counts;};
+G.schoolTeachers=function(b){
+  if(!b||G.world.bmap[b.id]!==b||b.type!=='school'||b.state!=='ok')return [];
+  return b.workers.map(id=>G.world.cmap[id]).filter(c=>c&&!c.dead&&c.adult&&!c.student&&!G.isArriving(c)&&c.job===b.id);
+};
+G.schoolTeacherPresent=b=>G.schoolTeachers(b).some(c=>!G.isSick(c)&&c.hunger<1&&c.state==='work'&&c.task?.kind==='teach'&&c.task.b===b&&G.atMedicalDoor(c,b)&&G.d2(c.x,c.y,c.task.tx,c.task.ty)<.04);
+G.inSchool=function(c){const t=c.task;return !!(t&&['study','teach'].includes(t.kind)&&c.state==='work'&&G.world.bmap[t.b.id]===t.b&&t.b.state==='ok'&&G.atMedicalDoor(c,t.b)&&G.d2(c.x,c.y,t.tx,t.ty)<.04);};
+G.clearSchoolTasks=function(c){
+  const active=c.task&&['study','teach'].includes(c.task.kind);
+  if(active){c.task=null;if(c.state==='work'||(c.state==='walk'&&c.walkKind==='task')){c.path=null;c.pi=0;c.state='idle';c.walkKind='';c.wanderT=.5;}}
+  if(c.pausedTask&&['study','teach'].includes(c.pausedTask.kind))c.pausedTask=null;
+};
+G.restrictStudentWork=function(c){
+  c.adult=false;
+  if(c.job!=null){const b=G.world.bmap[c.job];if(b)b.workers=b.workers.filter(id=>id!==c.id);c.job=null;}
+  const forbidden=t=>t&&!['study','care','arrival'].includes(t.kind);
+  if(forbidden(c.task)){c.task=null;if(c.state==='work'||(c.state==='walk'&&c.walkKind==='task')){c.path=null;c.pi=0;c.state='idle';c.walkKind='';c.wanderT=0;}}
+  if(forbidden(c.pausedTask))c.pausedTask=null;
+};
+G.schoolCandidate=function(c,counts=G.schoolCounts()){
+  let best=null;
+  for(const b of G.world.buildings){
+    if(!G.schoolTeachers(b).length||(counts[b.id]||0)>=G.LIFE.schoolCap)continue;
+    const spot=c?G.workSpot(G.world,b,c.x,c.y,true):null;if(c&&!spot)continue;
+    if(!best||(spot?.route.eta||0)<(best.spot?.route.eta||0))best={b,spot};
+  }
+  return best;
+};
+G.assignSchool=function(c,counts=G.schoolCounts()){
+  const old=G.world.bmap[c.school];
+  if(G.schoolTeachers(old).length){const spot=G.workSpot(G.world,old,c.x,c.y,true);if(spot){c.schoolWaitReason='';return {b:old,spot};}}
+  const next=G.schoolCandidate(c,counts);
+  if(next){
+    if(c.school!=null)counts[c.school]=Math.max(0,(counts[c.school]||0)-1);
+    const changed=c.school!==next.b.id;c.school=next.b.id;counts[c.school]=(counts[c.school]||0)+1;c.schoolWaitReason='';
+    if(changed)G.clearSchoolTasks(c);return next;
+  }
+  if(!old||old.type!=='school'||old.state!=='ok'){if(c.school!=null)counts[c.school]=Math.max(0,(counts[c.school]||0)-1);c.school=null;}
+  const schools=G.world.buildings.filter(b=>b.type==='school'&&b.state==='ok'),staffed=schools.filter(b=>G.schoolTeachers(b).length);
+  c.schoolWaitReason=!schools.length?'暂无学堂，保留学籍与课时':!staffed.length?'缺教师，保留学籍与课时':staffed.every(b=>(counts[b.id]||0)>=G.LIFE.schoolCap)?'可用学堂已满20座，等待空位':'学堂入口不可达，等待通路或转校';
+  G.clearSchoolTasks(c);return null;
+};
+G.advanceEducation=function(c,counts){
+  if(G.isArriving(c))return;
+  if(c.student){
+    c.studyHours=G.studyHoursOf(c);G.restrictStudentWork(c);
+    if(c.age>=G.EDUCATION.graduateAge&&c.studyHours>=G.EDUCATION.totalHours-1e-8){
+      if(c.school!=null)counts[c.school]=Math.max(0,(counts[c.school]||0)-1);
+      c.student=false;c.adult=true;c.educated=true;c.school=null;c.studyHours=G.EDUCATION.totalHours;G.clearSchoolTasks(c);G.game.schedT=0;G.ui.toast(`🎓 ${c.name} 完成课时并达到毕业年龄，学成毕业`,'good');return;
+    }
+    G.assignSchool(c,counts);return;
+  }
+  if(!c.adult&&c.age>=G.ADULT_AGE){
+    const sc=G.pickSchool(counts,c);
+    if(sc){c.student=true;c.school=sc.id;c.studyHours=0;c.studyToday=0;c.studyDay=G.game.day;counts[sc.id]=(counts[sc.id]||0)+1;G.restrictStudentWork(c);G.ui.toast(`🎓 ${c.name} 进入学堂读书`,'good');}
+    else{c.adult=true;G.ui.toast(`${c.name} 长大成人，可以工作了`,'good');}
+  }
+};
+G.makeTeachingTask=function(b,c){
+  if(!G.schoolTeachers(b).includes(c)||G.isSick(c)||c.hunger>=1)return null;
+  const spot=G.workSpot(G.world,b,c.x,c.y,true);if(!spot){b.warnText='教师无法到达学堂入口';return null;}
+  return G.withTaskRoute({kind:'teach',b,tx:spot.x,ty:spot.y,work:1e9,workLeft:1e9},spot.route);
+};
+G.startStudy=function(c){
+  if(!c.student||c.dead||G.isArriving(c)||G.isRestTime()||G.isSick(c)||c.hunger>=1)return false;
+  G.restrictStudentWork(c);if(c.carry){G.startHaul(c);return false;}
+  const assigned=G.assignSchool(c);if(!assigned){c.state='idle';c.wanderT=4;return false;}
+  const {b,spot}=assigned;c.task=G.withTaskRoute({kind:'study',b,tx:spot.x,ty:spot.y,work:1e9,workLeft:1e9},spot.route);
+  return G.sendTo(c,spot.x,spot.y,spot.route);
+};
+G.validSchoolTask=function(c){
+  const t=c.task;if(!t||!['study','teach'].includes(t.kind)||G.world.bmap[t.b.id]!==t.b||t.b.state!=='ok'||G.isSick(c)||c.hunger>=1)return false;
+  return t.kind==='study'?c.student&&c.school===t.b.id&&G.schoolTeachers(t.b).length>0:G.schoolTeachers(t.b).includes(c);
+};
+G.stepSchool=function(c,dtH){
+  if(!G.validSchoolTask(c))return;
+  // A neighbouring construction can legally move an occupant off its old door.
+  // Rejoin through a fresh reachable entrance instead of remaining stuck at work.
+  if(!G.inSchool(c)){G.clearSchoolTasks(c);c.wanderT=0;return;}
+  c.animT+=dtH; // No normal labour, happiness or education multiplier can accelerate lessons.
+  if(c.task.kind!=='study'||!G.schoolTeacherPresent(c.task.b))return;
+  const today=G.studyTodayOf(c),hours=G.studyHoursOf(c),earned=Math.min(Math.max(0,dtH),G.EDUCATION.dailyHours-today,G.EDUCATION.totalHours-hours);
+  c.studyDay=G.game.day;c.studyToday=today+earned;c.studyHours=hours+earned;
+};
+G.leaveSchool=function(c){
+  if(!c||G.world.cmap[c.id]!==c||c.dead||!c.student||c.educated||c.age<G.ADULT_AGE)return false;
+  c.student=false;c.adult=true;c.school=null;G.clearSchoolTasks(c);c.schoolWaitReason='';G.game.schedT=0;
+  G.ui.toast(`${c.name} 已结束学业，作为未受教育工人工作；不能重新入学`,'warn');return true;
+};
+G.studentSummary=function(c){
+  const b=G.world.bmap[c.school],hours=G.studyHoursOf(c),today=G.studyTodayOf(c),total=G.EDUCATION.totalHours;
+  let status=c.educated?'已受教育':!c.student?(c.adult?'已作为工人，不再入学':'未到10岁入学年龄'):
+    hours>=total-1e-8?(c.age>=G.EDUCATION.graduateAge?'课时和年龄已满足，日终毕业':`课时已达标，等待${G.EDUCATION.graduateAge}岁`):
+    G.isSick(c)?'生病暂停学习':c.hunger>=1?'饥饿暂停学习':G.isRestTime()?'夜间休息，不计学习':
+    !b||b.state!=='ok'||!G.schoolTeachers(b).length?(c.schoolWaitReason||'缺教师或学堂，保留学籍等待转校'):
+    today>=G.EDUCATION.dailyHours-1e-8?'本日6小时已满':c.task?.kind==='study'&&c.state==='walk'?'正在步行上学':
+    G.inSchool(c)?G.schoolTeacherPresent(b)?'老师学生均到校，学习中':'已到校，等待健康教师到场':c.schoolWaitReason||'等待可达上学路线';
+  if(c.student&&c.age>=G.EDUCATION.graduateAge&&hours<total-1e-8)status+='；已到毕业年龄，尚缺课时';
+  return {schoolId:c.school,schoolName:b?.type==='school'?'学堂 #'+b.id:'待转校',progress:hours/total,hours,total,today,limit:G.EDUCATION.dailyHours,status,canLeave:!!(c.student&&!c.educated&&c.age>=G.ADULT_AGE),graduateAge:G.EDUCATION.graduateAge};
+};
+G.schoolSummary=function(b){
+  const students=G.world.citizens.filter(c=>!c.dead&&c.student&&c.school===b.id),teachers=G.schoolTeachers(b),present=G.schoolTeacherPresent(b),onSite=students.filter(G.inSchool).length;
+  return {capacity:G.LIFE.schoolCap,enrolled:students.length,onSite,staffAssigned:teachers.length,teacherPresent:present,teacherNames:teachers.map(c=>c.name),
+    status:!teachers.length?'缺教师：学生保留学籍，优先转校':present?'教师已到校，可进行真实学习':teachers.every(c=>G.isSick(c)||c.hunger>=1)?'教师生病或饥饿，暂停授课':b.warnText||'教师未到校，暂不计课时',
+    students:students.map(c=>({id:c.id,name:c.name,age:c.age,hours:G.studyHoursOf(c),today:G.studyTodayOf(c),progress:G.studyHoursOf(c)/G.EDUCATION.totalHours,status:G.studentSummary(c).status}))};
 };

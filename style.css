@@ -460,3 +460,9 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .farm-crop select:focus-visible { outline: 2px solid #ffe4a0; outline-offset: 3px; }
 .farm-crop select option:disabled { color: #ad9b7b; }
 @media (max-width: 600px) { .farm-crop select { min-height: 44px; } }
+
+.school-details,.student-details { border-top:1px solid #6d5a3c; margin-top:8px; padding-top:6px; }
+.school-details [data-school="students"] { font-size:12px; overflow-wrap:anywhere; }
+.school-leave-confirm { margin-top:8px; padding:8px; border:1px solid #af7256; }
+.school-leave-confirm p { font-size:12px; }
+.school-leave-confirm button { margin:4px 4px 0 0; }

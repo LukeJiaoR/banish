@@ -164,6 +164,11 @@ test('homeless camping remains opaque and selectable; indoor people have no invi
   const outside=citizen({state:'idle',carry:{type:'food',qty:2}});
   G.selectAt(outside.x,outside.y,{x,y:y+16});assert.equal(G.sel.id,outside.id);
 });
+test('actual students and teachers disappear only after arrival and have no invisible doorway hit target',()=>{
+  const b=building('school'),c=citizen({age:12,adult:false,student:true,school:b.id,state:'walk',walkKind:'task',path:[{x:9,y:10}],pi:0});
+  c.task={kind:'study',b,tx:9,ty:10,work:1e9,workLeft:1e9};assert(draw(c).sprites.length);c.state='work';c.path=null;assert(G.inSchool(c));assert.equal(draw(c).sprites.length,0);
+  const[x,y]=G.T2S(c.x,c.y);G.selectAt(c.x,c.y,{x,y:y+16});assert.equal(G.sel,null);c.x=7;assert(draw(c).sprites.length,'not hidden before physical door');
+});
 test('status separates ordinary waiting, input shortages, limits, travel and indoor/outdoor rest', () => {
   const c=citizen();assert.equal(G.ui.citizenStatus(c),'散工待命');
   c.age=8;assert.equal(G.ui.citizenStatus(c),'玩耍休息');c.age=30;
