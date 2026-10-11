@@ -14,7 +14,7 @@ function loadGame(root) {
   };
   context.window = context;
   vm.createContext(context);
-  if (!sourceCache.has(root)) sourceCache.set(root, ['core', 'defs', 'map', 'sim', 'main'].map(name => [name, fs.readFileSync(path.join(root, 'js', name + '.js'), 'utf8')]));
+  if (!sourceCache.has(root)) sourceCache.set(root, ['core', 'defs', 'map', 'sim', 'fire', 'main'].map(name => [name, fs.readFileSync(path.join(root, 'js', name + '.js'), 'utf8')]));
   for (const [name, source] of sourceCache.get(root)) vm.runInContext(source, context, { filename: name + '.js' });
   const G = context.G;
   G.ui = { toast() {}, refreshHUD() {}, hideInfo() {}, setToolActive() {} };

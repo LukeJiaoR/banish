@@ -103,7 +103,7 @@ G.serializeGame = function () {
       v: G.VERSION,
       h: g.h, day: g.day, season: g.season, year: g.year,
       res: g.res, stats: g.stats, prevFood: g.prevFood, foodNet: g.foodNet, foodUrgent: g.foodUrgent, warned: g.warned,
-      heating:g.heating, farmPests:g.farmPests, townLedger:g.townLedger, challenges:g.challenges, hist: g.hist, buildLog: g.buildLog, toolWear: g.toolWear, steelToolWear: g.steelToolWear, healthStartDay: g.healthStartDay, nomads:g.nomads, unlocks: g.unlocks, livestock: g.livestock,
+      heating:g.heating, fireDisasters:g.fireDisasters, farmPests:g.farmPests, townLedger:g.townLedger, challenges:g.challenges, hist: g.hist, buildLog: g.buildLog, toolWear: g.toolWear, steelToolWear: g.steelToolWear, healthStartDay: g.healthStartDay, nomads:g.nomads, unlocks: g.unlocks, livestock: g.livestock,
       productionGoals: g.productionGoals && { ...g.productionGoals }, productionPaused: g.productionPaused && { ...g.productionPaused },
     },
     roads: Array.from(w.road).flatMap((road, i) => road ? [i] : []),
@@ -117,6 +117,7 @@ G.serializeGame = function () {
       upgradeFrom:b.upgradeFrom, workerLimit:b.workerLimit, sitePaused:b.sitePaused, sitePriority:b.sitePriority, progress: b.progress, workLeft: b.workLeft, totalWork: b.totalWork, paidCost: b.paidCost, constructionStarted: b.constructionStarted,
       workers: b.workers, family: b.family, noWork: b.noWork, warnText: b.warnText,
       bridgeAxis: b.bridgeAxis, bridgeLength: b.type === 'bridge' ? b.w + b.h - 1 : undefined,
+      houseFire:b.houseFire&&{...b.houseFire},ruinFrom:b.ruinFrom,ruinIncident:b.ruinIncident,
       mineralUnits:b.mineralUnits, pitSource:b.pitSource, mineMode: b.mineMode, legacyMine: b.legacyMine, mineTick: b.mineTick, toolRecipe: b.toolRecipe, reserveDays:b.reserveDays, coatRecipe:b.coatRecipe, coatMaterial:b.coatMaterial,
       doCut: b.doCut, doPlant: b.doPlant, fuelLimit: b.fuelLimit, toolLimit: b.toolLimit,
       farmSize:b.type==='farm'&&b.farmSize?[...b.farmSize]:undefined,
@@ -252,6 +253,13 @@ G.prepareSaveData = function (d) {
   if (!hasFoodClasses) g.res.grain = g.res.food; // legacy stock is preserved once
   if (gd.unlocks !== undefined) {record(gd.unlocks,'产业解锁');if(typeof gd.unlocks.orchard !== 'boolean')bad('果树种子解锁');for(const key of ['cabbage','beans'])if(gd.unlocks[key]!==undefined&&typeof gd.unlocks[key]!=='boolean')bad('农田种子解锁');g.unlocks={orchard:gd.unlocks.orchard,cabbage:gd.unlocks.cabbage===true,beans:gd.unlocks.beans===true};}
   if (gd.livestock !== undefined) {record(gd.livestock,'待安置牲畜');g.livestock={sheep:integer(gd.livestock.sheep,'待安置羊',0,1000000),cattle:gd.livestock.cattle===undefined?0:integer(gd.livestock.cattle,'待安置牛',0,1000000)};}
+  if(gd.fireDisasters!==undefined){const f=record(gd.fireDisasters,'住房火灾设置');if(typeof f.enabled!=='boolean')bad('住房火灾开关');
+    const startedDay=f.startedDay===null?null:integer(f.startedDay,'首次火灾启用日',0,g.day),graceUntil=integer(f.graceUntil,'火灾宽限日',0,g.day+48);
+    if(graceUntil!==(startedDay===null?0:startedDay+48)||(f.enabled&&startedDay===null))bad('火灾宽限状态');
+    const incidentHomes=ids(f.incidentHomes,'本次火情住房');if(incidentHomes.length>3||new Set(incidentHomes).size!==incidentHomes.length)bad('火情传播上限');
+    g.fireDisasters={enabled:f.enabled,startedDay,graceUntil,lastDay:integer(f.lastDay,'火灾结算日',-1,g.day),nextIgnitionDay:integer(f.nextIgnitionDay,'下次可起火日',0,g.day+24),serial:integer(f.serial,'火情序号',0),incidentHomes};
+    if(g.fireDisasters.serial===0&&incidentHomes.length)bad('火情序号');
+  }
   if(gd.farmPests!==undefined){const p=record(gd.farmPests,'农田虫害设置');if(typeof p.enabled!=='boolean')bad('农田虫害开关');
     g.farmPests={enabled:p.enabled,graceUntil:integer(p.graceUntil,'虫害宽限日',0,g.day+G.FARM_PESTS.graceDays),lastDay:integer(p.lastDay,'虫害结算日',-1,g.day)};
   }
@@ -387,6 +395,15 @@ G.prepareSaveData = function (d) {
       fuelLimit: bd.type === 'woodcutter' ? G.fuelLimitOf(bd) : undefined,
       reserveDays:bd.type==='tavern'?(bd.reserveDays===undefined?12:integer(bd.reserveDays,'酿酒储粮天数',8,48)):undefined,
     };
+    if(bd.houseFire!==undefined){const h=record(bd.houseFire,'住房火情');if(!['house','stonehouse'].includes(b.type)||b.state!=='ok'||b.family!==null||b.workers.length||g.fireDisasters.startedDay===null)bad('住房火情状态');
+      const incident=integer(h.incident,'火情来源',1),elapsed=number(h.elapsed,'火情发展小时',0,48),spreadAt=integer(h.spreadAt,'下次传播小时',18,54);
+      if(incident!==g.fireDisasters.serial||!g.fireDisasters.incidentHomes.includes(b.id)||elapsed>=48||spreadAt%6)bad('火情进度');
+      b.houseFire={incident,elapsed,need:integer(h.need,'剩余灭火桶数',1,3),spreadAt};
+    }
+    if(bd.type==='burntruins'){
+      if(!['house','stonehouse'].includes(bd.ruinFrom)||b.state!=='ok'||b.family!==null||b.workers.length||b.progress!==1||b.workLeft!==0)bad('烧毁住房状态');
+      if(bd.paidCost!==undefined&&Object.keys(record(bd.paidCost,'废墟建材')).length)bad('废墟不能退还旧建材');b.ruinFrom=bd.ruinFrom;b.ruinIncident=integer(bd.ruinIncident,'废墟火情序号',1,g.fireDisasters.serial);b.paidCost={};
+    }else if(bd.ruinFrom!==undefined||bd.ruinIncident!==undefined)bad('非废墟来源');
     if(bd.upgradeFrom!==undefined){if(bd.upgradeFrom!=='house'||bd.type!=='stonehouse')bad('住房升级来源');b.upgradeFrom='house';}
     if(bd.workerLimit!==undefined)b.workerLimit=integer(bd.workerLimit,'建筑用工上限',0,def.jobs||0);
     if(bd.sitePriority!==undefined){if(typeof bd.sitePriority!=='boolean'||b.state!=='site')bad('施工优先级');b.sitePriority=bd.sitePriority;}
@@ -604,6 +621,8 @@ G.prepareSaveData = function (d) {
     }else c.grief=null;
     w.citizens.push(c); w.cmap[c.id] = c;
   }
+  for(const f of w.families)if(f.houseId!==null&&(w.bmap[f.houseId]?.houseFire||w.bmap[f.houseId]?.type==='burntruins'))bad('火情住房不能入住');
+  for(const c of w.citizens)if(c.job!==null&&['well','burntruins'].includes(w.bmap[c.job]?.type))bad('无岗位消防设施');
   if(g.nomads.offer){const h=w.bmap[g.nomads.offer.hallId];if(!h||h.type!=='townhall'||h.state!=='ok')bad('来访申请市政厅失效');}
   for(const c of w.citizens)if(c.job!==null&&w.bmap[c.job]?.type==='mineralpit')bad('永久矿坑不能分配岗位');
   for(const c of w.citizens)if(G.isArriving(c)){c.job=null;for(const b of w.buildings)b.workers=b.workers.filter(id=>id!==c.id);}
