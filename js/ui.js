@@ -23,6 +23,7 @@ G.ui = {
   // Read-only citizen feedback. Idle is a scheduler state, not proof of a deadlock.
   citizenStatus: function (c) {
     const b = c.job != null ? G.world.bmap[c.job] : null;
+    if (G.isArriving ? G.isArriving(c) : c.arrivalHallId != null) return '迁入途中：先步行到市政厅报到';
     if (c.task && c.task.kind === 'care' && G.medicalStatus) return G.medicalStatus(c);
     if (c.state === 'rest') {
       if (G.citizenIndoorHome && G.citizenIndoorHome(c)) return '屋内休息';
@@ -202,7 +203,7 @@ G.ui = {
       { id: 'homes', name: '住房', icon: '🏠', hint: '安家与过冬', tools: ['house', 'stonehouse', 'boarding'] },
       { id: 'food', name: '食物生产', icon: '🌾', hint: '肉类 · 蔬菜 · 主食', tools: ['gatherer', 'hunting', 'dock', 'farm', 'orchard', 'pasture'] },
       { id: 'industry', name: '资源与加工', icon: '⚒️', hint: '木石铁煤 · 工具 · 衣物', tools: ['forester', 'woodcutter', 'stonequarry', 'mine', 'blacksmith', 'tailor'] },
-      { id: 'services', name: '城镇服务', icon: '🏘️', hint: '储运 · 教育 · 医疗 · 贸易', tools: ['storage', 'school', 'herbalist', 'hospital', 'tradingpost'] },
+      { id: 'services', name: '城镇服务', icon: '🏘️', hint: '储运 · 教育 · 医疗 · 迁入', tools: ['storage', 'school', 'herbalist', 'hospital', 'tradingpost', 'townhall'] },
       { id: 'land', name: '道路与采运', icon: '🛣️', hint: '修路 · 采集 · 拆除', tools: ['road', 'stoneroad', 'bridge', 'fell', 'quarry', 'demolish'] },
     ].map(group => ({ ...group, tools: group.tools.filter(available) })).filter(group => group.tools.length);
     const registered = new Set(this.toolGroups.flatMap(group => group.tools));
@@ -248,7 +249,7 @@ G.ui = {
     const icons = { stonehouse: 'tool_stonehouse', boarding: 'tool_boarding', mine: 'tool_mine', stonequarry: 'tool_stonequarry',
       blacksmith: 'tool_blacksmith', hunting: 'tool_hunting', house: 'tool_house', storage: 'tool_storage',
       gatherer: 'tool_gatherer', forester: 'tool_forester', woodcutter: 'tool_woodcutter', dock: 'tool_dock',
-      school: 'tool_school', herbalist: 'tool_herbalist', hospital: 'tool_hospital', farm: 'tool_farm', road: 'tool_road', stoneroad: 'tool_stoneroad', bridge: 'tool_bridge', demolish: 'tool_demolish' };
+      school: 'tool_school', herbalist: 'tool_herbalist', hospital: 'tool_hospital', townhall: 'tool_townhall', farm: 'tool_farm', road: 'tool_road', stoneroad: 'tool_stoneroad', bridge: 'tool_bridge', demolish: 'tool_demolish' };
     const special = {
       demolish: { name: '拆除', icon: '🚫', cost: '建筑 · 道路', tip: '拆除：点击建筑或道路移除；树木请用砍伐，岩石和铁矿请用采石采铁' },
       quarry: { name: '采石采铁', icon: '⛏', cost: '灰石 · 锈铁', tip: '采石采铁：框选预览并确认矿石；灰色岩石产石头，锈色铁矿产铁，散工开采后搬运入库' },
@@ -677,6 +678,106 @@ G.ui = {
       refund: !b.constructionStarted && b.progress === 0 && b.workLeft >= b.totalWork ? '未开工：取消退还全部已付建材，保留树木' : '已开工：拆除退还一半已付建材，已砍树不恢复'
     };
   },
+  townHallInfoData: function (b) {
+    if (b.type !== 'townhall' || b.state !== 'ok' || !G.townHallSummary) return null;
+    const s = G.townHallSummary(b), g = G.game, heat = this.heatDemand();
+    const days = n => Number.isFinite(n) ? `${Math.max(0, n).toFixed(1)} 天` : n === Infinity ? '暂无消耗' : '暂无记录';
+    const rows = (g.hist || []).filter(row => Number.isFinite(row.d) && row.d <= g.day && row.d > g.day - 60).slice(-60);
+    const born = rows.reduce((n, row) => n + (Number(row.born) || 0), 0);
+    const died = rows.reduce((n, row) => n + (Number(row.died) || 0), 0);
+    const data = {
+      status: '市政厅开放 · 无需安排工人',
+      population: `人口 ${s.population} · 成人 ${s.adults} · 儿童/学生 ${s.children}`,
+      housing: `无房家庭 ${s.homelessFamilies} 户 · 空屋 ${s.freeHomes} 户 · 宿舍空位 ${s.boardingSlots} 户`,
+      education: `已受教育 ${s.educated} 人 / 全镇 ${s.population} 人`,
+      health: `平均健康 ${Number(s.averageHealth || 0).toFixed(1)} / 5 · 患病 ${s.sick} 人`,
+      medical: `已任职健康医师 ${s.doctors} · 草药 ${Math.floor(s.herbs || 0)}；治疗仍需医师到岗、可达通路及接诊名额。`,
+      food: `食物 ${Math.floor(g.res.food)} · 现有人口约够 ${days(s.foodDays)}（不计新产出）`,
+      fuel: `柴火 ${Math.floor(g.res.firewood)} · ${this.heatDemandText(heat)}`,
+      tools: `工具 ${Math.floor(G.toolStock())} 件 · 当前成人约可用 ${days(G.toolDaysLeft(s.adults))}（不计新产出）`,
+      arriving: `迁入途中 ${s.arriving} 人；从地图边界步行到市政厅报到后再参加工作。`,
+      schedule: s.offer ? `本批申请至第 ${s.offer.expiresDay} 天；等待你的接纳或婉拒。`
+        : s.arriving ? '已接纳的家庭正在赶来。'
+        : Number.isFinite(s.nextDay) ? `暂无本厅申请，最早再访第 ${s.nextDay} 天；只在春夏来访。` : '暂无迁入申请。',
+      decisions: `已接纳 ${s.accepted} 人 · 主动婉拒 ${s.declined} 人（逾期离开不计）`,
+      historyTitle: `最近 60 天账本 · 已记录 ${rows.length} 天`,
+      historySummary: rows.length ? `第 ${rows[0].d}–${rows[rows.length - 1].d} 天：出生 ${born} · 死亡 ${died}；人口 ${rows[0].pop} → ${rows[rows.length - 1].pop}` : '尚无每日记录；结束第一天后开始记账。',
+      historyRows: rows.map(row => `第 ${row.d} 天 · 人口 ${Number(row.pop) || 0} · 出生 ${Number(row.born) || 0} · 死亡 ${Number(row.died) || 0} · ${[['food','粮'],['firewood','柴'],['wood','木'],['stone','石'],['iron','铁']].map(([key,label]) => label + (Number.isFinite(row[key]) ? row[key] : '—')).join(' / ')}`).join('\n'),
+    };
+    const offer = s.offer;
+    if (offer) {
+      const needed = s.offerFamilies + s.homelessFamilies, free = s.freeHomes + s.boardingSlots;
+      data.offerPeople = `申请迁入 ${s.offerPeople} 人 / ${s.offerFamilies} 户：成人 ${s.offerAdults} · 儿童 ${s.offerChildren}；全部未受教育。`;
+      data.offerFamilies = offer.families.map((f, i) => `家庭 ${i + 1}：父亲 ${f.fatherAge} 岁、母亲 ${f.motherAge} 岁${f.childAges.length ? '；孩子 ' + f.childAges.map(age => `${age} 岁`).join('、') : '；无随行儿童'}`).join('\n');
+      data.offerHousing = `住房：新来 ${s.offerFamilies} 户 + 现有无房 ${s.homelessFamilies} 户，共需 ${needed} 个家庭名额；空屋 ${s.freeHomes} + 宿舍空位 ${s.boardingSlots} = ${free}。${free < needed ? `还缺 ${needed - free} 户住处，可能露宿。` : '名额足够，入住仍需可达。'}`;
+      data.offerFood = `食物：新增约 ${Number(s.addedFoodPerDay).toFixed(1)} / 天；库存覆盖由 ${days(s.foodDays)} → ${days(s.foodDaysAfter)}，未计新增生产。`;
+      data.offerFuel = `取暖：若每户新家庭住木屋，整冬估计新增 ${Math.ceil(s.addedFuelPerWinter)} 柴火；现有柴火 ${Math.floor(g.res.firewood)}。石屋、宿舍与实际入住情况会改变需求。`;
+      data.offerMedical = `医疗：已任职健康医师 ${s.doctors} 人 · 草药 ${Math.floor(s.herbs || 0)}。${s.doctors ? '治疗仍需医师到岗、可达诊所及接诊名额。' : '目前没有医师，可自然康复，也可另配医师治疗。'}${offer.sickCount ? ` 本批有 ${offer.sickCount} 人患季节热病：会拖慢劳动，有近距传播风险，本批疾病不会直接致死。` : ' 本批未发现热病。'}`;
+    }
+    return { summary: s, data };
+  },
+  townHallInfoMarkup: function (b, facts) {
+    const data = facts.data;
+    return `<section class="townhall-details" data-townhall-panel>
+      ${['population', 'housing', 'education', 'health', 'medical', 'food', 'fuel', 'tools', 'arriving', 'schedule', 'decisions'].map(key => `<p class="row" data-townhall="${key}">${this.escHtml(data[key])}</p>`).join('')}
+      <div data-townhall-offer></div>
+      <p class="economy-message" data-townhall-message role="status" aria-live="polite"></p>
+      <details class="townhall-ledger"><summary data-townhall="historyTitle">${this.escHtml(data.historyTitle)}</summary>
+        <p data-townhall="historySummary">${this.escHtml(data.historySummary)}</p>
+        <div class="townhall-ledger-rows" data-townhall="historyRows">${this.escHtml(data.historyRows)}</div>
+        <p class="desc">仅保留实际记录的最近 60 天；出生、死亡与迁入分别计数，人口变化不等于出生减死亡。</p>
+      </details>
+    </section>`;
+  },
+  refreshTownHallInfo: function (b) {
+    const el = this.el.info;
+    if (!el.querySelector || !el.querySelector('[data-townhall-panel]')) return false;
+    const facts = this.townHallInfoData(b);
+    if (!facts) return false;
+    const { data, summary: s } = facts;
+    for (const key of Object.keys(data)) {
+      const node = el.querySelector(`[data-townhall="${key}"]`);
+      if (node && node.textContent !== data[key]) node.textContent = data[key];
+    }
+    const holder = el.querySelector('[data-townhall-offer]'), offerId = s.offer ? s.offer.id : null;
+    // Leave active controls intact on timed refreshes. Only a genuinely different
+    // offer gets new controls, whose handlers capture that offer's immutable ID.
+    if (holder._offerId !== offerId) {
+      const hadFocus = holder.contains && holder.contains(document.activeElement);
+      holder._offerId = offerId;
+      holder.innerHTML = s.offer ? `<section class="townhall-offer economy-form" aria-labelledby="townhall-offer-title">
+        <h3 id="townhall-offer-title">迁入申请 · 接纳前请核对</h3>
+        ${['offerPeople', 'offerFamilies', 'offerHousing', 'offerFood', 'offerFuel', 'offerMedical'].map(key => `<p id="townhall-${key}" data-townhall="${key}">${this.escHtml(data[key])}</p>`).join('')}
+        <p id="townhall-choice-note" class="townhall-choice-note">接纳会立即增加食物需求。即使住房、食物或医疗不足，也可自行决定接纳；婉拒不会增加人口。</p>
+        <div class="economy-actions"><button type="button" id="townhall-accept" aria-describedby="townhall-offerPeople townhall-offerHousing townhall-offerFood townhall-offerFuel townhall-offerMedical townhall-choice-note">知悉风险，接纳</button><button type="button" id="townhall-decline">婉拒本批</button></div>
+      </section>` : '';
+      const message = el.querySelector('[data-townhall-message]');
+      if (message) message.textContent = '';
+      if (hadFocus) { const close = el.querySelector('#info-close'); if (close && close.focus) close.focus(); }
+      if (s.offer) this.initTownHallOffer(b, holder, offerId);
+    }
+    return true;
+  },
+  initTownHallOffer: function (b, holder, offerId) {
+    const w = G.world, g = G.game, el = this.el.info;
+    let resolved = false;
+    for (const [id, accept] of [['townhall-accept', true], ['townhall-decline', false]]) {
+      const button = el.querySelector('#' + id);
+      if (!button) continue;
+      button.addEventListener('click', () => {
+        if (resolved || G.world !== w || G.game !== g || this.el.info !== el || !G.sel || G.sel.kind !== 'b' || G.sel.id !== b.id ||
+            w.bmap[b.id] !== b || b.state !== 'ok' || el.querySelector('[data-townhall-offer]') !== holder ||
+            el.querySelector('#' + id) !== button || holder._offerId !== offerId || (G.hasOpenModal && G.hasOpenModal())) return;
+        const current = G.townHallSummary(b).offer;
+        if (!current || current.id !== offerId) { this.refreshTownHallInfo(b); return; }
+        const result = G.decideNomads(b, offerId, accept);
+        if (result.ok) resolved = true;
+        this.refreshTownHallInfo(b);
+        const message = el.querySelector('[data-townhall-message]');
+        if (message) message.textContent = result.ok ? accept ? `已接纳 ${result.count || 0} 人，正在从地图边界赶来。` : '已婉拒本批申请。' : result.reason || '申请已变化，请查看最新情况后再决定。';
+      });
+    }
+  },
   resourceChainInfoData: function (b) {
     if (b.state !== 'ok' || !['mine', 'stonequarry', 'blacksmith'].includes(b.type)) return null;
     const smith = b.type === 'blacksmith', outputs = G.productionOutputsOf(b);
@@ -877,6 +978,7 @@ G.ui = {
     const sameSelection = this._infoWorld === w && this._infoSelection === selected;
     // Update only fuel text, never replace this panel's focused buttons. A new
     // selection or a site finishing construction still gets its own full panel.
+    if (sameSelection && selected.state === 'ok' && this._townHallInfoState === selected.state && this.refreshTownHallInfo(selected)) return;
     if (sameSelection && selected.state === 'ok' && this._economyInfoState === selected.state && this.refreshEconomyInfo(selected)) return;
     if (sameSelection && selected.state === 'ok' && this._medicalInfoState === selected.state && this.refreshMedicalInfo(selected)) return;
     if (sameSelection && selected.state === 'ok' && this._resourceChainInfoState === selected.state && this.refreshResourceChainInfo(selected)) return;
@@ -905,11 +1007,13 @@ G.ui = {
       const siteData = b.state === 'site' ? this.siteInfoData(b) : null;
       const medicalData = this.medicalInfoData(b);
       const chainData = this.resourceChainInfoData(b);
+      const hallData = this.townHallInfoData(b);
       let status;
       if (fuelData) status = fuelData.status;
       else if (siteData) status = siteData.status;
       else if (medicalData) status = medicalData.status;
       else if (chainData) status = chainData.status;
+      else if (hallData) status = hallData.data.status;
       else if (G.productionLimited(b) && G.buildingGoalStatus(b)) status = G.buildingGoalStatus(b);
       else if (b.type === 'house' || b.type === 'stonehouse') status = b.family != null ? '有人居住' : '空置';
       else if (['tradingpost', 'pasture', 'orchard'].includes(b.type)) status = this.economyStatus(b);
@@ -954,6 +1058,7 @@ G.ui = {
         <div class="row desc">目标不是取暖需求。库存达到目标只阻止本屋接新批次；调低可给建设留木，但不会预留建材。已接批次仍可能耗木，其他伐木屋按各自目标继续。住房变化和户外受冻仍须留意。</div>`;
       }
       if (chainData) extra += this.resourceChainInfoMarkup(b, chainData);
+      if (hallData) extra += this.townHallInfoMarkup(b, hallData);
       if (b.state === 'ok') extra += this.economyInfoMarkup(b);
       if (medicalData) extra += this.medicalInfoMarkup(b, medicalData);
       const outputs = { gatherer: ['vegetables'], hunting: ['meat', 'leather'], dock: ['meat'], farm: ['grain'], orchard: ['vegetables'], pasture: ['meat', 'wool'], tailor: ['clothes'], herbalist: ['herbs'] };
@@ -971,7 +1076,7 @@ G.ui = {
       }
       el.innerHTML = `
         <div class="info-head"><span>${def.icon} ${def.name}</span><button id="info-close">✕</button></div>
-        <div class="row"${siteData ? ' data-site-status' : ''}${fuelData ? ' data-fuel="status"' : ''}${medicalData ? ' data-medical="status"' : ''}${chainData ? ' data-resource-chain-live="status"' : ''}${b.state === 'ok' && ['tradingpost', 'pasture', 'orchard'].includes(b.type) ? ' data-economy-status' : ''}>${this.escHtml(status)}</div>
+        <div class="row"${siteData ? ' data-site-status' : ''}${fuelData ? ' data-fuel="status"' : ''}${medicalData ? ' data-medical="status"' : ''}${chainData ? ' data-resource-chain-live="status"' : ''}${hallData ? ' data-townhall="status"' : ''}${b.state === 'ok' && ['tradingpost', 'pasture', 'orchard'].includes(b.type) ? ' data-economy-status' : ''}>${this.escHtml(status)}</div>
         ${workers}${extra}
         <div class="row desc">${def.desc}</div>
         <div class="row desc" data-info-refund${fuelData ? ' data-fuel="refund"' : ''}>${fuelData ? fuelData.refund : siteData ? siteData.refund : '已开工：拆除退还一半已付建材，已砍树不恢复'}</div>
@@ -980,6 +1085,8 @@ G.ui = {
       this._economyInfoState = b.state;
       this._medicalInfoState = b.state;
       this._resourceChainInfoState = b.state;
+      this._townHallInfoState = b.state;
+      if (hallData) this.refreshTownHallInfo(b);
       if (medicalData) this.refreshMedicalPatients(b);
       if (chainData) this.initResourceChainInfo(b);
       if (b.state === 'ok') this.initEconomyInfo(b);

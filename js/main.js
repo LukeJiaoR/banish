@@ -103,7 +103,7 @@ G.serializeGame = function () {
       v: G.VERSION,
       h: g.h, day: g.day, season: g.season, year: g.year,
       res: g.res, stats: g.stats, prevFood: g.prevFood, foodNet: g.foodNet, foodUrgent: g.foodUrgent, warned: g.warned,
-      hist: g.hist, buildLog: g.buildLog, toolWear: g.toolWear, steelToolWear: g.steelToolWear, healthStartDay: g.healthStartDay, unlocks: g.unlocks, livestock: g.livestock,
+      hist: g.hist, buildLog: g.buildLog, toolWear: g.toolWear, steelToolWear: g.steelToolWear, healthStartDay: g.healthStartDay, nomads:g.nomads, unlocks: g.unlocks, livestock: g.livestock,
       productionGoals: g.productionGoals && { ...g.productionGoals }, productionPaused: g.productionPaused && { ...g.productionPaused },
     },
     roads: Array.from(w.road).flatMap((road, i) => road ? [i] : []),
@@ -132,7 +132,7 @@ G.serializeGame = function () {
       x: c.x, y: c.y, familyId: c.familyId, job: c.job,
       partnerId: c.partnerId, parentIds: c.parentIds, grandparentIds: c.grandparentIds, ancestorIds: c.ancestorIds, birthFamilyId: c.birthFamilyId,
       student: c.student ? 1 : 0, educated: c.educated ? 1 : 0, school: c.school != null ? c.school : null,
-      hunger: c.hunger, cold: c.cold, clothingLeft: c.clothingLeft, dietVariety: c.dietVariety, dietScore: c.dietScore, happiness: c.happiness, health: c.health, sickDays: c.sickDays, immunityDays: c.immunityDays, herbCooldown: c.herbCooldown, careHours: c.careHours, camped: c.camped ? 1 : 0, carry: c.carry,
+      arrivalHallId:c.arrivalHallId, hunger: c.hunger, cold: c.cold, clothingLeft: c.clothingLeft, dietVariety: c.dietVariety, dietScore: c.dietScore, happiness: c.happiness, health: c.health, sickDays: c.sickDays, immunityDays: c.immunityDays, herbCooldown: c.herbCooldown, careHours: c.careHours, camped: c.camped ? 1 : 0, carry: c.carry,
     })),
     nextUid: G._peekUid(),
   };
@@ -272,6 +272,17 @@ G.prepareSaveData = function (d) {
   if (gd.prevFood !== undefined) g.prevFood = number(gd.prevFood, '昨日食物', 0);
   if (gd.foodNet !== undefined) g.foodNet = number(gd.foodNet, '食物变化');
   g.healthStartDay = gd.healthStartDay === undefined ? g.day : integer(gd.healthStartDay, '健康机制启用日', 0, g.day);
+  g.nomads={nextDay:g.day+G.YEAR_DAYS,serial:0,offer:null,accepted:0,declined:0};
+  if(gd.nomads!==undefined){
+    const n=record(gd.nomads,'迁入记录');
+    g.nomads={nextDay:integer(n.nextDay,'下次来访日'),serial:integer(n.serial,'来访序号'),accepted:integer(n.accepted,'累计接纳'),declined:integer(n.declined,'累计拒绝'),offer:null};
+    if(n.offer!=null){const o=record(n.offer,'来访申请'),fs=array(o.families,'来访家庭');if(fs.length<1||fs.length>2)bad('来访家庭数');
+      const families=fs.map(f=>{record(f,'来访家庭');const ages=array(f.childAges,'来访子女年龄');if(ages.length>1)bad('来访子女人数');return {fatherAge:integer(f.fatherAge,'来访父亲年龄',22,38),motherAge:integer(f.motherAge,'来访母亲年龄',22,38),childAges:ages.map(a=>integer(a,'来访孩子年龄',2,8))};});
+      g.nomads.offer={id:id(o.id,'来访序号'),hallId:id(o.hallId,'申请市政厅'),expiresDay:integer(o.expiresDay,'申请截止日'),families,sickCount:integer(o.sickCount,'来访热病人数',0,1)};
+      if(o.id>g.nomads.serial)bad('来访序号超前');
+    }
+  }
+
   g.toolWear = Number.isFinite(gd.toolWear) && gd.toolWear >= 0 ? gd.toolWear : 0;
   g.steelToolWear = gd.steelToolWear === undefined ? 0 : number(gd.steelToolWear, '钢工具磨损', 0, 1);
   g.warned = gd.warned === undefined ? {} : clone(record(gd.warned, '提醒状态'));
@@ -437,7 +448,7 @@ G.prepareSaveData = function (d) {
       ancestorIds: cd.ancestorIds === undefined ? undefined : ids(cd.ancestorIds, '祖辈 ID'),
       birthFamilyId: cd.birthFamilyId === undefined ? undefined : nullableId(cd.birthFamilyId, '原生家庭'),
       student: !!cd.student, educated: !!cd.educated, school: nullableId(cd.school, '学校'),
-      task: null, pausedTask: null, carry, state: 'idle', walkKind: '', path: null, pi: 0, camped: !!cd.camped,
+      arrivalHallId:nullableId(cd.arrivalHallId,'入村登记点'), task: null, pausedTask: null, carry, state: 'idle', walkKind: '', path: null, pi: 0, camped: !!cd.camped,
       wanderT: 0, hunger: cd.hunger === undefined ? 0 : number(cd.hunger, '饥饿', 0),
       cold: cd.cold === undefined ? 0 : number(cd.cold, '寒冷', 0), animT: 0, dead: false,
       clothingLeft: cd.clothingLeft === undefined ? 0 : number(cd.clothingLeft, '衣物耐久天数', 0, G.YEAR_DAYS),
@@ -452,6 +463,8 @@ G.prepareSaveData = function (d) {
     };
     w.citizens.push(c); w.cmap[c.id] = c;
   }
+  if(g.nomads.offer){const h=w.bmap[g.nomads.offer.hallId];if(!h||h.type!=='townhall'||h.state!=='ok')bad('来访申请市政厅失效');}
+  for(const c of w.citizens)if(G.isArriving(c)){c.job=null;for(const b of w.buildings)b.workers=b.workers.filter(id=>id!==c.id);}
   // Old resource huts held four workers. Keep two stable assignments on completed
   // specialist huts; builders keep their construction slots until finishBuilding runs.
   // Tasks already restart under the existing snapshot contract; cargo stays owned
@@ -487,7 +500,7 @@ G.applySaveData = function (d) {
   G.ui.hideInfo(); G.ui.setToolActive();
   document.getElementById('over').classList.add('hidden');
   // All cargo is validated and owned by the candidate; now resume its deliveries.
-  for (const c of G.world.citizens) if (c.carry) G.startHaul(c);
+  for (const c of G.world.citizens) if (c.carry) G.startHaul(c); else if(G.isArriving(c))G.startImmigration(c);
   const s = G.world.start, [sx, sy] = G.T2S(s.x, s.y);
   G.cam.x = window.innerWidth / 2 - sx * G.cam.z;
   G.cam.y = window.innerHeight / 2 - sy * G.cam.z;
