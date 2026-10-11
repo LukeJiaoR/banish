@@ -124,6 +124,12 @@ G.BDEF = {
     wall: '#b3a28a', wallD: '#8b7963', roof: '#675e51',
     desc: '1名医师、8个床位。患病市民需沿可达路线入诊，医师到岗累计照料24小时后康复；入诊后不再向周围传播。无医师时不能治疗。本批季节热病自然8天康复，不直接致死。',
   },
+  townhall: {
+    id: 'townhall', name: '市政厅', icon: '🏛️', w: 3, h: 3,
+    cost: {wood:63,stone:124,iron:48}, buildWork:160, jobs:0, passable:false,
+    wall:'#a09077',wallD:'#746958',roof:'#6e7775',
+    desc: '不占工人。查看城镇与近60天记录，主动接纳或拒绝来访家庭。2～6人是小镇节奏适配；接纳前查看住房、粮柴与医疗压力，来者从可达边界步行入村登记后才工作。',
+  },
   school: {
     id: 'school', name: '学堂', icon: '🏫', w: 3, h: 3,
     cost: { wood: 50, stone: 16, iron: 16 }, buildWork: 100, jobs: 1, passable: false,

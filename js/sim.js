@@ -9,6 +9,7 @@ G.newGameState = function () {
     speed: 1, paused: false,
     res: { wood: 80, stone: 48, iron: 0, tools: 15, food: 500, meat: 0, vegetables: 0, grain: 500, leather: 0, wool: 0, clothes: 0, herbs: 0, coal: 0, steelTools: 0, firewood: 50 }, // 开局（原版中难度 5 家庭，工具 15 件≈第一轮磨损周期）；存粮较原版加厚：15 人 6 天食物跑道撑不到第一座采集屋建成
     healthStartDay: 0,
+    nomads: {nextDay:G.YEAR_DAYS,serial:0,offer:null,accepted:0,declined:0},
     schedT: 1,
     over: false,
     stats: { born: 0, died: 0, deadReasons: {} },
@@ -58,6 +59,7 @@ G.endDay = function () {
   if (g.season !== oldSeason) G.onSeasonChange(oldSeason, g.season);
 
   G.advanceTownEconomy();
+  G.advanceNomads();
 
   // ---- 农田生长 ----
   for (const b of w.buildings) {
@@ -439,7 +441,7 @@ G.tryBirths = function () {
   for (const fam of w.families) {
     if (fam.members.length < 2 || fam.houseId == null || fam.members.length >= G.LIFE.maxFamily) continue;
     const couple = (fam.coupleIds || []).map(id => w.cmap[id]);
-    if (couple.length !== 2 || couple.some(c => !c || c.dead || c.student || c.familyId !== fam.id || !fam.members.includes(c.id))) continue;
+    if (couple.length !== 2 || couple.some(c => !c || c.dead || c.student || G.isArriving(c) || c.familyId !== fam.id || !fam.members.includes(c.id))) continue;
     const mother = couple.find(c => c.sex === 'f'), father = couple.find(c => c.sex === 'm');
     if (!mother || !father || mother.partnerId !== father.id || father.partnerId !== mother.id || G.areCloseKin(mother, father)) continue;
     if (mother.age < Math.max(18, G.MOTHER_MIN) || mother.age > G.MOTHER_MAX || father.age < 18) continue;
@@ -485,7 +487,7 @@ G.spawnCitizen = function (opt) {
     grandparentIds: Array.isArray(opt.grandparentIds) ? opt.grandparentIds.slice() : [],
     ancestorIds: Array.isArray(opt.ancestorIds) ? opt.ancestorIds.slice() : [],
     birthFamilyId: opt.birthFamilyId != null ? opt.birthFamilyId : null,
-    job: null, task: null, carry: null, pausedTask: null,
+    job: null, task: null, carry: null, pausedTask: null, arrivalHallId:opt.arrivalHallId??null,
     student: false, educated: false, school: null,
     state: 'idle', walkKind: '', path: null, pi: 0, camped: false,
     wanderT: G.rng() * 3,
@@ -578,7 +580,7 @@ G.alternateTaskEndpoint = function (c, t) {
   if (!t || G.physicalTaskEndpoint(t) || !t.b || G.world.bmap[t.b.id] !== t.b) return null;
   if (['build','clearSite'].includes(t.kind) ? t.b.state !== 'site' : t.b.state !== 'ok') return null;
   if (t.kind === 'clearSite' && (!t.tree || G.world.trees[G.world.treeIdx[t.tree.i]] !== t.tree)) return null;
-  if (['care', 'clinic'].includes(t.kind)) return G.workSpot(G.world, t.b, c.x, c.y, true);
+  if (['care', 'clinic', 'arrival'].includes(t.kind)) return G.workSpot(G.world, t.b, c.x, c.y, true);
   if (t.kind === 'clearSite') return G.siteClearSpot(c, t.b, t.tree);
   if (['firewood', 'trade'].includes(t.kind) && t.phase === 'fetch') return G.storageRoute(c.x, c.y)?.spot || null;
   if (t.kind === 'build' || t.kind === 'firewood' || t.kind === 'trade' ||
@@ -603,7 +605,7 @@ G.routeCanReuse = function (route, c, tx, ty) {
 G.sendTo = function (c, tx, ty, planned = null) {
   let route=planned||(c.task&&c.task.dispatchRoute);
   if(c.task) delete c.task.dispatchRoute;
-  const buildingTask=c.task && (['build','clearSite','firewood','trade','care','clinic'].includes(c.task.kind) || (c.task.kind==='work' && c.task.b && ['dock','mine','stonequarry','blacksmith','pasture','orchard'].includes(c.task.b.type)));
+  const buildingTask=c.task && (['build','clearSite','firewood','trade','care','clinic','arrival'].includes(c.task.kind) || (c.task.kind==='work' && c.task.b && ['dock','mine','stonequarry','blacksmith','pasture','orchard'].includes(c.task.b.type)));
   if((route && !G.routeCanReuse(route,c,tx,ty)) || (!route && buildingTask)) {
     const spot=G.alternateTaskEndpoint(c,c.task);
     if(!spot){if(c.task)G.dropBlockedTask(c,c.task);c.path=null;c.state='idle';c.wanderT=.5;return false;}
@@ -653,6 +655,7 @@ G.goHome = function (c) {
 
 /* 天亮续接昨晚挂起的任务；目标已失效（树被砍/建筑拆了/换岗位）则放弃 */
 G.resumeTask = function (c) {
+  if (G.isArriving(c)) {c.pausedTask=null;return G.startImmigration(c);}
   const t = c.pausedTask;
   c.pausedTask = null;
   if (!t) return false;
@@ -890,6 +893,7 @@ G.buildingGoalStatus = function (b) {
 // Only configured automatic jobs gain completion protection. Never change the
 // unset baseline, teachers, manual tasks, or construction scheduling here.
 G.goalCommitment = function (c) {
+  if (G.isArriving(c)) return true;
   if (c.task && c.task.kind === 'care') return true;
   const b = G.world.bmap[c.job];
   if (b && b.type === 'hospital' && !G.isSick(c) && G.world.citizens.some(G.isSick)) return true;
@@ -1086,7 +1090,7 @@ G.stepCitizen = function (c, dtH) {
       c.wanderT -= dtH;
       if (c.wanderT <= 0) {
         c.wanderT = 2 + G.rng() * 5;
-        if (c.age >= G.ADULT_AGE) G.requestTask(c); // 有岗位的接活；无业散工顺路处理「砍伐」标记
+        if (G.isArriving(c) || c.age >= G.ADULT_AGE) G.requestTask(c); // 有岗位的接活；无业散工顺路处理「砍伐」标记
         else if (!G.tryMedicalCare(c)) G.wander(c);
       }
     }
@@ -1154,6 +1158,7 @@ G.cancelResourceMarks = function (kind) {
 
 G.requestTask = function (c) {
   c.task = null;
+  if (G.isArriving(c)) {if(G.isRestTime())G.goHome(c);else G.startImmigration(c);return;}
   if (!c.carry && G.tryMedicalCare(c)) return;
   if (G.isRestTime()) { G.goHome(c); return; } // 深夜不接受新任务
   const w = G.world;
@@ -1513,6 +1518,11 @@ G.completeTask = function (c) {
   if (!t) { G.requestTask(c); return; }
   const b = t.b;
   switch (t.kind) {
+    case 'arrival': {
+      if(b && G.world.bmap[b.id]===b && b.state==='ok' && G.d2(c.x,c.y,t.tx,t.ty)<.04 && !G.tileBlocked(G.world,t.tx,t.ty)){c.arrivalHallId=null;c.pausedTask=null;G.game.schedT=0;if(!c.adult){c.state='idle';c.wanderT=1;return;}}
+      else {G.startImmigration(c);return;}
+      break;
+    }
     case 'clinic': break;
     case 'build': {
       if (b && b.state === 'site') {
@@ -1637,6 +1647,7 @@ G.releaseWorker = function (c) {
 };
 
 G.assignWorker = function (b, c) {
+  if(G.isArriving(c))return;
   if (b.type === 'hospital' && b.state === 'ok' && G.isSick(c)) return;
   c.job = b.id;
   b.workers.push(c.id);
@@ -1984,6 +1995,7 @@ G.addBuilding = function (type, x, y, opt) {
 G.finishBuilding = function (b) {
   if (b.state !== 'site' || G.siteTrees(b).length) return;
   b.state = 'ok';
+  if(b.type==='townhall')G.game.nomads.nextDay=Math.max(G.game.nomads.nextDay,G.game.day+G.SEASON_DAYS);
   b.progress = 1;
   G.bumpNavigation(G.world);
   // 建造工人多于正式岗位时，释放多余人员
@@ -2001,6 +2013,7 @@ G.finishBuilding = function (b) {
 
 G.removeBuilding = function (b) {
   const w = G.world;
+  if(b.type==='townhall'&&G.game.nomads.offer?.hallId===b.id)G.game.nomads.offer=null;
   if (b.type === 'bridge') { const check=G.bridgeRemovalStatus(w,b); if(!check.ok){G.ui.toast(check.reason,'warn');return;} }
   if (b.type === 'tradingpost' && Object.values(b.tradeInventory || {}).some(q => q > 0)) { G.ui.toast('先把待售目标设0，搬空贸易库存再拆除','warn'); return; }
   if (b.type === 'pasture' && b.animals) { G.game.livestock.sheep += b.animals; b.animals = 0; }
@@ -2358,4 +2371,82 @@ G.addBridge = function(start,end) {
   for(const [type,qty]of Object.entries(plan.materials))G.game.res[type]-=qty;
   w.buildings.push(b);w.bmap[b.id]=b;for(const p of plan.path){w.bgrid[p.y*w.N+p.x]=b.id;G.markGroundDirty(p.x,p.y);}
   G.bumpNavigation(w);G.game.buildLog.push({d:G.game.day,t:'bridge'});if(G.game.buildLog.length>30)G.game.buildLog.shift();G.scheduleJobs();return {ok:true,b};
+};
+
+/* One town-wide offer: accepting is an explicit, idempotent gameplay decision.
+ * Family sizes and timing are intentionally bounded for this small-town model. */
+G.isArriving = c => !!c && !c.dead && c.arrivalHallId != null;
+G.nomadPeople = offer => offer ? offer.families.reduce((n,f)=>n+2+f.childAges.length,0) : 0;
+G.advanceNomads = function() {
+  const g=G.game,w=G.world,n=g.nomads;
+  if(n.offer && (n.offer.expiresDay<=g.day || w.bmap[n.offer.hallId]?.type!=='townhall' || w.bmap[n.offer.hallId]?.state!=='ok'))n.offer=null;
+  if(n.offer || g.day<n.nextDay || g.season>=2 || w.citizens.length<10)return;
+  const hall=w.buildings.find(b=>b.type==='townhall'&&b.state==='ok');if(!hall)return;
+  const count=G.clamp(Math.round(w.citizens.length*(.1+G.rng()*.2)),2,6),families=[];
+  const households=count>=4?2:1;let kids=count-households*2;
+  for(let f=0;f<households;f++){const childCount=Math.min(1,kids);kids-=childCount;families.push({fatherAge:G.ri(22,38),motherAge:G.ri(22,38),childAges:Array.from({length:childCount},()=>G.ri(2,8))});}
+  n.offer={id:++n.serial,hallId:hall.id,expiresDay:g.day+G.SEASON_DAYS,families,sickCount:G.chance(.2)?1:0};
+  n.nextDay=g.day+G.YEAR_DAYS;
+  G.ui.toast(`🏛 有${G.nomadPeople(n.offer)}名来访者申请迁入，请在市政厅查看需求后接纳或拒绝（${G.SEASON_DAYS}天内）`,'info');
+};
+G.nomadEntry = function(b) {
+  const w=G.world;if(!b||w.bmap[b.id]!==b||b.state!=='ok'||b.type!=='townhall')return null;
+  const edges=[];for(let k=0;k<w.N;k++)for(const p of [{x:k,y:0},{x:k,y:w.N-1},{x:0,y:k},{x:w.N-1,y:k}])if(!G.tileBlocked(w,p.x,p.y))edges.push(p);
+  // A stranded resident at one side of the hall must not veto another doorway
+  // connected to both the settled village and a walkable map boundary.
+  const checked=new Set();
+  for(const c of w.citizens){
+    if(c.dead||G.isArriving(c))continue;
+    const door=G.workSpot(w,b,c.x,c.y);if(!door)continue;
+    const key=door.y*w.N+door.x;if(checked.has(key))continue;checked.add(key);
+    const outward=G.findPathToAny(w,door.x,door.y,edges);if(!outward)continue;
+    const boundary=outward.target,back=[{x:door.x,y:door.y},...outward.path].reverse().slice(1);
+    return {boundary,door:{x:door.x,y:door.y,building:b,state:'ok'},path:back};
+  }
+  return null;
+};
+G.startImmigration = function(c,entry=null) {
+  if(!G.isArriving(c))return false;
+  const w=G.world;let b=w.bmap[c.arrivalHallId],spot;
+  if(b&&b.type==='townhall'&&b.state==='ok')spot=entry?entry.door:G.workSpot(w,b,c.x,c.y);
+  else {b=null;for(const fallback of w.buildings.filter(x=>x.state==='ok'&&['townhall','storage'].includes(x.type))){spot=G.workSpot(w,fallback,c.x,c.y);if(spot){b=fallback;break;}}}
+  if(!b||!spot){c.task=null;c.path=null;c.state='idle';c.wanderT=2;return false;}
+  c.task={kind:'arrival',b,tx:spot.x,ty:spot.y,work:.1,workLeft:.1};
+  const route=entry?{world:w,revision:w.navigationRevision||0,fromX:c.x,fromY:c.y,target:entry.door,path:entry.path}:spot.route;
+  return G.sendTo(c,spot.x,spot.y,route);
+};
+G.decideNomads = function(b,offerId,accept) {
+  const w=G.world,g=G.game,n=g.nomads,o=n.offer;
+  if(w.bmap[b?.id]!==b||b?.type!=='townhall'||b.state!=='ok'||!o||o.id!==offerId||o.hallId!==b.id||o.expiresDay<=g.day||typeof accept!=='boolean')return {ok:false,reason:'这批申请已变化或过期，请查看当前市政厅记录'};
+  const count=G.nomadPeople(o);
+  if(!accept){n.offer=null;n.declined+=count;return {ok:true,count};}
+  const entry=G.nomadEntry(b);if(!entry)return {ok:false,reason:'没有从地图边界通往本村市政厅的可达路线，请先打通道路或桥梁'};
+  // Consume the exact offer before creating people. Repeated/stale clicks cannot
+  // add the same families twice, including callbacks from another hall/world.
+  n.offer=null;const newcomers=[];
+  for(const f of o.families){
+    const base={x:entry.boundary.x,y:entry.boundary.y,arrivalHallId:b.id};
+    const father=G.spawnCitizen({...base,sex:'m',age:f.fatherAge}),mother=G.spawnCitizen({...base,sex:'f',age:f.motherAge});
+    const fam={id:G.nextId(),members:[father.id,mother.id],houseId:null,coupleIds:[father.id,mother.id]};
+    father.partnerId=mother.id;mother.partnerId=father.id;father.familyId=fam.id;mother.familyId=fam.id;w.families.push(fam);newcomers.push(father,mother);
+    for(const age of f.childAges){const child=G.spawnCitizen({...base,age,adult:false,familyId:fam.id,parentIds:[father.id,mother.id],birthFamilyId:fam.id});fam.members.push(child.id);newcomers.push(child);}
+  }
+  if(o.sickCount)newcomers[0].sickDays=1; // disclosed, existing nonlethal fever only
+  n.accepted+=count;G.normalizeFamilyRelations(w);G.assignHousing();
+  for(const c of newcomers)G.startImmigration(c,entry);
+  g.schedT=0;G.ui.refreshHUD();return {ok:true,count};
+};
+G.townHallSummary = function(b) {
+  const w=G.world,g=G.game,n=g.nomads,cs=w.citizens.filter(c=>!c.dead),pop=cs.length;
+  const offer=n.offer&&n.offer.hallId===b.id&&n.offer.expiresDay>g.day?n.offer:null,people=G.nomadPeople(offer);
+  const children=cs.filter(c=>!c.adult).length,offeredFamilies=offer?offer.families.length:0;
+  return {population:pop,adults:cs.filter(c=>c.adult).length,children,educated:cs.filter(c=>c.educated).length,
+    homelessFamilies:w.families.filter(f=>f.members.length&&f.houseId==null).length,
+    freeHomes:w.buildings.filter(h=>h.state==='ok'&&['house','stonehouse'].includes(h.type)&&h.family==null).length,
+    boardingSlots:w.buildings.filter(h=>h.state==='ok'&&h.type==='boarding').reduce((s,h)=>s+Math.max(0,G.LIFE.boardingCap-G.boardingFamilies(w,h).length),0),
+    averageHealth:pop?cs.reduce((s,c)=>s+G.healthOf(c),0)/pop:0,sick:cs.filter(G.isSick).length,
+    doctors:w.buildings.filter(h=>h.type==='hospital'&&h.state==='ok').reduce((s,h)=>s+h.workers.filter(id=>w.cmap[id]&&!w.cmap[id].dead&&!G.isSick(w.cmap[id])).length,0),herbs:g.res.herbs,
+    foodDays:pop?g.res.food/(pop*G.LIFE.eatPerDay):0,offer,offerPeople:people,offerFamilies:offeredFamilies,offerAdults:offeredFamilies*2,offerChildren:people-offeredFamilies*2,
+    foodDaysAfter:pop+people?g.res.food/((pop+people)*G.LIFE.eatPerDay):0,addedFoodPerDay:people*G.LIFE.eatPerDay,addedFuelPerWinter:offeredFamilies*30,
+    arriving:cs.filter(G.isArriving).length,nextDay:n.nextDay,accepted:n.accepted,declined:n.declined};
 };

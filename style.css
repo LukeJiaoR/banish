@@ -423,3 +423,15 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .trade-inventory summary { cursor: pointer; color: #e5c88c; }
 .trade-inventory p { padding-top: 6px; font-size: 11px; }
 @media (max-width: 600px) { .economy-form select, .economy-form input, .economy-form button { min-height: 42px; font-size: 13px; } }
+
+/* Town records and the explicit migration decision share one persistent panel. */
+.townhall-details { margin-top: 7px; padding-top: 5px; border-top: 1px solid rgba(216,178,90,.3); }
+.townhall-offer { border-color: #c69c4b; background: rgba(101,74,30,.3); }
+.townhall-offer p { margin: 6px 0; white-space: pre-line; overflow-wrap: anywhere; }
+.townhall-choice-note { color: #ffd59a; border-left: 2px solid #d4a35c; padding-left: 7px; }
+.townhall-offer .economy-actions button { flex: 1 1 100px; }
+.townhall-offer button:focus-visible, .townhall-ledger summary:focus-visible { outline: 2px solid #ffe4a0; outline-offset: 3px; }
+.townhall-ledger { margin-top: 8px; padding-top: 6px; border-top: 1px dashed #79643e; }
+.townhall-ledger summary { cursor: pointer; color: #e5c88c; }
+.townhall-ledger p { margin: 6px 0; }
+.townhall-ledger-rows { max-height: 180px; overflow-y: auto; white-space: pre-line; font-size: 11px; font-variant-numeric: tabular-nums; }
