@@ -246,4 +246,15 @@ test('real simulation acceptance updates the persistent panel and spawns real fa
   assert.match(live(f, 'arriving').textContent, /迁入途中 3 人/);
   assert.equal(G.game.nomads.offer, null);
 });
+test('development challenges explain adapted independent criteria without granting rewards or rewriting old dates',()=>{
+ const f=town(),{G,b}=f;f.select(b);assert.match(f.info.textContent,/发展挑战（本作适配）/);assert.match(live(f,'challengeSettlement').textContent,/已入村 0\/30 人/);assert.match(live(f,'challengeFood').textContent,/0\/12 日.*0\/3/);assert.match(live(f,'challengeEducation').textContent,/0\/3 人.*0\/1 人/);assert.match(f.info.textContent,/无资源奖励或效率加成/);assert.match(f.info.textContent,/旧档不追溯历史完成日/);
+ G.game.day=80;G.game.challenges.completed.settlement=80;G.ui.renderInfo();assert.match(live(f,'challengeSettlement').textContent,/已确认：第 80 天/);
+});
+test('challenge rows update in place while details controls retain focus and rendering remains read-only',()=>{
+ const f=town(),{G,b}=f;f.select(b);const close=f.info.querySelector('#info-close');close.focus();const row=live(f,'challengeFood'),writes=f.info.htmlWrites;const before=JSON.stringify({g:G.game,w:G.world});for(let i=0;i<30;i++)G.ui.renderInfo();assert.equal(f.info.htmlWrites,writes);assert.equal(live(f,'challengeFood'),row);assert.equal(f.doc.activeElement,close);assert.equal(JSON.stringify({g:G.game,w:G.world}),before);
+});
+test('new village never inherits a previous worlds confirmation dates in the existing hall view',()=>{
+ const f=town(),{G,b}=f;G.game.challenges.completed.education=0;f.select(b);assert.match(live(f,'challengeEducation').textContent,/已确认：第 0 天/);G.game=G.newGameState();G.ui.renderInfo();assert.doesNotMatch(live(f,'challengeEducation').textContent,/已确认/);assert.deepEqual(Object.keys(G.game.challenges.completed),[]);
+});
+
 console.log(`Town hall UI: ${passed} interaction suites passed (DOM fixture; browser visual acceptance not performed).`);

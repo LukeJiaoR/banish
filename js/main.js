@@ -103,7 +103,7 @@ G.serializeGame = function () {
       v: G.VERSION,
       h: g.h, day: g.day, season: g.season, year: g.year,
       res: g.res, stats: g.stats, prevFood: g.prevFood, foodNet: g.foodNet, foodUrgent: g.foodUrgent, warned: g.warned,
-      heating:g.heating, townLedger:g.townLedger, hist: g.hist, buildLog: g.buildLog, toolWear: g.toolWear, steelToolWear: g.steelToolWear, healthStartDay: g.healthStartDay, nomads:g.nomads, unlocks: g.unlocks, livestock: g.livestock,
+      heating:g.heating, townLedger:g.townLedger, challenges:g.challenges, hist: g.hist, buildLog: g.buildLog, toolWear: g.toolWear, steelToolWear: g.steelToolWear, healthStartDay: g.healthStartDay, nomads:g.nomads, unlocks: g.unlocks, livestock: g.livestock,
       productionGoals: g.productionGoals && { ...g.productionGoals }, productionPaused: g.productionPaused && { ...g.productionPaused },
     },
     roads: Array.from(w.road).flatMap((road, i) => road ? [i] : []),
@@ -252,6 +252,10 @@ G.prepareSaveData = function (d) {
   if (!hasFoodClasses) g.res.grain = g.res.food; // legacy stock is preserved once
   if (gd.unlocks !== undefined) {record(gd.unlocks,'产业解锁');if(typeof gd.unlocks.orchard !== 'boolean')bad('果树种子解锁');if(gd.unlocks.cabbage!==undefined&&typeof gd.unlocks.cabbage!=='boolean')bad('卷心菜种子解锁');g.unlocks={orchard:gd.unlocks.orchard,cabbage:gd.unlocks.cabbage===true};}
   if (gd.livestock !== undefined) {record(gd.livestock,'待安置牲畜');g.livestock={sheep:integer(gd.livestock.sheep,'待安置羊',0,1000000),cattle:gd.livestock.cattle===undefined?0:integer(gd.livestock.cattle,'待安置牛',0,1000000)};}
+  if(gd.challenges!==undefined){
+    const q=record(gd.challenges,'发展挑战');if(q.v!==1)bad('发展挑战版本');const completed=record(q.completed,'挑战确认日');
+    for(const key of Object.keys(completed)){if(!G.TOWN_CHALLENGE_KEYS.includes(key))bad('发展挑战项目');g.challenges.completed[key]=integer(completed[key],'挑战确认日',0,g.day);}
+  }
   if (gd.productionGoals !== undefined) {
     const goals = record(gd.productionGoals, '自动生产目标');
     const paused = gd.productionPaused === undefined ? {} : record(gd.productionPaused, '生产暂停状态');
