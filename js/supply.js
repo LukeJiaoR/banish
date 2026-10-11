@@ -3,6 +3,9 @@
  * an atomic mixed basket, arrival moves it again, and meals/heating consume only
  * the destination's stock. Automatic supply remains the new/legacy default. */
 G.supplyEnabled=()=>G.game.supplyMode==='physical';
+G.clothingSupplyEnabled=()=>G.supplyEnabled()&&G.game.clothingSupply===true;
+G.supplyCoats=s=>(s?.clothes||0)+(s?.warmCoats||0);
+G.supplyCoatDemand=b=>G.clothingSupplyEnabled()?G.supplyResidents(b).filter(c=>(c.clothingLeft||0)<=7).length:0;
 G.supplyStock=b=>b.supplyStock||(b.supplyStock=G.emptySupplyStock());
 G.supplyCargo=c=>c?.carry?.supplyBatch?c.carry:null;
 G.supplyHome=b=>!!b&&['house','stonehouse','boarding'].includes(b.type)&&b.state==='ok'&&!b.houseFire;
@@ -49,24 +52,27 @@ G.supplyNeeds=function(b){
  const stock=b.supplyStock||G.emptySupplyStock(),incoming=G.supplyIncoming(b),all=Object.fromEntries(G.SUPPLY.types.map(k=>[k,(stock[k]||0)+incoming[k]]));
  if(b.type==='market'){
   const residents=G.world.buildings.filter(h=>G.supplyHome(h)&&Math.max(Math.abs(h.x-b.x),Math.abs(h.y-b.y))<=G.SUPPLY.marketRadius).reduce((n,h)=>n+G.supplyResidents(h).length,0);
-  return {food:Math.max(0,Math.min(180,residents*G.LIFE.eatPerDay*3)-G.supplyFood(all)),firewood:Math.max(0,(G.game.season>=2?40:10)-all.firewood),coal:Math.max(0,(G.heatingPolicy().allowCoal?20:0)-all.coal),room:Math.max(0,G.SUPPLY.marketCap-G.supplySum(all))};
+  return {coats:G.clothingSupplyEnabled()?Math.max(0,Math.min(12,residents)-G.supplyCoats(all)):0,food:Math.max(0,Math.min(180,residents*G.LIFE.eatPerDay*3)-G.supplyFood(all)),firewood:Math.max(0,(G.game.season>=2?40:10)-all.firewood),coal:Math.max(0,(G.heatingPolicy().allowCoal?20:0)-all.coal),room:Math.max(0,G.SUPPLY.marketCap-G.supplySum(all))};
  }
  const residents=G.supplyResidents(b).length,heat=residents&&G.BDEF[b.type]?.warmWoodPerYear?G.BDEF[b.type].warmWoodPerYear/G.SEASON_DAYS*G.SUPPLY.fuelDays:0;
- return {food:Math.max(0,residents*G.LIFE.eatPerDay*G.SUPPLY.foodDays-G.supplyFood(all)),firewood:Math.max(0,(G.game.season>=2?heat:Math.min(heat,3))-all.firewood-(G.heatingPolicy().allowCoal?all.coal*G.COAL_HEAT:0)),coal:0,room:Math.max(0,G.SUPPLY.homeCap-G.supplySum(all))};
+ return {coats:Math.max(0,G.supplyCoatDemand(b)-G.supplyCoats(all)),food:Math.max(0,residents*G.LIFE.eatPerDay*G.SUPPLY.foodDays-G.supplyFood(all)),firewood:Math.max(0,(G.game.season>=2?heat:Math.min(heat,3))-all.firewood-(G.heatingPolicy().allowCoal?all.coal*G.COAL_HEAT:0)),coal:0,room:Math.max(0,G.SUPPLY.homeCap-G.supplySum(all))};
 };
 G.supplyBasket=function(stock,needs,cap,publicStock=false){
  const out=G.emptySupplyStock();let room=Math.min(cap,needs.room);
  const take=(k,n)=>{const available=publicStock&&k==='coal'?Math.min(stock[k]||0,G.heatingCoalAvailable()):(stock[k]||0);const q=Math.max(0,Math.min(n,available-out[k],room));out[k]+=q;room-=q;return q;};
  let fuel=needs.firewood;if(G.game.season>=2){fuel-=take('firewood',fuel);if(G.heatingPolicy().allowCoal&&fuel>0)take('coal',fuel/G.COAL_HEAT);}
+ // Only whole garments travel. Warm coats are preferred at actual pickup,
+ // never replace a still-worn coat, and share the same finite cargo capacity.
+ let coats=needs.coats||0;for(const k of ['warmCoats','clothes'])if(coats>=1){const n=Math.floor(Math.min(coats,stock[k]||0,room));if(n>0)coats-=take(k,n);}
  let food=needs.food;
  for(let pass=0;pass<3&&food>1e-8&&room>1e-8;pass++){const keys=G.FOOD_KEYS.filter(k=>(stock[k]||0)-out[k]>1e-8),part=keys.length?food/keys.length:0;if(!keys.length)break;for(const k of keys)food-=take(k,part);}
  if(G.game.season<2)fuel-=take('firewood',fuel);if(needs.coal>0)take('coal',needs.coal);
  return Object.fromEntries(Object.entries(out).filter(([,q])=>q>1e-8));
 };
 G.supplyRestockWanted=function(b){
- const n=G.supplyNeeds(b);if(b.type==='market')return n.room>0&&(n.food>=20||n.firewood>=5||n.coal>=5);
+ const n=G.supplyNeeds(b);if(b.type==='market')return n.room>0&&(n.food>=20||n.firewood>=5||n.coal>=5||n.coats>=1);
  const r=G.supplyResidents(b).length,s=b.supplyStock||G.emptySupplyStock(),heat=(G.BDEF[b.type]?.warmWoodPerYear||0)/G.SEASON_DAYS;
- return r>0&&(G.supplyFood(s)<r*G.LIFE.eatPerDay*2||(G.game.season>=2&&s.firewood+(G.heatingPolicy().allowCoal?s.coal*G.COAL_HEAT:0)<heat*2));
+ return r>0&&(n.coats>=1||G.supplyFood(s)<r*G.LIFE.eatPerDay*2||(G.game.season>=2&&s.firewood+(G.heatingPolicy().allowCoal?s.coal*G.COAL_HEAT:0)<heat*2));
 };
 G.supplyClaimed=b=>G.world.citizens.some(c=>G.supplyTaskOf(c)?.to===b||(G.supplyCargo(c)&&G.supplyDestination(c.carry.supplyBatch)===b));
 G.supplySourceStock=function(b,to,vendor){
@@ -74,7 +80,7 @@ G.supplySourceStock=function(b,to,vendor){
  if(b.type==='supplycache')return {stock:G.supplyStock(b),publicStock:false};
  if(G.supplyHome(b)&&!G.supplyResidents(b).length)return {stock:G.supplyStock(b),publicStock:false};
  if(!vendor&&b.type==='market'&&Math.max(Math.abs(to.x-b.x),Math.abs(to.y-b.y))<=G.SUPPLY.marketRadius)return {stock:G.supplyStock(b),publicStock:false};
- if(b.type==='storage'||b.type==='stockpile'){const stock={...G.game.res};if(b.type==='stockpile')for(const k of G.FOOD_KEYS)stock[k]=0;return {stock,publicStock:true};}
+ if(b.type==='storage'||b.type==='stockpile'){const stock={...G.game.res};if(b.type==='stockpile')for(const k of [...G.FOOD_KEYS,...G.CLOTHING_KEYS])stock[k]=0;return {stock,publicStock:true};}
  return null;
 };
 G.supplySourceRoute=function(c,to,vendor=false){
@@ -167,7 +173,7 @@ G.stepSupply=function(c,dt){
  t.workLeft-=dt;if(t.workLeft>0)return true;
  if(t.phase==='recover'){
   const items=G.recoverableSupply(t.source),stock=G.supplyStock(t.source);let room=G.SUPPLY.homeCarry;const basket={};
-  for(const[k,q]of Object.entries(items)){const n=Math.min(q,room,G.mineralStorageSpace(k));if(n>1e-8){basket[k]=n;stock[k]-=n;room-=n;}}
+  for(const[k,q]of Object.entries(items)){const raw=Math.min(q,room,G.mineralStorageSpace(k)),n=G.CLOTHING_KEYS.includes(k)?Math.floor(raw):raw;if(n>1e-8){basket[k]=n;stock[k]-=n;room-=n;}}
   const entries=Object.entries(basket);if(!entries.length){G.cancelSupplyTask(c);return true;}
   const[type,qty]=entries.shift();c.carry={type,qty,extra:Object.fromEntries(entries),staffingReturn:true,supplyBatch:{kind:'return',to:null}};
   G.resumeSupplyCargo(c);return true;
@@ -183,12 +189,12 @@ G.stepSupply=function(c,dt){
  const cargo=G.supplyCargo(c);if(!cargo){G.finishSupplyTask(c);return true;}
  const items=G.supplyCargoItems(cargo);
  if(t.phase==='return'){
-  for(const[k,q]of Object.entries(items))items[k]-=G.deposit(k,q,true);
+  for(const[k,q]of Object.entries(items)){const amount=G.CLOTHING_KEYS.includes(k)?Math.floor(Math.min(q,G.mineralStorageSpace(k))):q;items[k]-=G.deposit(k,amount,true);}
   G.compactSupplyCargo(c,items);G.updateProductionGoals();
   if(c.carry){c.state='supplyWait';t.retryH=2;t.workLeft=G.SUPPLY.unloadH;c.path=null;return true;}
  }else{
   const stock=G.supplyStock(t.to);let room=Math.max(0,(t.to.type==='market'?G.SUPPLY.marketCap:G.SUPPLY.homeCap)-G.supplySum(stock));
-  for(const[k,q]of Object.entries(items)){const n=Math.min(q,room);stock[k]=(stock[k]||0)+n;items[k]-=n;room-=n;}
+  for(const[k,q]of Object.entries(items)){const raw=Math.min(q,room),n=G.CLOTHING_KEYS.includes(k)?Math.floor(raw):raw;stock[k]=(stock[k]||0)+n;items[k]-=n;room-=n;}
   G.compactSupplyCargo(c,items);if(c.carry){G.returnSupplyCargo(c);return true;}
  }
  G.finishSupplyTask(c);return true;
@@ -215,7 +221,7 @@ G.supplyInventory=function(g=G.game,w=G.world){
  result.available=G.emptySupplyStock();for(const key of ['public','market','home','camp','cache','transit'])add(result.available,result[key]);return result;
 };
 G.supplyEconomyStock=function(type,g=G.game,w=G.world){
- if(g.supplyMode!=='physical'||!['food',...G.FOOD_KEYS,'firewood'].includes(type))return g.res[type]||0;
+ if(g.supplyMode!=='physical'||!['food',...G.FOOD_KEYS,'firewood',...(g.clothingSupply?G.CLOTHING_KEYS:[])].includes(type))return g.res[type]||0;
  const total=G.supplyInventory(g,w).available;return type==='food'?G.supplyFood(total):total[type];
 };
 
@@ -254,6 +260,7 @@ G.householdSupplySummary=function(b){
  const stock={...G.emptySupplyStock(),...b.supplyStock},people=G.supplyResidents(b).length,incoming=G.supplyIncoming(b),buyers=G.world.citizens.filter(c=>G.supplyTaskOf(c)?.to===b||G.supplyCargo(c)&&G.supplyDestination(c.carry.supplyBatch)===b);
  const foodDays=people?G.supplyFood(stock)/(people*G.LIFE.eatPerDay):0,heat=(G.BDEF[b.type]?.warmWoodPerYear||0)/G.SEASON_DAYS;
  let reason=!G.supplyEnabled()?'自动供给：仍按旧规则从公共库存每日食用和取暖':b.houseFire?'火情封闭：屋内物资暂不可取，烧毁时才计损':!people?'空屋物资由空闲散工实际回收':buyers.length?'采购或返家途中，送到后才可食用':G.supplyFood(stock)<people*G.LIFE.eatPerDay?'家中口粮不足一日：需有空手健康成人、可达仓库/市场及道路':'家中有粮，低于两日储备时成人会在当前任务收尾后采购';
+ if(G.clothingSupplyEnabled()&&!buyers.length&&!b.houseFire&&people&&G.supplyNeeds(b).coats>=1)reason+='；备换衣物不足，需实际采购送回（已穿衣未到期不更换）';
  return {mode:G.game.supplyMode,stock,incoming,people,foodDays,fuelDays:heat?(stock.firewood+(G.heatingPolicy().allowCoal?stock.coal*G.COAL_HEAT:0))/heat:0,buyers:buyers.map(c=>({id:c.id,name:c.name})),reason};
 };
 G.marketSupplySummary=function(b){
@@ -280,3 +287,15 @@ G.supplyServiceBreak=function(c,dt){
  c.supplyServiceRetry=Math.max(0,(c.supplyServiceRetry||0)-dt);if(c.supplyServiceRetry>0)return false;c.supplyServiceRetry=2;
  const previous=c.task;if(G.tryHouseholdSupply(c))return true;c.task=previous;return false;
 };
+
+
+/* A separate one-time choice preserves the food/fuel-only contract of existing
+ * physical saves. Worn durability is untouched; replacement needs real delivery. */
+G.clothingSupplyQuote=function(){
+ const g=G.game,w=G.world,enabled=G.clothingSupplyEnabled(),people=w.citizens.filter(c=>!c.dead);
+ const key=JSON.stringify([g.supplyMode,g.clothingSupply,g.day,g.season,G.CLOTHING_KEYS.map(k=>g.res[k]),w.navigationRevision||0,
+  people.map(c=>[c.id,c.familyId,c.clothingType,c.clothingLeft,c.adult,c.student,G.isSick(c)]),w.families.map(f=>[f.id,f.houseId]),w.buildings.map(b=>[b.id,b.state,b.houseFire?.incident])]);
+ return {key,enabled,ok:G.supplyEnabled()&&!enabled&&people.length>0,unclothed:people.filter(c=>!(c.clothingLeft>0)).length,soon:people.filter(c=>c.clothingLeft>0&&c.clothingLeft<=7).length,
+  public:{clothes:g.res.clothes,warmCoats:g.res.warmCoats},rule:'一次性启用后，穿坏才从住处或临时补给点的现货换衣；成人提前为7日内需换衣的家人采购。已穿衣耐久保留，不划拨或赠送衣物，不能切回远程领取。衣物不到家时即使公共有货也不能换上。'};
+};
+G.enableClothingSupply=function(key,expectedGame=G.game){const q=G.clothingSupplyQuote();if(expectedGame!==G.game||!q.ok||q.key!==key)return false;G.game.clothingSupply=true;G.game.schedT=0;return true;};

@@ -628,7 +628,7 @@ G.ui = {
         }
         if (k === 'clothes' || k === 'warmCoats') {
           const unprotected = G.world.citizens.filter(c => !(c.clothingLeft > 0)).length;
-          el.title += ` · ${unprotected} 人衣物已耗尽；${k === 'warmCoats' ? '暖衣需 2 皮革 + 2 羊毛，户外受冻降低 70%（较普通衣物再减半）' : '普通衣物需 2 皮革或 2 羊毛，户外受冻降低 40%'}；每件 ${G.YEAR_DAYS} 天，日终穿坏才优先领暖衣，再领普通衣物；不替代住房与柴火`;
+          el.title += ` · ${unprotected} 人衣物已耗尽；${k === 'warmCoats' ? '暖衣需 2 皮革 + 2 羊毛，户外受冻降低 70%（较普通衣物再减半）' : '普通衣物需 2 皮革或 2 羊毛，户外受冻降低 40%'}；每件 ${G.YEAR_DAYS} 天，日终穿坏才优先领暖衣，再领普通衣物；不替代住房与柴火` + (G.clothingSupplyEnabled?.() ? '；只从家中/临时补给点现货换衣，公共成衣需先实际配送' : '；沿用远程公共领取');
         }
         if (k === 'herbs') el.title += ' · 采药屋在成熟林中采集，送仓后用于草药保健；诊所治疗不消耗草药';
         if (k === 'ale') el.title += ' · 麦酒不计入三类食物，不可充饥；仅供 18 岁以上居民到酒馆休闲，每次消耗 1 麦酒';
@@ -1008,6 +1008,7 @@ G.ui = {
       rule: quote.rule || '已分配的物资不会重复领取；以后由货商与家庭采购者实际搬运。',
       cost: enabled ? '一次性启动分配已结束，不再扣取或赠送启动物资。' : `确认后从公共库存实际扣除：${this.supplyStockText(quote.cost, true)}。这些物资逐项移入下列住处，不是赠送。`,
       coverage: enabled ? '库存位置、在途与消耗请看实物分布和家庭详情。' : `本次实际启动口粮 ${this.supplyNumber(quote.foodDays)} 天（最多 2 天）；距两日口粮还缺 ${this.supplyNumber(quote.foodShortfall)}，冷季取暖还缺 ${this.supplyNumber(quote.fuelShortfall)} 柴火当量。${quote.foodDays < 2 - 1e-8 ? '库存不足，不能保证两日供给。' : ''}`,
+      clothing: G.clothingSupplyEnabled?.() ? '衣物配送已启用：穿坏只从住处现货换衣；先暖衣后普通衣，保留已穿耐久。' : '衣物仍沿用远程公共领取。启用家庭配送后，可在这里另行确认把衣物加入真实配送。',
       buyers: enabled ? '无健康成人的家庭需空闲散工协助；配送需要可达道路和真实库存。' : `无健康成人采购者 ${quote.familiesWithoutBuyer || 0} 户；完工通用仓 ${quote.readyStores || 0} 座。无采购者家庭依赖空闲散工，市场需另外安排货商。`,
     } };
   },
@@ -1025,7 +1026,14 @@ G.ui = {
         <div class="hidden" data-supply-mode-confirm><p>确认后公共库存按上列数量转入各住处；今后必须实际配送。此存档不能返回自动供给，也不能再次领取启动物资。</p>
           <div class="economy-actions"><button type="button" id="supply-mode-confirm" class="danger" disabled>确认永久启用真实配送</button><button type="button" id="supply-mode-cancel">取消，保留自动供给</button></div>
         </div>
-      </div><p class="economy-message" data-supply-mode-message role="status" aria-live="polite"></p></section>`;
+      </div><p class="economy-message" data-supply-mode-message role="status" aria-live="polite"></p>
+      <div data-clothing-supply-controls class="hidden"><h3>加入衣物配送 · 不可逆</h3>
+        <p data-clothing-supply-facts></p><p class="warn-txt">${this.escHtml(G.clothingSupplyQuote().rule)}请先导出原局，确认配送通路和家中衣物到货后再过冬。</p>
+        <button type="button" id="clothing-supply-export">先导出当前存档</button>
+        <button type="button" id="clothing-supply-start">查看衣物配送确认</button>
+        <div data-clothing-supply-confirm class="hidden"><p>不扣取或分配任何衣服；今后需要实际送到家，公共有货不等于家人已穿上。不能切回远程领取。</p>
+          <button type="button" id="clothing-supply-confirm" class="danger" disabled>确认永久启用衣物配送</button><button type="button" id="clothing-supply-cancel">取消，保留原领取规则</button></div>
+        <p data-clothing-supply-message role="status" aria-live="polite"></p></div></section>`;
   },
   supplyModeControlValid: function (b, context, node, allowModal = false) {
     if (!context) return false;
@@ -1067,6 +1075,7 @@ G.ui = {
     panel.querySelector('#supply-mode-start').setAttribute('aria-disabled', String(enabled || !quote.ok));
     panel.querySelector('#supply-mode-confirm').disabled = enabled || !quote.ok || panel._supplyPending === null;
     if (enabled && actionFocused) this.el.info.querySelector('#info-close')?.focus?.();
+    this.refreshClothingSupplyInfo(b);
     return true;
   },
   initSupplyModeInfo: function (b) {
@@ -1110,7 +1119,53 @@ G.ui = {
       this.resetSupplyConfirmation(panel, ok ? '已永久启用全村真实配送；启动物资已按预览从公共库存转入各住处，未新增物资。本存档不能切回自动供给。' : '条件已变化，未切换；请重新预览。');
       if (ok) { this.refreshHUD(); el.querySelector('#info-close')?.focus?.(); } else start.focus?.();
     });
+    this.initClothingSupplyInfo(b);
     this.refreshSupplyModeInfo(b);
+  },
+  resetClothingConfirmation: function(panel, message) {
+    panel._clothingPending = null;
+    const box = panel.querySelector('[data-clothing-supply-confirm]'), button = panel.querySelector('#clothing-supply-confirm');
+    if (box) box.classList.add('hidden'); if (button) button.disabled = true;
+    if (message !== undefined) panel.querySelector('[data-clothing-supply-message]').textContent = message;
+  },
+  refreshClothingSupplyInfo: function(b) {
+    const panel=this.el.info.querySelector?.('[data-supply-mode-panel]');if(!panel)return;
+    const controls=panel.querySelector('[data-clothing-supply-controls]');if(!controls)return;
+    const q=G.clothingSupplyQuote(),visible=G.supplyEnabled()&&!q.enabled,active=controls.contains(document.activeElement);
+    const valid=this.supplyModeControlValid(b,panel._supplyContext,null,true),modal=G.hasOpenModal?.();
+    if(!valid||modal||!q.ok||(panel._clothingPending!==null&&panel._clothingPending!==undefined&&panel._clothingPending!==q.key)) {
+      const hadPending=panel._clothingPending!=null,inside=panel.querySelector('[data-clothing-supply-confirm]').contains(document.activeElement);
+      this.resetClothingConfirmation(panel,hadPending?'条件已变化，请重新查看衣物配送确认。':undefined);
+      if(inside&&visible&&!modal)panel.querySelector('#clothing-supply-start').focus();
+    }
+    controls.classList.toggle('hidden',!visible);
+    panel.querySelector('[data-clothing-supply-facts]').textContent=`公共普通衣 ${this.supplyNumber(q.public.clothes)} / 暖衣 ${this.supplyNumber(q.public.warmCoats)}；衣物耗尽 ${q.unclothed} 人，7日内需换衣 ${q.soon} 人。启用不赠衣、不扣料、不重置已穿耐久。`;
+    for(const id of ['start','export','cancel'])panel.querySelector('#clothing-supply-'+id).disabled=!visible;
+    panel.querySelector('#clothing-supply-confirm').disabled=!visible||!q.ok||panel._clothingPending==null;
+    if(!visible&&active)this.el.info.querySelector('#info-close')?.focus?.();
+  },
+  initClothingSupplyInfo: function(b) {
+    const panel=this.el.info.querySelector('[data-supply-mode-panel]'),context=panel._supplyContext;
+    const button=id=>panel.querySelector('#clothing-supply-'+id),valid=node=>G.supplyEnabled()&&!G.clothingSupplyEnabled()&&this.supplyModeControlValid(b,context,node);
+    panel._clothingPending=null;
+    for(const id of ['start','confirm','cancel','export']) {
+      const node=button(id);node.addEventListener('keydown',e=>{if(e.repeat&&(e.key==='Enter'||e.key===' '))e.preventDefault();});
+      node.addEventListener('click',e=>{
+        if(e.detail>1||!valid(node)){this.resetClothingConfirmation(panel);return;}
+        if(id==='cancel'){this.resetClothingConfirmation(panel,'已取消，领取规则未改。');button('start').focus();return;}
+        if(id==='export'){
+          this.resetClothingConfirmation(panel);
+          try{G.exportSaveFile();panel.querySelector('[data-clothing-supply-message]').textContent='已请求下载，请核对文件已保存；尚未启用衣物配送，请重新确认。';}
+          catch(error){panel.querySelector('[data-clothing-supply-message]').textContent='导出未完成，衣物领取规则未改。';}return;
+        }
+        const pending=panel._clothingPending,q=G.clothingSupplyQuote();this.refreshClothingSupplyInfo(b);
+        if(!q.ok)return;
+        if(id==='start'){panel._clothingPending=q.key;panel.querySelector('[data-clothing-supply-confirm]').classList.remove('hidden');button('confirm').disabled=false;button('confirm').focus();return;}
+        if(pending==null||pending!==q.key||panel._clothingPending!==pending)return;
+        this.resetClothingConfirmation(panel);
+        if(G.enableClothingSupply(pending,context.game)){this.refreshSupplyModeInfo(b);this.refreshVillageSupplyInfo();this.refreshMarketSupplyInfo(b);this.refreshHUD();this.el.info.querySelector('#info-close')?.focus?.();}
+      });
+    }
   },
   heatingInfoData:function(b){
     const s=G.homeHeatingSummary(b);if(!s)return null;
@@ -2111,7 +2166,7 @@ G.ui = {
       recipe: `每批：${warm ? '2 皮革 + 2 羊毛' : s.material==='auto'?'2 皮革或 2 羊毛（自动优先皮革）':`2 ${G.RES[s.material].name}（仅用所选材料）`} → 1 ${G.RES[s.output].name}（受教育 2）；基础劳动 8 小时`,
       materials: '新批次用料：' + s.materials.map(item => `${item.qty} ${G.RES[item.type].name}`).join(' + ') + '（新任务锁定选择，到仓才整批领取）',
       inputs: `原料库存：皮革 ${Math.floor(g.res.leather || 0)} · 羊毛 ${Math.floor(g.res.wool || 0)}`,
-      stock: `可用成衣：普通衣物 ${Math.floor(s.clothes || 0)} · 暖衣 ${Math.floor(s.warmCoats || 0)}（在途未入库不计）`,
+      stock: `${G.clothingSupplyEnabled?.()?'公共成衣':'可用成衣'}：普通衣物 ${Math.floor(s.clothes || 0)} · 暖衣 ${Math.floor(s.warmCoats || 0)}（在途未入库不计）` + (G.clothingSupplyEnabled?.()?`；目标计量普通 ${this.supplyNumber(G.supplyEconomyStock('clothes'))} / 暖衣 ${this.supplyNumber(G.supplyEconomyStock('warmCoats'))}，含已配送未穿成衣，不含正在穿着和火情封存` : ''),
       wearers: `全镇穿着：普通 ${s.wearers.basic} 人 · 暖衣 ${s.wearers.warm} 人 · 衣物耗尽 ${s.wearers.ragged} 人`,
       targets: '独立全镇目标：' + targets.join(' · '),
       goals: `当前配方：${G.buildingGoalStatus(b) || '未设全镇目标，仍受本类衣物仓容限制'}`,
@@ -2473,7 +2528,7 @@ G.ui = {
     return {
       worn: `衣物：${type === 'warm' ? '暖衣' : type === 'basic' ? '普通衣物' : '已耗尽，等待成衣'}${type === 'none' ? '' : ' · 约剩 ' + Math.ceil(left) + ' 天'}`,
       cold: `户外受冻 ×${mul.toFixed(1)}${type === 'warm' ? '（降低 70%，比普通衣物再减半）' : type === 'basic' ? '（降低 40%）' : '（无衣物防寒）'}`,
-      renewal: `日终磨损 1 天，穿坏才优先领暖衣，无则普通；每件 ${G.YEAR_DAYS} 天，不提前替换旧衣。`,
+      renewal: `日终磨损 1 天，穿坏才优先领暖衣，无则普通；每件 ${G.YEAR_DAYS} 天，不提前替换旧衣。` + (G.clothingSupplyEnabled?.() ? '只从家中/临时补给点现货领取，成人提前为7日内需换衣的家人实际采购。' : '仍沿用远程公共领取，可在市政厅或市场明确启用衣物配送。'),
       shelter: '衣物不改变无柴冷屋受冻或烧柴暖屋恢复，仍需住房与柴火。',
     };
   },
@@ -2532,7 +2587,7 @@ G.ui = {
       if (panel && (!sameSelection || !this.fireActionValid(selected, panel._fireContext, null, true))) this.resetFireAction(panel);
     }
     const supplyPanel = el.querySelector?.('[data-supply-mode-panel]');
-    if (supplyPanel && (!sameSelection || !this.supplyModeControlValid(selected, supplyPanel._supplyContext, null, true))) this.resetSupplyConfirmation(supplyPanel);
+    if (supplyPanel && (!sameSelection || !this.supplyModeControlValid(selected, supplyPanel._supplyContext, null, true))) { this.resetSupplyConfirmation(supplyPanel); this.resetClothingConfirmation(supplyPanel); }
     const fishingPanel = el.querySelector?.('[data-fishing-panel]');
     if (fishingPanel && (!sameSelection || !this.fishingControlValid(selected, fishingPanel._fishingContext, null, true))) this.resetFishingConfirmation(fishingPanel);
     const homeFire = G.sel.kind === 'b' ? this.homeFireInfoData(selected) : null;
@@ -3274,7 +3329,7 @@ G.ui = {
       const target = G.productionGoalOf(type);
       const foodClass = (G.FOOD_KEYS || []).includes(type);
       const tool = type === 'tools' || type === 'steelTools';
-      const distributedGoal = physical && (type === 'food' || foodClass || type === 'firewood');
+      const distributedGoal = physical && (type === 'food' || foodClass || type === 'firewood' || G.clothingSupplyEnabled?.() && G.CLOTHING_KEYS.includes(type));
       stock.textContent = `${physical ? '公共库存' : '库存'} ${Math.floor(G.game.res[type])} · ${foodClass ? '与其他食物共享总仓容 ' + cap + '（总食物 ' + Math.floor(G.game.res.food) + '）' : '硬仓容 ' + (tool ? '不限' : cap)}`;
       if (distributedGoal) stock.textContent += `；目标计量 ${this.supplyNumber(type === 'food' ? G.supplyFood(supplies) : supplies[type])}（公共 + 市场/住处/配送在途/待回收，不含火情封存；逐户现货才可使用）`;
       status.textContent = target === null ? '未设置全镇目标，继承原规则' :
@@ -3296,7 +3351,7 @@ G.ui = {
     const el = document.getElementById(id);
     if (!el) return;
     const supplyPanel = this.el.info && this.el.info.querySelector?.('[data-supply-mode-panel]');
-    if (supplyPanel) this.resetSupplyConfirmation(supplyPanel, '确认已取消，请关闭弹窗后重新预览。');
+    if (supplyPanel) { this.resetSupplyConfirmation(supplyPanel, '确认已取消，请关闭弹窗后重新预览。'); this.resetClothingConfirmation(supplyPanel, '确认已取消，请关闭弹窗后重新预览。'); }
     const mineralPanel = this.el.info && this.el.info.querySelector && this.el.info.querySelector('[data-mineral-removal-panel]');
     if (mineralPanel) this.resetMineralRemoval(mineralPanel, '拆除确认已取消，请关闭弹窗后重新查看。');
     this._dialogFocus = this._dialogFocus || {};

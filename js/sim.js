@@ -72,7 +72,7 @@ G.newGameState = function () {
     h: 6, day: 0, season: 0, year: 1,
     speed: 1, paused: false,
     res: { wood: 80, stone: 48, iron: 0, tools: 15, food: 500, meat: 0, vegetables: 0, grain: 500, leather: 0, wool: 0, clothes: 0, warmCoats: 0, herbs: 0, coal: 0, steelTools: 0, ale: 0, firewood: 50 }, // 开局（原版中难度 5 家庭，工具 15 件≈第一轮磨损周期）；存粮较原版加厚：15 人 6 天食物跑道撑不到第一座采集屋建成
-    heating:{allowCoal:false,coalReserve:20}, fishingRules:'shared', supplyMode:'automatic',
+    heating:{allowCoal:false,coalReserve:20}, fishingRules:'shared', supplyMode:'automatic',clothingSupply:false,
     fireDisasters:{enabled:false,startedDay:null,graceUntil:0,lastDay:-1,nextIgnitionDay:0,serial:0,incidentHomes:[]},
     healthStartDay: 0, farmPests:{enabled:false,graceUntil:0,lastDay:-1}, challenges:{v:1,completed:{}},
     nomads: {nextDay:G.YEAR_DAYS,serial:0,offer:null,accepted:0,declined:0},
@@ -3200,9 +3200,12 @@ G.wearClothing=function(c){
   c.clothingLeft=Math.max(0,(c.clothingLeft||0)-1);
   if(c.clothingLeft>0)return;
   c.clothingType=null;
-  const type=G.game.res.warmCoats>=1?'warmCoats':G.game.res.clothes>=1?'clothes':null;
+  const physical=G.clothingSupplyEnabled?.(),home=physical?G.supplyFamilyTarget(G.familyOf(c),false):null;
+  const stock=physical?(home?.supplyStock||{}):G.game.res;
+  const type=stock.warmCoats>=1?'warmCoats':stock.clothes>=1?'clothes':null;
   if(!type)return;
-  G.game.res[type]--;c.clothingType=type==='warmCoats'?'warm':'basic';c.clothingLeft=G.YEAR_DAYS;
+  if(physical)G.useSupplyStock(stock,type,1);else stock[type]--;
+  c.clothingType=type==='warmCoats'?'warm':'basic';c.clothingLeft=G.YEAR_DAYS;
 };
 G.taskIngredients=t=>!t.consume?[]:Array.isArray(t.consume)?t.consume:[t.consume];
 G.tailorRecipeOf=b=>b.coatRecipe==='warm'?'warm':'basic';
