@@ -127,6 +127,7 @@ G.serializeGame = function () {
       lastHeating:b.lastHeating, unheated:b.unheated, graves:b.graves,
       animalType:b.animalType, pastureProducts:b.pastureProducts, animals: b.animals, animalGrowth: b.animalGrowth, animalTarget: b.animalTarget, woolReady: b.woolReady,
       orchardAge: b.orchardAge, orchardYield: b.orchardYield, orchardSeason: b.orchardSeason, tendedDay: b.tendedDay,
+      orchardTrees:b.orchardTrees?b.orchardTrees.map(t=>({...t})):undefined,orchardDay:b.orchardDay,orchardReplant:b.orchardReplant,orchardWarnYear:b.orchardWarnYear,
     })),
     families: w.families.map(f => ({ id: f.id, members: f.members, houseId: f.houseId, coupleIds: f.coupleIds })),
     citizens: w.citizens.map(c => ({
@@ -434,10 +435,26 @@ G.prepareSaveData = function (d) {
       b.animalGrowth=bd.animalGrowth===undefined?0:number(bd.animalGrowth,'繁殖进度',0,1);
       b.woolReady=bd.woolReady===undefined?0:number(bd.woolReady,'待剪羊毛',0,b.animalType==='sheep'?48:0);
     }
+    if(['orchardTrees','orchardDay','orchardReplant','orchardWarnYear'].some(k=>bd[k]!==undefined)&&bd.type!=='orchard')bad('果园树株字段');
     if(bd.type==='orchard'){
-      b.orchardAge=bd.orchardAge===undefined?0:integer(bd.orchardAge,'果树树龄',0,G.YEAR_DAYS*4);
-      b.orchardYield=bd.orchardYield===undefined?0:number(bd.orchardYield,'待收果实',0,180);
-      if(bd.orchardSeason!==undefined)b.orchardSeason=integer(bd.orchardSeason,'果树产季',1);
+      const age=bd.orchardAge===undefined?0:integer(bd.orchardAge,'果树养护年龄',0,G.ORCHARD.matureDays);
+      let fruit=bd.orchardYield===undefined?0:number(bd.orchardYield,'待收果实',0,180);
+      const season=bd.orchardSeason===undefined?0:integer(bd.orchardSeason,'果树产季',1,g.year);
+      if(bd.orchardReplant!==undefined&&typeof bd.orchardReplant!=='boolean')bad('果园补种开关');
+      b.orchardReplant=bd.orchardReplant!==false;
+      if(bd.orchardTrees!==undefined){
+        if(!Array.isArray(bd.orchardTrees)||bd.orchardTrees.length!==G.ORCHARD.count)bad('果园树株数量');
+        b.orchardTrees=bd.orchardTrees.map((t,i)=>{record(t,'果园树株');if(typeof t.planted!=='boolean')bad('果树种植状态');
+          const tree={planted:t.planted,age:integer(t.age,'单株树龄',0,G.orchardLifetime(i)-1),fruit:number(t.fruit,'单株果实',0,G.ORCHARD.fruit),season:integer(t.season,'单株产季',0,g.year),tendedDay:integer(t.tendedDay,'单株照料日',-1,g.day),cycle:integer(t.cycle,'单株更新次数',0)};
+          if(!tree.planted&&(tree.age||tree.fruit))bad('空果树位含生长或果实');return tree;});
+        b.orchardDay=integer(bd.orchardDay,'果园推进日',0,g.day);
+        G.syncOrchardTotals(b);if(b.orchardAge!==age||Math.abs(b.orchardYield-fruit)>1e-7)bad('果园汇总与树株不符');
+      }else{
+        const tended=bd.tendedDay===undefined?-1:integer(bd.tendedDay,'旧果园照料日',0,g.day);
+        b.orchardTrees=Array.from({length:G.ORCHARD.count},()=>{const n=Math.min(G.ORCHARD.fruit,fruit);fruit-=n;return {planted:true,age,fruit:n,season,tendedDay:tended,cycle:0};});
+        b.orchardDay=g.day;G.syncOrchardTotals(b);
+      }
+      if(bd.orchardWarnYear!==undefined)b.orchardWarnYear=integer(bd.orchardWarnYear,'果园预警年份',1,g.year);
     }
     if(bd.tendedDay!==undefined)b.tendedDay=integer(bd.tendedDay,'最近照料日',0,g.day);
     if (bd.productionPaused !== undefined && typeof bd.productionPaused !== 'boolean') bad('本屋生产暂停状态');
@@ -490,6 +507,7 @@ G.prepareSaveData = function (d) {
       carry = { type: cd.carry.type === 'food' ? 'grain' : cd.carry.type, qty: number(cd.carry.qty, '随身资源数量', 0) };
       if(cd.carry.staffingReturn!==undefined){if(cd.carry.staffingReturn!==true)bad('撤岗保货标记');carry.staffingReturn=true;}
       if(cd.carry.smithInput!==undefined){if(cd.carry.smithInput!==true||!carry.staffingReturn||!['iron','wood','coal'].includes(carry.type)||carry.qty>(carry.type==='iron'?1:2)||cd.carry.brewIngredient!==undefined||cd.carry.pastureId!==undefined)bad('铁匠原料货批');carry.smithInput=true;}
+      if(cd.carry.orchardId!==undefined){if(carry.type!=='vegetables'||cd.carry.extra!==undefined||cd.carry.smithInput!==undefined||cd.carry.brewIngredient!==undefined||cd.carry.pastureId!==undefined||carry.qty>G.ORCHARD.fruit)bad('果园携果类型');carry.orchardId=integer(cd.carry.orchardId,'果园携果来源',1);}
       if(cd.carry.pastureId!==undefined){if(!['meat','leather','wool'].includes(carry.type)||cd.carry.extra!==undefined)bad('牧场携货类型');carry.pastureId=integer(cd.carry.pastureId,'牧场携货来源',1);}
       if(cd.carry.brewIngredient!==undefined){if(cd.carry.brewIngredient!==true||carry.type!=='grain')bad('酿造原粮标记');carry.brewIngredient=true;}
       if (cd.carry.extra !== undefined) {

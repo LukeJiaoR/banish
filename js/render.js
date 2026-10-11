@@ -532,7 +532,7 @@ G.addEconomyFieldParts = function (items, b, bounds) {
     for(const r of G.activeGraves(b))add({kind:'grave',x:b.x+.85+(r.slot%2)*1.7,y:b.y+.5+Math.floor(r.slot/2)*.85});
   } else if (b.type === 'orchard') {
     for (let y = 1; y < b.h; y += 2) for (let x = 1; x < b.w; x += 2)
-      add({ kind: 'fruitTree', x: b.x + x, y: b.y + y });
+      add({ kind: 'fruitTree', x: b.x + x, y: b.y + y, ti:Math.floor(y/2)*3+Math.floor(x/2) });
   } else {
     add({ kind: 'sheepShelter', x: b.x + 2.1, y: b.y + 2.1 });
     const spots = [[3.2, 1.2], [4.7, 1.6], [2.8, 2.7], [4.5, 3.1], [1.2, 3.2], [1.5, 4.7],
@@ -570,8 +570,10 @@ G.drawEconomyFieldPart = function (ctx, p) {
     G.sprDraw(ctx, 'sheep', sx, sy, { w: 24, flip: p.n % 3 === 1 }); return;
   }
   if (p.kind === 'fruitTree') {
-    const growth = Math.max(0, Math.min(1, (p.b.orchardAge || 0) / (G.YEAR_DAYS * 4)));
-    const fruit = growth >= 1 && G.game.season === 2 && p.b.orchardYield > 0;
+    const tree=p.b.orchardTrees?.[p.ti];
+    if(tree&&!tree.planted){ctx.fillStyle='#876947';ctx.beginPath();ctx.ellipse(sx,sy,4,2,0,0,Math.PI*2);ctx.fill();return;}
+    const growth=Math.max(0,Math.min(1,(tree?tree.age:p.b.orchardAge||0)/(G.YEAR_DAYS*4)));
+    const fruit=G.game.season===2&&(tree?tree.fruit>0:growth>=1&&p.b.orchardYield>0);
     // Small new trees have no misleading harvest-ready fruit; the ripe sprite appears in autumn.
     G.sprDraw(ctx, fruit ? 'orchard' : 'orchard_leafy', sx, sy, { w: 24 + 28 * growth });
   }
@@ -692,7 +694,7 @@ G.drawCitizen = function (ctx, c, time, homes) {
   else if (working) {
     // 旧两张“work”图其实是挥工具与抱筐两种姿态，交替播放会整个人跳变。
     const t = c.task;
-    const basket = t && (t.kind === 'sow' || t.kind === 'harvest' || t.kind === 'plant' || (t.yield && G.isFood(t.yield.type)));
+    const basket = t && (t.kind === 'sow' || t.kind === 'harvest' || t.kind === 'plant' || t.kind === 'orchard' || (t.yield && G.isFood(t.yield.type)));
     frame = basket ? 'adult_work_1' : 'adult_work_0';
     fallback = 'adult_idle';
   } else if (c.carry) {

@@ -43,6 +43,7 @@ G.ui = {
       if (c.task && c.task.kind === 'host') return '酒馆在岗接待';
       if (c.task && c.task.kind === 'clinic') return b && b.type === 'herbalist' ? '采药屋值守' : '诊所值守';
       if (c.task && c.task.kind === 'trade') return c.task.phase === 'return' ? '退回待售库存' : '装卸贸易物资';
+      if(c.task?.kind==='orchard')return ({plant:'种植果树',tend:'养护幼树',harvest:'采收果实'})[c.task.phase]+'（第'+(c.task.ti+1)+'株）';
       const labels = { clearSite: '清理工地', chop: '砍伐', clearrock: '清矿', build: '建造中', sow: '播种', harvest: '收获', plant: '补种', firewood: '加工柴火' };
       return c.task ? (labels[c.task.kind] || (b && b.type === 'tailor' ? '制作衣物' : b && b.type === 'orchard' ? '果园劳作' : b && b.type === 'pasture' ? `照料${G.LIVESTOCK[G.pastureTypeOf(b)].name}群` : '工作中')) : '等待下一项任务';
     }
@@ -53,6 +54,7 @@ G.ui = {
       if (c.walkKind === 'wander') return '闲逛';
       if (c.task && c.task.kind === 'firewood' && c.task.b && c.task.b.type === 'tailor') return c.task.phase === 'fetch' ? '前往仓库核对衣料（完成时才扣原料）' : `返回裁缝铺制作${G.RES[c.task.yield && c.task.yield.type || 'clothes'].name}`;
       if (c.task && c.task.kind === 'firewood' && c.task.phase === 'fetch') return c.task.consume && G.RES[c.task.consume.type] ? `前往仓库取${G.RES[c.task.consume.type].name}` : '前往仓库取原木';
+      if(c.task?.kind==='orchard')return ({plant:'前往空树位种植',tend:'前往幼树照料',harvest:'前往成熟果树采果'})[c.task.phase]+'（第'+(c.task.ti+1)+'株）';
       if(c.task?.kind==='smith')return '前往堆料场或仓库取铁匠原料（尚未扣料）';
       if (c.task && c.task.kind === 'brew') return c.task.phase === 'fetch' ? '前往仓库取酿酒主食' : '前往酒馆加工麦酒';
       if (c.task && c.task.kind === 'trade') return c.task.phase === 'fetch' ? '前往仓库备货' : '运送贸易物资';
@@ -2010,11 +2012,7 @@ G.ui = {
     if (G.productionLimited(b) && G.buildingGoalStatus(b)) return G.buildingGoalStatus(b);
     if (b.type === 'tradingpost') return b.merchant && b.merchant.leaveDay > G.game.day ? '商船停靠，可交易' : b.workers.length ? '等待商船，商人按目标搬运备货' : '等待商人岗位分配';
     if (b.type === 'pasture') return G.pastureSummary(b).status;
-    if (b.type === 'orchard') {
-      if (!(G.game.unlocks && G.game.unlocks.orchard)) return '需从贸易站购买果树种子';
-      if ((b.orchardAge || 0) < G.YEAR_DAYS * 4) return '幼树养护中，约 4 年成熟';
-      return G.game.season === 2 ? b.orchardYield > 0 ? '秋季收获中' : '本季果实已收完' : '果树已成熟，等待秋季';
-    }
+    if(b.type==='orchard')return G.orchardSummary(b).status;
     return '';
   },
 
@@ -2061,7 +2059,13 @@ G.ui = {
       </section>
       <p class="economy-message" data-economy-message role="status" aria-live="polite"></p>
     </section>`;
-    if (b.type === 'orchard') return `<section class="economy-details" data-economy="orchard"><p data-economy-live="orchard-age"></p><p data-economy-live="orchard-harvest"></p><p class="desc">种子永久解锁后，工人照料幼树约 4 年才结果。秋季采收，果实归入蔬菜；冬季未收果实损失。</p></section>`;
+    if(b.type==='orchard')return `<section class="economy-details" data-economy="orchard">
+      <p data-economy-live="orchard-age"></p><p data-economy-live="orchard-harvest"></p><p data-economy-live="orchard-renewal"></p>
+      <form id="orchard-replant-form" class="economy-form"><label for="orchard-replant">空位补种</label><select id="orchard-replant"><option value="on"${b.orchardReplant!==false?' selected':''}>允许农夫补种</option><option value="off"${b.orchardReplant===false?' selected':''}>暂停新补种</option></select><button type="submit">应用补种设置</button></form>
+      <p class="desc">每株由农夫实际到达后种植、照料或采收。秋季先采果，再种空位和养幼树；暂停补种只影响新任务，已开始的单株工作照常完成。4年有效养护成熟，每株每秋最多20果，搬运后才入库；满仓携果保留，冬季未采果损失。</p>
+      <p class="desc">树龄达到12–20年时按株错峰枯尽，届时该株未采果实一起损失（不计为已产出）；一年内将枯尽会预警，应优先采收。补种重新养4年。本作适配寿命，不是原版精确数值。旧成熟园从4岁迁移，至少还有8年宽限；不影响已有在途果实。</p>
+      <p class="desc" data-economy-live="orchard-trees" style="white-space:pre-line"></p><p class="economy-message" data-economy-message role="status" aria-live="polite"></p>
+    </section>`;
     return '';
   },
 
@@ -2102,6 +2106,7 @@ G.ui = {
         this.refreshHUD();
       });
     }
+    if(b.type==='orchard')onSubmit('orchard-replant-form',()=>{const value=el.querySelector('#orchard-replant').value;message(['on','off'].includes(value)&&G.setOrchardReplant(b,value==='on')?value==='on'?'允许新补种；需农夫到空树位劳动。':'已暂停新补种；现果、养护与已开始的工作继续。':'补种设置无效');});
     if (b.type === 'pasture') {
       onSubmit('pasture-type-form',()=>{const type=el.querySelector('#pasture-type').value;message(G.setPastureType(b,type)?`牧场物种已设为${G.LIVESTOCK[type].name}；下一次放入只接收该物种。`:G.pastureSwitchReason(b)||'物种选择无效');});
       onSubmit('pasture-stock-form', () => {
@@ -2192,9 +2197,12 @@ G.ui = {
       this.refreshPastureSplit(b);
       const output=el.querySelector('[data-pasture-output]');if(output){const html='产出：'+G.productionOutputsOf(b).filter(k=>k!=='food').map(k=>`${this.resourceIcon(k)}${G.RES[k].name}`).join(' · ');if(output.innerHTML!==html)output.innerHTML=html;}
     } else {
-      const unlocked = G.game.unlocks && G.game.unlocks.orchard, age = b.orchardAge || 0;
-      set('[data-economy-live="orchard-age"]', `果树种子：${unlocked ? '已永久解锁' : '尚未购买'} · 已养护 ${(age / G.YEAR_DAYS).toFixed(1)} / 4 年`);
-      set('[data-economy-live="orchard-harvest"]', age < G.YEAR_DAYS * 4 ? `尚需 ${G.YEAR_DAYS * 4 - age} 天有效照料才成熟。` : `本季待采果实 ${Math.floor(b.orchardYield || 0)}（计入蔬菜，搬运后才入库）。`);
+      const d=G.orchardSummary(b),unlocked=G.game.unlocks?.orchard;
+      set('[data-economy-live="orchard-age"]',`种子：${unlocked?'永久解锁':'尚未购买'} · 空位 ${d.empty} / 幼树 ${d.young} / 成树 ${d.mature}（共9位）`);
+      set('[data-economy-live="orchard-harvest"]',`本季未采果实 ${Math.floor(d.fruit)}（蔬菜）；实际采收/送仓才记产出/入库。${d.status}`);
+      set('[data-economy-live="orchard-renewal"]',`已应用补种：${b.orchardReplant?'允许':'暂停'} · 一年内将枯尽 ${d.soon} 株${Number.isFinite(d.nextDeath)?' · 最短还差 '+d.nextDeath+' 树龄日':''}；空位没有产量。`);
+      set('[data-economy-live="orchard-trees"]',(b.orchardTrees||[]).map((t,i)=>`第${i+1}株：${t.planted?`树龄 ${(t.age/G.YEAR_DAYS).toFixed(1)} 年 / 寿命 ${G.orchardLifetime(i)/G.YEAR_DAYS} 年 · ${t.age<G.ORCHARD.matureDays?'尚需 '+(G.ORCHARD.matureDays-t.age)+' 有效养护日':'成熟'} · 待采 ${Math.floor(t.fruit)}`:'空位，待种植'}`).join('\n'));
+
     }
     return true;
   },
