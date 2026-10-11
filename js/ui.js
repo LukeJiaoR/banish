@@ -2176,7 +2176,7 @@ G.ui = {
     const seed = G.seedUnlockKey ? G.seedUnlockKey(good) : good === 'orchardSeed' ? 'orchard' : null;
     const seedReason = G.seedTradeReason ? G.seedTradeReason(good, qty) : seed && G.game.unlocks && G.game.unlocks[seed] ? '果树种子已永久解锁。' : seed && qty !== 1 ? '种子每次只能购买 1 份。' : '';
     let reason = !merchant ? '商船尚未停靠。' : seedReason || (qty > stock ? `商船只有 ${stock} 件，数量不足。` : available < cost ? `本站待售${G.RES[payment].name}不足，还需 ${Math.ceil(cost - available)}。` : '');
-    if (!reason && !G.isLivestockType(good) && !seed && G.tradeStored && G.TRADE_CAPACITY && G.tradeStored(b) - cost + qty > G.TRADE_CAPACITY) reason = '交易后会超过本站共享容量，请先腾出空间。';
+    if (!reason && !G.isLivestockType(good) && !seed && G.tradeStored && G.TRADE_CAPACITY && G.tradeStored(b) + G.tradeIncoming(b) - cost + qty > G.TRADE_CAPACITY) reason = '交易后会超过本站共享容量（含在途占位），请先腾出空间。';
     const text = `购买${offer.name} × ${qty}，实际支付${G.RES[payment].name} × ${cost}（单价 ${offer.price}，付款价值 ${value}/件）。\n商船存货 ${stock} · 本站可支付 ${Math.floor(available)}。` + (seed ? '\n种子仅购 1 份永久解锁，不可复购，不占仓位。' : '') + (reason ? '\n' + reason : '');
     return { ok: !reason, good, payment, qty, cost, reason, text };
   },
@@ -2193,7 +2193,7 @@ G.ui = {
       set('[data-economy-live="merchant"]', merchant ? `商船将在 ${b.merchant.leaveDay - G.game.day} 天后离开。` : `下一艘商船约 ${Math.max(0, (b.nextMerchantDay || G.game.day) - G.game.day)} 天后到达。`);
       const inventory = b.tradeInventory || {}, targets = b.tradeTargets || {};
       const stored = G.tradeStored ? G.tradeStored(b) : Object.values(inventory).reduce((sum, value) => sum + value, 0);
-      set('[data-economy-live="trade-capacity"]', `待售总量 ${Math.floor(stored)} / ${G.TRADE_CAPACITY || 2000}（各资源共享，货物价值用于以物易物）`);
+      set('[data-economy-live="trade-capacity"]', `已入站 ${Math.floor(stored)} + 在途占位 ${G.tradeIncoming(b)} / ${G.TRADE_CAPACITY || 2000} · 可用空位 ${G.tradeFreeSpace(b)}（各资源共享；在途货尚不可交易）`);
       const lines = Object.keys(G.TRADE_VALUES).map(type => `${G.RES[type].name}：待售 ${Math.floor(inventory[type] || 0)} / 目标 ${targets[type] || 0}`);
       set('[data-economy-live="inventory"]', lines.join('\n'));
       const type = el.querySelector('#trade-target-resource').value;
