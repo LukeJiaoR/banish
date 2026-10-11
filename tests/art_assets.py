@@ -92,3 +92,14 @@ for stage in ['stage0','stage1','stage2','ripe']:
     assert all(a.getpixel(p) == 0 for p in [(0,0),(127,0),(0,95),(127,95)]), file
     assert a.getbbox(), file
     print(file, im.size, 'cabbage crop size and alpha: OK')
+
+# Revised meadow keeps the current decoded texture budget and stays opaque.
+meadow_bytes = 0
+for season in ['spring', 'summer', 'autumn', 'winter']:
+    file = ROOT / 'assets' / 'terrain-v2' / ('meadow_' + season + '.png')
+    im = Image.open(file)
+    assert im.size == (512, 512), file
+    assert im.convert('RGBA').getchannel('A').getextrema() == (255, 255), file
+    meadow_bytes += file.stat().st_size
+assert meadow_bytes <= 2655092, 'four-meadow compressed budget must not exceed previous version'
+print('Four meadow textures: opaque 512-square, decoded 4 MiB, compressed', meadow_bytes, 'bytes')
