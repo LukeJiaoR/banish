@@ -175,6 +175,7 @@ test('missing API and old stock snapshots never become invented zero-production 
   assert.equal(flow(f, 'firewood', 'current', 'used'), '—');
   assert.equal(flow(f, 'food', 'difference', 'delta'), '—');
   assert.match(live(f, 'food').textContent, /食物 500/);
+  assert.match(live(f, 'challengeFood').textContent, /缺少流水统计.*不能确认/);
 });
 
 test('new-game first day starts at 06:00 and never projects its partial output to a full day', () => {

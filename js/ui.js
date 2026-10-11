@@ -1120,6 +1120,13 @@ G.ui = {
       </details>
     </details>`;
   },
+  townChallengeInfoData:function(){
+    const f=G.townChallengeFacts(),done=G.game.challenges?.completed||{};
+    const status=key=>done[key]!==undefined?`已确认：第 ${done[key]} 天`:(f[key].ready?'当前已满足，待下次日界确认':'进行中');
+    return {challengeSettlement:`安居村庄 · ${status('settlement')}：已入村 ${f.settlement.population}/30 人；有完工住房 ${f.settlement.homed}/${f.settlement.population} 人，还缺 ${f.settlement.population-f.settlement.homed} 人住处。`,
+      challengeFood:!f.food.available?'一季多元生产：缺少流水统计，暂不能确认；不把未知产出当作零。':`一季多元生产 · ${status('food')}：最近完整记录 ${f.food.days}/12 日${f.food.days?`（第 ${f.food.fromDay}–${f.food.toDay} 天）`:''}；实际产出食物 ${f.food.produced.toFixed(1)} / 居民食用 ${f.food.used.toFixed(1)}；有实际产出的类别 ${f.food.groups}/3。${!f.food.contiguous?'需紧接今天的连续12个完整日。':''}`,
+      challengeEducation:`教育传承 · ${status('education')}：受教育成人 ${f.education.educated}/3 人；已有课时且所属学堂完工的学生 ${f.education.students}/1 人。`};
+  },
   townHallInfoData: function (b) {
     if (b.type !== 'townhall' || b.state !== 'ok' || !G.townHallSummary) return null;
     const s = G.townHallSummary(b), g = G.game, heat = this.heatDemand();
@@ -1146,7 +1153,7 @@ G.ui = {
       historySummary: rows.length ? `第 ${rows[0].d}–${rows[rows.length - 1].d} 天：出生 ${born} · 死亡 ${died}；人口 ${rows[0].pop} → ${rows[rows.length - 1].pop}` : '尚无每日记录；结束第一天后开始记账。',
       historyRows: rows.map(row => `第 ${row.d} 天 · 人口 ${Number(row.pop) || 0} · 出生 ${Number(row.born) || 0} · 死亡 ${Number(row.died) || 0} · ${[['food','粮'],['firewood','柴'],['wood','木'],['stone','石'],['iron','铁']].map(([key,label]) => label + (Number.isFinite(row[key]) ? row[key] : '—')).join(' / ')}`).join('\n'),
     };
-    Object.assign(data, this.townLedgerInfoData());
+    Object.assign(data, this.townLedgerInfoData(), this.townChallengeInfoData());
     const offer = s.offer;
     if (offer) {
       const needed = s.offerFamilies + s.homelessFamilies, free = s.freeHomes + s.boardingSlots;
@@ -1165,6 +1172,11 @@ G.ui = {
       ${['population', 'housing', 'education', 'health', 'medical', 'food', 'fuel', 'tools', 'arriving', 'schedule', 'decisions'].map(key => `<p class="row" data-townhall="${key}">${this.escHtml(data[key])}</p>`).join('')}
       <div data-townhall-offer></div>
       <p class="economy-message" data-townhall-message role="status" aria-live="polite"></p>
+      <details class="townhall-ledger" data-town-challenges><summary>发展挑战（本作适配）</summary>
+        ${['challengeSettlement','challengeFood','challengeEducation'].map(key=>`<p class="row" data-townhall="${key}">${this.escHtml(data[key])}</p>`).join('')}
+        <p class="desc">30名已入村居民都有完工住房；或连续12完整日肉/蔬菜/主食各有实际产出、合计不少于实际食用且有人食用；或3名受教成人与1名已有课时学生。三项独立，无资源奖励或效率加成，不是原版成就的精确条件。</p>
+        <p class="desc">日界首次观察满足后永久记录本次确认日；旧档不追溯历史完成日。产出可仍在搬运，贸易运回不算自产，统计不保证库存足够、均衡饮食或下一季继续自给。</p>
+      </details>
       ${this.townLedgerInfoMarkup(data)}
       <details class="townhall-ledger"><summary data-townhall="historyTitle">${this.escHtml(data.historyTitle)}</summary>
         <p data-townhall="historySummary">${this.escHtml(data.historySummary)}</p>

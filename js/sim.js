@@ -45,13 +45,35 @@ G.townLedgerSummary=function(){
     recent,previous,comparable:recent.days===12&&previous.days===12};
 };
 
+/* Small-map development challenges observe existing state and recorded flows.
+ * They never control production, grant resources or claim an unobserved date. */
+G.TOWN_CHALLENGE_KEYS=['settlement','food','education'];
+G.townChallengeFacts=function(){
+  const w=G.world,cs=w.citizens.filter(c=>!c.dead&&!G.isArriving(c)),pop=cs.length;
+  const homed=cs.filter(c=>{const h=G.homeOf(c);return h&&h.state==='ok'&&['house','stonehouse','boarding'].includes(h.type);}).length;
+  const educated=cs.filter(c=>c.adult&&c.educated).length;
+  const students=cs.filter(c=>c.student&&c.studyHours>0&&w.bmap[c.school]?.type==='school'&&w.bmap[c.school].state==='ok').length;
+  const available=typeof G.townLedgerSummary==='function';
+  const recent=available?G.townLedgerSummary().recent:{days:0,fromDay:null,toDay:null,totals:G.ledgerTotals([])},totals=recent.totals,groups=G.FOOD_KEYS.filter(k=>totals[k].produced>0).length;
+  const contiguous=recent.days===12&&recent.toDay-recent.fromDay===11&&recent.toDay===G.game.day-1;
+  return {settlement:{population:pop,homed,ready:pop>=30&&homed===pop},
+    food:{available,days:recent.days,contiguous,fromDay:recent.fromDay,toDay:recent.toDay,groups,produced:totals.food.produced,used:totals.food.used,
+      ready:contiguous&&groups===3&&totals.food.used>0&&totals.food.produced>=totals.food.used},
+    education:{educated,students,ready:educated>=3&&students>=1}};
+};
+G.observeTownChallenges=function(){
+  const facts=G.townChallengeFacts(),g=G.game;
+  if(!g.challenges)g.challenges={v:1,completed:{}};
+  for(const key of G.TOWN_CHALLENGE_KEYS)if(facts[key].ready&&g.challenges.completed[key]===undefined)g.challenges.completed[key]=g.day;
+};
+
 G.newGameState = function () {
   const g = {
     h: 6, day: 0, season: 0, year: 1,
     speed: 1, paused: false,
     res: { wood: 80, stone: 48, iron: 0, tools: 15, food: 500, meat: 0, vegetables: 0, grain: 500, leather: 0, wool: 0, clothes: 0, warmCoats: 0, herbs: 0, coal: 0, steelTools: 0, ale: 0, firewood: 50 }, // 开局（原版中难度 5 家庭，工具 15 件≈第一轮磨损周期）；存粮较原版加厚：15 人 6 天食物跑道撑不到第一座采集屋建成
     heating:{allowCoal:false,coalReserve:20},
-    healthStartDay: 0,
+    healthStartDay: 0, challenges:{v:1,completed:{}},
     nomads: {nextDay:G.YEAR_DAYS,serial:0,offer:null,accepted:0,declined:0},
     schedT: 1,
     over: false,
@@ -234,6 +256,7 @@ G.endDay = function () {
     warn: (g.warned.hunger ? 'h' : '') + (g.warned.firewood ? 'w' : '') + (g.warned.foodLow ? 'l' : ''),
   });
   if (g.hist.length > 60) g.hist.shift();
+  G.observeTownChallenges();
   G.ui.refreshHUD();
 };
 
