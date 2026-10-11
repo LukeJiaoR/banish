@@ -103,7 +103,7 @@ G.serializeGame = function () {
       v: G.VERSION,
       h: g.h, day: g.day, season: g.season, year: g.year,
       res: g.res, stats: g.stats, prevFood: g.prevFood, foodNet: g.foodNet, foodUrgent: g.foodUrgent, warned: g.warned,
-      heating:g.heating, fireDisasters:g.fireDisasters, farmPests:g.farmPests, townLedger:g.townLedger, challenges:g.challenges, hist: g.hist, buildLog: g.buildLog, toolWear: g.toolWear, steelToolWear: g.steelToolWear, healthStartDay: g.healthStartDay, nomads:g.nomads, unlocks: g.unlocks, livestock: g.livestock,
+      heating:g.heating, fishingRules:g.fishingRules, fireDisasters:g.fireDisasters, farmPests:g.farmPests, townLedger:g.townLedger, challenges:g.challenges, hist: g.hist, buildLog: g.buildLog, toolWear: g.toolWear, steelToolWear: g.steelToolWear, healthStartDay: g.healthStartDay, nomads:g.nomads, unlocks: g.unlocks, livestock: g.livestock,
       productionGoals: g.productionGoals && { ...g.productionGoals }, productionPaused: g.productionPaused && { ...g.productionPaused },
     },
     roads: Array.from(w.road).flatMap((road, i) => road ? [i] : []),
@@ -253,6 +253,8 @@ G.prepareSaveData = function (d) {
   if (!hasFoodClasses) g.res.grain = g.res.food; // legacy stock is preserved once
   if (gd.unlocks !== undefined) {record(gd.unlocks,'产业解锁');if(typeof gd.unlocks.orchard !== 'boolean')bad('果树种子解锁');for(const key of ['cabbage','beans'])if(gd.unlocks[key]!==undefined&&typeof gd.unlocks[key]!=='boolean')bad('农田种子解锁');g.unlocks={orchard:gd.unlocks.orchard,cabbage:gd.unlocks.cabbage===true,beans:gd.unlocks.beans===true};}
   if (gd.livestock !== undefined) {record(gd.livestock,'待安置牲畜');g.livestock={sheep:integer(gd.livestock.sheep,'待安置羊',0,1000000),cattle:gd.livestock.cattle===undefined?0:integer(gd.livestock.cattle,'待安置牛',0,1000000)};}
+  if(gd.fishingRules!==undefined&&!['classic','shared'].includes(gd.fishingRules))bad('渔场规则');
+  g.fishingRules=gd.fishingRules===undefined?'classic':gd.fishingRules;
   if(gd.fireDisasters!==undefined){const f=record(gd.fireDisasters,'住房火灾设置');if(typeof f.enabled!=='boolean')bad('住房火灾开关');
     const startedDay=f.startedDay===null?null:integer(f.startedDay,'首次火灾启用日',0,g.day),graceUntil=integer(f.graceUntil,'火灾宽限日',0,g.day+48);
     if(graceUntil!==(startedDay===null?0:startedDay+48)||(f.enabled&&startedDay===null))bad('火灾宽限状态');

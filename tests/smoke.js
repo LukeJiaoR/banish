@@ -1039,7 +1039,11 @@ G.markGroundDirty = G.markGroundDirty || (() => {}); // render.js 未加载时�
   const c = G.spawnCitizen({ x: 4, y: 4, sex: 'm', age: 25 });
   c.job = b.id;
   const t = G.makeTask(b, c);
-  check('周边无水渔获减半（8→4）', t && t.yield.qty === 4);
+  check('共享规则无水不接捕鱼任务', t === null);
+  G.game.fishingRules='classic';
+  const legacyFish=G.makeTask(b,c);
+  check('旧村经典规则保留无水半产（8→4）', legacyFish && legacyFish.yield.qty===4);
+  G.game.fishingRules='shared';
   for (let y = 6; y < 12; y++) for (let x = 6; x < 12; x++) w.water[y * w.N + x] = 1; // 大片水域
   b.noWork = false;
   const t2 = G.makeTask(b, c);
