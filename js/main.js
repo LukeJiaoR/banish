@@ -103,6 +103,7 @@ G.serializeGame = function () {
       v: G.VERSION,
       h: g.h, day: g.day, season: g.season, year: g.year,
       res: g.res, stats: g.stats, prevFood: g.prevFood, foodNet: g.foodNet, foodUrgent: g.foodUrgent, warned: g.warned,
+      supplyMode:g.supplyMode,supplyStartedDay:g.supplyStartedDay,supplyUsed:g.supplyUsed,supplyLost:g.supplyLost,
       heating:g.heating, fishingRules:g.fishingRules, fireDisasters:g.fireDisasters, farmPests:g.farmPests, townLedger:g.townLedger, challenges:g.challenges, hist: g.hist, buildLog: g.buildLog, toolWear: g.toolWear, steelToolWear: g.steelToolWear, healthStartDay: g.healthStartDay, nomads:g.nomads, unlocks: g.unlocks, livestock: g.livestock,
       productionGoals: g.productionGoals && { ...g.productionGoals }, productionPaused: g.productionPaused && { ...g.productionPaused },
     },
@@ -125,12 +126,12 @@ G.serializeGame = function () {
       sownAll: b.sownAll, growth: b.growth, harvestDone: b.harvestDone, cropType:b.cropType, cropChoice:b.cropChoice,
       sowingCommitted: b.sowingCommitted, pestInfestation:b.pestInfestation, lastPestCrop:b.lastPestCrop, earlyHarvestYield:b.earlyHarvestYield, productionPaused: b.productionPaused,
       tradeInventory: b.tradeInventory, tradeTargets: b.tradeTargets, merchant: b.merchant, nextMerchantDay: b.nextMerchantDay, merchantVisits:b.merchantVisits, merchantOrders:b.merchantOrders, autoTrade:b.autoTrade, autoTradeLast:b.autoTradeLast,
-      lastHeating:b.lastHeating, unheated:b.unheated, graves:b.graves,
+      supplyStock:b.supplyStock,lastHeating:b.lastHeating, unheated:b.unheated, graves:b.graves,
       animalType:b.animalType, pastureProducts:b.pastureProducts, animals: b.animals, animalGrowth: b.animalGrowth, animalTarget: b.animalTarget, woolReady: b.woolReady,
       orchardAge: b.orchardAge, orchardYield: b.orchardYield, orchardSeason: b.orchardSeason, tendedDay: b.tendedDay,
       orchardTrees:b.orchardTrees?b.orchardTrees.map(t=>({...t})):undefined,orchardDay:b.orchardDay,orchardReplant:b.orchardReplant,orchardWarnYear:b.orchardWarnYear,
     })),
-    families: w.families.map(f => ({ id: f.id, members: f.members, houseId: f.houseId, coupleIds: f.coupleIds })),
+    families: w.families.map(f => ({ id: f.id, members: f.members, houseId: f.houseId, coupleIds: f.coupleIds,supplyCamp:f.supplyCamp&&{x:f.supplyCamp.x,y:f.supplyCamp.y,supplyStock:f.supplyCamp.supplyStock} })),
     citizens: w.citizens.map(c => ({
       id: c.id, name: c.name, sex: c.sex, age: c.age, adult: c.adult,
       x: c.x, y: c.y, familyId: c.familyId, job: c.job,
@@ -138,6 +139,7 @@ G.serializeGame = function () {
       student: c.student ? 1 : 0, educated: c.educated ? 1 : 0, school: c.school != null ? c.school : null, studyHours:G.studyHoursOf(c),studyToday:G.studyTodayOf(c),studyDay:g.day,
       arrivalHallId:c.arrivalHallId, hunger: c.hunger, cold: c.cold, clothingLeft: c.clothingLeft, clothingType:c.clothingType, dietVariety: c.dietVariety, dietScore: c.dietScore, happiness: c.happiness, leisureDays:c.leisureDays, grief:c.grief, health: c.health, sickDays: c.sickDays, immunityDays: c.immunityDays, herbCooldown: c.herbCooldown, careHours: c.careHours, camped: c.camped ? 1 : 0, carry: c.carry,
     })),
+    supplyCaches:(w.supplyCaches||[]).map(b=>({id:b.id,x:b.x,y:b.y,w:b.w,h:b.h,supplyStock:b.supplyStock})),
     nextUid: G._peekUid(),
   };
 };
@@ -236,6 +238,10 @@ G.prepareSaveData = function (d) {
   const nullableId = (v, field) => v == null ? null : id(v, field);
   const ids = (v, field) => array(v, field).map(x => id(x, field));
   const clone = v => JSON.parse(JSON.stringify(v));
+  const supplyStock=(value,field,limit=Infinity)=>{
+    record(value,field);if(Object.keys(value).length!==G.SUPPLY.types.length||Object.keys(value).some(k=>!G.SUPPLY.types.includes(k)))bad(field+'种类');
+    const stock=Object.fromEntries(G.SUPPLY.types.map(k=>[k,number(value[k],field,0)]));if(G.supplySum(stock)>limit+1e-6)bad(field+'容量');return stock;
+  };
   record(d, '根对象');
   if (d.v !== undefined && d.v !== 1) bad('版本不受支持');
   integer(d.seed, '地图种子', -0x80000000, 0xffffffff);
@@ -255,6 +261,11 @@ G.prepareSaveData = function (d) {
   if (gd.livestock !== undefined) {record(gd.livestock,'待安置牲畜');g.livestock={sheep:integer(gd.livestock.sheep,'待安置羊',0,1000000),cattle:gd.livestock.cattle===undefined?0:integer(gd.livestock.cattle,'待安置牛',0,1000000)};}
   if(gd.fishingRules!==undefined&&!['classic','shared'].includes(gd.fishingRules))bad('渔场规则');
   g.fishingRules=gd.fishingRules===undefined?'classic':gd.fishingRules;
+  if(gd.supplyMode!==undefined&&!['automatic','physical'].includes(gd.supplyMode))bad('生活配送规则');
+  g.supplyMode=gd.supplyMode||'automatic';g.supplyStartedDay=gd.supplyStartedDay==null?null:integer(gd.supplyStartedDay,'配送启用日',0,g.day);
+  g.supplyUsed=gd.supplyUsed===undefined?G.emptySupplyStock():supplyStock(gd.supplyUsed,'家庭实际消耗');
+  g.supplyLost=gd.supplyLost===undefined?G.emptySupplyStock():supplyStock(gd.supplyLost,'家庭实际损失');
+  if(g.supplyMode==='automatic'&&(g.supplyStartedDay!==null||G.supplySum(g.supplyUsed)||G.supplySum(g.supplyLost)))bad('自动供给带配送记录');
   if(gd.fireDisasters!==undefined){const f=record(gd.fireDisasters,'住房火灾设置');if(typeof f.enabled!=='boolean')bad('住房火灾开关');
     const startedDay=f.startedDay===null?null:integer(f.startedDay,'首次火灾启用日',0,g.day),graceUntil=integer(f.graceUntil,'火灾宽限日',0,g.day+48);
     if(graceUntil!==(startedDay===null?0:startedDay+48)||(f.enabled&&startedDay===null))bad('火灾宽限状态');
@@ -317,7 +328,11 @@ G.prepareSaveData = function (d) {
       if(fromHour>=G.DAY_H||fromHour!==(day===startDay?startHour:0)||r.partial!==(fromHour>0))bad('流水部分日');
       if(closed?(day>=g.day||r.toHour!==G.DAY_H):(day!==g.day||fromHour>g.h))bad('流水日范围');
       exactKeys(r.flows,G.LEDGER_RES,'流水资源');const flows={};
-      for(const k of G.LEDGER_RES){exactKeys(r.flows[k],G.LEDGER_METRICS,'流水计量');flows[k]=Object.fromEntries(G.LEDGER_METRICS.map(m=>[m,number(r.flows[k][m],'流水数量',0)]));}
+      for(const k of G.LEDGER_RES){
+        const old=r.flows[k]?.distributedUsed===undefined&&r.flows[k]?.distributedLost===undefined;
+        exactKeys(r.flows[k],old?G.LEDGER_METRICS.filter(m=>!m.startsWith('distributed')):G.LEDGER_METRICS,'流水计量');
+        flows[k]=Object.fromEntries(G.LEDGER_METRICS.map(m=>[m,old&&m.startsWith('distributed')?0:number(r.flows[k][m],'流水数量',0)]));
+      }
       return {day,fromHour,partial:r.partial,opening:stock(r.opening,'期初库存'),flows,...(closed?{toHour:G.DAY_H,closing:stock(r.closing,'期末库存')}:{})};
     };
     const input=array(l.days,'流水历史');if(input.length>48)bad('流水历史过长');
@@ -556,12 +571,19 @@ G.prepareSaveData = function (d) {
     for (let yy = y; yy < y + b.h; yy++) for (let xx = x; xx < x + b.w; xx++) {
       const i = yy * w.N + xx; if (w.bgrid[i] >= 0) bad('建筑重叠'); w.bgrid[i] = b.id;
     }
+    if(bd.supplyStock!==undefined){
+      if(!['house','stonehouse','boarding','market'].includes(b.type)||b.state!=='ok'||g.supplyMode!=='physical')bad('配送库存建筑');
+      b.supplyStock=supplyStock(bd.supplyStock,'建筑配送库存',b.type==='market'?G.SUPPLY.marketCap:G.SUPPLY.homeCap);
+    }
     w.buildings.push(b); w.bmap[b.id] = b;
   }
   w.families = families.map(fd => {
     record(fd, '家庭记录');
-    return { id: uniqueId(fd.id, '家庭 ID'), members: ids(fd.members, '家庭成员'), houseId: nullableId(fd.houseId, '住房'),
+    const f={ id: uniqueId(fd.id, '家庭 ID'), members: ids(fd.members, '家庭成员'), houseId: nullableId(fd.houseId, '住房'),
       coupleIds: fd.coupleIds === undefined ? undefined : ids(fd.coupleIds, '配偶') };
+    if(fd.supplyCamp!==undefined){const camp=record(fd.supplyCamp,'临时生活补给点');if(g.supplyMode!=='physical')bad('自动供给带临时补给');
+      f.supplyCamp={id:f.id,type:'supplycamp',state:'ok',w:1,h:1,x:integer(camp.x,'补给点 x',0,Math.min(oldN,w.N)-1),y:integer(camp.y,'补给点 y',0,Math.min(oldN,w.N)-1),supplyStock:supplyStock(camp.supplyStock,'临时生活库存',G.SUPPLY.homeCap)};
+    }return f;
   });
   for (const cd of citizens) {
     record(cd, '市民记录');
@@ -579,16 +601,24 @@ G.prepareSaveData = function (d) {
       if(cd.carry.orchardId!==undefined){if(carry.type!=='vegetables'||cd.carry.extra!==undefined||cd.carry.smithInput!==undefined||cd.carry.brewIngredient!==undefined||cd.carry.pastureId!==undefined||carry.qty>G.ORCHARD.fruit)bad('果园携果类型');carry.orchardId=integer(cd.carry.orchardId,'果园携果来源',1);}
       if(cd.carry.pastureId!==undefined){if(!['meat','leather','wool'].includes(carry.type)||cd.carry.extra!==undefined)bad('牧场携货类型');carry.pastureId=integer(cd.carry.pastureId,'牧场携货来源',1);}
       if(cd.carry.brewIngredient!==undefined){if(cd.carry.brewIngredient!==true||carry.type!=='grain')bad('酿造原粮标记');carry.brewIngredient=true;}
+      if(cd.carry.supplyBatch!==undefined){const batch=record(cd.carry.supplyBatch,'生活配送货批');
+        if(g.supplyMode!=='physical'||!carry.staffingReturn||!G.SUPPLY.types.includes(carry.type)||['smithInput','coatInput','tailorId','fuelInput','firewoodId','orchardId','pastureId','brewIngredient'].some(k=>cd.carry[k]!==undefined))bad('生活配送货批类型');
+        if(!['home','vendor','return'].includes(batch.kind)||Object.keys(batch).some(k=>!['kind','to','familyId'].includes(k)))bad('生活配送目的类型');
+        const to=nullableId(batch.to,'生活配送目的地');if((batch.kind==='return')!==(to===null))bad('生活配送目的地');
+        carry.supplyBatch={kind:batch.kind,to};if(batch.kind==='home')carry.supplyBatch.familyId=id(batch.familyId,'生活配送家庭');else if(batch.familyId!==undefined)bad('生活配送家庭');
+      }
       if (cd.carry.extra !== undefined) {
         if(cd.carry.type!=='meat'&&!carry.staffingReturn)bad('副产物携带类型');
         record(cd.carry.extra, '随身副产物'); carry.extra = {};
         for (const type of Object.keys(cd.carry.extra)) {
           if(carry.coatInput&&(type===carry.type||cd.carry.extra[type]>2))bad('衣料副批数量');
-          if (!(carry.smithInput?['iron','wood','coal']:['leather','wool']).includes(type)||carry.smithInput&&(type===carry.type||cd.carry.extra[type]>(type==='iron'?1:2))) bad('副产物种类');
+          if (!(carry.supplyBatch?G.SUPPLY.types:carry.smithInput?['iron','wood','coal']:['leather','wool']).includes(type)||carry.smithInput&&(type===carry.type||cd.carry.extra[type]>(type==='iron'?1:2))) bad('副产物种类');
+          if(carry.supplyBatch&&type===carry.type)bad('重复配送主货');
           carry.extra[type] = number(cd.carry.extra[type], '副产物数量', 0);
         }
       }
     }
+    if(carry?.supplyBatch&&(carry.qty<=0||G.supplySum(G.supplyCargoItems(carry))>(carry.supplyBatch.kind==='home'?G.SUPPLY.homeCarry:G.SUPPLY.vendorCarry)+1e-6))bad('生活配送批量');
     if(cd.clothingType!=null&&!['basic','warm'].includes(cd.clothingType))bad('穿着衣物类型');
     const c = {
       id: uniqueId(cd.id, '市民 ID'), name: cd.name, sex: cd.sex, age: number(cd.age, '年龄', 0), adult: !!cd.adult,
@@ -623,6 +653,12 @@ G.prepareSaveData = function (d) {
     }else c.grief=null;
     w.citizens.push(c); w.cmap[c.id] = c;
   }
+  w.supplyCaches=optionalArray(d.supplyCaches,'散落生活物资').map(row=>{
+    record(row,'散落生活物资');if(g.supplyMode!=='physical')bad('自动供给带散落物资');
+    const width=integer(row.w,'散落范围宽',1,4),height=integer(row.h,'散落范围高',1,3);
+    if(![[1,1],[2,2],[3,3],[4,3]].some(([x,y])=>x===width&&y===height))bad('散落物资原占地'); // citizen/camp, house, market, boarding
+    return {id:uniqueId(row.id,'散落物资 ID'),type:'supplycache',state:'ok',x:integer(row.x,'散落物资 x',0,Math.min(oldN,w.N)-width),y:integer(row.y,'散落物资 y',0,Math.min(oldN,w.N)-height),w:width,h:height,supplyStock:supplyStock(row.supplyStock,'散落生活库存',G.SUPPLY.homeCap)};
+  });
   for(const f of w.families)if(f.houseId!==null&&(w.bmap[f.houseId]?.houseFire||w.bmap[f.houseId]?.type==='burntruins'))bad('火情住房不能入住');
   for(const c of w.citizens)if(c.job!==null&&['well','burntruins'].includes(w.bmap[c.job]?.type))bad('无岗位消防设施');
   if(g.nomads.offer){const h=w.bmap[g.nomads.offer.hallId];if(!h||h.type!=='townhall'||h.state!=='ok')bad('来访申请市政厅失效');}

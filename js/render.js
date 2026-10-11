@@ -133,7 +133,7 @@ G.BUILD_SPR_W = {
   house: 1.16, stonehouse: 1.12, boarding: 1.04, storage: 1.03, stockpile:1.25, mine: 1.12,
   gatherer: 1.10, forester: 1.06, woodcutter: 1.12, dock: 1.0,
   school: 1.06, blacksmith: 1.06, hunting: 1.08, site_2x2: 1.0, site_3x3: 1.0,
-  well: 1.25, burntruins: 1.25, tailor: 1.04, tavern: 7 / 6, tradingpost: 0.875, herbalist: 1.25, hospital: 7 / 6, stonequarry: 7 / 6, mineralpit: 7 / 6, townhall: 7 / 6,
+  market:7/6, well: 1.25, burntruins: 1.25, tailor: 1.04, tavern: 7 / 6, tradingpost: 0.875, herbalist: 1.25, hospital: 7 / 6, stonequarry: 7 / 6, mineralpit: 7 / 6, townhall: 7 / 6,
 };
 /* 精灵内烟囱的横向位置（相对精灵宽度，负=偏左），用于挂炊烟粒子 */
 G.BUILD_CHIMNEY_X = { house: -0.30, stonehouse: 0.02, boarding: -0.32 };
@@ -386,7 +386,7 @@ G.drawBuilding = function (ctx, b, time) {
   // 建筑精灵：脚点 = 占地菱形最下角，宽度 = 占地菱形宽 × 出格系数
   const sprW = (b.w + b.h) * 32 * (G.BUILD_SPR_W[b.type] || 1.08);
   // 贸易站按原图50%显示；补偿底角下方3px透明余量，让石基脚点贴合占地底角。
-  const sprFootY = B[1] + (b.type === 'tradingpost' ? 1.5 : b.type === 'mineralpit' ? 2 : b.type==='burntruins'?2.5:b.type==='well'?1:0);
+  const sprFootY = B[1] + ((b.type === 'tradingpost'||b.type==='market') ? 1.5 : b.type === 'mineralpit' ? 2 : b.type==='burntruins'?2.5:b.type==='well'?1:0);
   const spr = G.sprDraw(ctx, b.type, B[0], sprFootY, { w: sprW });
   if (spr) {
     if (def.chimney) { // 挂烟囱粒子锚点（精灵内烟囱横向位置见 BUILD_CHIMNEY_X）
@@ -714,7 +714,8 @@ G.drawCitizen = function (ctx, c, time, homes) {
   const s = child ? 0.72 : 1;
   const walking = c.state === 'walk' || c.state === 'haul';
   const rescue=G.fireTaskOf&&G.fireTaskOf(c);
-  const working = c.state === 'work'&&!rescue;
+  const shopping=G.supplyTaskOf&&G.supplyTaskOf(c);
+  const working = c.state === 'work'&&!rescue&&!shopping;
   const bob = walking ? Math.abs(Math.sin(c.animT)) * 1.2 : (working ? Math.abs(Math.sin(c.animT)) * 0.6 : 0);
   const target = G.citizenWorkTarget(c);
   const facing = G.citizenFacing(c, target), flip = facing < 0;
@@ -998,6 +999,7 @@ G.frame = function (dtReal) {
     if (c.state === 'rest' && c.camped === false && !citizenHomes) citizenHomes = G.citizenHomeLookup(w);
     items.push({ d: c.x + c.y + 0.01, k: 2, c });
   }
+  for(const pile of [...(w.supplyCaches||[]),...(w.families||[]).map(f=>f.supplyCamp).filter(Boolean)])if(G.supplySum(pile.supplyStock)>1e-8&&pile.x>=tx0-3&&pile.x<=tx1+3&&pile.y>=ty0-3&&pile.y<=ty1+3)items.push({d:pile.x+pile.y+.005,k:6,pile});
   items.sort((a, b) => a.d - b.d);
   const now = performance.now() / 1000;
   for (const it of items) {
@@ -1020,11 +1022,13 @@ G.frame = function (dtReal) {
     }
     else if (it.k === 4) G.drawFarmCrop(ctx, it.b, it.f);
     else if (it.k === 5) G.drawEconomyFieldPart(ctx, it);
+    else if (it.k === 6) G.drawSupplyPile(ctx,it.pile);
     else if (it.k === 1) {
       if(it.b.type==='farm')G.drawFarmPestBadge(ctx,it.b);
       // Farm ground/crops were split above; keep its building-level badges.
       if (it.b.type !== 'farm' && !(it.b.state === 'ok' && (it.b.type === 'pasture' || it.b.type === 'orchard' || it.b.type === 'cemetery')))
         G.drawBuilding(ctx, it.b, now);
+      if(G.game.supplyMode==='physical'&&G.supplyHome(it.b)&&G.supplyResidents(it.b).length&&G.supplyFood(it.b.supplyStock)<G.supplyResidents(it.b).length*G.LIFE.eatPerDay){const p=G.T2S(it.b.x+it.b.w/2,it.b.y);G.drawNeedBadge(ctx,p[0]-3,p[1]-25,'food');}
       // Cold homes get a distinct snowflake; no-work warning remains separate.
       if (G.isWinter() && it.b.unheated && it.b.state === 'ok') {
         const T = G.T2S(it.b.x + it.b.w / 2, it.b.y);
@@ -1120,4 +1124,15 @@ G.drawBridge = function(ctx,b) {
     ctx.restore();
   }
   if(!complete){const [sx,sy]=G.T2S(b.x,b.y);ctx.fillStyle='#403924';ctx.fillRect(sx-19,sy-19,38,5);ctx.fillStyle='#dbb25f';ctx.fillRect(sx-19,sy-19,38*b.progress,5);}
+};
+
+/* Existing resource art on a small code-native crate: actual recoverable goods,
+ * not another warehouse or a passive transfer. Camps remain unheated outdoors. */
+G.drawSupplyPile=function(ctx,pile){
+ if(!G.supplySum(pile.supplyStock))return;const[x,y]=G.T2S(pile.x,pile.y),by=y+16;
+ quadFill(ctx,x-6,by-4,x,by-7,x+6,by-4,x,by-1,'#98734d');
+ quadFill(ctx,x-6,by-4,x,by-1,x,by+3,x-6,by,'#785238');
+ quadFill(ctx,x,by-1,x+6,by-4,x+6,by,x,by+3,'#5d452e');
+ const types=G.SUPPLY.types.filter(k=>(pile.supplyStock[k]||0)>1e-8).slice(0,3);
+ types.forEach((type,i)=>G.sprDraw(ctx,'carry_'+type,x+(i-(types.length-1)/2)*5,by-2,{w:8}));
 };
