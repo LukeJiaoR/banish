@@ -41,7 +41,7 @@ G.newGame = function (seed, options) {
   // 资源：木 80 / 石 48 / 食 500 / 柴 50 / 工具 15（≈第一轮磨损周期，之后靠铁匠铺）
   G.game = G.newGameState();
   G.sel = null;
-  G.tool = null; G.cancelRoadPlan(); G.cancelHarvestPlan();
+  G.tool = null; G.cancelRoadPlan(); G.cancelHarvestPlan(); G.cancelFarmPlan();
   G.smoke = [];
   G.flakes = null;
   if (!options.preserveSaves) {
@@ -119,6 +119,7 @@ G.serializeGame = function () {
       bridgeAxis: b.bridgeAxis, bridgeLength: b.type === 'bridge' ? b.w + b.h - 1 : undefined,
       mineMode: b.mineMode, legacyMine: b.legacyMine, mineTick: b.mineTick, toolRecipe: b.toolRecipe, reserveDays:b.reserveDays, coatRecipe:b.coatRecipe,
       doCut: b.doCut, doPlant: b.doPlant, fuelLimit: b.fuelLimit, toolLimit: b.toolLimit,
+      farmSize:b.type==='farm'&&b.farmSize?[...b.farmSize]:undefined,
       farm: b.farm ? b.farm.map(f => [f.sown ? 1 : 0, f.harvested ? 1 : 0]) : undefined,
       sownAll: b.sownAll, growth: b.growth, harvestDone: b.harvestDone, cropType:b.cropType, cropChoice:b.cropChoice,
       sowingCommitted: b.sowingCommitted, earlyHarvestYield:b.earlyHarvestYield, productionPaused: b.productionPaused,
@@ -357,6 +358,7 @@ G.prepareSaveData = function (d) {
     record(bd, '建筑记录');
     if (!Object.prototype.hasOwnProperty.call(G.BDEF, bd.type)) bad('建筑类型');
     let def = G.BDEF[bd.type];
+    if(bd.farmSize!==undefined){if(bd.type!=='farm'||!G.farmDefinition(bd.farmSize))bad('农田尺寸');def=G.farmDefinition(bd.farmSize);}
     if (bd.type === 'bridge') {
       if (!['x','y'].includes(bd.bridgeAxis)) bad('木桥方向');
       const length = integer(bd.bridgeLength,'木桥长度',3,24);
@@ -451,6 +453,7 @@ G.prepareSaveData = function (d) {
     }
     if(bd.earlyHarvestYield!==undefined&&bd.type!=='farm')bad('抢收仅用于农田');
     if (bd.type === 'farm') {
+      if(bd.farmSize!==undefined)b.farmSize=[...bd.farmSize];
       b.cropType=bd.cropType===undefined?'wheat':bd.cropType;b.cropChoice=bd.cropChoice===undefined?b.cropType:bd.cropChoice;
       if(typeof b.cropType!=='string'||typeof b.cropChoice!=='string'||!Object.hasOwn(G.CROPS,b.cropType)||!Object.hasOwn(G.CROPS,b.cropChoice))bad('农田作物种类');
       if((b.cropType==='cabbage'||b.cropChoice==='cabbage')&&!g.unlocks.cabbage)bad('农田作物种子未解锁');
@@ -570,7 +573,7 @@ G.applySaveData = function (d) {
   const candidate = G.prepareSaveData(d);
   G.world = candidate.world; G.game = candidate.game; G.rng = candidate.rng; G.setUid(candidate.nextUid);
   if (G._recoveryBackedUp) G.autosaveBlocked = false;
-  G.sel = null; G.tool = null; G.cancelRoadPlan(); G.cancelHarvestPlan(); G.smoke = []; G.flakes = null; G.keys = {};
+  G.sel = null; G.tool = null; G.cancelRoadPlan(); G.cancelHarvestPlan(); G.cancelFarmPlan(); G.smoke = []; G.flakes = null; G.keys = {};
   G.ui.hideInfo(); G.ui.setToolActive();
   document.getElementById('over').classList.add('hidden');
   // All cargo is validated and owned by the candidate; now resume its deliveries.
@@ -675,7 +678,7 @@ G.clampCam = function () {
 
 /* ---------- 工具模式 ---------- */
 G.setTool = function (t) {
-  G.cancelRoadPlan(); G.cancelHarvestPlan();
+  G.cancelRoadPlan(); G.cancelHarvestPlan(); G.cancelFarmPlan();
   if (t == null) { G.tool = null; }
   else if (t === 'demolish') G.tool = { kind: 'demolish' };
   else if (['road','stoneroad','bridge'].includes(t)) G.tool = { kind: 'road', surface:t==='stoneroad'?'stone':t==='bridge'?'bridge':'dirt' };
@@ -718,6 +721,7 @@ G.paintRockLine = function (x0, y0, x1, y1) {
 /* ---------- 建造 ---------- */
 G.tryPlace = function (tx, ty) {
   const type = G.tool.type;
+  if(type==='farm'){G.selectFarmCorner(tx,ty);return;}
   const def = G.BDEF[type];
   const ox = tx - ((def.w - 1) >> 1), oy = ty - ((def.h - 1) >> 1);
   const r = G.addBuilding(type, ox, oy);
@@ -741,6 +745,38 @@ G.paintRoad = function (x0, y0, x1, y1) {
     if (e2 > -dy) { err -= dy; x += sx; }
     if (e2 < dx) { err += dx; y += sy; }
   }
+};
+
+/* Farm placement is a transient rectangle, not an immediate stamp. */
+G.farmPlan=null;G.farmDrag=null;G.farmGestureVersion=0;
+G.isFarmPlanning=()=>G.tool?.kind==='build'&&G.tool.type==='farm';
+G.cancelFarmPlan=function(){G.farmPlan=null;G.farmDrag=null;G.farmGestureVersion++;};
+G.farmPoint=(x,y)=>Number.isFinite(x)&&Number.isFinite(y)?{x:Math.floor(x),y:Math.floor(y)}:null;
+G.farmBounds=function(p){if(!p?.start||!p.end)return null;return {x:Math.min(p.start.x,p.end.x),y:Math.min(p.start.y,p.end.y),w:Math.abs(p.end.x-p.start.x)+1,h:Math.abs(p.end.y-p.start.y)+1};};
+G.selectFarmCorner=function(x,y){
+  if(!G.world||!G.isFarmPlanning()||G.hasOpenModal())return;
+  const point=G.farmPoint(x,y);if(!point)return;
+  const old=G.farmPlan;
+  if(!old||old.world!==G.world||old.game!==G.game||old.end)G.farmPlan={world:G.world,game:G.game,start:point,end:null};
+  else G.farmPlan={...old,end:point};
+};
+G.farmPlanStatus=function(){
+  const plan=G.farmPlan,w=G.world;
+  if(G.farmDrag)return {ok:false,reason:'正在选择矩形；松开后查看面积与用工，再确认开田'};
+  if(!plan||plan.world!==w||plan.game!==G.game||!plan.end)return {ok:false,reason:plan?.world===w?'已选第一角，请选择对角':'鼠标拖出矩形，或点击两个对角；每边4至15格'};
+  const bounds=G.farmBounds(plan),size=[bounds.w,bounds.h],def=G.farmDefinition(size),base={plan,bounds,size};
+  if(!def)return {...base,ok:false,reason:'农田每边须为4至15格；当前 '+bounds.w+'×'+bounds.h};
+  const check=G.canPlace(w,'farm',bounds.x,bounds.y,size);if(!check.ok)return {...base,...check};
+  const trees=G.siteTrees(bounds),area=bounds.w*bounds.h,workers=G.initialFarmWorkers(size);
+  return {...base,ok:true,area,workers,work:def.buildWork,trees:trees.length,fullYield:area*G.PROD.farm.perTile,
+    signature:[bounds.x,bounds.y,...size,w.navigationRevision||0,trees.map(t=>t.i+':'+t.b).join(',')].join('|')};
+};
+G.confirmFarmPlan=function(intent){
+  if(!G.isFarmPlanning()||G.hasOpenModal())return {ok:false,reason:'先关闭弹窗并回到农田规划'};
+  const s=G.farmPlanStatus();if(!s.ok)return s;
+  if(!intent||intent.plan!==s.plan||intent.signature!==s.signature)return {ok:false,reason:'地块或清树需求已变，请复查预览后重新确认'};
+  const r=G.addBuilding('farm',s.bounds.x,s.bounds.y,{farmSize:s.size});
+  if(r.ok){G.cancelFarmPlan();G.ui.refreshHUD();}return r;
 };
 
 /* Transient, explicitly confirmed road plan. Existing marked work is never
@@ -902,21 +938,21 @@ G.init = function () {
   window.addEventListener('beforeunload', () => G.autosave());
   window.addEventListener('pagehide', () => G.autosave());
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') { resetInput(); G.cancelRoadPlan(); G.cancelHarvestPlan(); G.autosave(); }
+    if (document.visibilityState === 'hidden') { resetInput(); G.cancelRoadPlan(); G.cancelHarvestPlan(); G.cancelFarmPlan(); G.autosave(); }
   });
   // 定时自动存档：每 90 秒（游戏进行中）
   setInterval(() => G.autosave(), 90000);
 
   /* ----- 输入 ----- */
   let dragging = false, dragBtn = -1, dragMoved = 0, lastX = 0, lastY = 0, pressX = 0, pressY = 0;
-  let roadTouch = null, harvestTouch = null, roadMouse = null;
+  let roadTouch = null, harvestTouch = null, roadMouse = null, farmTouch=null, farmMouse=null;
   function resetInput() {
     if (G.harvestPlan && !G.harvestPlan.frozen) G.cancelHarvestPlan();
     G.keys = {};
     dragging = false; dragBtn = -1; dragMoved = 0;
-    roadTouch = null; harvestTouch = null; roadMouse = null; G.roadDrag = null;
+    roadTouch = null; harvestTouch = null; roadMouse = null; G.roadDrag = null;farmTouch=null;farmMouse=null;G.farmDrag=null;
   }
-  window.addEventListener('blur', () => { resetInput(); roadTouch = null; G.cancelRoadPlan(); G.cancelHarvestPlan(); });
+  window.addEventListener('blur', () => { resetInput(); roadTouch = null; G.cancelRoadPlan(); G.cancelHarvestPlan(); G.cancelFarmPlan(); });
   document.addEventListener('focusin', e => { if (G.isInputTarget(e.target)) resetInput(); });
 
   const toLocal = (e) => {
@@ -934,7 +970,8 @@ G.init = function () {
     if (e.button === 2 && G.tool) { G.setTool(null); return; } // 右键取消工具
     dragging = true; dragBtn = e.button; dragMoved = 0;
     lastX = pressX = p.x; lastY = pressY = p.y;
-    roadMouse = null;
+    roadMouse = null;farmMouse=null;
+    if(e.button===0&&G.isFarmPlanning()){const t=G.screenToTile(p.x,p.y);farmMouse={start:G.farmPoint(t.tx,t.ty),world:G.world,generation:G.farmGestureVersion};}
     if (e.button === 0 && G.tool && G.tool.kind === 'road') {
       const t = G.screenToTile(p.x, p.y);
       roadMouse = { start: { x: Math.floor(t.tx), y: Math.floor(t.ty) }, world: G.world, generation: G.roadGestureVersion };
@@ -957,6 +994,8 @@ G.init = function () {
     if (dragBtn === 2 || dragBtn === 1 || (dragBtn === 0 && !G.tool && dragMoved > 4)) {
       G.cam.x += dx; G.cam.y += dy;
       lastX = p.x; lastY = p.y;
+    } else if(dragBtn===0&&G.isFarmPlanning()&&farmMouse&&farmMouse.world===G.world&&farmMouse.generation===G.farmGestureVersion&&dragMoved>4){
+      G.farmDrag={world:G.world,start:farmMouse.start,end:G.farmPoint(t.tx,t.ty)};
     } else if (dragBtn === 0 && G.tool && G.tool.kind === 'road' && roadMouse && roadMouse.world === G.world && roadMouse.generation === G.roadGestureVersion && dragMoved > 4) {
       G.roadPlan = null;
       G.roadDrag = { world: G.world, start: roadMouse.start, end: { x: Math.floor(t.tx), y: Math.floor(t.ty) } };
@@ -974,6 +1013,7 @@ G.init = function () {
     const t = G.screenToTile(p.x, p.y);
     const tx = Math.floor(t.tx), ty = Math.floor(t.ty);
     dragMoved = Math.max(dragMoved, Math.abs(p.x - pressX) + Math.abs(p.y - pressY));
+    if(e.button===0&&G.isFarmPlanning()){const gesture=farmMouse;farmMouse=null;G.farmDrag=null;if(!gesture||gesture.world!==G.world||gesture.generation!==G.farmGestureVersion)return;if(dragMoved>4){G.farmPlan=null;G.selectFarmCorner(gesture.start.x,gesture.start.y);G.selectFarmCorner(tx,ty);}else G.selectFarmCorner(tx,ty);return;}
     if (e.button === 0 && G.tool && G.tool.kind === 'road') {
       const gesture = roadMouse; roadMouse = null; G.roadDrag = null;
       if (!gesture || gesture.world !== G.world || gesture.generation !== G.roadGestureVersion) return;
@@ -1006,6 +1046,9 @@ G.init = function () {
     }
   });
 
+  G.cv.addEventListener('touchstart',e=>{if(!G.isFarmPlanning())return;e.preventDefault();resetInput();farmTouch=!G.hasOpenModal()&&e.touches.length===1?{x:e.touches[0].clientX,y:e.touches[0].clientY,world:G.world,generation:G.farmGestureVersion}:null;},{passive:false});
+  G.cv.addEventListener('touchmove',e=>{if(!G.isFarmPlanning())return;e.preventDefault();if(!farmTouch||e.touches.length!==1||Math.abs(e.touches[0].clientX-farmTouch.x)+Math.abs(e.touches[0].clientY-farmTouch.y)>10)farmTouch=null;},{passive:false});
+  G.cv.addEventListener('touchend',e=>{if(!G.isFarmPlanning()){farmTouch=null;return;}e.preventDefault();if(farmTouch&&farmTouch.world===G.world&&farmTouch.generation===G.farmGestureVersion&&e.changedTouches.length===1&&!G.hasOpenModal()){const p=toLocal(e.changedTouches[0]),t=G.screenToTile(p.x,p.y);G.selectFarmCorner(t.tx,t.ty);}farmTouch=null;},{passive:false});
   const harvesting = () => G.tool && ['fell', 'quarry'].includes(G.tool.kind);
   G.cv.addEventListener('touchstart', e => {
     if (!harvesting()) return;
@@ -1037,7 +1080,7 @@ G.init = function () {
     e.preventDefault();
     if (e.touches.length !== 1 || !roadTouch || Math.abs(e.touches[0].clientX - roadTouch.x) + Math.abs(e.touches[0].clientY - roadTouch.y) > 10) roadTouch = null;
   }, { passive: false });
-  G.cv.addEventListener('touchcancel', () => { roadTouch = null; harvestTouch = null; G.cancelRoadPlan(); G.cancelHarvestPlan(); });
+  G.cv.addEventListener('touchcancel', () => { roadTouch = null; harvestTouch = null; G.cancelRoadPlan(); G.cancelHarvestPlan(); G.cancelFarmPlan(); });
   G.cv.addEventListener('touchend', e => {
     if (!G.tool || G.tool.kind !== 'road') { roadTouch = null; return; }
     e.preventDefault();

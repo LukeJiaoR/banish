@@ -1611,7 +1611,7 @@ G.makeTask = function (b, c) {
           claimed.add(t2.ti);
       // 播种（春）
       if (!b.sownAll && (g.season === 0 || g.season === 1) && (!G.goalPaused(G.farmOutput(b)) || G.farmSeasonCommitted(b))) {
-        const ti = b.farm.findIndex((f, i) => !f.sown && !claimed.has(i));
+        const ti = G.nextFarmTile(b,c,claimed,f=>!f.sown);
         if (ti >= 0) {
           const f = b.farm[ti];
           b.sowingCommitted = true; // First accepted sow locks this season's crop, even before arrival.
@@ -1620,7 +1620,7 @@ G.makeTask = function (b, c) {
       }
       // 收获（秋，作物长成）
       if (G.farmHarvestReady(b)) {
-        const ti = b.farm.findIndex((f, i) => f.sown && !f.harvested && !claimed.has(i));
+        const ti = G.nextFarmTile(b,c,claimed,f=>f.sown&&!f.harvested);
         if (ti >= 0) {
           const f = b.farm[ti];
           return { kind: 'harvest', b, ti, crop:G.farmCropOf(b), cropYear:g.year, tx: f.x, ty: f.y, work: G.taskWork(c, P2.tileWorkH), workLeft: 0 };
@@ -2061,14 +2061,15 @@ G.siteTrees = function (b) {
 };
 G.addBuilding = function (type, x, y, opt) {
   opt = opt || {};
-  const def = G.BDEF[type];
+  const def=type==='farm'?G.farmDefinition(opt.farmSize):G.BDEF[type];
+  if(!def||(opt.farmSize!==undefined&&type!=='farm'))return {ok:false,reason:'农田每边须为4至15格的整数'};
   const w = G.world;
   if (!opt.free) {
     for (const k in def.cost) {
       if (G.game.res[k] < def.cost[k]) return { ok: false, reason: `${G.RES[k].name}不足（需要 ${def.cost[k]}）` };
     }
   }
-  const chk = G.canPlace(w, type, x, y);
+  const chk = G.canPlace(w, type, x, y, opt.farmSize);
   if (!chk.ok) return chk;
   if (opt.instant && G.siteTrees({ x, y, w: def.w, h: def.h }).length) return { ok: false, reason: '立即放置需要已清场的地面' };
   if (!opt.free) for (const k in def.cost) G.game.res[k] -= def.cost[k];
@@ -2085,6 +2086,7 @@ G.addBuilding = function (type, x, y, opt) {
     paidCost: opt.free ? {} : Object.assign({}, def.cost), constructionStarted: false,
   };
   if (type === 'farm') {
+    if(opt.farmSize!==undefined){b.farmSize=[...opt.farmSize];b.workerLimit=G.initialFarmWorkers(b.farmSize);}
     b.cropType='wheat';b.cropChoice='wheat';
     b.farm = [];
     for (let j = y; j < y + def.h; j++)
@@ -2920,6 +2922,16 @@ G.setFarmCrop=function(b,type){
   b.cropChoice=type;
   if(!G.farmSeasonCommitted(b)&&(G.game.season===0||G.game.season===1))b.cropType=type;
   b.noWork=false;b.warnText='';G.updateProductionGoals();G.game.schedT=0;return true;
+};
+// Existing fixed plots keep their old traversal. New planned rectangles take
+// the nearest free cell, avoiding row-wide ping-pong between several farmers.
+// Every candidate belongs to the already-cleared passable plot; sendTo still
+// performs the real route, and active/overnight claims remain exclusive.
+G.nextFarmTile=function(b,c,claimed,eligible){
+  let best=-1,distance=Infinity;
+  for(let i=0;i<b.farm.length;i++){const f=b.farm[i];if(claimed.has(i)||!eligible(f))continue;if(!b.farmSize)return i;
+    const d=G.d2(c.x,c.y,f.x,f.y);if(d<distance){distance=d;best=i;}}
+  return best;
 };
 G.farmSummary=function(b){
   const crop=G.farmCropOf(b),choice=G.cropChoiceOf(b),committed=G.farmSeasonCommitted(b),g=G.game;
