@@ -2379,14 +2379,49 @@ G.cancelMerchantOrder=function(b,expectedMerchant){
   const id=G.merchantProfile(b).id;if(!b.merchantOrders?.[id])return {ok:false,reason:'本商人没有待回访订单'};
   delete b.merchantOrders[id];return {ok:true};
 };
+/* A player-authored in-game rule: one exact batch, one payment resource,
+ * future arrivals only. The arrival token is consumed before any trade. */
+G.defaultAutoTrade=()=>({enabled:false,good:'coal',qty:10,payment:'stone',maxPrice:6});
+G.autoTradeConfigReason=function(rule){
+  if(!rule||typeof rule!=='object'||Array.isArray(rule)||typeof rule.enabled!=='boolean')return '自动购买开关无效';
+  if(typeof rule.good!=='string'||!Object.hasOwn(G.TRADE_GOODS,rule.good))return '请选择有效的购买货物';
+  if(typeof rule.payment!=='string'||!Object.hasOwn(G.TRADE_VALUES,rule.payment))return '请选择有效的本站付款物资';
+  if(!Number.isInteger(rule.qty)||rule.qty<1||rule.qty>G.TRADE_GOODS[rule.good].stock)return `每船数量须为1至${G.TRADE_GOODS[rule.good].stock}的整数`;
+  if(!Number.isInteger(rule.maxPrice)||rule.maxPrice<1||rule.maxPrice>1000000)return '最高单价须为1至1000000的整数贸易价值';
+  return '';
+};
+G.autoTradeSummary=function(b){
+  const rule={...(b?.autoTrade||G.defaultAutoTrade())};
+  return {rule,last:b?.autoTradeLast?{...b.autoTradeLast}:null,currentProcessed:b?.merchant?.autoTradeDone===true,
+    maxPayment:Math.ceil(rule.maxPrice*rule.qty/G.TRADE_VALUES[rule.payment])};
+};
+G.setAutoTrade=function(b,rule,expectedGame){
+  if((expectedGame!==undefined&&expectedGame!==G.game)||!b||G.world.bmap[b.id]!==b||b.type!=='tradingpost'||b.state!=='ok')return {ok:false,reason:'贸易站或村庄已变，请重新查看'};
+  const reason=G.autoTradeConfigReason(rule);if(reason)return {ok:false,reason};
+  b.autoTrade={enabled:rule.enabled,good:rule.good,qty:rule.qty,payment:rule.payment,maxPrice:rule.maxPrice};
+  return {ok:true}; // Never replays the current boat or reserves payment.
+};
+G.runArrivalAutoTrade=function(b,m){
+  if(!G.currentMerchant(b,m)||m?.autoTradeDone!==false)return false;
+  m.autoTradeDone=true;
+  const rule=b.autoTrade||G.defaultAutoTrade();if(!rule.enabled)return false;
+  const unitPrice=G.merchantPrice(b,rule.good),reason=G.autoTradeConfigReason(rule);
+  const result=reason?{ok:false,reason}:unitPrice>rule.maxPrice?
+    {ok:false,reason:`本船单价${unitPrice}超出最高单价${rule.maxPrice}，本船不自动购买`}:G.executeTrade(b,rule.good,rule.qty,rule.payment,m);
+  b.autoTradeLast={day:G.game.day,visit:b.merchantVisits,merchantId:m.id,good:rule.good,qty:rule.qty,payment:rule.payment,unitPrice,
+    paid:result.ok?result.paid:0,ok:result.ok,reason:result.ok?'已按到港规则用本站库存完成整批购买':result.reason};
+  return result.ok;
+};
 G.arriveMerchant=function(b){
+  if(!b||G.world.bmap[b.id]!==b||b.type!=='tradingpost'||b.state!=='ok'||G.currentMerchant(b))return false;
   const visit=b.merchantVisits||0,id=G.MERCHANT_CYCLE[visit%G.MERCHANT_CYCLE.length],p=G.MERCHANTS[id];
   const goods=visit===0?p.goods:p.goods.map(good=>({good,r:G.rng()})).sort((a,b)=>a.r-b.r).slice(0,p.assortment).map(v=>v.good);
-  const m={id,arrivedDay:G.game.day,leaveDay:G.game.day+G.SEASON_DAYS,stock:Object.fromEntries(goods.map(k=>[k,G.TRADE_GOODS[k].stock]))};
+  const m={id,arrivedDay:G.game.day,leaveDay:G.game.day+G.SEASON_DAYS,autoTradeDone:false,stock:Object.fromEntries(goods.map(k=>[k,G.TRADE_GOODS[k].stock]))};
   const order=b.merchantOrders?.[id];
   if(order){m.stock[order.good]=order.qty;m.orderedGood=order.good;delete b.merchantOrders[id];}
   b.merchant=m;b.merchantVisits=visit+1;
-  G.ui.toast(`⛵ ${p.name}到访贸易站${order?'，上次订货已带到，请手动成交':''}`,'good');
+  const autoBought=G.runArrivalAutoTrade(b,m);
+  G.ui.toast(`⛵ ${p.name}到访贸易站${autoBought?'，已按规则自动购买':order?'，上次订货已带到，请查看交易':''}`,'good');
 };
 G.tradeQuote=function(b,good,qty,payment){
   const q={ok:false,good,qty,payment,merchant:b?.merchant,cost:0,unitPrice:G.merchantPrice(b,good)};
@@ -2403,7 +2438,7 @@ G.tradeQuote=function(b,good,qty,payment){
   return {...q,ok:true};
 };
 G.ensureEconomyBuilding = function(b) {
-  if(b.type==='tradingpost'){b.tradeInventory=b.tradeInventory||{};b.tradeTargets=b.tradeTargets||{};if(!Number.isFinite(b.nextMerchantDay))b.nextMerchantDay=G.game.day+G.SEASON_DAYS;if(!Number.isInteger(b.merchantVisits))b.merchantVisits=b.merchant?1:0;b.merchantOrders=b.merchantOrders||{};}
+  if(b.type==='tradingpost'){b.tradeInventory=b.tradeInventory||{};b.tradeTargets=b.tradeTargets||{};if(!Number.isFinite(b.nextMerchantDay))b.nextMerchantDay=G.game.day+G.SEASON_DAYS;if(!Number.isInteger(b.merchantVisits))b.merchantVisits=b.merchant?1:0;b.merchantOrders=b.merchantOrders||{};b.autoTrade=b.autoTrade||G.defaultAutoTrade();}
   if(b.type==='pasture'){b.animalType=G.pastureTypeOf(b);b.animals=b.animals||0;b.animalGrowth=b.animalGrowth||0;b.woolReady=b.woolReady||0;b.pastureProducts=b.pastureProducts||{meat:0,leather:0};if(!Number.isFinite(b.animalTarget))b.animalTarget=8;}
   if(b.type==='orchard')G.ensureOrchard(b);
 };

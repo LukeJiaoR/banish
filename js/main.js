@@ -123,7 +123,7 @@ G.serializeGame = function () {
       farm: b.farm ? b.farm.map(f => [f.sown ? 1 : 0, f.harvested ? 1 : 0, f.pestLost ? 1 : 0]) : undefined,
       sownAll: b.sownAll, growth: b.growth, harvestDone: b.harvestDone, cropType:b.cropType, cropChoice:b.cropChoice,
       sowingCommitted: b.sowingCommitted, pestInfestation:b.pestInfestation, lastPestCrop:b.lastPestCrop, earlyHarvestYield:b.earlyHarvestYield, productionPaused: b.productionPaused,
-      tradeInventory: b.tradeInventory, tradeTargets: b.tradeTargets, merchant: b.merchant, nextMerchantDay: b.nextMerchantDay, merchantVisits:b.merchantVisits, merchantOrders:b.merchantOrders,
+      tradeInventory: b.tradeInventory, tradeTargets: b.tradeTargets, merchant: b.merchant, nextMerchantDay: b.nextMerchantDay, merchantVisits:b.merchantVisits, merchantOrders:b.merchantOrders, autoTrade:b.autoTrade, autoTradeLast:b.autoTradeLast,
       lastHeating:b.lastHeating, unheated:b.unheated, graves:b.graves,
       animalType:b.animalType, pastureProducts:b.pastureProducts, animals: b.animals, animalGrowth: b.animalGrowth, animalTarget: b.animalTarget, woolReady: b.woolReady,
       orchardAge: b.orchardAge, orchardYield: b.orchardYield, orchardSeason: b.orchardSeason, tendedDay: b.tendedDay,
@@ -417,6 +417,17 @@ G.prepareSaveData = function (d) {
       if(G.tradeStored(b)>G.TRADE_CAPACITY+1e-6)bad('贸易库存超容量');
       b.nextMerchantDay=bd.nextMerchantDay===undefined?g.day+G.SEASON_DAYS:integer(bd.nextMerchantDay,'商船下次到访',0);
       b.merchantVisits=bd.merchantVisits===undefined?(bd.merchant?1:0):integer(bd.merchantVisits,'商人来访轮次',0,1000000);
+      b.autoTrade=G.defaultAutoTrade();
+      if(bd.autoTrade!==undefined){const rule=record(bd.autoTrade,'自动购买规则');if(G.autoTradeConfigReason(rule))bad('自动购买规则');
+        b.autoTrade={enabled:rule.enabled,good:rule.good,qty:rule.qty,payment:rule.payment,maxPrice:rule.maxPrice};}
+      if(bd.autoTradeLast!==undefined){const r=record(bd.autoTradeLast,'自动购买结果');
+        if(typeof r.good!=='string'||!Object.hasOwn(G.TRADE_GOODS,r.good)||typeof r.payment!=='string'||!Object.hasOwn(G.TRADE_VALUES,r.payment)||
+          typeof r.merchantId!=='string'||!Object.hasOwn(G.MERCHANTS,r.merchantId)||typeof r.ok!=='boolean'||typeof r.reason!=='string'||r.reason.length>200)bad('自动购买结果');
+        b.autoTradeLast={day:integer(r.day,'自动购买日期',0,g.day),visit:integer(r.visit,'自动购买轮次',1,b.merchantVisits),merchantId:r.merchantId,
+          good:r.good,qty:integer(r.qty,'自动购买数量',1,G.TRADE_GOODS[r.good].stock),payment:r.payment,
+          unitPrice:integer(r.unitPrice,'自动购买单价',1,1000000),paid:integer(r.paid,'自动购买实付',0,G.TRADE_CAPACITY),ok:r.ok,reason:r.reason};
+        if(r.paid!==(r.ok?Math.ceil(r.unitPrice*r.qty/G.TRADE_VALUES[r.payment]):0))bad('自动购买实付结果');
+      }
       b.merchantOrders={};
       if(bd.merchantOrders!==undefined){record(bd.merchantOrders,'回访订货');for(const id of Object.keys(bd.merchantOrders)){
         if(!Object.hasOwn(G.MERCHANTS,id))bad('订货商人');const order=record(bd.merchantOrders[id],'订货');
@@ -425,7 +436,9 @@ G.prepareSaveData = function (d) {
       }}
       if(bd.merchant!=null){record(bd.merchant,'商船');record(bd.merchant.stock,'商船货物');
         const id=bd.merchant.id===undefined?'general':bd.merchant.id;if(!Object.hasOwn(G.MERCHANTS,id))bad('商人身份');
-        b.merchant={id,leaveDay:integer(bd.merchant.leaveDay,'商船离港',0),stock:{}};
+        b.merchant={id,leaveDay:integer(bd.merchant.leaveDay,'商船离港',0),stock:{},autoTradeDone:true};
+        // A serialized docked boat has already crossed its one arrival event.
+        if(bd.merchant.autoTradeDone!==undefined&&bd.merchant.autoTradeDone!==true)bad('自动购买到港标记');
         if(bd.merchant.arrivedDay!==undefined){b.merchant.arrivedDay=integer(bd.merchant.arrivedDay,'商船到港',0,g.day);if(b.merchant.leaveDay<=b.merchant.arrivedDay)bad('商船停靠日期');}
         for(const key of Object.keys(bd.merchant.stock)){if(!G.MERCHANTS[id].goods.includes(key))bad('商船货物种类');b.merchant.stock[key]=integer(bd.merchant.stock[key],'商船库存',0,G.TRADE_GOODS[key].stock);}
         if(bd.merchant.orderedGood!==undefined){const good=bd.merchant.orderedGood;if(typeof good!=='string'||!Object.hasOwn(b.merchant.stock,good))bad('本次订货货物');b.merchant.orderedGood=good;}
