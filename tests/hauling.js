@@ -76,7 +76,7 @@ test('limited smith stops consuming wood and restarts after tools wear', () => {
   assert.equal(G.game.res.tools,G.PROD.blacksmith.toolLimit-1);
   G.scheduleJobs();assert.equal(c.job,b.id);assert.equal(c.task.yield.type,'tools');
   const wood=G.game.res.wood,iron=G.game.res.iron;
-  G.completeTask(c);
+  for(let n=0;n<2000&&G.game.res.tools<G.PROD.blacksmith.toolLimit;n++)G.stepCitizen(c,.1);
   assert.equal(G.game.res.wood,wood-2);assert.equal(G.game.res.iron,iron-1);
   assert.equal(G.game.res.tools,G.PROD.blacksmith.toolLimit+1); // one batch may cross target
   assert.equal(G.makeTask(b,c),null);

@@ -1180,10 +1180,10 @@ G.markGroundDirty = G.markGroundDirty || (() => {}); // render.js 未加载时�
   c.job = b.id;
   g.res.iron = 5; g.res.wood = 50; g.res.tools = 0;
   const t = G.makeTask(b, c);
-  check('铁匠任务：1铁+2木 → 2 工具', t && t.kind === 'work' && Array.isArray(t.consume) && t.yield.type === 'tools' && t.yield.qty === 2);
-  c.task = t; c.state = 'work'; t.workLeft = 0;
-  G.completeTask(c);
-  check('完工扣料入库（铁-1 木-2 工具+2）', g.res.iron === 4 && g.res.wood === 48 && g.res.tools === 2);
+  check('铁匠任务：1铁+2木 → 2 工具', t && t.kind === 'smith' && t.phase === 'fetch' && Array.isArray(t.consume) && t.yield.type === 'tools' && t.yield.qty === 2);
+  g.h=12;c.task=t;G.sendTo(c,t.tx,t.ty);
+  for(let n=0;n<2000&&g.res.tools===0;n++)G.stepCitizen(c,.1);
+  check('真实取料、回屋加工后入库（铁-1 木-2 工具+2）', g.res.iron === 4 && g.res.wood === 48 && g.res.tools === 2);
   g.res.iron = 0;
   b.noWork = false;
   const t2 = G.makeTask(b, c);
