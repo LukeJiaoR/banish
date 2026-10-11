@@ -701,7 +701,7 @@ G.storageRoute = function (x, y) {
  * on staffing withdrawal share this bounded path. Ordinary unmarked cargo
  * keeps its existing delivery policy; the marker dies with its cargo object. */
 G.isMineralCargo = function (c) { return !!c.carry && (c.carry.staffingReturn===true || ['stone','iron','coal','ale','clothes','warmCoats'].includes(c.carry.type) || (c.carry.type==='grain' && c.carry.brewIngredient===true) || (Number.isInteger(c.carry.pastureId)&&['meat','leather','wool'].includes(c.carry.type))); };
-G.mineralStorageSpace = function (type) { return Math.max(0, G.storageCap() - G.game.res[G.isFood(type)?'food':type]); };
+G.mineralStorageSpace = function (type) { return G.isTool(type) ? Infinity : Math.max(0, G.storageCap() - G.game.res[G.isFood(type)?'food':type]); };
 // Ordinary in-flight minerals remain eligible as before; only an already
 // blocked delivery cannot count as available labour or occupy a productive slot.
 G.mineralDeliveryBlocked = function (c) {
@@ -2022,6 +2022,51 @@ G.addBuilding = function (type, x, y, opt) {
   return { ok: true, b };
 };
 
+/* In-place housing renewal: reclaimed old material is invested once in the
+ * stone site, not minted into storage. Full paidCost includes that investment
+ * so cancelling returns the ordinary site's material entitlement exactly once. */
+G.houseUpgradeQuote=function(b){
+  const w=G.world,g=G.game,invalid={ok:false,reason:'只能升级本村已建成的木屋'};
+  if(!b||w.bmap[b.id]!==b||b.type!=='house'||b.state!=='ok')return invalid;
+  const cost={...G.BDEF.stonehouse.cost},paid=b.paidCost||G.BDEF.house.cost,salvage={},due={};
+  for(const [k,qty]of Object.entries(cost)){
+    const recover=Math.floor(Math.max(0,Math.min(Number(paid[k])||0,G.BDEF.house.cost[k]||0))/2);
+    if(recover)salvage[k]=recover;due[k]=qty-recover;
+  }
+  const families=w.families.filter(f=>f.houseId===b.id&&f.members.length),people=families.reduce((n,f)=>n+f.members.filter(id=>w.cmap[id]&&!w.cmap[id].dead).length,0);
+  const freeHomes=w.buildings.filter(h=>h!==b&&h.state==='ok'&&['house','stonehouse'].includes(h.type)&&h.family==null).length;
+  const boardingSlots=w.buildings.filter(h=>h.state==='ok'&&h.type==='boarding').reduce((n,h)=>n+Math.max(0,G.LIFE.boardingCap-G.boardingFamilies(w,h).length),0);
+  const winter=G.isWinter(),missing=Object.entries(due).filter(([k,qty])=>g.res[k]<qty);
+  const builder=w.citizens.some(c=>!c.dead&&c.adult&&!c.student&&!G.isArriving(c)&&G.workSpot(w,b,c.x,c.y));
+  const reason=missing.length?'补料不足：'+missing.map(([k,qty])=>G.RES[k].name+'需'+qty).join('、'):!builder?'没有成人能到达这间房屋施工，请先打通道路':'可升级：住户立即搬出，完成施工后才能重新入住';
+  const key=JSON.stringify([b.id,cost,salvage,due,families.map(f=>[f.id,...f.members]),people,freeHomes,boardingSlots,winter,!missing.length,builder]);
+  return {ok:!missing.length&&builder,reason,key,cost,salvage,due,families:families.length,people,freeHomes,boardingSlots,winter,
+    oldFuel:G.BDEF.house.warmWoodPerYear,newFuel:G.BDEF.stonehouse.warmWoodPerYear};
+};
+G.upgradeHouse=function(b,expectedKey){
+  const q=G.houseUpgradeQuote(b);
+  if(!q.ok)return {ok:false,reason:q.reason};
+  if(typeof expectedKey!=='string'||expectedKey!==q.key)return {ok:false,reason:'升级报价或住房情况已变化，请重新查看并确认'};
+  const w=G.world,g=G.game,families=w.families.filter(f=>f.houseId===b.id),residents=new Set(families.flatMap(f=>f.members));
+  // All validation precedes the first deduction; state/type change is the
+  // idempotency boundary before scheduling can call any gameplay callback.
+  for(const [k,qty]of Object.entries(q.due))g.res[k]-=qty;
+  b.type='stonehouse';b.state='site';b.upgradeFrom='house';b.progress=0;
+  b.workLeft=b.totalWork=G.BDEF.stonehouse.buildWork;b.paidCost={...q.cost};b.constructionStarted=false;
+  b.family=null;b.workers=[];b.noWork=false;b.warnText='';b.sitePaused=false;delete b.workerLimit;delete b.unheated;
+  for(const f of families)f.houseId=null;
+  G.bumpNavigation(w);G.assignHousing();
+  // A resident walking to the old wooden home must not finish that stale route
+  // and appear to sleep in the new worksite. Preserve suspended work/cargo.
+  for(const c of w.citizens)if(residents.has(c.id)&&(c.state==='rest'||(c.state==='walk'&&c.walkKind==='home'))){
+    c.path=null;c.pi=0;c.walkKind='';c.state='idle';c.camped=false;c.wanderT=.5;
+    if(G.isRestTime())G.goHome(c);
+  }
+  g.buildLog.push({d:g.day,t:'upgrade:house:stonehouse'});if(g.buildLog.length>30)g.buildLog.shift();
+  G.scheduleJobs();G.ui.refreshHUD();G.ui.toast('🏗 木屋已腾空，正在原地改建石屋；完工前不能居住','info');
+  return {ok:true,b};
+};
+
 G.finishBuilding = function (b) {
   if (b.state !== 'site' || G.siteTrees(b).length) return;
   b.state = 'ok';
@@ -2043,6 +2088,7 @@ G.finishBuilding = function (b) {
 
 G.removeBuilding = function (b) {
   const w = G.world;
+  if(!b||w.bmap[b.id]!==b)return; // A consumed/cancelled site cannot refund twice.
   if(b.type==='townhall'&&G.game.nomads.offer?.hallId===b.id)G.game.nomads.offer=null;
   if (b.type === 'bridge') { const check=G.bridgeRemovalStatus(w,b); if(!check.ok){G.ui.toast(check.reason,'warn');return;} }
   if (b.type === 'tradingpost' && Object.values(b.tradeInventory || {}).some(q => q > 0)) { G.ui.toast('先把待售目标设0，搬空贸易库存再拆除','warn'); return; }
@@ -2054,7 +2100,8 @@ G.removeBuilding = function (b) {
   }
   for (const id of b.workers) {
     const c = w.cmap[id];
-    if (c) { c.job = null; c.task = null; c.pausedTask = null; c.path = null; c.state = 'idle'; }
+    if(c&&b.state==='site'&&b.upgradeFrom==='house')G.markStaffingCargo(c);
+    if (c) { c.job = null; delete c.staffingRelease; c.task = null; c.pausedTask = null; c.path = null; c.state = 'idle'; }
   }
   for (const c of w.citizens) {
     if(c.task && c.task.kind==='care' && c.task.b===b)G.cancelMedicalCare(c);

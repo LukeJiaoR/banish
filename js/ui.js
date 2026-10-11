@@ -796,11 +796,144 @@ G.ui = {
   },
   siteInfoData: function (b) {
     const w = G.world, trees = G.siteTrees ? G.siteTrees(b).length : 0;
+    const upgrade = b.type === 'stonehouse' && b.upgradeFrom === 'house';
+    const untouched = !b.constructionStarted && b.progress === 0 && b.workLeft >= b.totalWork;
     return {
-      status: trees ? `清理工地：还需砍 ${trees} 棵树（工人搬运入仓）` : `建造中 ${Math.floor(b.progress * 100)}%`,
+      status: (upgrade ? '木屋升级石屋 · ' : '') + (trees ? `清理工地：还需砍 ${trees} 棵树（工人搬运入仓）` : `建造中 ${Math.floor(b.progress * 100)}%`),
       workers: b.workers.map(id => w.cmap[id]).filter(Boolean).map(c => c.name).join('、') || '等待建筑工人',
-      refund: !b.constructionStarted && b.progress === 0 && b.workLeft >= b.totalWork ? '未开工：取消退还全部已付建材，保留树木' : '已开工：拆除退还一半已付建材，已砍树不恢复'
+      refund: upgrade ? `${untouched ? '未开工：取消退还全部' : '已开工：取消退还一半'}石屋已付建材（包含旧屋回收材料）。原木屋已拆除，取消升级不会还原木屋。`
+        : untouched ? '未开工：取消退还全部已付建材，保留树木' : '已开工：拆除退还一半已付建材，已砍树不恢复'
     };
+  },
+  homeInfoData: function (b) {
+    if (!['house', 'stonehouse'].includes(b.type) || b.state !== 'ok') return null;
+    const families = G.world.families.filter(f => f.houseId === b.id);
+    const residents = families.flatMap(f => f.members.map(id => G.world.cmap[id]).filter(c => c && !c.dead));
+    return {
+      status: residents.length ? '有人居住' : '空置',
+      residents: residents.length ? `住户：${residents.map(c => `${c.name}(${Math.floor(c.age)}岁)`).join('、')}` : '住户：暂无',
+    };
+  },
+  houseUpgradeInfoData: function (b) {
+    if (b.type !== 'house' || b.state !== 'ok' || !G.houseUpgradeQuote) return null;
+    const quote = G.houseUpgradeQuote(b);
+    const materials = values => ['wood', 'stone', 'iron'].map(key => `${G.RES[key].name} ${Number(values && values[key]) || 0}`).join(' · ');
+    return { quote, data: {
+      cost: `石屋完整建材：${materials(quote.cost)}`,
+      salvage: `旧屋回收抵扣：${materials(quote.salvage)}（按原屋实际投入）`,
+      due: `现在从库存补付：${materials(quote.due)}`,
+      displaced: `开始后搬出：${quote.families} 户 / ${quote.people} 人；施工期间不能住在这里。`,
+      housing: `全镇其余空屋 ${quote.freeHomes} 户 · 宿舍空位 ${quote.boardingSlots} 户。仅为全镇统计，未核实对住户是否可达，也不会预留床位。`,
+      cold: `${quote.winter ? '⚠ 当前正值寒冬。' : '冬季风险：'}搬出后若无可达住处和柴火，住户可能受冻；即使全镇有空位也不能保证入住。`,
+      fuel: `本作取暖：有人入住时，每屋每年约 ${quote.oldFuel} → ${quote.newFuel} 柴火（冬季集中消耗，省一半）。`,
+      reason: quote.ok ? '建材和可达建筑工人满足开始条件，实际完工仍需施工。' : `暂不能升级：${quote.reason || '请检查建材和可用建筑工人。'}`,
+    } };
+  },
+  houseUpgradeInfoMarkup: function (facts) {
+    if (!facts) return '';
+    return `<section class="economy-form house-upgrade-details" data-house-upgrade-panel aria-labelledby="house-upgrade-title">
+      <h3 id="house-upgrade-title">木屋升级为石屋</h3>
+      ${Object.keys(facts.data).map(key => `<p class="row" data-house-upgrade="${key}">${this.escHtml(facts.data[key])}</p>`).join('')}
+      <p class="house-upgrade-warning">确认开始后立即拆除原木屋，住户搬出，原屋永久消失。取消升级工地也不会还原木屋。</p>
+      <button type="button" id="house-upgrade-start" aria-expanded="false">查看升级确认</button>
+      <div class="house-upgrade-confirm hidden" data-house-upgrade-confirm>
+        <p>已了解上方最新建材、搬迁和受冻风险？确认后立即补付建材并拆除木屋，原址改建石屋。</p>
+        <div class="economy-actions"><button type="button" id="house-upgrade-confirm" class="danger">确认拆木屋并升级</button><button type="button" id="house-upgrade-cancel">取消，保留木屋</button></div>
+      </div>
+      <p class="economy-message" data-house-upgrade-message role="status" aria-live="polite"></p>
+    </section>`;
+  },
+  houseUpgradeControlValid: function (b, context, node, allowModal) {
+    const { world, game, el, panel } = context;
+    return G.world === world && G.game === game && this.el.info === el && !el.classList.contains('hidden') &&
+      G.sel && G.sel.kind === 'b' && G.sel.id === b.id && world.bmap[b.id] === b && b.type === 'house' && b.state === 'ok' &&
+      el.querySelector('[data-house-upgrade-panel]') === panel && (!node || (!node.disabled && panel.querySelector('#' + node.id) === node)) &&
+      (allowModal || !(G.hasOpenModal && G.hasOpenModal()));
+  },
+  resetHouseUpgrade: function (panel, message, restoreFocus) {
+    const box = panel.querySelector('[data-house-upgrade-confirm]'), start = panel.querySelector('#house-upgrade-start'), confirm = panel.querySelector('#house-upgrade-confirm'), status = panel.querySelector('[data-house-upgrade-message]');
+    panel._upgradePending = null;
+    if (box) box.classList.add('hidden');
+    if (start) start.setAttribute('aria-expanded', 'false');
+    if (confirm) confirm.disabled = true;
+    if (message !== undefined && status) status.textContent = message;
+    if (restoreFocus && box && box.contains(document.activeElement) && start && start.focus) start.focus();
+  },
+  refreshHouseUpgradeInfo: function (b, facts) {
+    const el = this.el.info, panel = el.querySelector && el.querySelector('[data-house-upgrade-panel]');
+    if (!panel || !panel._upgradeContext || !this.houseUpgradeControlValid(b, panel._upgradeContext, null, true)) return false;
+    const start = panel.querySelector('#house-upgrade-start'), confirm = panel.querySelector('#house-upgrade-confirm');
+    if (!start || !confirm || !panel.querySelector('[data-house-upgrade-confirm]')) return false;
+    facts = facts || this.houseUpgradeInfoData(b);
+    if (!facts) return false;
+    for (const key of Object.keys(facts.data)) {
+      const node = panel.querySelector(`[data-house-upgrade="${key}"]`);
+      if (node && node.textContent !== facts.data[key]) node.textContent = facts.data[key];
+    }
+    // Updating facts never silently renews a destructive confirmation.
+    if (G.hasOpenModal && G.hasOpenModal()) this.resetHouseUpgrade(panel, '升级确认已取消，请关闭弹窗后重新查看。', false);
+    else if (panel._upgradePending !== null && (!facts.quote.ok || panel._upgradePending !== facts.quote.key))
+      this.resetHouseUpgrade(panel, '建材、住户或安置条件已变化。上方已更新，请重新查看升级确认。', true);
+    start.setAttribute('aria-disabled', String(!facts.quote.ok));
+    confirm.disabled = panel._upgradePending === null || !facts.quote.ok;
+    return true;
+  },
+  refreshHomeInfo: function (b, upgradeFacts) {
+    const data = this.homeInfoData(b), el = this.el.info;
+    if (!data || !el.querySelector || !el.querySelector('[data-home-residents]')) return false;
+    for (const key of Object.keys(data)) {
+      const node = el.querySelector(`[data-home-${key}]`);
+      if (node && node.textContent !== data[key]) node.textContent = data[key];
+    }
+    this.refreshHouseUpgradeInfo(b, upgradeFacts);
+    return true;
+  },
+  initHouseUpgradeInfo: function (b) {
+    const el = this.el.info, panel = el.querySelector && el.querySelector('[data-house-upgrade-panel]');
+    if (!panel) return;
+    const context = { world: G.world, game: G.game, el, panel };
+    panel._upgradeContext = context;
+    const start = panel.querySelector('#house-upgrade-start'), confirm = panel.querySelector('#house-upgrade-confirm'), cancel = panel.querySelector('#house-upgrade-cancel'), box = panel.querySelector('[data-house-upgrade-confirm]');
+    this.resetHouseUpgrade(panel, '');
+    for (const button of [start, confirm, cancel]) button.addEventListener('keydown', e => {
+      if (e.repeat && (e.key === 'Enter' || e.key === ' ')) e.preventDefault();
+    });
+    start.addEventListener('click', e => {
+      if ((e && e.detail > 1) || !this.houseUpgradeControlValid(b, context, start)) { this.resetHouseUpgrade(panel); return; }
+      const facts = this.houseUpgradeInfoData(b);
+      this.refreshHomeInfo(b, facts);
+      if (!facts.quote.ok) { this.resetHouseUpgrade(panel, facts.data.reason); return; }
+      panel._upgradePending = facts.quote.key;
+      box.classList.remove('hidden');
+      start.setAttribute('aria-expanded', 'true');
+      confirm.disabled = false;
+      panel.querySelector('[data-house-upgrade-message]').textContent = '尚未拆除或扣料，请确认以上条件，或取消保留木屋。';
+      if (confirm.focus) confirm.focus();
+    });
+    cancel.addEventListener('click', () => {
+      if (!this.houseUpgradeControlValid(b, context, cancel)) { this.resetHouseUpgrade(panel); return; }
+      this.resetHouseUpgrade(panel, '已取消确认，木屋、住户和建材均未改变。');
+      if (start.focus) start.focus();
+    });
+    confirm.addEventListener('click', e => {
+      if ((e && e.detail > 1) || !this.houseUpgradeControlValid(b, context, confirm) || panel._upgradePending === null) { this.resetHouseUpgrade(panel); return; }
+      const facts = this.houseUpgradeInfoData(b), expectedKey = panel._upgradePending;
+      this.refreshHomeInfo(b, facts);
+      if (!facts.quote.ok || facts.quote.key !== expectedKey || panel._upgradePending === null) return;
+      this.resetHouseUpgrade(panel);
+      const result = G.upgradeHouse(b, expectedKey);
+      if (!result.ok) {
+        this.refreshHomeInfo(b);
+        this.resetHouseUpgrade(panel, result.reason || '条件已改变，未开始升级，请重新查看。', true);
+        if (start.focus) start.focus();
+        return;
+      }
+      this.renderInfo(true);
+      const close = el.querySelector('#info-close');
+      if (close && close.focus) close.focus();
+      this.refreshHUD();
+    });
+    this.refreshHouseUpgradeInfo(b);
   },
   townHallInfoData: function (b) {
     if (b.type !== 'townhall' || b.state !== 'ok' || !G.townHallSummary) return null;
@@ -1440,6 +1573,7 @@ G.ui = {
     const sameSelection = this._infoWorld === w && this._infoGame === G.game && this._infoElement === el && this._infoSelection === selected;
     // Workforce facts must update before every specialized panel's early return.
     if (sameSelection && G.sel.kind === 'b' && this._infoBuildState === selected.state) this.refreshWorkforceInfo(selected);
+    if (!force && sameSelection && G.sel.kind === 'b' && this._infoBuildState === selected.state && this._infoBuildType === selected.type && this.refreshHomeInfo(selected)) return;
     // Update only fuel text, never replace this panel's focused buttons. A new
     // selection or a site finishing construction still gets its own full panel.
     if (sameSelection && selected.state === 'ok' && this._townHallInfoState === selected.state && this.refreshTownHallInfo(selected)) return;
@@ -1452,7 +1586,7 @@ G.ui = {
     if (sameSelection && selected.state === 'ok' && this._resourceChainInfoState === selected.state && this.refreshResourceChainInfo(selected)) return;
     if (sameSelection && selected.type === 'woodcutter' && this._fuelInfoState === selected.state && this.refreshFuelInfo(selected)) return;
     if (hadFocus && !force && sameSelection && selected.type !== 'woodcutter' &&
-        !(selected.type === 'farm' && selected.state === 'ok' && G.farmSummary) && (G.sel.kind === 'c' || this._infoBuildState === selected.state)) {
+        !(selected.type === 'farm' && selected.state === 'ok' && G.farmSummary) && (G.sel.kind === 'c' || (this._infoBuildState === selected.state && this._infoBuildType === selected.type))) {
       if (G.sel.kind === 'c') { this.refreshCitizenLeisure(selected); this.refreshCitizenClothing(selected); this.refreshStudentInfo(selected); }
       // Patch changing site facts in place without stealing keyboard focus.
       if (G.sel.kind === 'b' && selected.state === 'site') {
@@ -1473,6 +1607,7 @@ G.ui = {
     this._infoElement = el;
     this._infoSelection = selected;
     this._infoBuildState = selected.state;
+    this._infoBuildType = selected.type;
     if (G.sel.kind === 'b') {
       const b = w.bmap[G.sel.id];
       if (!b) { this.hideInfo(); return; }
@@ -1487,6 +1622,7 @@ G.ui = {
       const farmData = this.farmInfoData(b);
       const schoolData=this.schoolInfoData(b);
       const workforceData = this.workforceInfoData(b);
+      const homeData = this.homeInfoData(b), upgradeData = this.houseUpgradeInfoData(b);
       let status;
       if (fuelData) status = fuelData.status;
       else if (siteData) status = siteData.status;
@@ -1498,7 +1634,7 @@ G.ui = {
       else if (tailorData) status = tailorData.data.status;
       else if (farmData) status = farmData.data.status;
       else if (G.productionLimited(b) && G.buildingGoalStatus(b)) status = G.buildingGoalStatus(b);
-      else if (b.type === 'house' || b.type === 'stonehouse') status = b.family != null ? '有人居住' : '空置';
+      else if (homeData) status = homeData.status;
       else if (['tradingpost', 'pasture', 'orchard'].includes(b.type)) status = this.economyStatus(b);
       else if (b.type === 'boarding') status = `入住 ${G.boardingFamilies(w, b).length} / ${G.LIFE.boardingCap} 家`;
       else if (b.type === 'farm') {
@@ -1514,10 +1650,8 @@ G.ui = {
         workers = `<div class="row">${medicalData ? b.type === 'hospital' ? '医师' : '采药员' : tavernData ? '酿酒工（需 18 岁以上且健康）' : '工人'}：<span${siteData ? ' data-site-workers' : ''}${fuelData ? ' data-fuel="workers"' : ''}${medicalData ? ' data-medical="workers"' : ''}${chainData ? ' data-resource-chain-live="workers"' : ''}${tavernData ? ' data-tavern="workers"' : ''}${tailorData ? ' data-tailor="workers"' : ''}${farmData ? ' data-farm="workers"' : ''}${b.state === 'ok' && ['tradingpost', 'pasture', 'orchard'].includes(b.type) ? ' data-economy-workers' : ''}>${names || (b.state === 'site' ? '等待建筑工人' : '无')}</span></div>`;
       }
       let extra = '';
-      if ((b.type === 'house' || b.type === 'stonehouse') && b.family != null) {
-        const fam = w.families.find(f => f.id === b.family);
-        if (fam) extra = `<div class="row">住户：${fam.members.map(id => w.cmap[id]).filter(Boolean).map(c => `${this.escHtml(c.name)}(${Math.floor(c.age)}岁)`).join('、')}</div>`;
-      }
+      if (homeData) extra = `<div class="row" data-home-residents>${this.escHtml(homeData.residents)}</div>`;
+      if (upgradeData) extra += this.houseUpgradeInfoMarkup(upgradeData);
       if (b.type === 'school' && !schoolData) {
         const n = w.citizens.filter(cc => cc.school === b.id).length;
         extra = `<div class="row">学生：${n} / ${G.LIFE.schoolCap}</div>`;
@@ -1564,7 +1698,7 @@ G.ui = {
       }
       el.innerHTML = `
         <div class="info-head"><span>${def.icon} ${def.name}</span><button id="info-close">✕</button></div>
-        <div class="row"${siteData ? ' data-site-status' : ''}${fuelData ? ' data-fuel="status"' : ''}${medicalData ? ' data-medical="status"' : ''}${chainData ? ' data-resource-chain-live="status"' : ''}${hallData ? ' data-townhall="status"' : ''}${tavernData ? ' data-tavern="status"' : ''}${tailorData ? ' data-tailor="status"' : ''}${farmData ? ' data-farm="status"' : ''}${schoolData?' data-school="status"':''}${b.state === 'ok' && ['tradingpost', 'pasture', 'orchard'].includes(b.type) ? ' data-economy-status' : ''}>${this.escHtml(status)}</div>
+        <div class="row"${siteData ? ' data-site-status' : ''}${homeData ? ' data-home-status' : ''}${fuelData ? ' data-fuel="status"' : ''}${medicalData ? ' data-medical="status"' : ''}${chainData ? ' data-resource-chain-live="status"' : ''}${hallData ? ' data-townhall="status"' : ''}${tavernData ? ' data-tavern="status"' : ''}${tailorData ? ' data-tailor="status"' : ''}${farmData ? ' data-farm="status"' : ''}${schoolData?' data-school="status"':''}${b.state === 'ok' && ['tradingpost', 'pasture', 'orchard'].includes(b.type) ? ' data-economy-status' : ''}>${this.escHtml(status)}</div>
         ${workers}${this.workforceInfoMarkup(b, workforceData)}${extra}
         <div class="row desc">${def.desc}</div>
         <div class="row desc" data-info-refund${fuelData ? ' data-fuel="refund"' : ''}>${fuelData ? fuelData.refund : siteData ? siteData.refund : '已开工：拆除退还一半已付建材，已砍树不恢复'}</div>
@@ -1579,6 +1713,7 @@ G.ui = {
       this._farmInfoState = b.state;
       this._schoolInfoState=b.state;
       this.initWorkforceInfo(b);
+      if (upgradeData) this.initHouseUpgradeInfo(b);
       const workforceField = el.querySelector && el.querySelector('#worker-limit-input');
       if (workforceField && workforceDraft !== null) workforceField.value = workforceDraft;
       if (hallData) this.refreshTownHallInfo(b);
@@ -1640,10 +1775,13 @@ G.ui = {
     }));
     if (focusSelector && el.querySelector) { const next = el.querySelector(focusSelector); if (next) next.focus(); }
     const dem = document.getElementById('info-demolish');
-    const renderedState = selected.state;
+    const renderedState = selected.state, renderedType = selected.type, renderedGame = G.game;
     if (dem) dem.addEventListener('click', () => {
       // A stale cancel-site button must never remove a newly completed building.
-      if (!G.sel || G.sel.kind !== 'b' || G.world !== w || w.bmap[G.sel.id] !== selected || selected.state !== renderedState) {
+      if (!G.sel || G.sel.kind !== 'b' || G.world !== w || G.game !== renderedGame || this.el.info !== el ||
+          w.bmap[G.sel.id] !== selected || selected.state !== renderedState || selected.type !== renderedType ||
+          el.querySelector('#info-demolish') !== dem || (el.classList.contains && el.classList.contains('hidden')) ||
+          (G.hasOpenModal && G.hasOpenModal())) {
         this.renderInfo();
         return;
       }
