@@ -136,6 +136,12 @@ G.BDEF = {
     wall:'#a09077',wallD:'#746958',roof:'#6e7775',
     desc: '不占工人。查看城镇与近60天记录，主动接纳或拒绝来访家庭。2～6人是小镇节奏适配；接纳前查看住房、粮柴与医疗压力，来者从可达边界步行入村登记后才工作。',
   },
+  cemetery: {
+    id:'cemetery',name:'墓园',icon:'🪦',w:4,h:4,
+    cost:{wood:16,stone:40},buildWork:80,jobs:0,passable:true,
+    wall:'#948b7a',wallD:'#6e6558',roof:'#837b6b',
+    desc:'小型4×4墓园，8个墓位，不占常驻工人。亲属去世时需有空位且从逝者所在地可达，才减轻新发生的哀伤；墓位保留4年后自然释放。有未到期墓位时不可拆除，不能拆建刷新容量。尺寸、成本与时长为本作适配。',
+  },
   school: {
     id: 'school', name: '学堂', icon: '🏫', w: 3, h: 3,
     cost: { wood: 50, stone: 16, iron: 16 }, buildWork: 100, jobs: 1, passable: false,

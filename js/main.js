@@ -123,6 +123,7 @@ G.serializeGame = function () {
       sownAll: b.sownAll, growth: b.growth, harvestDone: b.harvestDone, cropType:b.cropType, cropChoice:b.cropChoice,
       sowingCommitted: b.sowingCommitted, productionPaused: b.productionPaused,
       tradeInventory: b.tradeInventory, tradeTargets: b.tradeTargets, merchant: b.merchant, nextMerchantDay: b.nextMerchantDay,
+      graves:b.graves,
       animalType:b.animalType, pastureProducts:b.pastureProducts, animals: b.animals, animalGrowth: b.animalGrowth, animalTarget: b.animalTarget, woolReady: b.woolReady,
       orchardAge: b.orchardAge, orchardYield: b.orchardYield, orchardSeason: b.orchardSeason, tendedDay: b.tendedDay,
     })),
@@ -132,7 +133,7 @@ G.serializeGame = function () {
       x: c.x, y: c.y, familyId: c.familyId, job: c.job,
       partnerId: c.partnerId, parentIds: c.parentIds, grandparentIds: c.grandparentIds, ancestorIds: c.ancestorIds, birthFamilyId: c.birthFamilyId,
       student: c.student ? 1 : 0, educated: c.educated ? 1 : 0, school: c.school != null ? c.school : null, studyHours:G.studyHoursOf(c),studyToday:G.studyTodayOf(c),studyDay:g.day,
-      arrivalHallId:c.arrivalHallId, hunger: c.hunger, cold: c.cold, clothingLeft: c.clothingLeft, clothingType:c.clothingType, dietVariety: c.dietVariety, dietScore: c.dietScore, happiness: c.happiness, leisureDays:c.leisureDays, health: c.health, sickDays: c.sickDays, immunityDays: c.immunityDays, herbCooldown: c.herbCooldown, careHours: c.careHours, camped: c.camped ? 1 : 0, carry: c.carry,
+      arrivalHallId:c.arrivalHallId, hunger: c.hunger, cold: c.cold, clothingLeft: c.clothingLeft, clothingType:c.clothingType, dietVariety: c.dietVariety, dietScore: c.dietScore, happiness: c.happiness, leisureDays:c.leisureDays, grief:c.grief, health: c.health, sickDays: c.sickDays, immunityDays: c.immunityDays, herbCooldown: c.herbCooldown, careHours: c.careHours, camped: c.camped ? 1 : 0, carry: c.carry,
     })),
     nextUid: G._peekUid(),
   };
@@ -406,6 +407,12 @@ G.prepareSaveData = function (d) {
         for(const key of Object.keys(bd.merchant.stock)){if(!Object.hasOwn(G.TRADE_GOODS,key))bad('商船货物种类');b.merchant.stock[key]=integer(bd.merchant.stock[key],'商船库存',0,G.TRADE_GOODS[key].stock);}
       }
     }
+    if(bd.type==='cemetery'){
+      const rows=bd.graves===undefined?[]:array(bd.graves,'墓位');if(rows.length>G.MEMORIAL.capacity||(b.state!=='ok'&&rows.length))bad('墓位容量或施工状态');
+      const slots=new Set();b.graves=rows.map(r=>{record(r,'墓位');const slot=integer(r.slot,'墓位编号',0,G.MEMORIAL.capacity-1);if(slots.has(slot))bad('重复墓位');slots.add(slot);
+        if(typeof r.name!=='string'||r.name.length>80)bad('墓碑姓名');const deathDay=integer(r.deathDay,'安葬日期',0,g.day),expiresDay=integer(r.expiresDay,'墓位到期日',deathDay);
+        if(expiresDay!==deathDay+G.MEMORIAL.graveDays)bad('墓位期限');return {slot,name:r.name,deathDay,expiresDay};});
+    }else if(bd.graves!==undefined)bad('非墓园墓位');
     if(bd.type==='pasture'){
       if(bd.animalType!==undefined&&!G.isLivestockType(bd.animalType))bad('牧场物种');
       b.animalType=bd.animalType||'sheep';const cap=G.LIVESTOCK[b.animalType].cap;
@@ -504,6 +511,9 @@ G.prepareSaveData = function (d) {
       herbCooldown: cd.herbCooldown === undefined ? 0 : integer(cd.herbCooldown, '草药保健间隔', 0, 4),
       careHours: cd.careHours === undefined ? 0 : number(cd.careHours, '医师已照料小时', 0, 24),
     };
+    if(cd.grief!=null){const r=record(cd.grief,'亲属哀伤');if(typeof r.name!=='string'||r.name.length>80||typeof r.buried!=='boolean')bad('哀伤来源');
+      c.grief={loss:number(r.loss,'哀伤幅度',0,G.MEMORIAL.maxLoss),days:integer(r.days,'哀伤天数',1,G.MEMORIAL.griefDays),name:r.name,buried:r.buried};
+    }else c.grief=null;
     w.citizens.push(c); w.cmap[c.id] = c;
   }
   if(g.nomads.offer){const h=w.bmap[g.nomads.offer.hallId];if(!h||h.type!=='townhall'||h.state!=='ok')bad('来访申请市政厅失效');}

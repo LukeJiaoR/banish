@@ -1,0 +1,6 @@
+'use strict';const assert=require('node:assert/strict'),fs=require('fs'),vm=require('vm'),path=require('path');
+const ctx={console,document:{},addEventListener(){}};ctx.window=ctx;vm.createContext(ctx);for(const n of ['core','defs','map','sim','sprites','render'])vm.runInContext(fs.readFileSync(path.join(__dirname,'..','js',n+'.js'),'utf8'),ctx);const G=ctx.G;
+const b={type:'cemetery',state:'ok',x:2,y:3,w:4,h:4,graves:[]};
+for(const count of [0,1,8]){b.graves=Array.from({length:count},(_,slot)=>({slot,name:'村民',deathDay:0,expiresDay:192}));const parts=[];G.addEconomyFieldParts(parts,b);const graves=parts.filter(p=>p.kind==='grave');assert.equal(graves.length,count);assert.equal(parts.filter(p=>p.kind==='sheepShelter'||p.kind==='sheep'||p.kind==='cattle').length,0);assert.equal(new Set(graves.map(p=>p.x+','+p.y)).size,count);const calls=[];G.sprDraw=(...args)=>{calls.push(args);return [16,17];};graves.forEach(p=>G.drawEconomyFieldPart({},p));assert.equal(calls.length,count);assert(calls.every(c=>c[1]==='grave'&&c[4].w===16));}
+G.game.day=192;const expired=[];G.addEconomyFieldParts(expired,b);assert(!expired.some(p=>p.kind==='grave'));
+console.log('Cemetery render: empty/one/full/expired graves, unique slots and sprite dimensions passed.');
