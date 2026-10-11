@@ -486,13 +486,14 @@ G.prepareSaveData = function (d) {
       record(cd.carry, '随身资源'); if (!G.RES_KEYS.includes(cd.carry.type)) bad('随身资源类型');
       carry = { type: cd.carry.type === 'food' ? 'grain' : cd.carry.type, qty: number(cd.carry.qty, '随身资源数量', 0) };
       if(cd.carry.staffingReturn!==undefined){if(cd.carry.staffingReturn!==true)bad('撤岗保货标记');carry.staffingReturn=true;}
+      if(cd.carry.smithInput!==undefined){if(cd.carry.smithInput!==true||!carry.staffingReturn||!['iron','wood','coal'].includes(carry.type)||carry.qty>(carry.type==='iron'?1:2)||cd.carry.brewIngredient!==undefined||cd.carry.pastureId!==undefined)bad('铁匠原料货批');carry.smithInput=true;}
       if(cd.carry.pastureId!==undefined){if(!['meat','leather','wool'].includes(carry.type)||cd.carry.extra!==undefined)bad('牧场携货类型');carry.pastureId=integer(cd.carry.pastureId,'牧场携货来源',1);}
       if(cd.carry.brewIngredient!==undefined){if(cd.carry.brewIngredient!==true||carry.type!=='grain')bad('酿造原粮标记');carry.brewIngredient=true;}
       if (cd.carry.extra !== undefined) {
         if(cd.carry.type!=='meat'&&!carry.staffingReturn)bad('副产物携带类型');
         record(cd.carry.extra, '随身副产物'); carry.extra = {};
         for (const type of Object.keys(cd.carry.extra)) {
-          if (!['leather', 'wool'].includes(type)) bad('副产物种类');
+          if (!(carry.smithInput?['iron','wood','coal']:['leather','wool']).includes(type)||carry.smithInput&&(type===carry.type||cd.carry.extra[type]>(type==='iron'?1:2))) bad('副产物种类');
           carry.extra[type] = number(cd.carry.extra[type], '副产物数量', 0);
         }
       }

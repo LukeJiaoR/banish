@@ -38,6 +38,7 @@ G.ui = {
     }
     if (c.state === 'work') {
       if (c.task && c.task.kind === 'firewood' && c.task.b && c.task.b.type === 'tailor') return c.task.phase === 'fetch' ? '核对仓库衣料（完成时才扣原料）' : `制作${G.RES[c.task.yield && c.task.yield.type || 'clothes'].name}`;
+      if(c.task?.kind==='smith')return c.task.phase==='fetch'?'在库取铁匠原料（整批出库）':`锻造${G.RES[c.task.yield.type].name}（使用随身已取原料）`;
       if (c.task && c.task.kind === 'brew') return c.task.phase === 'fetch' ? '取主食酿酒' : '加工麦酒';
       if (c.task && c.task.kind === 'host') return '酒馆在岗接待';
       if (c.task && c.task.kind === 'clinic') return b && b.type === 'herbalist' ? '采药屋值守' : '诊所值守';
@@ -46,11 +47,13 @@ G.ui = {
       return c.task ? (labels[c.task.kind] || (b && b.type === 'tailor' ? '制作衣物' : b && b.type === 'orchard' ? '果园劳作' : b && b.type === 'pasture' ? `照料${G.LIVESTOCK[G.pastureTypeOf(b)].name}群` : '工作中')) : '等待下一项任务';
     }
     if (c.state === 'walk' || c.state === 'haul') {
+      if(c.carry?.smithInput)return c.state==='haul'?'退回铁匠原料（已出库，未消耗）':c.walkKind==='home'?'带铁匠原料回家休息':c.task?.kind==='smith'?'携铁、木或煤返回铁匠铺':'铁匠原料待退仓';
       if (c.carry) return c.carry.brewIngredient ? `搬运酿酒主食（${c.state === 'haul' ? '退回仓库' : '送往酒馆'}）` : `搬运${G.RES[c.carry.type].name}（${c.state === 'haul' ? '送仓' : '途中'}）`;
       if (c.walkKind === 'home') return '回家途中';
       if (c.walkKind === 'wander') return '闲逛';
       if (c.task && c.task.kind === 'firewood' && c.task.b && c.task.b.type === 'tailor') return c.task.phase === 'fetch' ? '前往仓库核对衣料（完成时才扣原料）' : `返回裁缝铺制作${G.RES[c.task.yield && c.task.yield.type || 'clothes'].name}`;
       if (c.task && c.task.kind === 'firewood' && c.task.phase === 'fetch') return c.task.consume && G.RES[c.task.consume.type] ? `前往仓库取${G.RES[c.task.consume.type].name}` : '前往仓库取原木';
+      if(c.task?.kind==='smith')return '前往堆料场或仓库取铁匠原料（尚未扣料）';
       if (c.task && c.task.kind === 'brew') return c.task.phase === 'fetch' ? '前往仓库取酿酒主食' : '前往酒馆加工麦酒';
       if (c.task && c.task.kind === 'trade') return c.task.phase === 'fetch' ? '前往仓库备货' : '运送贸易物资';
       return '前往工作点';
@@ -1494,6 +1497,7 @@ G.ui = {
     });
     this.refreshTailorInfo(b);
   },
+  cargoText: function(cargo){return cargo?[{type:cargo.type,qty:cargo.qty},...Object.entries(cargo.extra||{}).map(([type,qty])=>({type,qty}))].filter(x=>x.qty>0&&G.RES[x.type]).map(x=>`${G.RES[x.type].name} ${Number(x.qty)}`).join(' + '):'无';},
   resourceChainInfoData: function (b) {
     if (b.state !== 'ok' || !['mine', 'stonequarry', 'blacksmith'].includes(b.type)) return null;
     const smith = b.type === 'blacksmith', outputs = G.productionOutputsOf(b);
@@ -1503,7 +1507,9 @@ G.ui = {
     const workers = b.workers.map(id => G.world.cmap[id]).filter(Boolean);
     const goal = G.buildingGoalStatus(b);
     let status;
-    if (G.productionLimited(b) && goal) status = goal;
+    if(smith&&workers.some(c=>[c.task,c.pausedTask].some(t=>t?.kind==='smith'&&t.phase==='process')))status='原料已整批出库，继续返屋或加工；公共原料库存只决定后续新批次';
+    else if(smith&&workers.some(c=>c.carry?.smithInput))status='未消耗原料正在退仓；仓满或无通路时随身保留';
+    else if (G.productionLimited(b) && goal) status = goal;
     else if (smith && G.toolLimited(b)) status = `${G.RES[output].name}已达本屋目标，暂停新批次`;
     else if (!G.jobCanProduce(b)) {
       const missing = smith ? G.blacksmithRecipe(b).filter(item => G.game.res[item.type] < item.qty) : [];
@@ -1517,8 +1523,9 @@ G.ui = {
       for (const task of [c.task, c.pausedTask]) {
         if (!task || task.b !== b || !task.yield || !G.RES[task.yield.type] || seen.has(task)) continue;
         seen.add(task);
-        batches.push(`${G.RES[task.yield.type].name} ${task.yield.qty}`);
+        batches.push(`${G.RES[task.yield.type].name} ${task.yield.qty}${task.kind==='smith'?(task.phase==='fetch'?'（取料途中，未扣原料）':`（原料已出库：${this.cargoText(c.carry)}；${c.pausedTask===task?'夜间暂停':c.state==='walk'?'返回铁匠铺':'加工中'}）`):''}`);
       }
+      if(smith&&c.job===b.id&&c.carry?.smithInput&&![c.task,c.pausedTask].some(t=>t?.kind==='smith'&&t.phase==='process'))batches.push(`退回原料 ${this.cargoText(c.carry)}${G.cargoWaitReason(c)?'（'+G.cargoWaitReason(c)+'）':''}`);
       if (c.job === b.id && c.carry && (smith ? ['tools', 'steelTools'] : ['stone', 'iron', 'coal']).includes(c.carry.type))
         batches.push(`${G.RES[c.carry.type].name} ${c.carry.qty}（待送仓）`);
     }
@@ -1533,7 +1540,8 @@ G.ui = {
     if (smith) {
       const recipe = G.blacksmithRecipe(b), p = G.PROD.blacksmith;
       data.recipe = `每批：${recipe.map(item => `${item.qty} ${G.RES[item.type].name}`).join(' + ')} → ${p.toolsOut} ${G.RES[output].name}（受教育 ${p.eduToolsOut}）`;
-      data.inputs = '原料库存：' + recipe.map(item => `${G.RES[item.type].name} ${Math.floor(G.game.res[item.type] || 0)}`).join(' · ');
+      data.logistics='取料：实际步行到兼容堆料场/仓库后整批扣料，携料回屋加工；工具仍送通用仓库。道路和仓点距离影响往返。中断或读档时未消耗原料退仓，仓满保留随身；读档不恢复加工工时。';
+      data.inputs = '公共可用原料（不含已出库批次）：' + recipe.map(item => `${G.RES[item.type].name} ${Math.floor(G.game.res[item.type] || 0)}`).join(' · ');
       data.target = `本屋${G.RES[output].name}目标：${G.toolLimitOf(b)}（只看当前所选产物库存）`;
       data.lifetime = `寿命：铁工具 ${G.LIFE.toolLifeDays} / 钢工具 ${G.LIFE.steelToolLifeDays} 成人天；生产效率相同，优先磨损钢工具。工具不限仓储。`;
     }
@@ -1550,7 +1558,7 @@ G.ui = {
       ${choice ? `<div class="economy-form"><label for="${field}">${smith ? '铁匠配方' : '矿井开采模式'}</label>
         <select id="${field}" aria-describedby="resource-chain-change-note">${options.map(([value, label]) => `<option value="${value}"${value === choice ? ' selected' : ''}>${label}</option>`).join('')}</select>
         <p class="desc" id="resource-chain-change-note">${smith ? '切换后新批次使用所选配方；已接批次按原配方完成，已有随身物资继续送仓。' : '切换只影响新批次；已接开采批次和随身矿物保留，继续送仓。'}${mine && b.legacyMine ? '旧档混采不会自动切换，可在这里保留或改选。' : ''}</p></div>` : ''}
-      ${['production', 'recipe', 'inputs', 'stock'].filter(key => data[key]).map(key => `<div class="row" data-resource-chain-live="${key}">${this.escHtml(data[key])}</div>`).join('')}
+      ${['production', 'recipe', 'inputs', 'stock', 'logistics'].filter(key => data[key]).map(key => `<div class="row" data-resource-chain-live="${key}">${this.escHtml(data[key])}</div>`).join('')}
       ${smith ? `<div class="row tog-row resource-chain-target"><span data-resource-chain-live="target">${this.escHtml(data.target)}</span>
         <button type="button" class="mini-tog" data-tl="-10" title="降低当前产物的本屋目标 10" aria-label="降低本屋工具目标 10">−</button>
         <button type="button" class="mini-tog" data-tl="10" title="提高当前产物的本屋目标 10" aria-label="提高本屋工具目标 10">＋</button></div>` : ''}
@@ -1916,7 +1924,7 @@ G.ui = {
         <div class="info-head"><span>🧑 ${this.escHtml(c.name)}</span><button id="info-close">✕</button></div>
         <div class="row" data-citizen-role>${c.sex === 'm' ? '男' : '女'} · ${Math.floor(c.age)} 岁 · ${c.student ? '学生' : c.adult ? '成人' : '儿童'}</div>
         <div class="row">职业：<span data-citizen-job>${jobName}</span> · <span data-citizen-status>${this.escHtml(status)}</span></div>
-        ${c.carry ? `<div class="row">随身：${G.RES[c.carry.type].name} ${Number(c.carry.qty)}（未入库）</div>` : ''}
+        ${c.carry ? `<div class="row">随身：${this.cargoText(c.carry)}（${c.carry.smithInput?'铁匠原料已出库、尚未消耗':'未入库'}）</div>` : ''}
         <div class="row">家庭：${fam ? (fam.houseId != null ? '有房' : '无房') : '单身'}</div>
         ${this.studentInfoMarkup(c)}
         <div class="row">饥饿 ${'▕'.repeat(Math.min(4, c.hunger)) || '无'} · 受冻 ${c.cold > 1 ? '是' : '无'}</div>

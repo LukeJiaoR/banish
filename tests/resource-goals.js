@@ -71,7 +71,7 @@ test('lower goal preserves active, paused and carry work through scheduler and d
  }
 });
 test('accepted smith batch completes after pause then releases normally and can return',()=>{
- const {G,building,citizen}=fixture(),b=building('blacksmith',{toolLimit:30}),c=citizen(b);G.game.res.iron=10;G.game.res.food=1000;c.task=G.makeTask(b,c);c.state='work';const old={...G.game.res};G.setProductionGoal('tools',0);G.completeTask(c);
+ const {G,building,citizen}=fixture(),b=building('blacksmith',{toolLimit:30}),c=citizen(b);G.game.res.iron=10;G.game.res.food=1000;c.task=G.makeTask(b,c);c.state='work';const old={...G.game.res};G.setProductionGoal('tools',0);G.game.h=12;G.sendTo(c,c.task.tx,c.task.ty);for(let n=0;n<2000&&G.game.res.tools===old.tools;n++)G.stepCitizen(c,.1);
  assert.equal(G.game.res.tools,old.tools+2);assert.equal(G.game.res.iron,old.iron-1);assert.equal(G.game.res.wood,old.wood-2);G.scheduleJobs();assert.equal(c.job,null);
  G.setProductionGoal('tools',50);G.scheduleJobs();assert.equal(c.job,b.id);assert.ok(c.task);
 });

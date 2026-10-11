@@ -606,8 +606,9 @@ G.alternateTaskEndpoint = function (c, t) {
   if (t.kind === 'clearSite' && (!t.tree || G.world.trees[G.world.treeIdx[t.tree.i]] !== t.tree)) return null;
   if (['care', 'clinic', 'arrival', 'leisure', 'host', 'study', 'teach'].includes(t.kind)) return G.workSpot(G.world, t.b, c.x, c.y, true);
   if (t.kind === 'clearSite') return G.siteClearSpot(c, t.b, t.tree);
-  if (['firewood', 'trade', 'brew'].includes(t.kind) && t.phase === 'fetch') return G.storageRoute(c.x,c.y,G.fetchStorageTypes(t))?.spot || null;
-  if (t.kind === 'build' || t.kind === 'firewood' || t.kind === 'trade' || t.kind === 'brew' ||
+  if(t.kind==='smith'&&t.phase==='fetch'&&!G.hasStorageBuilding())return G.workSpot(G.world,t.b,c.x,c.y,true);
+  if (['firewood', 'trade', 'brew', 'smith'].includes(t.kind) && t.phase === 'fetch') return G.storageRoute(c.x,c.y,G.fetchStorageTypes(t))?.spot || null;
+  if (t.kind === 'build' || t.kind === 'firewood' || t.kind === 'trade' || t.kind === 'brew' || t.kind === 'smith' ||
       (t.kind === 'work' && ['dock', 'mine', 'stonequarry', 'blacksmith', 'pasture', 'orchard'].includes(t.b.type)))
     return G.workSpot(G.world, t.b, c.x, c.y, true);
   return null;
@@ -629,7 +630,7 @@ G.routeCanReuse = function (route, c, tx, ty) {
 G.sendTo = function (c, tx, ty, planned = null) {
   let route=planned||(c.task&&c.task.dispatchRoute);
   if(c.task) delete c.task.dispatchRoute;
-  const buildingTask=c.task && (['build','clearSite','firewood','trade','care','clinic','arrival','leisure','host','brew','study','teach'].includes(c.task.kind) || (c.task.kind==='work' && c.task.b && ['dock','mine','stonequarry','blacksmith','pasture','orchard'].includes(c.task.b.type)));
+  const buildingTask=c.task && (['build','clearSite','firewood','trade','care','clinic','arrival','leisure','host','brew','smith','study','teach'].includes(c.task.kind) || (c.task.kind==='work' && c.task.b && ['dock','mine','stonequarry','blacksmith','pasture','orchard'].includes(c.task.b.type)));
   if((route && !G.routeCanReuse(route,c,tx,ty)) || (!route && buildingTask)) {
     const spot=G.alternateTaskEndpoint(c,c.task);
     if(!spot){if(c.task)G.dropBlockedTask(c,c.task);c.path=null;c.state='idle';c.wanderT=.5;return false;}
@@ -707,7 +708,7 @@ G.resumeTask = function (c) {
     ok = G.farmTaskCurrent(t) && t.b.farm[t.ti].sown && !t.b.farm[t.ti].harvested;
   } else if(ok&&t.kind==='teach'){
     ok=G.schoolTeachers(t.b).includes(c)&&!G.isSick(c)&&c.hunger<1;
-  } else if (ok && t.kind === 'firewood') {
+  } else if (ok && ['firewood','smith'].includes(t.kind)) {
     ok = t.b.state === 'ok';
   } else if (ok && t.kind === 'build') {
     ok = t.b.state === 'site'&&!t.b.sitePaused;
@@ -769,7 +770,7 @@ G.waitForMineralStorage = function (c, reason) {
 G.warnMineralStorage = function () {
   if (G.game.warned.mineralStorageFull) return;
   G.game.warned.mineralStorageFull = true;
-  G.ui.toast('⚠ 仓位已满，矿物、麦酒、成衣、牧场产物、撤岗货批或退回原粮由市民随身保留；使用库存或建成新仓库后继续送仓', 'warn');
+  G.ui.toast('⚠ 仓位已满，矿物、麦酒、成衣、牧场产物、撤岗货批、铁匠原料或退回原粮由市民随身保留；使用库存或建成新仓库后继续送仓', 'warn');
 };
 G.cargoWaitReason = function (c) {
   if (!G.isMineralCargo(c) || !c.haulPending || c.state === 'haul') return '';
@@ -781,7 +782,7 @@ G.finishMineralHaul = function (c) {
   if (c.carry.qty > 0) { G.warnMineralStorage(); G.waitForMineralStorage(c, 'space'); return; }
   if(c.carry.staffingReturn&&c.carry.extra){
     const next=Object.keys(c.carry.extra).find(k=>c.carry.extra[k]>0);
-    if(next){const qty=c.carry.extra[next],extra={...c.carry.extra};delete extra[next];c.carry={type:next,qty,staffingReturn:true,...(Object.keys(extra).length?{extra}:{})};G.startMineralHaul(c);return;}
+    if(next){const qty=c.carry.extra[next],extra={...c.carry.extra};delete extra[next];c.carry={type:next,qty,staffingReturn:true,...(c.carry.smithInput?{smithInput:true}:{}),...(Object.keys(extra).length?{extra}:{})};G.startMineralHaul(c);return;}
   }
   c.carry = null; c.haulPending = false; c.haulWait = ''; c.haulTo = null;
   G.requestTask(c);
@@ -1010,6 +1011,48 @@ G.deposit = function (type, qty, retain=false) {
   G.updateProductionGoals(); return got;
 };
 
+/* Blacksmith batches own actual withdrawn input cargo. Unserialized tasks may
+ * be abandoned on load, but that one bounded cargo must be returned, not charged
+ * again or promoted into a new batch. Other workshops keep their old contracts. */
+G.makeBlacksmithTask=function(b,c){
+  if(G.toolLimited(b)){b.noWork=true;b.warnText='工具已达上限';return null;}
+  const consume=G.blacksmithRecipe(b).map(item=>({...item})),r=G.game.res;
+  if(consume.some(item=>r[item.type]<item.qty)){b.noWork=true;b.warnText=G.blacksmithOutput(b)==='steelTools'?'缺铁、木材或煤':'缺铁或木材';return null;}
+  const stored=G.hasStorageBuilding(),route=stored?G.storageRoute(c.x,c.y,consume.map(item=>item.type)):null;
+  const spot=stored?route?.spot:G.workSpot(G.world,b,c.x,c.y);
+  if(!spot){b.noWork=true;b.warnText=stored?'取料堆料场或仓库不可达':'铁匠入口不可达';return null;}
+  return G.withTaskRoute({kind:'smith',phase:'fetch',b,tx:spot.x,ty:spot.y,work:.1,workLeft:.1,
+    craftWork:G.taskWork(c,G.PROD.blacksmith.workH),consume,
+    yield:{type:G.blacksmithOutput(b),qty:c.educated?G.PROD.blacksmith.eduToolsOut:G.PROD.blacksmith.toolsOut}},spot.route);
+};
+G.smithTaskCurrent=(c,t)=>!!t&&t.kind==='smith'&&G.world.cmap[c.id]===c&&!c.dead&&
+  t.b?.type==='blacksmith'&&G.world.bmap[t.b.id]===t.b&&t.b.state==='ok'&&c.job===t.b.id;
+G.smithAtTask=function(c,t){
+  if(!G.smithTaskCurrent(c,t)||G.tileBlocked(G.world,Math.round(c.x),Math.round(c.y))||G.d2(c.x,c.y,t.tx,t.ty)>.04)return false;
+  return t.phase==='fetch'&&G.hasStorageBuilding()?G.atStorageDoor(c,G.fetchStorageTypes(t)):G.atMedicalDoor(c,t.b);
+};
+G.smithCargoMatches=function(c,t){
+  const cargo=c.carry;if(!cargo||cargo!==t.inputCargo||!cargo.smithInput||!cargo.staffingReturn)return false;
+  const contents={[cargo.type]:cargo.qty,...(cargo.extra||{})};
+  return Object.keys(contents).length===t.consume.length&&t.consume.every(item=>contents[item.type]===item.qty);
+};
+G.returnSmithBatch=function(c){if(G.world.cmap[c.id]!==c||c.dead)return;c.task=null;c.pausedTask=null;if(c.carry)G.startHaul(c);else{c.state='idle';c.wanderT=2;}};
+G.completeSmithTask=function(c,t){
+  if(!G.smithAtTask(c,t)){G.returnSmithBatch(c);return;}
+  if(t.phase==='fetch'){
+    if(c.carry||t.consume.some(item=>G.game.res[item.type]<item.qty)){G.returnSmithBatch(c);return;}
+    const spot=G.workSpot(G.world,t.b,c.x,c.y);if(!spot){t.b.warnText='铁匠入口不可达';G.returnSmithBatch(c);return;}
+    // Synchronous all-or-nothing withdrawal, after both storage and return route checks.
+    for(const item of t.consume)G.withdrawResource(item.type,item.qty);
+    const [first,...rest]=t.consume;
+    c.carry={type:first.type,qty:first.qty,extra:Object.fromEntries(rest.map(item=>[item.type,item.qty])),staffingReturn:true,smithInput:true};
+    t.inputCargo=c.carry;t.phase='process';t.tx=spot.x;t.ty=spot.y;t.work=t.workLeft=t.craftWork;c.task=t;
+    if(!G.sendTo(c,t.tx,t.ty,spot.route))G.returnSmithBatch(c);return;
+  }
+  if(t.phase!=='process'||!G.smithCargoMatches(c,t)){G.returnSmithBatch(c);return;}
+  c.carry={type:t.yield.type,qty:t.yield.qty};G.startHaul(c);
+};
+
 /* 背料到达仓库：转入回屋加工段。返回 false = 仓库没料（白跑） */
 G.firewoodFetchDone = function (c, t) {
   if(G.hasStorageBuilding()&&!G.atStorageDoor(c,G.fetchStorageTypes(t)))return false;
@@ -1071,13 +1114,14 @@ G.detourCitizen = function (c, dtH) {
     if (G.physicalTaskEndpoint(t)) { G.dropBlockedTask(c, t); return; }
     if (t) {
       const spot = G.alternateTaskEndpoint(c, t);
-      if (!spot) { if (t.kind === 'care') G.cancelMedicalCare(c); else if(t.kind==='leisure')G.cancelLeisure(c);else if(['study','teach'].includes(t.kind)){G.clearSchoolTasks(c);c.schoolWaitReason='上学路线受阻，保留学籍等待通路';c.wanderT=4;} return; }
+      if (!spot) { if(t.kind==='smith'){G.returnSmithBatch(c);return;} if (t.kind === 'care') G.cancelMedicalCare(c); else if(t.kind==='leisure')G.cancelLeisure(c);else if(['study','teach'].includes(t.kind)){G.clearSchoolTasks(c);c.schoolWaitReason='上学路线受阻，保留学籍等待通路';c.wanderT=4;} return; }
       goal = spot; t.tx = spot.x; t.ty = spot.y;
     } else if (c.walkKind === 'wander') { c.path = null; c.state = 'idle'; c.wanderT = 2; return; }
     else return;
   }
   const path = G.routeCanReuse(goal.route,c,goal.x,goal.y) ? goal.route.path : G.findPath(G.world, Math.round(c.x), Math.round(c.y), goal.x, goal.y);
   if (!path) {
+    if(c.task?.kind==='smith'){G.returnSmithBatch(c);return;}
     if(c.task&&['study','teach'].includes(c.task.kind)){const b=c.task.b;b.warnText='上学路线受阻';G.clearSchoolTasks(c);c.schoolWaitReason='上学路线受阻，保留学籍等待通路';c.wanderT=4;return;}
     if (c.task && c.task.kind === 'care') { G.cancelMedicalCare(c); return; }
     if(G.isLeisureVisitor(c)){G.cancelLeisure(c);return;}
@@ -1139,6 +1183,10 @@ G.stepCitizen = function (c, dtH) {
       return;
     }
     case 'work': {
+      if(c.task?.kind==='smith'&&!G.smithAtTask(c,c.task)){
+        const t=c.task;if(!G.smithTaskCurrent(c,t)||!G.sendTo(c,t.tx,t.ty))G.returnSmithBatch(c);
+        return;
+      }
       if(c.task?.economy==='pasture'&&!G.atPastureWork(c,c.task)){
         if(G.pastureTaskCurrent(c,c.task))G.sendTo(c,c.task.tx,c.task.ty);
         else{c.task=null;c.state='idle';c.wanderT=0;}
@@ -1527,23 +1575,7 @@ G.makeTask = function (b, c) {
         work:G.taskWork(c,8),workLeft:0,consume:status.materials.map(item=>({...item})),
         yield:{type:G.tailorOutput(b),qty:c.educated?2:1}},route.spot.route);
     }
-    case 'blacksmith': {
-      if (G.toolLimited(b)) { b.noWork = true; b.warnText = '工具已达上限'; return null; }
-      const spot = G.workSpot(w, b, c.x, c.y);
-      if (!spot) return null;
-      const cons = G.blacksmithRecipe(b);
-      if (cons.some(c2 => g.res[c2.type] < c2.qty)) {
-        b.noWork = true; b.warnText = G.blacksmithOutput(b) === 'steelTools' ? '缺铁、木材或煤' : '缺铁或木材';
-        return null;
-      }
-      // 1铁+2木 → 2 件工具（受教育 3）；铁匠抡锤不用工具，不吃减产
-      return G.withTaskRoute({
-        kind: 'work', b, tx: spot.x, ty: spot.y,
-        work: G.taskWork(c, P.blacksmith.workH), workLeft: 0,
-        consume: cons,
-        yield: { type: G.blacksmithOutput(b), qty: c.educated ? P.blacksmith.eduToolsOut : P.blacksmith.toolsOut },
-      }, spot.route);
-    }
+    case 'blacksmith': return G.makeBlacksmithTask(b,c);
     case 'hunting': {
       const R = P.hunting.radius;
       // 狩猎依赖成熟林（鹿群栖息地）：成熟树不足不开工，产出随林况浮动——与采集互补的食物来源
@@ -1659,6 +1691,7 @@ G.completeTask = function (c) {
       break;
     }
     case 'trade': { G.completeTradeTask(c,t); return; }
+    case 'smith': { G.completeSmithTask(c,t); return; }
     case 'work': {
       if (t.economy) { G.completeEconomyWork(c,t); break; }
       if (t.consume) {
