@@ -46,6 +46,14 @@ G.BDEF = {
     wall:'#95724d', wallD:'#685139', roof:'#967755',
     desc:'低成本原料交货点，需清场和施工。只收原木、石头、铁、煤与柴火；各类公共仓容增加250，按实际可达耗时选择。食物与工具仍送通用仓库；沿用公共库存，不代表独立地方存货。',
   },
+  well: {
+    id:'well',name:'水井',icon:'🪣',w:2,h:2,cost:{wood:16,stone:24},buildWork:60,jobs:0,
+    wall:'#978a71',wallD:'#6d6453',roof:'#775b3d',desc:'无固定岗位。救火者从可达水井或河岸实际取水，再送到火点。只为可选住房火灾供水，不增加公共可交易库存。',
+  },
+  burntruins: {
+    id:'burntruins',name:'烧毁的住房',icon:'🔥',w:2,h:2,cost:{},buildWork:0,jobs:0,unbuildable:true,
+    wall:'#615449',wallD:'#413c35',roof:'#514941',desc:'不能居住；可清理（不退还原建材）或支付新材料原址重建。原家庭身份与已有携货不受损。',
+  },
   mineralpit: {
     id:'mineralpit',name:'永久矿坑',icon:'⛏️',w:3,h:3,cost:{},buildWork:0,jobs:0,passable:false,unbuildable:true,
     wall:'#786d5a',wallD:'#504b40',roof:'#686254',

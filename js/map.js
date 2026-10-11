@@ -563,7 +563,7 @@ G.canPlace = function (w, type, ox, oy, farmSize) {
   if(type==='farm'&&(!Number.isInteger(ox)||!Number.isInteger(oy)))return {ok:false,reason:'农田坐标须为整数'};
   const def = type==='farm'?G.farmDefinition(farmSize):G.BDEF[type];
   if(!def||(farmSize!==undefined&&type!=='farm'))return {ok:false,reason:'农田每边须为4至15格的整数'};
-  if(def.unbuildable)return {ok:false,reason:'永久矿坑不能主动建造或重新开发'};
+  if(def.unbuildable)return {ok:false,reason:def.name+'不能主动建造或重新开发'};
   const N = w.N;
   if (ox < 0 || oy < 0 || ox + def.w > N || oy + def.h > N) return { ok: false, reason: '超出地图范围' };
   let hasWater = false;

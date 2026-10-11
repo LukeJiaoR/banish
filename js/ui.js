@@ -23,6 +23,8 @@ G.ui = {
   // Read-only citizen feedback. Idle is a scheduler state, not proof of a deadlock.
   citizenStatus: function (c) {
     const b = c.job != null ? G.world.bmap[c.job] : null;
+    const fire = G.fireRescueState && G.fireRescueState(c);
+    if (fire) return fire;
     if (G.isArriving ? G.isArriving(c) : c.arrivalHallId != null) return '迁入途中：先步行到市政厅报到';
     if (c.task && c.task.kind === 'care' && G.medicalStatus) return G.medicalStatus(c);
     if(c.student&&G.studentSummary)return G.studentSummary(c).status;
@@ -238,12 +240,12 @@ G.ui = {
   // Keep every real tool mounted: switching category never recreates buttons.
   initToolbar: function () {
     const special = ['fell', 'quarry', 'demolish'];
-    const available = t => special.includes(t) || !!G.BDEF[t];
+    const available = t => !['burntruins', 'mineralpit'].includes(t) && (special.includes(t) || !!G.BDEF[t]);
     this.toolGroups = [
       { id: 'homes', name: '住房', icon: '🏠', hint: '安家与过冬', tools: ['house', 'stonehouse', 'boarding'] },
       { id: 'food', name: '食物生产', icon: '🌾', hint: '肉类 · 蔬菜 · 主食', tools: ['gatherer', 'hunting', 'dock', 'farm', 'orchard', 'pasture'] },
       { id: 'industry', name: '资源与加工', icon: '⚒️', hint: '木石铁煤 · 工具 · 衣物 · 酿造', tools: ['forester', 'woodcutter', 'stonequarry', 'mine', 'blacksmith', 'tailor', 'tavern'] },
-      { id: 'services', name: '城镇服务', icon: '🏘️', hint: '储运 · 教育 · 医疗 · 迁入 · 安葬', tools: ['storage', 'stockpile', 'school', 'herbalist', 'hospital', 'tradingpost', 'townhall', 'cemetery'] },
+      { id: 'services', name: '城镇服务', icon: '🏘️', hint: '储运 · 水源 · 教育 · 医疗 · 迁入 · 安葬', tools: ['storage', 'stockpile', 'well', 'school', 'herbalist', 'hospital', 'tradingpost', 'townhall', 'cemetery'] },
       { id: 'land', name: '道路与采运', icon: '🛣️', hint: '修路 · 采集 · 拆除', tools: ['road', 'stoneroad', 'bridge', 'fell', 'quarry', 'demolish'] },
     ].map(group => ({ ...group, tools: group.tools.filter(available) })).filter(group => group.tools.length);
     const registered = new Set(this.toolGroups.flatMap(group => group.tools));
@@ -746,6 +748,10 @@ G.ui = {
   hideInfo: function () {
     const panel = this.el.info.querySelector && this.el.info.querySelector('[data-mineral-removal-panel]');
     if (panel) this.resetMineralRemoval(panel);
+    for (const kind of ['fire-rules', 'fire-rebuild']) {
+      const fire = this.el.info.querySelector && this.el.info.querySelector(`[data-${kind}-panel]`);
+      if (fire) this.resetFireAction(fire);
+    }
     G.sel = null;
     this.el.info.classList.add('hidden');
     this._infoSelection = null; // Reopening mounts new controls; dismissed callbacks stay stale.
@@ -875,7 +881,7 @@ G.ui = {
     const families = G.world.families.filter(f => f.houseId === b.id);
     const residents = families.flatMap(f => f.members.map(id => G.world.cmap[id]).filter(c => c && !c.dead));
     return {
-      status: b.type==='boarding'?`入住 ${families.length} / ${G.LIFE.boardingCap} 家`:residents.length ? '有人居住' : '空置',
+      status: G.houseFireSummary?.(b)?.active ? this.homeFireInfoData(b).data.status : b.type==='boarding'?`入住 ${families.length} / ${G.LIFE.boardingCap} 家`:residents.length ? '有人居住' : '空置',
       residents: residents.length ? `住户：${residents.map(c => `${c.name}(${Math.floor(c.age)}岁)`).join('、')}` : '住户：暂无',
     };
   },
@@ -908,8 +914,168 @@ G.ui = {
       panel.querySelector('[data-heating-message]').textContent=ok?'已应用全镇策略，从下一次冬季日界扣料生效。':'请输入有效燃料策略与非负整数煤底线。';this.refreshHeatingInfo(b);
     });
   },
+  fireRulesInfoData: function (b) {
+    if (b.type !== 'townhall' || b.state !== 'ok' || !G.fireRulesSummary || !G.fireToggleQuote) return null;
+    const s = G.fireRulesSummary(), quote = G.fireToggleQuote(!s.enabled);
+    const grace = s.startedDay == null ? `首次开启后有 ${G.FIRE?.graceDays || 48} 天宽限。`
+      : Number.isFinite(s.graceUntil) && s.graceUntil > G.game.day ? `宽限至第 ${s.graceUntil} 天；重新开关不会重置。` : '首次宽限已结束；重新开关不会重置。';
+    return { quote, title: '可选住宅火灾（本作适配）', start: s.enabled ? '查看关闭火灾确认' : '查看开启火灾确认',
+      confirm: s.enabled ? '确认关闭新增火灾' : '确认开启住宅火灾',
+      confirmation: s.enabled ? `关闭后只阻止新起火和新蔓延，当前 ${s.activeCount} 座住宅仍会继续燃烧、受损和接受救援，可能烧毁；不会撤销已有损失。`
+        : `确认开启后，完工木屋和石屋可能低概率起火。${grace}住户撤离后仍需住房、食物与柴火，失去住房可能导致饥饿和受冻。`,
+      data: {
+        state: `全镇住宅火灾：${s.enabled ? '已开启' : '默认关闭 / 当前关闭'} · 活动住宅 ${s.activeCount} 座 · 焦土废墟 ${s.ruins} 处。${grace}`,
+        rescue: `正在救火 ${s.rescuers} 人 / 最多 2 人 · 可用空闲救援者 ${s.availableRescuers} 人。${s.availableRescuers === 0 ? '没有空闲救援者，可降低其他建筑用工上限，等收尾后释放空闲成人；不会自动抽走在岗者。' : ''}${s.reason || ''}`,
+        staffing: '仅健康、18岁以上、无岗位、无当前或暂停任务且不携货的空闲成人可救援；不会自动抽走教师、医师或生产工人。需要时请到其他建筑详情降低用工上限，待收尾后释放空闲成人。',
+        water: '救援者必须真实往返可达水井或河岸取水，再到住宅灭火；水井无需岗位，不提供全镇水库存，距离与通路影响救援。',
+        risk: `仅完工木屋/石屋受灾，先有 ${G.FIRE?.warningHours || 12} 小时烟雾预警，再有 ${G.FIRE?.burnHours || 36} 小时火势窗口，每起事故最多波及 ${G.FIRE?.maxHomes || 3} 座附近住宅。警报后家庭寻找空屋或宿舍；不直接烧死居民，但原有饥饿、受冻风险仍存在。`,
+        recovery: '灭火后原屋按正常住房规则分配，不驱逐临时住处的新住户，也不强制原家庭搬回。烧毁后可付完整新建材料重建；清理废墟不返材料。',
+      } };
+  },
+  fireRebuildInfoData: function (b) {
+    const s = G.houseFireSummary && G.houseFireSummary(b);
+    if (!s || !s.ruin || !G.fireRebuildQuote) return null;
+    const quote = G.fireRebuildQuote(b), name = G.BDEF[quote.origin || s.origin]?.name || '原住宅';
+    return { quote, title: '原址重建住宅', start: '查看重建确认', confirm: '确认扣料并重建',
+      confirmation: `确认后按下方完整新建价扣料，原址开始重建${name}；施工完工前不能入住，实际需要可达建筑工人施工，不立即恢复住房。`,
+      data: {
+        origin: `原住宅：${name}。烧毁材料已损失，无旧料回收或抵扣；清理废墟退还 0 材料。`,
+        cost: `完整新建材料：${this.resourceCost(quote.cost || {}, false)}。`,
+        housing: `全镇无房家庭 ${Number(quote.homelessFamilies) || 0} 户。${quote.winter ? '⚠ 当前正值寒冬。' : ''}施工期间仍需可达空屋或宿舍、食物和柴火；冬季可能受冻，重建不预留床位。`,
+        reason: quote.ok ? '材料与施工条件满足，可以确认开始；仍须实际施工。' : `暂不能重建：${quote.reason || '请检查材料和可达建筑工人。'}`,
+      } };
+  },
+  fireActionMarkup: function (kind, facts) {
+    if (!facts) return '';
+    const row = key => `<p class="row desc" data-${kind}="${key}">${this.escHtml(facts.data[key])}</p>`;
+    const rows = kind === 'fire-rules' ? ['state', 'rescue'].map(row).join('') + `<details><summary>火灾范围、救援与安置规则</summary>${['staffing', 'water', 'risk', 'recovery'].map(row).join('')}</details>` : Object.keys(facts.data).map(row).join('');
+    return `<section class="economy-form" data-${kind}-panel aria-labelledby="${kind}-title">
+      <h3 id="${kind}-title">${this.escHtml(facts.title)}</h3>
+      ${rows}
+      <button type="button" id="${kind}-start" aria-expanded="false">${this.escHtml(facts.start)}</button>
+      <div class="hidden" data-${kind}-confirm>
+        <p data-${kind}-quote>${this.escHtml(facts.confirmation)}</p>
+        <div class="economy-actions"><button type="button" id="${kind}-confirm" class="danger" disabled>${this.escHtml(facts.confirm)}</button><button type="button" id="${kind}-cancel">取消，保持现状</button></div>
+      </div><p data-${kind}-message role="status" aria-live="polite"></p>
+    </section>`;
+  },
+  fireActionValid: function (b, context, node, allowModal) {
+    if (!context) return false;
+    const { world, game, el, panel, type, state, kind } = context;
+    return G.world === world && G.game === game && this.el.info === el && !el.classList.contains('hidden') &&
+      G.sel?.kind === 'b' && G.sel.id === b.id && world.bmap[b.id] === b && b.type === type && b.state === state &&
+      el.querySelector(`[data-${kind}-panel]`) === panel && (!node || (!node.disabled && panel.querySelector('#' + node.id) === node)) &&
+      (allowModal || !(G.hasOpenModal && G.hasOpenModal()));
+  },
+  resetFireAction: function (panel, message, restoreFocus) {
+    const kind = panel._fireContext?.kind;
+    if (!kind) return;
+    const box = panel.querySelector(`[data-${kind}-confirm]`), start = panel.querySelector(`#${kind}-start`), confirm = panel.querySelector(`#${kind}-confirm`);
+    panel._firePending = null;
+    if (box) box.classList.add('hidden');
+    if (start) start.setAttribute('aria-expanded', 'false');
+    if (confirm) confirm.disabled = true;
+    const status = panel.querySelector(`[data-${kind}-message]`);
+    if (message !== undefined && status) status.textContent = message;
+    if (restoreFocus && box?.contains(document.activeElement) && start?.focus) start.focus();
+  },
+  refreshFireAction: function (b, kind, facts) {
+    const panel = this.el.info.querySelector?.(`[data-${kind}-panel]`);
+    if (!panel || !panel._fireContext) return false;
+    if (!this.fireActionValid(b, panel._fireContext, null, true)) { this.resetFireAction(panel); return false; }
+    facts = facts || (kind === 'fire-rules' ? this.fireRulesInfoData(b) : this.fireRebuildInfoData(b));
+    if (!facts) { this.resetFireAction(panel); return false; }
+    for (const [key, text] of Object.entries(facts.data)) {
+      const node = panel.querySelector(`[data-${kind}="${key}"]`);
+      if (node && node.textContent !== text) node.textContent = text;
+    }
+    const start = panel.querySelector(`#${kind}-start`), confirm = panel.querySelector(`#${kind}-confirm`);
+    if (!start || !confirm || !panel.querySelector(`[data-${kind}-confirm]`)) { this.resetFireAction(panel); return false; }
+    if (start.textContent !== facts.start) start.textContent = facts.start;
+    if (confirm.textContent !== facts.confirm) confirm.textContent = facts.confirm;
+    const modal = G.hasOpenModal && G.hasOpenModal();
+    if (panel._firePending && (modal || panel._firePending.settings !== G.game.fireDisasters || panel._firePending.rulesKey !== JSON.stringify(G.FIRE) || !facts.quote.ok || panel._firePending.key !== facts.quote.key))
+      this.resetFireAction(panel, modal ? '确认已取消，请关闭弹窗后重新查看。' : '设置、火情或重建条件已变化，请核对最新信息后重新确认。', !modal);
+    start.setAttribute('aria-disabled', String(!facts.quote.ok));
+    confirm.disabled = !panel._firePending || !facts.quote.ok;
+    return true;
+  },
+  initFireAction: function (b, kind) {
+    const el = this.el.info, panel = el.querySelector(`[data-${kind}-panel]`);
+    if (!panel) return;
+    const context = { world: G.world, game: G.game, el, panel, type: b.type, state: b.state, kind };
+    panel._fireContext = context;
+    const start = panel.querySelector(`#${kind}-start`), confirm = panel.querySelector(`#${kind}-confirm`), cancel = panel.querySelector(`#${kind}-cancel`), box = panel.querySelector(`[data-${kind}-confirm]`);
+    const factsNow = () => kind === 'fire-rules' ? this.fireRulesInfoData(b) : this.fireRebuildInfoData(b);
+    this.resetFireAction(panel, '');
+    for (const button of [start, confirm, cancel]) button.addEventListener('keydown', e => {
+      if (e.repeat && (e.key === 'Enter' || e.key === ' ')) e.preventDefault();
+    });
+    start.addEventListener('click', e => {
+      if (e.detail > 1 || !this.fireActionValid(b, context, start)) { this.resetFireAction(panel); return; }
+      const facts = factsNow();
+      this.refreshFireAction(b, kind, facts);
+      if (!facts?.quote.ok) { this.resetFireAction(panel, facts?.quote.reason || '当前无法操作，请检查最新条件。'); return; }
+      panel._firePending = { key: facts.quote.key, enabled: facts.quote.enabled, settings: G.game.fireDisasters, rulesKey: JSON.stringify(G.FIRE) };
+      panel.querySelector(`[data-${kind}-quote]`).textContent = facts.confirmation;
+      panel.querySelector(`[data-${kind}-message]`).textContent = '尚未更改设置或扣料，请核对后确认，也可取消。';
+      box.classList.remove('hidden'); start.setAttribute('aria-expanded', 'true'); confirm.disabled = false;
+      if (confirm.focus) confirm.focus();
+    });
+    cancel.addEventListener('click', () => {
+      if (!this.fireActionValid(b, context, cancel)) { this.resetFireAction(panel); return; }
+      this.resetFireAction(panel, '已取消，设置、建筑和材料保持不变。');
+      if (start.focus) start.focus();
+    });
+    confirm.addEventListener('click', e => {
+      if (e.detail > 1 || !this.fireActionValid(b, context, confirm) || !panel._firePending) { this.resetFireAction(panel); return; }
+      const pending = panel._firePending, facts = factsNow();
+      this.refreshFireAction(b, kind, facts);
+      if (!facts?.quote.ok || !panel._firePending || facts.quote.key !== pending.key) return;
+      this.resetFireAction(panel);
+      const result = kind === 'fire-rules' ? { ok: G.setFireDisasters(pending.enabled, pending.key, context.game) }
+        : G.rebuildBurntHome(b, pending.key, context.game);
+      if (!result.ok) { this.refreshFireAction(b, kind); this.resetFireAction(panel, result.reason || '条件已变化，未执行，请重新确认。'); if (start.focus) start.focus(); return; }
+      if (kind === 'fire-rules') {
+        this.refreshFireAction(b, kind);
+        this.resetFireAction(panel, pending.enabled ? '已开启住宅火灾。请留意宽限、空闲救援者和可达水源。' : '已关闭新增起火和新蔓延。当前火灾、损伤与救援仍会继续，已有损失不返还。');
+        if (start.focus) start.focus();
+      } else {
+        this.renderInfo(true);
+        const close = el.querySelector('#info-close'); if (close?.focus) close.focus();
+      }
+      this.refreshHUD();
+    });
+    this.refreshFireAction(b, kind);
+  },
+  homeFireInfoData: function (b) {
+    const s = G.houseFireSummary && G.houseFireSummary(b);
+    if (!s || (!s.active && !s.ruin)) return null;
+    return { summary: s, data: {
+      status: s.status || (s.ruin ? '住宅已烧毁，不能入住' : s.phase === 'warning' ? '烟雾预警，住户撤离中' : '住宅起火，住户撤离中'),
+      progress: s.ruin ? '建筑已成为废墟，清理不返还材料。' : `已持续 ${Math.max(0, Number(s.elapsed) || 0).toFixed(1)} 小时 · 烟雾预警 ${Number(s.warningHours) || 12} 小时 · 损伤 ${Math.round(Number(s.damage) || 0)}%。`,
+      water: s.ruin ? '救援已结束，需完整材料原址重建或清理废墟。' : `仍需送到 ${Math.max(0, Number(s.waterNeeded) || 0)} 桶水 · 本屋救援者 ${Number(s.rescuers) || 0} 人。${s.reason || ''}`,
+      shelter: '报警后家庭寻找可达空屋或宿舍；未安置者仍面临饥饿、受冻风险。灭火后按正常住房规则分配，不驱逐临时住户，也不强制原家庭搬回。',
+      staffing: '救援最多使用 2 名健康、18岁以上、无岗无任务且不携货的空闲成人。没有空闲救援者时，请降低其他建筑用工上限并等待收尾；不会自动抽走教师、医师或生产工人。',
+    } };
+  },
+  homeFireInfoMarkup: function (facts) {
+    return facts ? `<section class="economy-form" data-home-fire-panel><h3>住宅火情与安置</h3>${Object.entries(facts.data).map(([key, text]) => `<p class="row" data-home-fire="${key}">${this.escHtml(text)}</p>`).join('')}</section>` : '';
+  },
+  refreshHomeFireInfo: function (b) {
+    const facts = this.homeFireInfoData(b), el = this.el.info;
+    if (!facts || !el.querySelector('[data-home-fire-panel]')) return false;
+    for (const [key, text] of Object.entries(facts.data)) {
+      const node = el.querySelector(`[data-home-fire="${key}"]`);
+      if (node && node.textContent !== text) node.textContent = text;
+    }
+    const demolish = el.querySelector('#info-demolish');
+    if (demolish) demolish.disabled = !!facts.summary.active;
+    this.refreshFireAction(b, 'fire-rebuild');
+    return true;
+  },
   houseUpgradeInfoData: function (b) {
-    if (b.type !== 'house' || b.state !== 'ok' || !G.houseUpgradeQuote) return null;
+    if (b.type !== 'house' || b.state !== 'ok' || !G.houseUpgradeQuote || G.houseFireSummary?.(b)?.active) return null;
     const quote = G.houseUpgradeQuote(b);
     const materials = values => ['wood', 'stone', 'iron'].map(key => `${G.RES[key].name} ${Number(values && values[key]) || 0}`).join(' · ');
     return { quote, data: {
@@ -940,7 +1106,7 @@ G.ui = {
   houseUpgradeControlValid: function (b, context, node, allowModal) {
     const { world, game, el, panel } = context;
     return G.world === world && G.game === game && this.el.info === el && !el.classList.contains('hidden') &&
-      G.sel && G.sel.kind === 'b' && G.sel.id === b.id && world.bmap[b.id] === b && b.type === 'house' && b.state === 'ok' &&
+      G.sel && G.sel.kind === 'b' && G.sel.id === b.id && world.bmap[b.id] === b && b.type === 'house' && b.state === 'ok' && !G.houseFireSummary?.(b)?.active &&
       el.querySelector('[data-house-upgrade-panel]') === panel && (!node || (!node.disabled && panel.querySelector('#' + node.id) === node)) &&
       (allowModal || !(G.hasOpenModal && G.hasOpenModal()));
   },
@@ -981,6 +1147,7 @@ G.ui = {
     }
     this.refreshHouseUpgradeInfo(b, upgradeFacts);
     this.refreshHeatingInfo(b);
+    this.refreshHomeFireInfo(b);
     return true;
   },
   initHouseUpgradeInfo: function (b) {
@@ -1184,6 +1351,7 @@ G.ui = {
     const data = facts.data;
     return `<section class="townhall-details" data-townhall-panel>
       ${['population', 'housing', 'education', 'health', 'medical', 'food', 'fuel', 'tools', 'arriving', 'schedule', 'decisions'].map(key => `<p class="row" data-townhall="${key}">${this.escHtml(data[key])}</p>`).join('')}
+      ${this.fireActionMarkup('fire-rules', this.fireRulesInfoData(b))}
       <div data-townhall-offer></div>
       <p class="economy-message" data-townhall-message role="status" aria-live="polite"></p>
       <details class="townhall-ledger" data-town-challenges><summary>发展挑战（本作适配）</summary>
@@ -1209,6 +1377,7 @@ G.ui = {
       const node = el.querySelector(`[data-townhall="${key}"]`);
       if (node && node.textContent !== data[key]) node.textContent = data[key];
     }
+    this.refreshFireAction(b, 'fire-rules');
     const holder = el.querySelector('[data-townhall-offer]'), offerId = s.offer ? s.offer.id : null;
     // Leave active controls intact on timed refreshes. Only a genuinely different
     // offer gets new controls, whose handlers capture that offer's immutable ID.
@@ -2015,6 +2184,13 @@ G.ui = {
     const selected = G.sel.kind === 'b' ? w.bmap[G.sel.id] : w.cmap[G.sel.id];
     if (!selected) { this.hideInfo(); return; }
     const sameSelection = this._infoWorld === w && this._infoGame === G.game && this._infoElement === el && this._infoSelection === selected;
+    for (const kind of ['fire-rules', 'fire-rebuild']) {
+      const panel = el.querySelector && el.querySelector(`[data-${kind}-panel]`);
+      if (panel && (!sameSelection || !this.fireActionValid(selected, panel._fireContext, null, true))) this.resetFireAction(panel);
+    }
+    const homeFire = G.sel.kind === 'b' ? this.homeFireInfoData(selected) : null;
+    const firePresentationChanged = sameSelection && (!!homeFire !== !!el.querySelector?.('[data-home-fire-panel]') || (homeFire && this._infoBuildType !== selected.type));
+    if (firePresentationChanged) force = true;
     const mineralPanel = el.querySelector && el.querySelector('[data-mineral-removal-panel]');
     if (mineralPanel && !sameSelection) this.resetMineralRemoval(mineralPanel);
     else if (mineralPanel) this.refreshMineralRemoval(selected);
@@ -2030,7 +2206,8 @@ G.ui = {
     if (!force && sameSelection && G.sel.kind === 'b' && this._infoBuildState === selected.state && this._infoBuildType === selected.type && this.refreshHomeInfo(selected)) return;
     // Update only fuel text, never replace this panel's focused buttons. A new
     // selection or a site finishing construction still gets its own full panel.
-    if (sameSelection && selected.state === 'ok' && this._townHallInfoState === selected.state && this.refreshTownHallInfo(selected)) return;
+    if (!force && sameSelection && homeFire?.summary.ruin && this._infoBuildType === selected.type && this._infoBuildState === selected.state && this.refreshHomeFireInfo(selected)) return;
+    if (!force && sameSelection && selected.state === 'ok' && this._townHallInfoState === selected.state && this.refreshTownHallInfo(selected)) return;
     if (sameSelection && selected.state === 'ok' && this._tavernInfoState === selected.state && this.refreshTavernInfo(selected)) return;
     if (sameSelection && selected.state === 'ok' && this._tailorInfoState === selected.state && this.refreshTailorInfo(selected)) return;
     if (sameSelection && selected.state === 'ok' && this._farmInfoState === selected.state && this.refreshFarmInfo(selected)) return;
@@ -2059,7 +2236,7 @@ G.ui = {
     const workforceDraft = workforceInput ? workforceInput.value : null;
     const merchantActionChanged = merchantChanged && active && ['trade-execute', 'trade-order-confirm', 'trade-order-cancel'].includes(active.id);
     const autoTradeActionChanged = merchantChanged && active && ['auto-trade-confirm', 'auto-trade-cancel'].includes(active.id);
-    const focusSelector = destructiveActionChanged ? '#info-close' : merchantActionChanged ? '#trade-good' : autoTradeActionChanged ? '#auto-trade-apply' : hadFocus ? (active.id ? '#' + active.id : active.dataset.tl ? '[data-tl="' + active.dataset.tl + '"]' : active.dataset.fl ? '[data-fl="' + active.dataset.fl + '"]' : active.dataset.k ? '[data-k="' + active.dataset.k + '"]' : null) : null;
+    const focusSelector = destructiveActionChanged || (firePresentationChanged && hadFocus) ? '#info-close' : merchantActionChanged ? '#trade-good' : autoTradeActionChanged ? '#auto-trade-apply' : hadFocus ? (active.id ? '#' + active.id : active.dataset.tl ? '[data-tl="' + active.dataset.tl + '"]' : active.dataset.fl ? '[data-fl="' + active.dataset.fl + '"]' : active.dataset.k ? '[data-k="' + active.dataset.k + '"]' : null) : null;
     this._infoWorld = w;
     this._infoGame = G.game;
     this._infoElement = el;
@@ -2081,10 +2258,14 @@ G.ui = {
       const schoolData=this.schoolInfoData(b);
       const cemeteryData=b.type==='cemetery'&&b.state==='ok'?this.cemeteryInfoData(b):null;
       const pit = b.type === 'mineralpit', mineral = G.mineralSummary && G.mineralSummary(b);
-      const workforceData = pit ? null : this.workforceInfoData(b);
+      const fireData = this.homeFireInfoData(b), ruin = !!fireData?.summary.ruin;
+      const rebuildData = this.fireRebuildInfoData(b);
+      const workforceData = pit || ruin ? null : this.workforceInfoData(b);
       const homeData = this.homeInfoData(b), upgradeData = this.houseUpgradeInfoData(b);
       let status;
-      if (pit) status = '永久废矿坑：不可复垦、不可建造、不可通行，也不能拆除。';
+      if (fireData) status = fireData.data.status;
+      else if (b.type === 'well' && b.state === 'ok') status = '水井可供救援取水 · 无需安排工人';
+      else if (pit) status = '永久废矿坑：不可复垦、不可建造、不可通行，也不能拆除。';
       else if (fuelData) status = fuelData.status;
       else if (siteData) status = siteData.status;
       else if(cemeteryData)status=cemeteryData.status;
@@ -2116,6 +2297,9 @@ G.ui = {
       if (homeData) extra = `<div class="row" data-home-residents>${this.escHtml(homeData.residents)}</div>`;
       if(homeData)extra+=this.heatingInfoMarkup(b);
       if (upgradeData) extra += this.houseUpgradeInfoMarkup(upgradeData);
+      if (fireData) extra += this.homeFireInfoMarkup(fireData);
+      if (rebuildData) extra += this.fireActionMarkup('fire-rebuild', rebuildData);
+      if (b.type === 'well' && b.state === 'ok') extra += '<p class="row desc" data-well-purpose>救援者需沿可达通路走到井边取水，再携水返回住宅。水井无常驻岗位，不生成全镇水库存；也可从可达河岸取水。请靠近住房布置并保留通路。</p>';
       if (b.type === 'school' && !schoolData) {
         const n = w.citizens.filter(cc => cc.school === b.id).length;
         extra = `<div class="row">学生：${n} / ${G.LIFE.schoolCap}</div>`;
@@ -2169,8 +2353,8 @@ G.ui = {
         <div class="row"${siteData ? ' data-site-status' : ''}${homeData ? ' data-home-status' : ''}${fuelData ? ' data-fuel="status"' : ''}${medicalData ? ' data-medical="status"' : ''}${chainData ? ' data-resource-chain-live="status"' : ''}${hallData ? ' data-townhall="status"' : ''}${tavernData ? ' data-tavern="status"' : ''}${tailorData ? ' data-tailor="status"' : ''}${farmData ? ' data-farm="status"' : ''}${cemeteryData?' data-cemetery="status"':''}${schoolData?' data-school="status"':''}${b.state === 'ok' && ['tradingpost', 'pasture', 'orchard'].includes(b.type) ? ' data-economy-status' : ''}>${this.escHtml(status)}</div>
         ${workers}${this.workforceInfoMarkup(b, workforceData)}${extra}
         <div class="row desc">${def.desc}</div>
-        ${pit ? '' : `<div class="row desc" data-info-refund${fuelData ? ' data-fuel="refund"' : ''}>${fuelData ? fuelData.refund : siteData ? siteData.refund : '已开工：拆除退还一半已付建材，已砍树不恢复'}</div>
-        <button id="info-demolish" class="danger">${b.state === 'site' ? '取消工地' : '拆除'}</button>${this.mineralRemovalMarkup(b)}`}`;
+        ${pit ? '' : `<div class="row desc" data-info-refund${fuelData ? ' data-fuel="refund"' : ''}>${ruin ? '清理烧毁废墟退还 0 材料；不能回收原屋材料。' : fireData?.summary.active ? '火灾进行中，暂不能拆除；关闭新增火灾也不会停止当前损伤。' : fuelData ? fuelData.refund : siteData ? siteData.refund : '已开工：拆除退还一半已付建材，已砍树不恢复'}</div>
+        <button id="info-demolish" class="danger"${fireData?.summary.active ? ' disabled' : ''}>${b.state === 'site' ? '取消工地' : ruin ? '清理废墟（无返料）' : '拆除'}</button>${this.mineralRemovalMarkup(b)}`}`;
       if (fuelData) this._fuelInfoState = b.state;
       this._economyInfoState = b.state;
       this._medicalInfoState = b.state;
@@ -2185,7 +2369,8 @@ G.ui = {
       if (upgradeData) this.initHouseUpgradeInfo(b);
       const workforceField = el.querySelector && el.querySelector('#worker-limit-input');
       if (workforceField && workforceDraft !== null) workforceField.value = workforceDraft;
-      if (hallData) this.refreshTownHallInfo(b);
+      if (hallData) { this.initFireAction(b, 'fire-rules'); this.refreshTownHallInfo(b); }
+      if (rebuildData) this.initFireAction(b, 'fire-rebuild');
       if (tavernData) this.initTavernInfo(b);
       if (tailorData) this.initTailorInfo(b);
       if (farmData) this.initFarmInfo(b);
@@ -2259,7 +2444,7 @@ G.ui = {
       // A stale cancel-site button must never remove a newly completed building.
       if (!G.sel || G.sel.kind !== 'b' || G.world !== w || G.game !== renderedGame || this.el.info !== el ||
           w.bmap[G.sel.id] !== selected || selected.state !== renderedState || selected.type !== renderedType ||
-          el.querySelector('#info-demolish') !== dem || (el.classList.contains && el.classList.contains('hidden')) ||
+          dem.disabled || el.querySelector('#info-demolish') !== dem || (el.classList.contains && el.classList.contains('hidden')) ||
           (G.hasOpenModal && G.hasOpenModal())) {
         this.renderInfo();
         return;

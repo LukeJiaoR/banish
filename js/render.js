@@ -133,7 +133,7 @@ G.BUILD_SPR_W = {
   house: 1.16, stonehouse: 1.12, boarding: 1.04, storage: 1.03, stockpile:1.25, mine: 1.12,
   gatherer: 1.10, forester: 1.06, woodcutter: 1.12, dock: 1.0,
   school: 1.06, blacksmith: 1.06, hunting: 1.08, site_2x2: 1.0, site_3x3: 1.0,
-  tailor: 1.04, tavern: 7 / 6, tradingpost: 0.875, herbalist: 1.25, hospital: 7 / 6, stonequarry: 7 / 6, mineralpit: 7 / 6, townhall: 7 / 6,
+  well: 1.25, burntruins: 1.25, tailor: 1.04, tavern: 7 / 6, tradingpost: 0.875, herbalist: 1.25, hospital: 7 / 6, stonequarry: 7 / 6, mineralpit: 7 / 6, townhall: 7 / 6,
 };
 /* 精灵内烟囱的横向位置（相对精灵宽度，负=偏左），用于挂炊烟粒子 */
 G.BUILD_CHIMNEY_X = { house: -0.30, stonehouse: 0.02, boarding: -0.32 };
@@ -386,15 +386,18 @@ G.drawBuilding = function (ctx, b, time) {
   // 建筑精灵：脚点 = 占地菱形最下角，宽度 = 占地菱形宽 × 出格系数
   const sprW = (b.w + b.h) * 32 * (G.BUILD_SPR_W[b.type] || 1.08);
   // 贸易站按原图50%显示；补偿底角下方3px透明余量，让石基脚点贴合占地底角。
-  const sprFootY = B[1] + (b.type === 'tradingpost' ? 1.5 : b.type === 'mineralpit' ? 2 : 0);
+  const sprFootY = B[1] + (b.type === 'tradingpost' ? 1.5 : b.type === 'mineralpit' ? 2 : b.type==='burntruins'?2.5:b.type==='well'?1:0);
   const spr = G.sprDraw(ctx, b.type, B[0], sprFootY, { w: sprW });
   if (spr) {
     if (def.chimney) { // 挂烟囱粒子锚点（精灵内烟囱横向位置见 BUILD_CHIMNEY_X）
       b._chimney = [B[0] + spr[0] * (G.BUILD_CHIMNEY_X[b.type] || -0.30), B[1] - spr[1] * 0.58];
     }
+    if(b.houseFire)G.drawHouseFire(ctx,b,time,spr);
     return;
   }
 
+  if(b.type==='burntruins'){quadFill(ctx,...T,...R,...B,...L,'#625044');ctx.fillStyle='#382e28';ctx.fillRect(B[0]-12,B[1]-20,18,6);return;}
+  if(b.type==='well'){ctx.fillStyle='#8b806b';ctx.beginPath();ctx.ellipse(B[0],B[1]-18,20,10,0,0,Math.PI*2);ctx.fill();ctx.fillStyle='#4d6470';ctx.beginPath();ctx.ellipse(B[0],B[1]-22,13,6,0,0,Math.PI*2);ctx.fill();return;}
   if(b.type==='mineralpit'){
     // Offline/no-sprite fallback is an empty hollow, never a roofed building.
     quadFill(ctx,...T,...R,...B,...L,'#766c59');
@@ -454,6 +457,16 @@ G.drawBuilding = function (ctx, b, time) {
     ctx.fillRect(cx - 2.5, cy - 7, 5, 9);
     b._chimney = [cx, cy - 7];
   }
+  if(b.houseFire)G.drawHouseFire(ctx,b,time);
+};
+
+// Bounded code-native smoke/flames. State is also explained in textual details.
+G.drawHouseFire=function(ctx,b,time,sprite){
+ const fire=b.houseFire;if(!fire)return;const [x,y]=G.T2S(b.x+b.w,b.y+b.h),height=sprite?sprite[1]:65,burning=fire.elapsed>=12,phase=(time||0)*.001;
+ ctx.save();
+ for(let i=0;i<5;i++){const lift=((phase*.4+i*.23)%1)*24;ctx.globalAlpha=.45*(1-lift/40);ctx.fillStyle=burning?'#4b463f':'#817b6d';ctx.beginPath();ctx.ellipse(x-14+i*7+Math.sin(i+phase)*2,y-height*.83-lift,5+lift*.15,7+lift*.15,0,0,Math.PI*2);ctx.fill();}
+ if(burning)for(let i=0;i<4;i++){const px=x-17+i*11,py=y-height*.35-i%2*7,tip=24+Math.sin(phase*3+i)*5;ctx.globalAlpha=.88;ctx.fillStyle='#c77a35';ctx.beginPath();ctx.moveTo(px-5,py);ctx.quadraticCurveTo(px-7,py-8,px+1,py-tip);ctx.quadraticCurveTo(px+8,py-5,px+5,py);ctx.closePath();ctx.fill();ctx.fillStyle='#e2b75c';ctx.beginPath();ctx.moveTo(px-2,py);ctx.lineTo(px,py-tip*.6);ctx.lineTo(px+3,py);ctx.closePath();ctx.fill();}
+ ctx.globalAlpha=1;ctx.fillStyle='#3e3228';ctx.fillRect(x-4,y-height-12,8,11);ctx.fillStyle='#e6c56e';ctx.fillRect(x-1,y-height-10,2,5);ctx.fillRect(x-1,y-height-4,2,2);ctx.restore();
 };
 
 G.drawFarmPlan=function(ctx){
@@ -700,7 +713,8 @@ G.drawCitizen = function (ctx, c, time, homes) {
   const child = c.age < G.ADULT_AGE;
   const s = child ? 0.72 : 1;
   const walking = c.state === 'walk' || c.state === 'haul';
-  const working = c.state === 'work';
+  const rescue=G.fireTaskOf&&G.fireTaskOf(c);
+  const working = c.state === 'work'&&!rescue;
   const bob = walking ? Math.abs(Math.sin(c.animT)) * 1.2 : (working ? Math.abs(Math.sin(c.animT)) * 0.6 : 0);
   const target = G.citizenWorkTarget(c);
   const facing = G.citizenFacing(c, target), flip = facing < 0;
@@ -721,7 +735,7 @@ G.drawCitizen = function (ctx, c, time, homes) {
     const basket = t && (t.kind === 'sow' || t.kind === 'harvest' || t.kind === 'plant' || t.kind === 'orchard' || (t.yield && G.isFood(t.yield.type)));
     frame = basket ? 'adult_work_1' : 'adult_work_0';
     fallback = 'adult_idle';
-  } else if (c.carry) {
+  } else if (c.carry||rescue?.water) {
     frame = walking ? 'adult_carry_walk_' + (f % 4) : 'adult_carry_idle';
     fallback = walking ? 'adult_walk_' + (f % 4) : 'adult_idle';
   } else frame = walking ? 'adult_walk_' + (f % 4) : 'adult_idle';
@@ -743,6 +757,7 @@ G.drawCitizen = function (ctx, c, time, homes) {
       ctx.fillRect(cx - 1.3, sy - 5.4 * s - bob, 2.6, 2.6);
     }
   }
+  if(rescue?.water){const bx=sx+facing*3.5*s,by=bodyY-4*s;ctx.fillStyle='#795737';ctx.fillRect(bx-2,by-4,4,4);ctx.strokeStyle='#625b50';ctx.lineWidth=.7;ctx.beginPath();ctx.arc(bx,by-4,2,Math.PI,0);ctx.stroke();ctx.fillStyle='#6699a7';ctx.beginPath();ctx.ellipse(bx,by-4,2,1,0,0,Math.PI*2);ctx.fill();}
   if (G.sel && G.sel.kind === 'c' && G.sel.id === c.id) {
     ctx.strokeStyle = 'rgba(255,235,170,0.9)';
     ctx.lineWidth = 1.2;
