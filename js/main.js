@@ -117,7 +117,7 @@ G.serializeGame = function () {
       upgradeFrom:b.upgradeFrom, workerLimit:b.workerLimit, sitePaused:b.sitePaused, sitePriority:b.sitePriority, progress: b.progress, workLeft: b.workLeft, totalWork: b.totalWork, paidCost: b.paidCost, constructionStarted: b.constructionStarted,
       workers: b.workers, family: b.family, noWork: b.noWork, warnText: b.warnText,
       bridgeAxis: b.bridgeAxis, bridgeLength: b.type === 'bridge' ? b.w + b.h - 1 : undefined,
-      mineMode: b.mineMode, legacyMine: b.legacyMine, mineTick: b.mineTick, toolRecipe: b.toolRecipe, reserveDays:b.reserveDays, coatRecipe:b.coatRecipe,
+      mineMode: b.mineMode, legacyMine: b.legacyMine, mineTick: b.mineTick, toolRecipe: b.toolRecipe, reserveDays:b.reserveDays, coatRecipe:b.coatRecipe, coatMaterial:b.coatMaterial,
       doCut: b.doCut, doPlant: b.doPlant, fuelLimit: b.fuelLimit, toolLimit: b.toolLimit,
       farmSize:b.type==='farm'&&b.farmSize?[...b.farmSize]:undefined,
       farm: b.farm ? b.farm.map(f => [f.sown ? 1 : 0, f.harvested ? 1 : 0]) : undefined,
@@ -400,7 +400,7 @@ G.prepareSaveData = function (d) {
       b.toolRecipe = bd.toolRecipe === undefined ? 'iron' : bd.toolRecipe;
       if (!['iron', 'steel'].includes(b.toolRecipe)) bad('工具配方');
     }
-    if(bd.type==='tailor'){b.coatRecipe=bd.coatRecipe===undefined?'basic':bd.coatRecipe;if(!['basic','warm'].includes(b.coatRecipe))bad('衣物配方');}
+    if(bd.type==='tailor'){b.coatRecipe=bd.coatRecipe===undefined?'basic':bd.coatRecipe;if(!['basic','warm'].includes(b.coatRecipe))bad('衣物配方');b.coatMaterial=bd.coatMaterial===undefined?'auto':bd.coatMaterial;if(!['auto','leather','wool'].includes(b.coatMaterial))bad('普通衣原料选择');}
     if (bd.type === 'tradingpost') {
       for(const field of ['tradeInventory','tradeTargets']){
         b[field]={};if(bd[field]!==undefined){record(bd[field],field);for(const key of Object.keys(bd[field])){
@@ -507,6 +507,8 @@ G.prepareSaveData = function (d) {
       carry = { type: cd.carry.type === 'food' ? 'grain' : cd.carry.type, qty: number(cd.carry.qty, '随身资源数量', 0) };
       if(cd.carry.staffingReturn!==undefined){if(cd.carry.staffingReturn!==true)bad('撤岗保货标记');carry.staffingReturn=true;}
       if(cd.carry.smithInput!==undefined){if(cd.carry.smithInput!==true||!carry.staffingReturn||!['iron','wood','coal'].includes(carry.type)||carry.qty>(carry.type==='iron'?1:2)||cd.carry.brewIngredient!==undefined||cd.carry.pastureId!==undefined)bad('铁匠原料货批');carry.smithInput=true;}
+      if(cd.carry.coatInput!==undefined){if(!['leather','wool'].includes(carry.type)||!carry.staffingReturn||carry.qty>2||['smithInput','fuelInput','brewIngredient','pastureId','orchardId','firewoodId','tailorId'].some(k=>cd.carry[k]!==undefined))bad('裁缝衣料货批');carry.coatInput=integer(cd.carry.coatInput,'衣料来源',1);}
+      if(cd.carry.tailorId!==undefined){if(!['clothes','warmCoats'].includes(carry.type)||carry.qty>2||['extra','smithInput','fuelInput','brewIngredient','pastureId','orchardId','firewoodId','coatInput'].some(k=>cd.carry[k]!==undefined))bad('裁缝成衣货批');carry.tailorId=integer(cd.carry.tailorId,'成衣来源',1);}
       if(cd.carry.fuelInput!==undefined){if(cd.carry.fuelInput!==true||carry.type!=='wood'||!carry.staffingReturn||carry.qty>G.PROD.woodcutter.logsIn||['extra','smithInput','brewIngredient','pastureId','orchardId','firewoodId'].some(k=>cd.carry[k]!==undefined))bad('伐木屋原木货批');carry.fuelInput=true;}
       if(cd.carry.firewoodId!==undefined){if(carry.type!=='firewood'||carry.qty>G.PROD.woodcutter.logsIn*G.PROD.woodcutter.eduFirewoodPerLog||['extra','smithInput','brewIngredient','pastureId','orchardId','fuelInput'].some(k=>cd.carry[k]!==undefined))bad('伐木屋成柴货批');carry.firewoodId=integer(cd.carry.firewoodId,'伐木屋成柴来源',1);}
       if(cd.carry.orchardId!==undefined){if(carry.type!=='vegetables'||cd.carry.extra!==undefined||cd.carry.smithInput!==undefined||cd.carry.brewIngredient!==undefined||cd.carry.pastureId!==undefined||carry.qty>G.ORCHARD.fruit)bad('果园携果类型');carry.orchardId=integer(cd.carry.orchardId,'果园携果来源',1);}
@@ -516,6 +518,7 @@ G.prepareSaveData = function (d) {
         if(cd.carry.type!=='meat'&&!carry.staffingReturn)bad('副产物携带类型');
         record(cd.carry.extra, '随身副产物'); carry.extra = {};
         for (const type of Object.keys(cd.carry.extra)) {
+          if(carry.coatInput&&(type===carry.type||cd.carry.extra[type]>2))bad('衣料副批数量');
           if (!(carry.smithInput?['iron','wood','coal']:['leather','wool']).includes(type)||carry.smithInput&&(type===carry.type||cd.carry.extra[type]>(type==='iron'?1:2))) bad('副产物种类');
           carry.extra[type] = number(cd.carry.extra[type], '副产物数量', 0);
         }

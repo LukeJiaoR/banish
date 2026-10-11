@@ -37,7 +37,7 @@ G.ui = {
       return G.homeOf(c) ? '户外休息（未入屋）' : '露宿（无住房）';
     }
     if (c.state === 'work') {
-      if (c.task && c.task.kind === 'firewood' && c.task.b && c.task.b.type === 'tailor') return c.task.phase === 'fetch' ? '核对仓库衣料（完成时才扣原料）' : `制作${G.RES[c.task.yield && c.task.yield.type || 'clothes'].name}`;
+      if(c.task?.kind==='tailor')return c.task.phase==='fetch'?'在库领取整批衣料':`制作${G.RES[c.task.yield.type].name}（使用随身衣料）`;
       if(c.task?.kind==='fuel')return c.task.phase==='fetch'?'在库领取原木（整批出库）':'劈柴中（使用随身已取原木）';
       if(c.task?.kind==='smith')return c.task.phase==='fetch'?'在库取铁匠原料（整批出库）':`锻造${G.RES[c.task.yield.type].name}（使用随身已取原料）`;
       if (c.task && c.task.kind === 'brew') return c.task.phase === 'fetch' ? '取主食酿酒' : '加工麦酒';
@@ -49,12 +49,13 @@ G.ui = {
       return c.task ? (labels[c.task.kind] || (b && b.type === 'tailor' ? '制作衣物' : b && b.type === 'orchard' ? '果园劳作' : b && b.type === 'pasture' ? `照料${G.LIVESTOCK[G.pastureTypeOf(b)].name}群` : '工作中')) : '等待下一项任务';
     }
     if (c.state === 'walk' || c.state === 'haul') {
+      if(c.carry?.coatInput)return c.state==='haul'?'退回未使用衣料':c.walkKind==='home'?'带衣料回家休息':'携衣料返回裁缝铺';
       if(c.carry?.fuelInput)return c.state==='haul'?'退回未使用的原木':c.walkKind==='home'?'带原木回家休息':'携原木返回伐木屋';
       if(c.carry?.smithInput)return c.state==='haul'?'退回铁匠原料（已出库，未消耗）':c.walkKind==='home'?'带铁匠原料回家休息':c.task?.kind==='smith'?'携铁、木或煤返回铁匠铺':'铁匠原料待退仓';
       if (c.carry) return c.carry.brewIngredient ? `搬运酿酒主食（${c.state === 'haul' ? '退回仓库' : '送往酒馆'}）` : `搬运${G.RES[c.carry.type].name}（${c.state === 'haul' ? '送仓' : '途中'}）`;
       if (c.walkKind === 'home') return '回家途中';
       if (c.walkKind === 'wander') return '闲逛';
-      if (c.task && c.task.kind === 'firewood' && c.task.b && c.task.b.type === 'tailor') return c.task.phase === 'fetch' ? '前往仓库核对衣料（完成时才扣原料）' : `返回裁缝铺制作${G.RES[c.task.yield && c.task.yield.type || 'clothes'].name}`;
+      if(c.task?.kind==='tailor')return c.task.phase==='fetch'?'前往通用仓取衣料（尚未扣料）':`返回裁缝铺制作${G.RES[c.task.yield.type].name}`;
       if (c.task && c.task.kind === 'firewood' && c.task.phase === 'fetch') return c.task.consume && G.RES[c.task.consume.type] ? `前往仓库取${G.RES[c.task.consume.type].name}` : '前往仓库取原木';
       if(c.task?.kind==='orchard')return ({plant:'前往空树位种植',tend:'前往幼树照料',harvest:'前往成熟果树采果'})[c.task.phase]+'（第'+(c.task.ti+1)+'株）';
       if(c.task?.kind==='fuel')return '前往堆料场或仓库取原木（尚未扣料）';
@@ -136,6 +137,7 @@ G.ui = {
     const rows=G.world.citizens.filter(c=>!c.dead&&(c.carry?.firewoodId===b.id||c.job===b.id&&c.carry?.fuelInput||[c.task,c.pausedTask].some(t=>t?.kind==='fuel'&&t.b===b))).map(c=>{
       const t=[c.task,c.pausedTask].find(t=>t?.kind==='fuel'&&t.b===b);
       if(c.carry?.type==='firewood')return `${c.name}：已产柴火 ${c.carry.qty.toFixed(2)}，${G.cargoWaitReason(c)||'送仓途中，尚不可使用'}`;
+      if(c.carry?.coatInput)return c.state==='haul'?'退回未使用衣料':c.walkKind==='home'?'带衣料回家休息':'携衣料返回裁缝铺';
       if(c.carry?.fuelInput)return `${c.name}：原木 ${c.carry.qty.toFixed(2)} 已出库，${t?.phase==='process'?(c.pausedTask===t?'夜间暂停，次日续做':c.state==='work'?'在屋劈柴':'携木回屋'):'中断后退仓'}；不再重复扣料`;
       return `${c.name}：前往可达仓库取2原木，尚未扣料`;
     });return rows.join('；')||'暂无正在领料或送柴的批次';
@@ -1469,11 +1471,12 @@ G.ui = {
     if (b.type !== 'tailor' || b.state !== 'ok' || !G.tailorSummary) return null;
     const s = G.tailorSummary(b), warm = s.recipe === 'warm', g = G.game;
     const names = b.workers.map(id => G.world.cmap[id]).filter(Boolean).map(c => c.name).join('、');
-    const phases = { fetch: '前往仓库核料', work: '回铺 / 制作', haul: '待送仓', paused: '暂停保留' };
+    const phases = { fetch: '前往仓库领料，尚未出库', process:'已取衣料，回铺 / 制作', work: '回铺 / 制作', haul: '待送仓', paused: '暂停保留' };
     const batches = s.batches.map(batch => {
+      if(batch.type==='raw')return `${batch.carrier}：退回未用衣料 ${this.cargoText(batch.cargo)}`;
       const carrier = typeof batch.carrier === 'object' && batch.carrier ? batch.carrier.name :
         batch.carrier;
-      return `${G.RES[batch.type].name} ${batch.qty}（${phases[batch.phase] || '已接批次'}${carrier ? ' · ' + carrier : ''}）`;
+      return `${G.RES[batch.type].name} ${batch.qty}（${phases[batch.phase] || '已接批次'}${carrier ? ' · ' + carrier : ''}）${batch.materials?.length?'；原配料 '+batch.materials.map(x=>`${x.qty} ${G.RES[x.type].name}`).join(' + ')+(batch.withdrawn?' 已出库':' 尚未出库'):''}`;
     });
     const targets = ['clothes', 'warmCoats'].map(type => {
       const target = G.productionGoalOf(type);
@@ -1483,8 +1486,8 @@ G.ui = {
       status: `新批次：${s.canProduce ? b.noWork && b.warnText ? '等待：' + b.warnText : !names ? '等待可用工人' : '可制作' : s.reason || '暂不能制作'}`,
       workers: names || '无',
       production: `当前产出：${G.RES[s.output].name}`,
-      recipe: `每批：${warm ? '2 皮革 + 2 羊毛' : '2 皮革或 2 羊毛（自动优先皮革）'} → 1 ${G.RES[s.output].name}（受教育 2）；基础劳动 8 小时`,
-      materials: '新批次用料：' + s.materials.map(item => `${item.qty} ${G.RES[item.type].name}`).join(' + ') + '（未预留，完成时复核）',
+      recipe: `每批：${warm ? '2 皮革 + 2 羊毛' : s.material==='auto'?'2 皮革或 2 羊毛（自动优先皮革）':`2 ${G.RES[s.material].name}（仅用所选材料）`} → 1 ${G.RES[s.output].name}（受教育 2）；基础劳动 8 小时`,
+      materials: '新批次用料：' + s.materials.map(item => `${item.qty} ${G.RES[item.type].name}`).join(' + ') + '（新任务锁定选择，到仓才整批领取）',
       inputs: `原料库存：皮革 ${Math.floor(g.res.leather || 0)} · 羊毛 ${Math.floor(g.res.wool || 0)}`,
       stock: `可用成衣：普通衣物 ${Math.floor(s.clothes || 0)} · 暖衣 ${Math.floor(s.warmCoats || 0)}（在途未入库不计）`,
       wearers: `全镇穿着：普通 ${s.wearers.basic} 人 · 暖衣 ${s.wearers.warm} 人 · 衣物耗尽 ${s.wearers.ragged} 人`,
@@ -1499,9 +1502,13 @@ G.ui = {
         <select id="coat-recipe" aria-describedby="coat-recipe-note">${[['basic', '普通衣物'], ['warm', '暖衣（保暖外套）']].map(([value, label]) => `<option value="${value}"${value === facts.summary.recipe ? ' selected' : ''}>${label}</option>`).join('')}</select>
         <p class="desc" id="coat-recipe-note">切换只影响新批次；已接批次保留原产物、原材料，已有成衣继续送仓。旧档默认普通衣物。</p>
       </div>
+      <div class="economy-form"><label for="coat-material">普通衣用料（仅新批次）</label>
+        <select id="coat-material"${facts.summary.recipe==='warm'?' disabled':''}>${[['auto','自动：优先皮革'],['leather','仅皮革：保留羊毛'],['wool','仅羊毛：保留皮革']].map(([value,label])=>`<option value="${value}"${value===facts.summary.material?' selected':''}>${label}</option>`).join('')}</select>
+        <p class="desc">限定材料不足就停新批次，不自动换料；暖衣始终同时需要皮革和羊毛。旧档沿用自动。</p>
+      </div>
       ${Object.keys(facts.data).filter(key => !['status', 'workers'].includes(key)).map(key => `<p class="row" data-tailor="${key}">${this.escHtml(facts.data[key])}</p>`).join('')}
       <p class="economy-message" data-tailor-message role="status" aria-live="polite"></p>
-      <p class="desc">工人先走到可达仓库核对衣料，再回裁缝铺制作。原料暂留全镇库存，制作完成时才一次扣齐全部原料；此前不预扣，也没有随身衣料。取消或读档重开未完成批次不扣原料。成衣搬运入库后才可领取。</p>
+      <p class="desc">工人到可达通用仓整批领取衣料并立即出库，实际携料回铺制作；同批不再次扣料。切换只影响新任务。中断或读档退回未用衣料，满仓保留余料；成衣实际入库后才可领取。近仓与道路减少往返。</p>
       <p class="desc">普通衣物和暖衣有独立库存与全镇目标，可在资源目标面板调整。目标只限制新批次；已接批次仍可能完成并超过目标。</p>
       <p class="desc">每件 ${G.YEAR_DAYS} 天，日终磨损 1 天；穿坏时先领暖衣，无则领普通衣物。现有普通衣物不会立即换新，旧衣剩余耐久保留。户外受冻：普通衣物降低 40%，暖衣降低 70%（比普通再减半）。衣物不改变无柴冷屋受冻或烧柴暖屋恢复，仍需住房与柴火。</p>
     </section>`;
@@ -1520,6 +1527,7 @@ G.ui = {
     const select = el.querySelector('#coat-recipe');
     // A focused native select can have a keyboard draft before its change event.
     if (select && document.activeElement !== select) select.value = facts.summary.recipe;
+    const material=el.querySelector('#coat-material');if(material){material.disabled=facts.summary.recipe==='warm';if(document.activeElement!==material)material.value=facts.summary.material;}
     return true;
   },
   initTailorInfo: function (b) {
@@ -1527,18 +1535,14 @@ G.ui = {
     const panel = el.querySelector && el.querySelector('[data-tailor-panel]');
     const select = panel && panel.querySelector('#coat-recipe');
     if (!select || !G.setCoatRecipe) return;
-    select.addEventListener('change', () => {
-      if (G.world !== w || G.game !== g || this.el.info !== el || el.classList.contains('hidden') || !G.sel ||
-          G.sel.kind !== 'b' || G.sel.id !== b.id || w.bmap[b.id] !== b || b.state !== 'ok' ||
-          el.querySelector('[data-tailor-panel]') !== panel || el.querySelector('#coat-recipe') !== select ||
-          (G.hasOpenModal && G.hasOpenModal())) return;
-      const accepted = G.setCoatRecipe(b, select.value);
-      // Setters can reject a stale or invalid selection without replacing its node.
-      select.value = G.tailorRecipeOf(b);
-      this.refreshTailorInfo(b);
-      const message = el.querySelector('[data-tailor-message]');
-      if (message) message.textContent = accepted ? '配方已应用于新批次；已有批次和在途衣物保留。' : '配方未更改，请检查裁缝铺并重新选择。';
-    });
+    for(const [id,setter,getter] of [['coat-recipe','setCoatRecipe','tailorRecipeOf'],['coat-material','setCoatMaterial','tailorMaterialOf']]){
+      const input=el.querySelector('#'+id);if(!input)continue;
+      input.addEventListener('change',()=>{
+        if(G.world!==w||G.game!==g||this.el.info!==el||el.classList.contains('hidden')||G.sel?.kind!=='b'||G.sel.id!==b.id||w.bmap[b.id]!==b||b.state!=='ok'||el.querySelector('[data-tailor-panel]')!==panel||el.querySelector('#'+id)!==input||(G.hasOpenModal&&G.hasOpenModal())||(id==='coat-material'&&G.tailorRecipeOf(b)==='warm'))return;
+        const accepted=G[setter](b,input.value);input.value=G[getter](b);this.refreshTailorInfo(b);
+        const message=el.querySelector('[data-tailor-message]');if(message)message.textContent=accepted?'配方与用料选择已应用于新批次；已有批次和在途衣物保留。':'选择未更改，请检查裁缝铺并重新选择。';
+      });
+    }
     this.refreshTailorInfo(b);
   },
   cargoText: function(cargo){return cargo?[{type:cargo.type,qty:cargo.qty},...Object.entries(cargo.extra||{}).map(([type,qty])=>({type,qty}))].filter(x=>x.qty>0&&G.RES[x.type]).map(x=>`${G.RES[x.type].name} ${Number(x.qty)}`).join(' + '):'无';},

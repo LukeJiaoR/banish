@@ -607,8 +607,8 @@ G.alternateTaskEndpoint = function (c, t) {
   if (['care', 'clinic', 'arrival', 'leisure', 'host', 'study', 'teach'].includes(t.kind)) return G.workSpot(G.world, t.b, c.x, c.y, true);
   if (t.kind === 'clearSite') return G.siteClearSpot(c, t.b, t.tree);
   if(['smith','fuel'].includes(t.kind)&&t.phase==='fetch'&&!G.hasStorageBuilding())return G.workSpot(G.world,t.b,c.x,c.y,true);
-  if (['firewood', 'trade', 'brew', 'smith', 'fuel'].includes(t.kind) && t.phase === 'fetch') return G.storageRoute(c.x,c.y,G.fetchStorageTypes(t))?.spot || null;
-  if (t.kind === 'build' || t.kind === 'firewood' || t.kind === 'trade' || t.kind === 'brew' || t.kind === 'smith' || t.kind === 'fuel' ||
+  if (['firewood', 'trade', 'brew', 'smith', 'fuel', 'tailor'].includes(t.kind) && t.phase === 'fetch') return G.storageRoute(c.x,c.y,G.fetchStorageTypes(t))?.spot || null;
+  if (t.kind === 'build' || t.kind === 'firewood' || t.kind === 'trade' || t.kind === 'brew' || t.kind === 'smith' || t.kind === 'fuel' || t.kind === 'tailor' ||
       (t.kind === 'work' && ['dock', 'mine', 'stonequarry', 'blacksmith', 'pasture', 'orchard'].includes(t.b.type)))
     return G.workSpot(G.world, t.b, c.x, c.y, true);
   return null;
@@ -630,7 +630,7 @@ G.routeCanReuse = function (route, c, tx, ty) {
 G.sendTo = function (c, tx, ty, planned = null) {
   let route=planned||(c.task&&c.task.dispatchRoute);
   if(c.task) delete c.task.dispatchRoute;
-  const buildingTask=c.task && (['build','clearSite','firewood','trade','care','clinic','arrival','leisure','host','brew','smith','fuel','study','teach'].includes(c.task.kind) || (c.task.kind==='work' && c.task.b && ['dock','mine','stonequarry','blacksmith','pasture','orchard'].includes(c.task.b.type)));
+  const buildingTask=c.task && (['build','clearSite','firewood','trade','care','clinic','arrival','leisure','host','brew','smith','fuel','tailor','study','teach'].includes(c.task.kind) || (c.task.kind==='work' && c.task.b && ['dock','mine','stonequarry','blacksmith','pasture','orchard'].includes(c.task.b.type)));
   if((route && !G.routeCanReuse(route,c,tx,ty)) || (!route && buildingTask)) {
     const spot=G.alternateTaskEndpoint(c,c.task);
     if(!spot){if(c.task)G.dropBlockedTask(c,c.task);c.path=null;c.state='idle';c.wanderT=.5;return false;}
@@ -643,9 +643,9 @@ G.sendTo = function (c, tx, ty, planned = null) {
   }
   const p = G.routeCanReuse(route,c,tx,ty) ? route.path : G.findPath(G.world, Math.round(c.x), Math.round(c.y), tx, ty);
   if (!p) { c.state = 'idle'; c.task = null; return false; }
-  // The path planner rounds its start cell. Fuel tasks still need to walk
+  // The path planner rounds its start cell. Input-carrying tasks still need to walk
   // the final fraction of that cell after an interrupted commute.
-  if(c.task?.kind==='fuel' && p.length===0 && G.d2(c.x,c.y,tx,ty)>1e-8) {
+  if(['fuel','tailor'].includes(c.task?.kind) && p.length===0 && G.d2(c.x,c.y,tx,ty)>1e-8) {
     c.path=[{x:tx,y:ty}];c.pi=0;c.state='walk';c.walkKind='task';return true;
   }
   c.path = p; c.pi = 0;
@@ -715,7 +715,7 @@ G.resumeTask = function (c) {
     ok=G.orchardTaskCurrent(c,t);
   } else if(ok&&t.kind==='teach'){
     ok=G.schoolTeachers(t.b).includes(c)&&!G.isSick(c)&&c.hunger<1;
-  } else if (ok && ['firewood','smith','fuel'].includes(t.kind)) {
+  } else if (ok && ['firewood','smith','fuel','tailor'].includes(t.kind)) {
     ok = t.b.state === 'ok';
   } else if (ok && t.kind === 'build') {
     ok = t.b.state === 'site'&&!t.b.sitePaused;
@@ -789,7 +789,7 @@ G.finishMineralHaul = function (c) {
   if (c.carry.qty > 0) { G.warnMineralStorage(); G.waitForMineralStorage(c, 'space'); return; }
   if(c.carry.staffingReturn&&c.carry.extra){
     const next=Object.keys(c.carry.extra).find(k=>c.carry.extra[k]>0);
-    if(next){const qty=c.carry.extra[next],extra={...c.carry.extra};delete extra[next];c.carry={type:next,qty,staffingReturn:true,...(c.carry.smithInput?{smithInput:true}:{}),...(Object.keys(extra).length?{extra}:{})};G.startMineralHaul(c);return;}
+    if(next){const qty=c.carry.extra[next],extra={...c.carry.extra};delete extra[next];c.carry={type:next,qty,staffingReturn:true,...(c.carry.smithInput?{smithInput:true}:{}),...(c.carry.coatInput?{coatInput:c.carry.coatInput}:{}),...(Object.keys(extra).length?{extra}:{})};G.startMineralHaul(c);return;}
   }
   c.carry = null; c.haulPending = false; c.haulWait = ''; c.haulTo = null;
   G.requestTask(c);
@@ -1060,8 +1060,8 @@ G.completeSmithTask=function(c,t){
   c.carry={type:t.yield.type,qty:t.yield.qty};G.startHaul(c);
 };
 
-/* Fuel inputs are a distinct bounded batch; the tailor keeps its legacy
- * completion-time ingredient contract. No public stock is charged twice. */
+/* Fuel inputs are a distinct bounded batch. Tailor batches below separately
+ * track leather/wool; neither charges public stock twice. */
 G.makeFuelTask=function(b,c){
   const p=G.PROD.woodcutter;
   if(G.fuelLimited(b)){b.noWork=true;b.warnText='柴火已达上限';return null;}
@@ -1091,6 +1091,38 @@ G.completeFuelTask=function(c,t){
   const cargo=c.carry;
   if(t.phase!=='process'||!cargo||cargo!==t.inputCargo||!cargo.fuelInput||!cargo.staffingReturn||cargo.type!=='wood'||cargo.qty!==t.consume.qty||cargo.extra){G.returnSmithBatch(c);return;}
   t.completed=true;c.carry={type:'firewood',qty:t.yield.qty,firewoodId:t.b.id};G.recordProduction(t.b,'firewood',t.yield.qty);G.startHaul(c);
+};
+
+/* Tailors lock recipe selection when accepting a task and own the exact
+ * withdrawn leather/wool batch until it becomes clothing or is returned. */
+G.makeTailorTask=function(b,c){
+  const status=G.tailorProductionStatus(b);
+  if(!status.ok){b.noWork=true;b.warnText=status.reason;return null;}
+  const consume=status.materials.map(x=>({...x})),route=G.storageRoute(c.x,c.y,consume.map(x=>x.type));
+  if(!route){b.noWork=true;b.warnText='取衣料通用仓不可达';return null;}
+  b.noWork=false;b.warnText='';
+  return G.withTaskRoute({kind:'tailor',phase:'fetch',b,tx:route.spot.x,ty:route.spot.y,work:.1,workLeft:.1,
+    craftWork:G.taskWork(c,8),consume,yield:{type:G.tailorOutput(b),qty:c.educated?2:1}},route.spot.route);
+};
+G.tailorTaskCurrent=(c,t)=>!!t&&!t.completed&&t.kind==='tailor'&&G.world.cmap[c.id]===c&&!c.dead&&t.b?.type==='tailor'&&G.world.bmap[t.b.id]===t.b&&t.b.state==='ok'&&c.job===t.b.id;
+G.tailorAtTask=function(c,t){
+  if(!G.tailorTaskCurrent(c,t)||G.tileBlocked(G.world,Math.round(c.x),Math.round(c.y))||G.d2(c.x,c.y,t.tx,t.ty)>.04)return false;
+  return t.phase==='fetch'?G.atStorageDoor(c,t.consume.map(x=>x.type)):G.atMedicalDoor(c,t.b);
+};
+G.completeTailorTask=function(c,t){
+  if(t?.completed||G.world.cmap[c.id]!==c)return;
+  if(!G.tailorAtTask(c,t)){G.returnSmithBatch(c);return;}
+  if(t.phase==='fetch'){
+    if(c.carry||t.consume.some(x=>G.game.res[x.type]<x.qty)){G.returnSmithBatch(c);return;}
+    const spot=G.workSpot(G.world,t.b,c.x,c.y);if(!spot){t.b.warnText='裁缝铺入口不可达';G.returnSmithBatch(c);return;}
+    for(const item of t.consume)G.withdrawResource(item.type,item.qty);
+    const [first,...rest]=t.consume;c.carry={type:first.type,qty:first.qty,extra:Object.fromEntries(rest.map(x=>[x.type,x.qty])),staffingReturn:true,coatInput:t.b.id};
+    t.inputCargo=c.carry;t.phase='process';t.tx=spot.x;t.ty=spot.y;t.work=t.workLeft=t.craftWork;c.task=t;
+    if(!G.sendTo(c,t.tx,t.ty,spot.route))G.returnSmithBatch(c);return;
+  }
+  const cargo=c.carry,contents=cargo?{[cargo.type]:cargo.qty,...(cargo.extra||{})}:{};
+  if(t.phase!=='process'||!cargo||cargo!==t.inputCargo||cargo.coatInput!==t.b.id||!cargo.staffingReturn||Object.keys(contents).length!==t.consume.length||t.consume.some(x=>contents[x.type]!==x.qty)){G.returnSmithBatch(c);return;}
+  t.completed=true;c.carry={type:t.yield.type,qty:t.yield.qty,tailorId:t.b.id};G.recordProduction(t.b,t.yield.type,t.yield.qty);G.startHaul(c);
 };
 
 /* 背料到达仓库：转入回屋加工段。返回 false = 仓库没料（白跑） */
@@ -1154,14 +1186,14 @@ G.detourCitizen = function (c, dtH) {
     if (G.physicalTaskEndpoint(t)) { G.dropBlockedTask(c, t); return; }
     if (t) {
       const spot = G.alternateTaskEndpoint(c, t);
-      if (!spot) { if(['smith','fuel'].includes(t.kind)){G.returnSmithBatch(c);return;} if (t.kind === 'care') G.cancelMedicalCare(c); else if(t.kind==='leisure')G.cancelLeisure(c);else if(['study','teach'].includes(t.kind)){G.clearSchoolTasks(c);c.schoolWaitReason='上学路线受阻，保留学籍等待通路';c.wanderT=4;} return; }
+      if (!spot) { if(['smith','fuel','tailor'].includes(t.kind)){G.returnSmithBatch(c);return;} if (t.kind === 'care') G.cancelMedicalCare(c); else if(t.kind==='leisure')G.cancelLeisure(c);else if(['study','teach'].includes(t.kind)){G.clearSchoolTasks(c);c.schoolWaitReason='上学路线受阻，保留学籍等待通路';c.wanderT=4;} return; }
       goal = spot; t.tx = spot.x; t.ty = spot.y;
     } else if (c.walkKind === 'wander') { c.path = null; c.state = 'idle'; c.wanderT = 2; return; }
     else return;
   }
   const path = G.routeCanReuse(goal.route,c,goal.x,goal.y) ? goal.route.path : G.findPath(G.world, Math.round(c.x), Math.round(c.y), goal.x, goal.y);
   if (!path) {
-    if(c.task&&['smith','fuel'].includes(c.task.kind)){G.returnSmithBatch(c);return;}
+    if(c.task&&['smith','fuel','tailor'].includes(c.task.kind)){G.returnSmithBatch(c);return;}
     if(c.task&&['study','teach'].includes(c.task.kind)){const b=c.task.b;b.warnText='上学路线受阻';G.clearSchoolTasks(c);c.schoolWaitReason='上学路线受阻，保留学籍等待通路';c.wanderT=4;return;}
     if (c.task && c.task.kind === 'care') { G.cancelMedicalCare(c); return; }
     if(G.isLeisureVisitor(c)){G.cancelLeisure(c);return;}
@@ -1225,6 +1257,9 @@ G.stepCitizen = function (c, dtH) {
     }
     case 'work': {
       if(c.task?.kind==='orchard'&&!G.atOrchardTree(c,c.task)){G.sendTo(c,c.task.tx,c.task.ty);return;}
+      if(c.task?.kind==='tailor'&&!G.tailorAtTask(c,c.task)){
+        const t=c.task;if(!G.tailorTaskCurrent(c,t)||!G.sendTo(c,t.tx,t.ty))G.returnSmithBatch(c);return;
+      }
       if(c.task?.kind==='fuel'&&!G.fuelAtTask(c,c.task)){
         const t=c.task;if(!G.fuelTaskCurrent(c,t)||!G.sendTo(c,t.tx,t.ty))G.returnSmithBatch(c);
         return;
@@ -1579,17 +1614,7 @@ G.makeTask = function (b, c) {
       return G.withTaskRoute({kind:'work',b,tx:spot.x,ty:spot.y,work:G.taskWork(c,8),workLeft:0,economy:'pasture',pastureType:G.pastureTypeOf(b)},spot.route);
     }
     case 'orchard': return G.makeOrchardTask(b,c);
-    case 'tailor': {
-      const status=G.tailorProductionStatus(b);
-      if(!status.ok){b.noWork=true;b.warnText=status.reason;return null;}
-      const route=G.storageRoute(c.x,c.y,status.materials.map(x=>x.type));
-      if(!route){b.noWork=true;b.warnText='取料仓库不可达';return null;}
-      // Snapshot ingredients and output now. Selection changes never rewrite
-      // an accepted batch; the established tailor contract charges at completion.
-      return G.withTaskRoute({kind:'firewood',b,tx:route.spot.x,ty:route.spot.y,phase:'fetch',
-        work:G.taskWork(c,8),workLeft:0,consume:status.materials.map(item=>({...item})),
-        yield:{type:G.tailorOutput(b),qty:c.educated?2:1}},route.spot.route);
-    }
+    case 'tailor': return G.makeTailorTask(b,c);
     case 'blacksmith': return G.makeBlacksmithTask(b,c);
     case 'hunting': {
       const R = P.hunting.radius;
@@ -1708,6 +1733,7 @@ G.completeTask = function (c) {
     case 'trade': { G.completeTradeTask(c,t); return; }
     case 'smith': { G.completeSmithTask(c,t); return; }
     case 'fuel': { G.completeFuelTask(c,t); return; }
+    case 'tailor': { G.completeTailorTask(c,t); return; }
     case 'orchard': { G.completeOrchardTask(c,t); break; }
     case 'work': {
       if (t.economy) { G.completeEconomyWork(c,t); break; }
@@ -2116,7 +2142,7 @@ G.addBuilding = function (type, x, y, opt) {
   if (type === 'blacksmith') { b.toolLimit = G.PROD.blacksmith.toolLimit; b.toolRecipe = 'iron'; }
   if(type==='cemetery')b.graves=[];
   if(type==='tavern')b.reserveDays=12;
-  if(type==='tailor')b.coatRecipe='basic';
+  if(type==='tailor'){b.coatRecipe='basic';b.coatMaterial='auto';}
   if(type==='orchard'){b.orchardTrees=G.newOrchardTrees();b.orchardDay=G.game.day;b.orchardReplant=true;G.syncOrchardTotals(b);}
   if (type === 'woodcutter') b.fuelLimit = G.PROD.woodcutter.fuelLimit; // 燃料上限（原版 Fuel Limit）
   if (G.game && G.game.buildLog) { // 建造/拆除记录（反馈分析用；负号前缀 = 拆除）
@@ -2928,15 +2954,20 @@ G.wearClothing=function(c){
 };
 G.taskIngredients=t=>!t.consume?[]:Array.isArray(t.consume)?t.consume:[t.consume];
 G.tailorRecipeOf=b=>b.coatRecipe==='warm'?'warm':'basic';
+G.tailorMaterialOf=b=>['leather','wool'].includes(b.coatMaterial)?b.coatMaterial:'auto';
+G.setCoatMaterial=function(b,material){
+  if(!b||G.world.bmap[b.id]!==b||b.type!=='tailor'||b.state!=='ok'||!['auto','leather','wool'].includes(material))return false;
+  b.coatMaterial=material;b.noWork=false;b.warnText='';G.updateProductionGoals();G.game.schedT=0;return true;
+};
 G.tailorOutput=b=>G.tailorRecipeOf(b)==='warm'?'warmCoats':'clothes';
 G.tailorProductionStatus=function(b){
   const r=G.game.res,output=G.tailorOutput(b),warm=output==='warmCoats';
-  const material=r.leather>=2?'leather':r.wool>=2?'wool':'leather';
+  const chosen=G.tailorMaterialOf(b),material=chosen==='auto'?(r.leather>=2?'leather':r.wool>=2?'wool':'leather'):chosen;
   const materials=warm?[{type:'leather',qty:2},{type:'wool',qty:2}]:[{type:material,qty:2}];
   let reason='材料齐备，可接新批次';
   if(G.goalPaused(output))reason=`${G.RES[output].name}目标已达，暂停新批次`;
   else if(r[output]>=G.storageCap())reason=`${G.RES[output].name}仓容已满`;
-  else if(materials.some(item=>r[item.type]<item.qty))reason=warm?'保暖外套缺料：每批同时需要2皮革+2羊毛':'普通衣缺料：每批需要2皮革或2羊毛';
+  else if(materials.some(item=>r[item.type]<item.qty))reason=warm?'保暖外套缺料：每批同时需要2皮革+2羊毛':chosen==='auto'?'普通衣缺料：每批需要2皮革或2羊毛':`普通衣缺料：已选仅用2${G.RES[chosen].name}，不会自动改料`;
   else return {ok:true,reason,materials};
   return {ok:false,reason,materials};
 };
@@ -2950,11 +2981,12 @@ G.tailorSummary=function(b){
     if(!c.dead)wearers[({none:'ragged',basic:'basic',warm:'warm'})[G.clothingTypeOf(c)]]++;
     for(const task of [c.task,c.pausedTask]){
       if(!task||task.b!==b||!task.yield||!['clothes','warmCoats'].includes(task.yield.type)||seen.has(task))continue;
-      seen.add(task);batches.push({type:task.yield.type,qty:task.yield.qty,phase:task===c.pausedTask?'paused':task.phase||'work',carrier:c.name});
+      seen.add(task);batches.push({type:task.yield.type,qty:task.yield.qty,phase:task===c.pausedTask?'paused':task.phase||'work',carrier:c.name,materials:task.consume||[],withdrawn:!!c.carry?.coatInput});
     }
-    if(c.job===b.id&&c.carry&&['clothes','warmCoats'].includes(c.carry.type))batches.push({type:c.carry.type,qty:c.carry.qty,phase:'haul',carrier:c.name});
+    if(c.carry?.coatInput===b.id&&![c.task,c.pausedTask].some(t=>t?.kind==='tailor'&&t.b===b))batches.push({type:'raw',phase:'return',carrier:c.name,cargo:c.carry});
+    if(c.carry&&(c.carry.tailorId===b.id||c.job===b.id)&&['clothes','warmCoats'].includes(c.carry.type))batches.push({type:c.carry.type,qty:c.carry.qty,phase:'haul',carrier:c.name});
   }
-  return {recipe:G.tailorRecipeOf(b),output:G.tailorOutput(b),materials:s.materials,canProduce:s.ok,reason:s.reason,batches,
+  return {recipe:G.tailorRecipeOf(b),material:G.tailorMaterialOf(b),output:G.tailorOutput(b),materials:s.materials,canProduce:s.ok,reason:s.reason,batches,
     clothes:G.game.res.clothes,warmCoats:G.game.res.warmCoats,wearers};
 };
 
