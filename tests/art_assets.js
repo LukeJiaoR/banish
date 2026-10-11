@@ -36,3 +36,17 @@ assert.equal(calls.filter(call => call[0] === 'save').length, 2);
 assert.equal(calls.filter(call => call[0] === 'restore').length, 2);
 assert(!calls.some(call => call[0] === 'fillText'), 'Need badges must not depend on emoji glyphs');
 console.log(`Art assets: ${queued.length} PNG paths and all buildings/carry resources verified; badge drawing passed.`);
+
+// The cleaned standalone PNGs retain their original footprint/footpoint routing.
+G.world = {}; G.game = { season: 0, h: 12 };
+const drawSprite = G.sprDraw, placed = [];
+G.sprDraw = (_, name, x, y, options) => {
+  placed.push({ name, x, y, width: options.w }); return [options.w, 100];
+};
+const barn = { type: 'storage', state: 'ok', x: 10, y: 10, w: 3, h: 3, progress: .3 };
+G.drawBuilding(ctx, barn, 0);
+assert.deepStrictEqual(placed.pop(), { name: 'storage', x: 0, y: 416, width: 197.76 });
+barn.state = 'site'; G.drawBuilding(ctx, barn, 0);
+assert.deepStrictEqual(placed.pop(), { name: 'site_3x3', x: 0, y: 416, width: 192 });
+G.sprDraw = drawSprite;
+console.log('Cleaned storage/site retain original real drawBuilding widths and bottom-center anchors.');
