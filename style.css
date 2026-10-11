@@ -466,3 +466,10 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .school-leave-confirm { margin-top:8px; padding:8px; border:1px solid #af7256; }
 .school-leave-confirm p { font-size:12px; }
 .school-leave-confirm button { margin:4px 4px 0 0; }
+
+/* Workforce facts update in place alongside the existing building controls. */
+.workforce-details p { overflow-wrap: anywhere; }
+.workforce-details [data-workforce] { font-variant-numeric: tabular-nums; }
+.workforce-overview { margin-top: 7px; padding-top: 6px; border-top: 1px dashed #79643e; }
+.workforce-overview summary { color: #e5c88c; cursor: pointer; }
+.workforce-details input:focus-visible, .workforce-details button:focus-visible, .workforce-overview summary:focus-visible { outline: 2px solid #ffe4a0; outline-offset: 3px; }

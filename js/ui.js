@@ -686,6 +686,113 @@ G.ui = {
   hideInfo: function () {
     G.sel = null;
     this.el.info.classList.add('hidden');
+    this._infoSelection = null; // Reopening mounts new controls; dismissed callbacks stay stale.
+  },
+  workforceInfoData: function (b) {
+    if (!G.workforceSummary) return null;
+    const s = G.workforceSummary(b), g = s.global;
+    const data = {
+      current: s.supported ? `当前占岗 ${s.current} 人 · 其中收尾 ${s.draining} 人` : '本建筑无需安排工人',
+      limit: s.supported ? `已应用上限 ${s.limit} 人 · 原最大 ${s.maximum} 人` : '',
+      reason: s.supported ? s.reason || '等待下一次派工检查。' : '可在下方查看全镇人力。',
+      rule: !s.supported ? '全镇概览只读，各建筑的岗位在各自详情中调整。' : s.rule || (b.state === 'site' ? '暂停保留已完成工段和已付建材，取消未完成的小工段；恢复不重复扣建材。' : '上限不保证配足人数。设为 0 后停止接新工作，已接有限批次结清才释放；服务岗位立即停服务。'),
+      population: `成人 ${g.adults} 人 · 学生 ${g.students} 人`,
+      assigned: `已分配 ${g.assigned} 人 · 其中收尾 ${g.finishing} 人`,
+      available: `可再派工 ${g.available} 人 · 无岗带货 ${g.hauling} 人`,
+    };
+    return { summary: s, data };
+  },
+  workforceInfoMarkup: function (b, facts) {
+    if (!facts) return '';
+    const { summary: s, data } = facts;
+    return `<section class="economy-form workforce-details" data-workforce-panel aria-labelledby="workforce-title">
+      <h3 id="workforce-title">${b.state === 'site' ? '工地用工' : '建筑用工'}</h3>
+      ${['current', 'limit', 'reason', 'rule'].map(key => `<p class="row${key === 'rule' ? ' desc' : ''}" data-workforce="${key}">${this.escHtml(data[key])}</p>`).join('')}
+      ${s.supported ? b.state === 'site' ? '<div data-workforce-site-action></div>' : `<form id="worker-limit-form">
+        <label for="worker-limit-input">用工上限（0–${s.maximum} 的整数）</label>
+        <input id="worker-limit-input" type="number" min="0" max="${s.maximum}" step="1" inputmode="numeric" value="${s.limit}" aria-describedby="worker-limit-note">
+        <button id="worker-limit-apply" type="submit">应用用工上限</button>
+        <p class="desc" id="worker-limit-note">只设上限，不保证配足。0 停接新工作，收尾后释放；未点应用不生效。</p>
+      </form>` : ''}
+      <p class="economy-message" data-workforce-message role="status" aria-live="polite"></p>
+      <details class="workforce-overview"><summary>全镇人力概览</summary>
+        ${['population', 'assigned', 'available'].map(key => `<p class="row" data-workforce="${key}">${this.escHtml(data[key])}</p>`).join('')}
+        <p class="desc">收尾仍占原岗位；收尾者和无岗带货者都不计入可再派工。</p>
+      </details>
+    </section>`;
+  },
+  workforceControlValid: function (b, context, node) {
+    const { world, game, el, panel, state } = context;
+    return G.world === world && G.game === game && this.el.info === el && !el.classList.contains('hidden') &&
+      G.sel && G.sel.kind === 'b' && G.sel.id === b.id && world.bmap[b.id] === b && b.state === state &&
+      el.querySelector('[data-workforce-panel]') === panel && (!node || (!node.disabled && el.querySelector('#' + node.id) === node)) &&
+      !(G.hasOpenModal && G.hasOpenModal());
+  },
+  initWorkforceInfo: function (b) {
+    const el = this.el.info, panel = el.querySelector && el.querySelector('[data-workforce-panel]');
+    if (!panel) return;
+    const context = { world: G.world, game: G.game, el, panel, state: b.state };
+    panel._workforceContext = context;
+    const form = el.querySelector('#worker-limit-form'), input = el.querySelector('#worker-limit-input');
+    if (form && input) form.addEventListener('submit', e => {
+      e.preventDefault();
+      if (!this.workforceControlValid(b, context, form) || el.querySelector('#worker-limit-input') !== input) return;
+      const n = input.value.trim() === '' ? NaN : Number(input.value), s = G.workforceSummary(b);
+      const ok = G.setWorkerLimit(b, n);
+      const message = el.querySelector('[data-workforce-message]');
+      if (message) message.textContent = ok ? `用工上限已设为 ${n} 人。${n === 0 ? '已停止接新工作；仍占岗的收尾者完成结清后释放。' : '等待派工，实际人数以当前占岗为准。'}` : `请输入 0–${s.maximum} 的整数。`;
+      this.renderInfo();
+    });
+    this.refreshWorkforceInfo(b);
+  },
+  refreshWorkforceInfo: function (b) {
+    const el = this.el.info, panel = el.querySelector && el.querySelector('[data-workforce-panel]');
+    if (!panel || !panel._workforceContext || !this.workforceControlValid(b, panel._workforceContext)) return false;
+    const facts = this.workforceInfoData(b);
+    if (!facts) return false;
+    const { summary: s, data } = facts;
+    for (const key of Object.keys(data)) {
+      const node = panel.querySelector(`[data-workforce="${key}"]`);
+      if (node && node.textContent !== data[key]) node.textContent = data[key];
+    }
+    // Never assign input.value during refresh: it may hold an unapplied draft.
+    const holder = panel.querySelector('[data-workforce-site-action]');
+    if (holder) {
+      if (!holder._bound) {
+        // Fixed positions give each gesture one intent. A double click on Pause
+        // cannot land on a newly renamed Resume button and reverse the action.
+        holder._bound = true;
+        holder.innerHTML = '<div class="economy-actions"><button type="button" id="construction-pause">暂停工地</button><button type="button" id="construction-resume">恢复工地</button></div>';
+        for (const [id, desired] of [['construction-pause', true], ['construction-resume', false]]) {
+          const button = holder.querySelector('#' + id), context = panel._workforceContext;
+          button.addEventListener('keydown', e => {
+            if (e.repeat && (e.key === 'Enter' || e.key === ' ')) e.preventDefault();
+          });
+          button.addEventListener('click', e => {
+            if ((e && e.detail > 1) || !this.workforceControlValid(b, context, button)) {
+              if (G.world === context.world && G.game === context.game && this.el.info === el &&
+                  G.sel && G.sel.kind === 'b' && G.sel.id === b.id && G.world.bmap[b.id] === b && b.state !== context.state &&
+                  el.querySelector('[data-workforce-panel]') === panel && !el.classList.contains('hidden') && !(G.hasOpenModal && G.hasOpenModal())) this.renderInfo();
+              return;
+            }
+            if (G.workforceSummary(b).paused === desired) { this.refreshWorkforceInfo(b); return; }
+            if (G.setConstructionPaused(b, desired)) {
+              const message = panel.querySelector('[data-workforce-message]');
+              if (message) message.textContent = desired ? '工地已暂停。已完成工段和已付建材保留；携货者仍需送仓。' : '工地已恢复，等待建筑工人；不会再次扣除已付建材。';
+            }
+            this.renderInfo();
+          });
+        }
+      }
+      const pause = holder.querySelector('#construction-pause'), resume = holder.querySelector('#construction-resume');
+      pause.disabled = s.paused; resume.disabled = !s.paused;
+      const active = document.activeElement;
+      if ((active === pause || active === resume) && active.disabled) {
+        const next = s.paused ? resume : pause;
+        if (next.focus) next.focus();
+      }
+    }
+    return true;
   },
   siteInfoData: function (b) {
     const w = G.world, trees = G.siteTrees ? G.siteTrees(b).length : 0;
@@ -1331,6 +1438,8 @@ G.ui = {
     const selected = G.sel.kind === 'b' ? w.bmap[G.sel.id] : w.cmap[G.sel.id];
     if (!selected) { this.hideInfo(); return; }
     const sameSelection = this._infoWorld === w && this._infoGame === G.game && this._infoElement === el && this._infoSelection === selected;
+    // Workforce facts must update before every specialized panel's early return.
+    if (sameSelection && G.sel.kind === 'b' && this._infoBuildState === selected.state) this.refreshWorkforceInfo(selected);
     // Update only fuel text, never replace this panel's focused buttons. A new
     // selection or a site finishing construction still gets its own full panel.
     if (sameSelection && selected.state === 'ok' && this._townHallInfoState === selected.state && this.refreshTownHallInfo(selected)) return;
@@ -1355,7 +1464,9 @@ G.ui = {
       }
       return;
     }
-    const destructiveActionChanged = sameSelection && this._infoBuildState === 'site' && selected.state !== 'site' && active && active.id === 'info-demolish';
+    const destructiveActionChanged = sameSelection && this._infoBuildState === 'site' && selected.state !== 'site' && active && ['info-demolish', 'construction-pause', 'construction-resume'].includes(active.id);
+    const workforceInput = sameSelection && this._infoBuildState === selected.state && el.querySelector && el.querySelector('#worker-limit-input');
+    const workforceDraft = workforceInput ? workforceInput.value : null;
     const focusSelector = destructiveActionChanged ? '#info-close' : hadFocus ? (active.id ? '#' + active.id : active.dataset.tl ? '[data-tl="' + active.dataset.tl + '"]' : active.dataset.fl ? '[data-fl="' + active.dataset.fl + '"]' : active.dataset.k ? '[data-k="' + active.dataset.k + '"]' : null) : null;
     this._infoWorld = w;
     this._infoGame = G.game;
@@ -1375,6 +1486,7 @@ G.ui = {
       const tailorData = this.tailorInfoData(b);
       const farmData = this.farmInfoData(b);
       const schoolData=this.schoolInfoData(b);
+      const workforceData = this.workforceInfoData(b);
       let status;
       if (fuelData) status = fuelData.status;
       else if (siteData) status = siteData.status;
@@ -1453,7 +1565,7 @@ G.ui = {
       el.innerHTML = `
         <div class="info-head"><span>${def.icon} ${def.name}</span><button id="info-close">✕</button></div>
         <div class="row"${siteData ? ' data-site-status' : ''}${fuelData ? ' data-fuel="status"' : ''}${medicalData ? ' data-medical="status"' : ''}${chainData ? ' data-resource-chain-live="status"' : ''}${hallData ? ' data-townhall="status"' : ''}${tavernData ? ' data-tavern="status"' : ''}${tailorData ? ' data-tailor="status"' : ''}${farmData ? ' data-farm="status"' : ''}${schoolData?' data-school="status"':''}${b.state === 'ok' && ['tradingpost', 'pasture', 'orchard'].includes(b.type) ? ' data-economy-status' : ''}>${this.escHtml(status)}</div>
-        ${workers}${extra}
+        ${workers}${this.workforceInfoMarkup(b, workforceData)}${extra}
         <div class="row desc">${def.desc}</div>
         <div class="row desc" data-info-refund${fuelData ? ' data-fuel="refund"' : ''}>${fuelData ? fuelData.refund : siteData ? siteData.refund : '已开工：拆除退还一半已付建材，已砍树不恢复'}</div>
         <button id="info-demolish" class="danger">${b.state === 'site' ? '取消工地' : '拆除'}</button>`;
@@ -1466,6 +1578,9 @@ G.ui = {
       this._tailorInfoState = b.state;
       this._farmInfoState = b.state;
       this._schoolInfoState=b.state;
+      this.initWorkforceInfo(b);
+      const workforceField = el.querySelector && el.querySelector('#worker-limit-input');
+      if (workforceField && workforceDraft !== null) workforceField.value = workforceDraft;
       if (hallData) this.refreshTownHallInfo(b);
       if (tavernData) this.initTavernInfo(b);
       if (tailorData) this.initTailorInfo(b);

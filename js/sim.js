@@ -648,7 +648,7 @@ G.resumeTask = function (c) {
     ok = idx >= 0 && w.trees[idx] === t.tree;   // 同一棵树还在（防止重种/互换后误续）
   } else if (ok && t.kind === 'clearSite') {
     const idx = w.treeIdx[t.tree.y * w.N + t.tree.x];
-    ok = t.b.state === 'site' && idx >= 0 && w.trees[idx] === t.tree;
+    ok = t.b.state === 'site' && !t.b.sitePaused && idx >= 0 && w.trees[idx] === t.tree;
   } else if (ok && t.kind === 'clearrock') {
     ok = t.rock > 0 && w.rock[i] === t.rock;
   } else if (ok && t.kind === 'plant') {
@@ -663,8 +663,9 @@ G.resumeTask = function (c) {
   } else if (ok && t.kind === 'firewood') {
     ok = t.b.state === 'ok';
   } else if (ok && t.kind === 'build') {
-    ok = t.b.state === 'site';
+    ok = t.b.state === 'site'&&!t.b.sitePaused;
   }
+  if(t.b&&G.workerLimitOf(t.b)<=0&&c.staffingRelease!==t.b.id)ok=false;
   if (!ok) return false;
   c.task = t;
   c.state = 'idle';
@@ -696,9 +697,10 @@ G.storageRoute = function (x, y) {
 };
 
 /* Limited minerals retain one ordinary carried batch when a warehouse rejects
- * part of a delivery. Tavern output and refundable raw grain share this bounded
- * delivery path; other ordinary resource delivery policy is unchanged. */
-G.isMineralCargo = function (c) { return !!c.carry && (['stone','iron','coal','ale','clothes','warmCoats'].includes(c.carry.type) || (c.carry.type==='grain' && c.carry.brewIngredient===true) || (Number.isInteger(c.carry.pastureId)&&['meat','leather','wool'].includes(c.carry.type))); };
+ * part of a delivery. Tavern output, refundable raw grain and the specific current batch marked
+ * on staffing withdrawal share this bounded path. Ordinary unmarked cargo
+ * keeps its existing delivery policy; the marker dies with its cargo object. */
+G.isMineralCargo = function (c) { return !!c.carry && (c.carry.staffingReturn===true || ['stone','iron','coal','ale','clothes','warmCoats'].includes(c.carry.type) || (c.carry.type==='grain' && c.carry.brewIngredient===true) || (Number.isInteger(c.carry.pastureId)&&['meat','leather','wool'].includes(c.carry.type))); };
 G.mineralStorageSpace = function (type) { return Math.max(0, G.storageCap() - G.game.res[G.isFood(type)?'food':type]); };
 // Ordinary in-flight minerals remain eligible as before; only an already
 // blocked delivery cannot count as available labour or occupy a productive slot.
@@ -713,7 +715,7 @@ G.waitForMineralStorage = function (c, reason) {
 G.warnMineralStorage = function () {
   if (G.game.warned.mineralStorageFull) return;
   G.game.warned.mineralStorageFull = true;
-  G.ui.toast('⚠ 仓位已满，矿物、麦酒、成衣、牧场产物或退回原粮由市民随身保留；使用库存或建成新仓库后继续送仓', 'warn');
+  G.ui.toast('⚠ 仓位已满，矿物、麦酒、成衣、牧场产物、撤岗货批或退回原粮由市民随身保留；使用库存或建成新仓库后继续送仓', 'warn');
 };
 G.cargoWaitReason = function (c) {
   if (!G.isMineralCargo(c) || !c.haulPending || c.state === 'haul') return '';
@@ -723,11 +725,16 @@ G.cargoWaitReason = function (c) {
 G.finishMineralHaul = function (c) {
   c.carry.qty -= G.depositCargo(c.carry);
   if (c.carry.qty > 0) { G.warnMineralStorage(); G.waitForMineralStorage(c, 'space'); return; }
+  if(c.carry.staffingReturn&&c.carry.extra){
+    const next=Object.keys(c.carry.extra).find(k=>c.carry.extra[k]>0);
+    if(next){const qty=c.carry.extra[next],extra={...c.carry.extra};delete extra[next];c.carry={type:next,qty,staffingReturn:true,...(Object.keys(extra).length?{extra}:{})};G.startMineralHaul(c);return;}
+  }
   c.carry = null; c.haulPending = false; c.haulWait = ''; c.haulTo = null;
   G.requestTask(c);
 };
 G.startMineralHaul = function (c) {
   c.haulPending = true;
+  if(c.carry.qty<=0){G.finishMineralHaul(c);return;}
   if (G.mineralStorageSpace(c.carry.type) <= 0) { G.warnMineralStorage(); G.waitForMineralStorage(c, 'space'); return; }
   if (!G.nearestStorage(c.x, c.y)) { G.finishMineralHaul(c); return; } // legacy no-warehouse save
   const route = G.storageRoute(c.x, c.y);
@@ -745,6 +752,7 @@ G.availableRockMarks = function (w) {
 
 /* 开始搬运去仓库 */
 G.startHaul = function (c) {
+  if(c.staffingRelease!=null&&c.staffingRelease===c.job)G.markStaffingCargo(c);
   if (G.isMineralCargo(c)) { G.startMineralHaul(c); return; }
   if (!G.nearestStorage(c.x, c.y)) { // 兼容旧的无仓存档：仍受仓储上限约束
     G.depositCargo(c.carry);
@@ -874,6 +882,7 @@ G.buildingGoalStatus = function (b) {
 // Only configured automatic jobs gain completion protection. Never change the
 // unset baseline, teachers, manual tasks, or construction scheduling here.
 G.goalCommitment = function (c) {
+  if(c.carry?.staffingReturn===true||(c.staffingRelease!=null&&c.staffingRelease===c.job))return true;
   if (G.isArriving(c) || G.isLeisureVisitor(c)) return true;
   if ([c.task,c.pausedTask].some(t=>t&&t.kind==='brew'&&t.phase==='process') && c.carry?.brewIngredient) return true;
   if (c.task && c.task.kind === 'care') return true;
@@ -925,8 +934,8 @@ G.consumeFood = function (qty) {
   r.food = G.FOOD_KEYS.reduce((n,k) => n + r[k], 0); return [...eaten];
 };
 G.depositCargo = function (cargo) {
-  const accepted = G.deposit(cargo.type, cargo.qty, cargo.brewIngredient===true||Number.isInteger(cargo.pastureId));
-  if (cargo.extra) { for (const [type, qty] of Object.entries(cargo.extra)) G.deposit(type, qty); delete cargo.extra; }
+  const accepted = G.deposit(cargo.type, cargo.qty, cargo.staffingReturn===true||cargo.brewIngredient===true||Number.isInteger(cargo.pastureId));
+  if (cargo.extra&&cargo.staffingReturn!==true) { for (const [type, qty] of Object.entries(cargo.extra)) G.deposit(type, qty); delete cargo.extra; }
   return accepted;
 };
 G.deposit = function (type, qty, retain=false) {
@@ -1154,6 +1163,10 @@ G.cancelResourceMarks = function (kind) {
 };
 
 G.requestTask = function (c) {
+  const retiring=c.staffingRelease===c.job&&c.job!=null;
+  // Requesting work also happens after rest and partial harvest. Only an empty
+  // handoff is settled; the actual cargo keeps the old slot until fully unloaded.
+  if(retiring&&!c.carry)G.detachStaffingRole(c);
   c.task = null;
   if (G.isArriving(c)) {if(G.isRestTime())G.goHome(c);else G.startImmigration(c);return;}
   if (!c.carry && G.tryMedicalCare(c)) return;
@@ -1164,8 +1177,8 @@ G.requestTask = function (c) {
   const w = G.world;
   const b = c.job != null ? w.bmap[c.job] : null;
   // 换岗/任务中断后先交货；农田未满批可继续收割，找不到下一格时也必须交货。
-  const partialFarm = b && b.type === 'farm' && b.state === 'ok' && c.carry && c.carry.type === G.farmOutput(b) && !c.carry.brewIngredient && c.carry.qty < G.PROD.farm.haulCap;
-  const partialForester = b && b.type === 'forester' && b.state === 'ok' && b.doCut && !G.goalPaused('wood') && c.carry && c.carry.type === 'wood' && c.carry.qty + G.taskYield(G.taskLogYield(c)) <= G.PROD.forester.haulCap;
+  const partialFarm = !retiring && !c.carry?.staffingReturn && b && b.type === 'farm' && b.state === 'ok' && c.carry && c.carry.type === G.farmOutput(b) && !c.carry.brewIngredient && c.carry.qty < G.PROD.farm.haulCap;
+  const partialForester = !retiring && !c.carry?.staffingReturn && b && b.type === 'forester' && b.state === 'ok' && b.doCut && !G.goalPaused('wood') && c.carry && c.carry.type === 'wood' && c.carry.qty + G.taskYield(G.taskLogYield(c)) <= G.PROD.forester.haulCap;
   if (c.carry && !partialFarm && !partialForester) {
     G.startHaul(c); return;
   }
@@ -1196,6 +1209,7 @@ G.requestTask = function (c) {
     G.wander(c); // 没有标记树则照常闲逛
     return;
   }
+  if(G.workerLimitOf(b)<=0){G.detachStaffingRole(c);G.requestTask(c);return;}
   if (b.state === 'site') {
     const trees = G.siteTrees(b);
     if (trees.length) {
@@ -1301,6 +1315,7 @@ G.foodForestCanWork = function (b) {
 
 /* 按建筑类型生成任务 */
 G.makeTask = function (b, c) {
+  if(G.workerLimitOf(b)<=0)return null;
   const P = G.PROD, g = G.game, w = G.world;
   if (b.state === 'ok' && G.productionLimited(b) && !['woodcutter', 'blacksmith', 'herbalist', 'mine', 'stonequarry'].includes(b.type)) {
     b.warnText = G.buildingGoalStatus(b); return null;
@@ -1530,7 +1545,7 @@ G.completeTask = function (c) {
     case 'host': break;
     case 'brew': G.completeBrew(c,t);return;
     case 'build': {
-      if (b && b.state === 'site') {
+      if (b && G.world.bmap[b.id]===b && b.state === 'site'&&!b.sitePaused) {
         b.workLeft -= t.work;
         b.progress = G.clamp(1 - b.workLeft / b.totalWork, 0, 1);
         if (b.workLeft <= 0) G.finishBuilding(b);
@@ -1539,7 +1554,7 @@ G.completeTask = function (c) {
     }
     case 'clearSite': {
       const w = G.world, idx = w.treeIdx[t.tree.y * w.N + t.tree.x];
-      if (b && w.bmap[b.id] === b && b.state === 'site' && idx >= 0 && w.trees[idx] === t.tree) {
+      if (b && w.bmap[b.id] === b && b.state === 'site' && !b.sitePaused && idx >= 0 && w.trees[idx] === t.tree) {
         G.removeTree(w, t.tree.x, t.tree.y);
         c.carry = { type: 'wood', qty: t.logs || G.TREE_LOGS };
         G.recordProduction(b, 'wood', c.carry.qty);
@@ -1652,13 +1667,13 @@ G.releaseWorker = function (c) {
     const b = w.bmap[c.job];
     if (b) b.workers = b.workers.filter(id => id !== c.id);
   }
-  c.job = null; c.task = null; c.pausedTask = null;
+  delete c.staffingRelease; c.job = null; c.task = null; c.pausedTask = null;
   if (c.carry) { G.startHaul(c); return; } // 手上的货先送仓，不烂在身上
   c.state = 'idle'; c.wanderT = 0.5;
 };
 
 G.assignWorker = function (b, c) {
-  if(G.isArriving(c))return;
+  if(!c||c.dead||!c.adult||c.student||c.job!=null||c.carry?.staffingReturn===true||G.isArriving(c)||G.world.bmap[b.id]!==b||b.workers.length>=G.workerLimitOf(b))return;
   if(b.type==='tavern'&&b.state==='ok'&&(c.age<18||G.isSick(c)))return;
   if (b.type === 'hospital' && b.state === 'ok' && G.isSick(c)) return;
   c.job = b.id;
@@ -1688,7 +1703,7 @@ G.pickMarkDonor = function (w, harvestSeason, foodJobs, needFood) {
   const adultsOf = (b) => b.workers.map(id => w.cmap[id]).filter(c => c && !c.dead && c.adult && !G.goalCommitment(c) && !G.mineralDeliveryBlocked(c));
   for (const b of staffed) {
     const xs = adultsOf(b);
-    if (xs.length > G.BDEF[b.type].jobs) return xs[0]; // 超员
+    if (xs.length > G.workerLimitOf(b)) return xs[0]; // 超员
   }
   for (const b of staffed)
     if (G.productionLimited(b)) { const c = adultsOf(b)[0]; if (c) return c; }
@@ -1719,6 +1734,7 @@ G.farmHasWork = function (b) {
 
 /* 纯读的派工前置检查，避免为缺料/停用岗位取消正在干活的粮工。 */
 G.jobCanProduce = function (b) {
+  if(G.workerLimitOf(b)<=0)return false;
   const w = G.world, r = G.game.res, p = G.PROD;
   if (b.type === 'hospital') return G.world.citizens.some(G.isSick);
   if(b.type==='tavern')return G.tavernBrewStatus(b).ok || G.game.res.ale>0;
@@ -1742,9 +1758,11 @@ G.scheduleJobs = function () {
   const w = G.world;
   for(const c of w.citizens)if(c.student)G.restrictStudentWork(c);
   G.updateProductionGoals();
+  for(const b of w.buildings)G.enforceWorkerLimit(b);
   // A held mineral batch is not a free pair of hands. Free only an empty job
-  // slot; releaseWorker preserves cargo and retries the same bounded delivery.
-  for (const c of w.citizens) if (!c.dead && c.job != null && !c.task && !c.pausedTask && G.mineralDeliveryBlocked(c)) G.releaseWorker(c);
+  // slot; staffing handoffs retain their slot, even if the ceiling was restored.
+  // releaseWorker preserves other bounded cargo and retries that delivery.
+  for (const c of w.citizens) if (!c.dead && c.job != null && c.staffingRelease!==c.job && c.carry?.staffingReturn!==true && !c.task && !c.pausedTask && G.mineralDeliveryBlocked(c)) G.releaseWorker(c);
   for (const b of w.buildings) {
     // 在重新探测岗位前先释放确实没活的闲人；旧逻辑每2h清旗，导致每日释放永远看不到它。
     if (b.noWork || (G.hasProductionGoal(b) && G.productionLimited(b))) for (const id of b.workers.slice()) {
@@ -1779,14 +1797,14 @@ G.scheduleJobs = function () {
     if (!forestEligibility.has(b.id)) forestEligibility.set(b.id, G.foodForestCanWork(b));
     return forestEligibility.get(b.id);
   };
-  const isFood = b => b && hasForestWork(b) && b.state === 'ok' && !G.productionLimited(b) && FOOD_JOBS.includes(b.type) && (b.type !== 'farm' || G.farmHasWork(b));
+  const isFood = b => b && G.workerLimitOf(b)>0 && hasForestWork(b) && b.state === 'ok' && !G.productionLimited(b) && FOOD_JOBS.includes(b.type) && (b.type !== 'farm' || G.farmHasWork(b));
   const foodCount = () => w.citizens.filter(c => c.adult && !c.dead && isFood(w.bmap[c.job])).length;
   if (G.game.foodUrgent) {
     // 已占满的工地也必须能回补粮岗；只保护尚可工作的食物建筑，不空留人。
     const foodBuildings = w.buildings.filter(isFood);
     for (const b of foodBuildings) {
       let guard = 0;
-      while (b.workers.length < G.BDEF[b.type].jobs && foodCount() < needFood && guard++ < 4) {
+      while (b.workers.length < G.workerLimitOf(b) && foodCount() < needFood && guard++ < 4) {
         const free = jobless();
         let c = free.length > wantLabor ? G.pickNearest(free, b) : null;
         if (!c) {
@@ -1822,7 +1840,7 @@ G.scheduleJobs = function () {
   for (const b of w.buildings) {
     if (b.state !== 'site') continue;
     let guard = 0;
-    while (b.workers.length < 4 && guard++ < 8) {
+    while (b.workers.length < G.workerLimitOf(b) && guard++ < 8) {
       // 有标记待处理时给「砍伐/清石」保留 wantLabor 名无业散工——不够额就改抽在岗者（否则扩张期清石永远停摆）
       const free = jobless();
       let c = free.length > wantLabor ? G.pickNearest(free, b) : null;
@@ -1854,7 +1872,7 @@ G.scheduleJobs = function () {
     if (!def.jobs || !G.jobCanProduce(b)) continue;
     if (b.type !== 'herbalist' && G.productionLimited(b)) continue; // 柴火/工具达到上限的岗位不拉人，空闲者留给「砍伐」标记
     let guard = 0;
-    while (b.workers.length < def.jobs && guard++ < 6) {
+    while (b.workers.length < G.workerLimitOf(b) && guard++ < 6) {
       const pool = jobless().filter(c => (b.type !== 'hospital' || !G.isSick(c)) && (b.type!=='tavern'||(c.age>=18&&!G.isSick(c))));
       if (wantLabor && pool.length <= wantLabor) break;
       const c = G.pickNearest(pool, b);
@@ -1869,7 +1887,7 @@ G.scheduleJobs = function () {
   const FOOD_SET = ['gatherer', 'dock', 'hunting', 'farm'];
   const foodWorkerCount = () => w.buildings.filter(x => x.state === 'ok' && FOOD_JOBS.includes(x.type)).reduce((n, x) => n + x.workers.length, 0);
   const targets = w.buildings
-    .filter(b => b.state === 'ok' && G.BDEF[b.type].jobs > 0 && b.workers.length < G.BDEF[b.type].jobs && !b.noWork && G.jobCanProduce(b))
+    .filter(b => b.state === 'ok' && G.BDEF[b.type].jobs > 0 && b.workers.length < G.workerLimitOf(b) && !b.noWork && G.jobCanProduce(b))
     .sort((a, b2) => (a.type === 'woodcutter' ? -1 : b2.type === 'woodcutter' ? 1 : 0));
   for (const b of targets) {
     const eligibleForTarget = c => c && !G.goalCommitment(c) && (b.type !== 'hospital' || !G.isSick(c)) && (b.type!=='tavern'||(c.age>=18&&!G.isSick(c)));
@@ -2233,7 +2251,7 @@ G.isSick = c => !!c && !c.dead && c.sickDays > 0;
 G.healthWorkMul = c => (1 + Math.max(0, 3 - G.healthOf(c)) * 0.08) * (G.isSick(c) ? 1.5 : 1);
 G.medicalPatients = b => G.world.citizens.filter(c => !c.dead && c.task && c.task.kind === 'care' && c.task.b === b);
 G.medicalStaff = function (b) {
-  if (!b || G.world.bmap[b.id] !== b || b.state !== 'ok') return false;
+  if (!b || G.world.bmap[b.id] !== b || b.state !== 'ok'||G.workerLimitOf(b)<=0) return false;
   return b.workers.some(id => {
     const c = G.world.cmap[id];
     if (!c || c.dead || G.isSick(c) || c.job !== b.id || (c.task && c.task.kind === 'care')) return false;
@@ -2244,7 +2262,7 @@ G.atMedicalDoor = (c, b) => c.x >= b.x - 1 && c.x <= b.x + b.w && c.y >= b.y - 1
   (c.x < b.x || c.x >= b.x + b.w || c.y < b.y || c.y >= b.y + b.h) && !G.tileBlocked(G.world, Math.round(c.x), Math.round(c.y));
 G.validCareTask = function (c) {
   const t = c.task, b = t && t.b;
-  return !!(t && t.kind === 'care' && b && G.world.bmap[b.id] === b && b.state === 'ok' &&
+  return !!(t && t.kind === 'care' && b && G.world.bmap[b.id] === b && b.state === 'ok' && G.workerLimitOf(b)>0 &&
     (t.careType === 'hospital' ? b.type === 'hospital' && G.isSick(c) : b.type === 'herbalist' && !G.isSick(c)));
 };
 G.inMedicalCare = c => G.validCareTask(c) && c.state === 'work' && (!c.path || c.path.length === 0) && !c.carry && G.atMedicalDoor(c, c.task.b);
@@ -2541,7 +2559,7 @@ G.tavernBrewStatus=function(b,reserved=false){
 G.isLeisureVisitor=c=>!!c&&!c.dead&&c.task?.kind==='leisure';
 G.tavernVisitors=b=>G.world.citizens.filter(c=>G.isLeisureVisitor(c)&&c.task.b===b);
 G.tavernStaff=function(b){
-  if(!b||G.world.bmap[b.id]!==b||b.type!=='tavern'||b.state!=='ok')return false;
+  if(!b||G.world.bmap[b.id]!==b||b.type!=='tavern'||b.state!=='ok'||G.workerLimitOf(b)<=0)return false;
   return b.workers.some(id=>{const c=G.world.cmap[id],t=c?.task;return c&&!c.dead&&c.age>=18&&!G.isSick(c)&&c.job===b.id&&c.state==='work'&&t?.b===b&&
     (t.kind==='host'||(t.kind==='brew'&&t.phase==='process'))&&G.atMedicalDoor(c,b);});
 };
@@ -2575,7 +2593,7 @@ G.completeBrew=function(c,t){
   c.carry={type:'ale',qty:t.yield.qty};G.recordProduction(b,'ale',t.yield.qty);G.startHaul(c);
 };
 G.validLeisureTask=function(c){
-  const b=c.task?.b;return G.isLeisureVisitor(c)&&c.age>=18&&!G.isSick(c)&&!c.carry&&b&&G.world.bmap[b.id]===b&&b.state==='ok'&&b.type==='tavern';
+  const b=c.task?.b;return G.isLeisureVisitor(c)&&c.age>=18&&!G.isSick(c)&&!c.carry&&b&&G.world.bmap[b.id]===b&&b.state==='ok'&&b.type==='tavern'&&G.workerLimitOf(b)>0;
 };
 G.cancelLeisure=function(c){c.task=null;c.path=null;c.pi=0;c.state='idle';c.walkKind='';c.wanderT=1;c.leisureRetryH=G.LEISURE.retryHours;};
 G.tryLeisure=function(c){
@@ -2703,7 +2721,7 @@ G.studyHoursOf=c=>c.educated?G.EDUCATION.totalHours:G.clamp(Number.isFinite(c.st
 G.studyTodayOf=c=>c.studyDay===G.game.day?G.clamp(c.studyToday||0,0,G.EDUCATION.dailyHours):0;
 G.schoolCounts=function(){const counts={};for(const c of G.world.citizens)if(!c.dead&&c.student&&c.school!=null)counts[c.school]=(counts[c.school]||0)+1;return counts;};
 G.schoolTeachers=function(b){
-  if(!b||G.world.bmap[b.id]!==b||b.type!=='school'||b.state!=='ok')return [];
+  if(!b||G.world.bmap[b.id]!==b||b.type!=='school'||b.state!=='ok'||G.workerLimitOf(b)<=0)return [];
   return b.workers.map(id=>G.world.cmap[id]).filter(c=>c&&!c.dead&&c.adult&&!c.student&&!G.isArriving(c)&&c.job===b.id);
 };
 G.schoolTeacherPresent=b=>G.schoolTeachers(b).some(c=>!G.isSick(c)&&c.hunger<1&&c.state==='work'&&c.task?.kind==='teach'&&c.task.b===b&&G.atMedicalDoor(c,b)&&G.d2(c.x,c.y,c.task.tx,c.task.ty)<.04);
@@ -2806,4 +2824,88 @@ G.schoolSummary=function(b){
   return {capacity:G.LIFE.schoolCap,enrolled:students.length,onSite,staffAssigned:teachers.length,teacherPresent:present,teacherNames:teachers.map(c=>c.name),
     status:!teachers.length?'缺教师：学生保留学籍，优先转校':present?'教师已到校，可进行真实学习':teachers.every(c=>G.isSick(c)||c.hunger>=1)?'教师生病或饥饿，暂停授课':b.warnText||'教师未到校，暂不计课时',
     students:students.map(c=>({id:c.id,name:c.name,age:c.age,hours:G.studyHoursOf(c),today:G.studyTodayOf(c),progress:G.studyHoursOf(c)/G.EDUCATION.totalHours,status:G.studentSummary(c).status}))};
+};
+
+
+/* Player ceilings supplement the existing automatic scheduler, never reserve people. */
+G.workerLimitOf=function(b){
+  if(!b)return 0;if(b.state==='site')return b.sitePaused?0:4;
+  const max=G.BDEF[b.type]?.jobs||0;return Number.isInteger(b.workerLimit)?G.clamp(b.workerLimit,0,max):max;
+};
+G.markStaffingCargo=c=>{if(c.carry)c.carry.staffingReturn=true;};
+G.detachStaffingRole=function(c){
+  const b=G.world.bmap[c.job];if(b)b.workers=b.workers.filter(id=>id!==c.id);
+  G.markStaffingCargo(c);c.job=null;delete c.staffingRelease;
+};
+G.releaseStaffingWorker=function(c,b){
+  const own=c.task?.b===b;G.detachStaffingRole(c);
+  if(c.pausedTask?.b===b)c.pausedTask=null;
+  if(own){c.task=null;c.path=null;c.pi=0;c.walkKind='';c.state='idle';c.wanderT=.5;}
+  // A worker visiting a clinic remains its patient after giving up a job.
+  if(c.carry){G.startHaul(c);return;}
+  if(!c.task&&c.state!=='rest'){c.state='idle';c.wanderT=.5;}
+};
+G.workforceWorkers=b=>G.world.citizens.filter(c=>!c.dead&&c.adult&&!c.student&&c.job===b.id);
+G.staffingBatchActive=(c,b)=>!!c.carry||[c.task,c.pausedTask].some(t=>t?.b===b&&!['teach','clinic','host'].includes(t.kind));
+G.enforceWorkerLimit=function(b){
+  if(b.workerLimit===undefined&&!b.sitePaused)return; // Old/default automatic play is unchanged.
+  const workers=G.workforceWorkers(b),excess=Math.max(0,workers.length-G.workerLimitOf(b));
+  const rank=c=>c.staffingRelease===b.id?0:G.staffingBatchActive(c,b)?2:1;
+  const retire=new Set(workers.slice().sort((a,z)=>rank(a)-rank(z)||a.id-z.id).slice(0,excess).map(c=>c.id));
+  for(const c of workers){
+    if(!retire.has(c.id)){if(c.staffingRelease===b.id)delete c.staffingRelease;continue;}
+    if(b.state==='site'&&b.sitePaused){G.releaseStaffingWorker(c,b);continue;}
+    if(G.staffingBatchActive(c,b)){c.staffingRelease=b.id;G.markStaffingCargo(c);}
+    else G.releaseStaffingWorker(c,b);
+  }
+};
+G.syncStoppedServices=function(b){
+  if(G.workerLimitOf(b)>0)return;
+  for(const c of G.world.citizens){
+    if(c.task?.b===b&&c.task.kind==='care')G.cancelMedicalCare(c);
+    if(c.task?.b===b&&c.task.kind==='leisure')G.cancelLeisure(c);
+    if(c.student&&c.school===b.id){G.clearSchoolTasks(c);G.assignSchool(c);}
+  }
+};
+G.setWorkerLimit=function(b,limit){
+  const max=b&&G.BDEF[b.type]?.jobs||0;
+  if(!b||G.world.bmap[b.id]!==b||b.state!=='ok'||!max||!Number.isInteger(limit)||limit<0||limit>max)return false;
+  b.workerLimit=limit;G.enforceWorkerLimit(b);G.syncStoppedServices(b);G.game.schedT=0;return true;
+};
+G.setConstructionPaused=function(b,paused){
+  if(!b||G.world.bmap[b.id]!==b||b.state!=='site'||typeof paused!=='boolean')return false;
+  if(!!b.sitePaused===paused)return true;
+  b.sitePaused=paused;
+  if(paused){for(const c of G.world.citizens)if(c.job===b.id)G.releaseStaffingWorker(c,b);
+    for(const c of G.world.citizens){if(c.task?.b===b){c.task=null;c.path=null;c.pi=0;c.state='idle';c.wanderT=.5;}if(c.pausedTask?.b===b)c.pausedTask=null;}}
+  G.game.schedT=0;return true;
+};
+G.workforceBlockReason=function(b){
+  const r=G.game.res,status=G.buildingGoalStatus(b);if(status&&G.productionLimited(b))return status;
+  const full=G.productionOutputsOf(b).filter(k=>k!=='food'&&!G.isTool(k)&&G.mineralStorageSpace(k)<=0);
+  if(full.length)return full.map(k=>G.RES[k].name).join('、')+'仓满，暂停新生产';
+  if(b.type==='woodcutter')return '缺原木：每批需要'+G.PROD.woodcutter.logsIn;
+  if(b.type==='blacksmith'){const missing=G.blacksmithRecipe(b).filter(x=>r[x.type]<x.qty);if(missing.length)return '缺原料：'+missing.map(x=>G.RES[x.type].name+' '+x.qty).join('、');}
+  if(b.type==='tailor')return G.tailorProductionStatus(b).reason;
+  if(b.type==='tavern')return G.tavernBrewStatus(b).reason;
+  if(b.type==='hospital')return '暂无病人需要接诊';
+  if(b.type==='farm')return G.farmSummary(b).status;
+  if(b.type==='tradingpost')return '待售目标已满足，或仓库没有所需备货';
+  if(b.type==='pasture')return G.pastureSummary(b).status;
+  if(b.type==='orchard'&&!G.game.unlocks.orchard)return '尚未购买果树种子';
+  if(['gatherer','hunting','forester'].includes(b.type))return b.warnText||'工作范围内没有合适森林或种植位置';
+  return b.warnText||'暂时没有可执行工作';
+};
+G.workforceSummary=function(b){
+  const adults=G.world.citizens.filter(c=>!c.dead&&c.adult&&!c.student&&!G.isArriving(c)),workers=G.workforceWorkers(b),finishing=c=>c.staffingRelease!=null&&c.staffingRelease===c.job;
+  const global={adults:adults.length,students:G.world.citizens.filter(c=>!c.dead&&c.student).length,
+    assigned:adults.filter(c=>c.job!=null).length,finishing:adults.filter(finishing).length,
+    available:adults.filter(c=>c.job==null&&!c.carry&&!G.goalCommitment(c)).length,hauling:adults.filter(c=>c.job==null&&c.carry).length};
+  const maximum=b.state==='site'?4:G.BDEF[b.type]?.jobs||0,limit=G.workerLimitOf(b),draining=workers.filter(finishing),paused=b.state==='site'&&!!b.sitePaused;
+  const wait=draining.map(c=>G.cargoWaitReason(c)).find(Boolean);
+  const reason=paused?'施工已暂停，已完成工段与已付建材保留':draining.length?(wait||'本批工作/送仓结清后释放，不再接新批次'):limit===0?'已停用：不再分配工人':b.state==='ok'&&!G.jobCanProduce(b)?G.workforceBlockReason(b):workers.length<limit?(global.available?'等待自动调度或可达工作路线':'可用成人不足，已有岗位、送仓或个人服务占用劳力'):'当前人数已达上限';
+  const rule=b.state==='site'?'暂停立即停派；已完成工段保留，未完成小工段取消。恢复不重复扣建材，既有道路/桥梁通行不变。':
+    '上限不是保证人数；保持原单工效率和自动调度。降额先放空闲者，有限生产批次结清后释放；教师/医师/接待停止服务时立即释放。粮柴岗位调低可能断供，缺粮时也不会越过上限。'+
+    (b.type==='school'?'停教后学生保留课时并尝试转校。':['hospital','herbalist'].includes(b.type)?'停用后不再治疗或提供草药服务。':'');
+  return {supported:maximum>0,current:workers.length,limit,maximum,draining:draining.length,paused,reason,rule,global};
 };

@@ -114,7 +114,7 @@ G.serializeGame = function () {
     rockCleared: w.rockCleared,
     buildings: w.buildings.map(b => ({
       id: b.id, type: b.type, x: b.x, y: b.y, state: b.state,
-      progress: b.progress, workLeft: b.workLeft, totalWork: b.totalWork, paidCost: b.paidCost, constructionStarted: b.constructionStarted,
+      workerLimit:b.workerLimit, sitePaused:b.sitePaused, progress: b.progress, workLeft: b.workLeft, totalWork: b.totalWork, paidCost: b.paidCost, constructionStarted: b.constructionStarted,
       workers: b.workers, family: b.family, noWork: b.noWork, warnText: b.warnText,
       bridgeAxis: b.bridgeAxis, bridgeLength: b.type === 'bridge' ? b.w + b.h - 1 : undefined,
       mineMode: b.mineMode, legacyMine: b.legacyMine, mineTick: b.mineTick, toolRecipe: b.toolRecipe, reserveDays:b.reserveDays, coatRecipe:b.coatRecipe,
@@ -351,6 +351,8 @@ G.prepareSaveData = function (d) {
       fuelLimit: bd.type === 'woodcutter' ? G.fuelLimitOf(bd) : undefined,
       reserveDays:bd.type==='tavern'?(bd.reserveDays===undefined?12:integer(bd.reserveDays,'酿酒储粮天数',8,48)):undefined,
     };
+    if(bd.workerLimit!==undefined)b.workerLimit=integer(bd.workerLimit,'建筑用工上限',0,def.jobs||0);
+    if(bd.sitePaused!==undefined){if(typeof bd.sitePaused!=='boolean'||(bd.sitePaused&&b.state!=='site'))bad('工地暂停状态');b.sitePaused=bd.sitePaused;}
     if (bd.type === 'bridge') {
       b.bridgeAxis=bd.bridgeAxis;
       if(!G.planBridge(w,{x,y},{x:x+b.w-1,y:y+b.h-1}).ok) bad('木桥跨岸几何');
@@ -437,10 +439,11 @@ G.prepareSaveData = function (d) {
     if (cd.carry != null) {
       record(cd.carry, '随身资源'); if (!G.RES_KEYS.includes(cd.carry.type)) bad('随身资源类型');
       carry = { type: cd.carry.type === 'food' ? 'grain' : cd.carry.type, qty: number(cd.carry.qty, '随身资源数量', 0) };
+      if(cd.carry.staffingReturn!==undefined){if(cd.carry.staffingReturn!==true)bad('撤岗保货标记');carry.staffingReturn=true;}
       if(cd.carry.pastureId!==undefined){if(!['meat','leather','wool'].includes(carry.type)||cd.carry.extra!==undefined)bad('牧场携货类型');carry.pastureId=integer(cd.carry.pastureId,'牧场携货来源',1);}
       if(cd.carry.brewIngredient!==undefined){if(cd.carry.brewIngredient!==true||carry.type!=='grain')bad('酿造原粮标记');carry.brewIngredient=true;}
       if (cd.carry.extra !== undefined) {
-        if(cd.carry.type!=='meat')bad('副产物携带类型');
+        if(cd.carry.type!=='meat'&&!carry.staffingReturn)bad('副产物携带类型');
         record(cd.carry.extra, '随身副产物'); carry.extra = {};
         for (const type of Object.keys(cd.carry.extra)) {
           if (!['leather', 'wool'].includes(type)) bad('副产物种类');
@@ -492,6 +495,11 @@ G.prepareSaveData = function (d) {
     b.workers = ordered.slice(0, G.BDEF[b.type].jobs);
     const keep = new Set(b.workers);
     for (const c of assigned) if (!keep.has(c.id)) c.job = null;
+  }
+  for(const b of w.buildings)if(b.workerLimit!==undefined||b.sitePaused){
+    const assigned=w.citizens.filter(c=>c.job===b.id),allowed=G.workerLimitOf(b),eligible=new Set(assigned.map(c=>c.id));
+    b.workers=[...new Set([...b.workers.filter(id=>eligible.has(id)),...eligible])].slice(0,allowed);
+    const kept=new Set(b.workers);for(const c of assigned)if(!kept.has(c.id)){G.markStaffingCargo(c);c.job=null;}
   }
   if (G.normalizeFamilyRelations) G.normalizeFamilyRelations(w);
   // Relocate old saves' citizens trapped inside a footprint before committing.
