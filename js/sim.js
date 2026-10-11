@@ -2309,6 +2309,14 @@ G.demolishAt = function (tx, ty) {
 /* Town development: explicit inventories and worker trips, not global free production. */
 G.TRADE_CAPACITY = 2000;
 G.tradeStored = b => Object.values(b.tradeInventory || {}).reduce((n,q) => n + q, 0);
+// Only actual carried deliveries reserve space. Plans reserve nothing; a load
+// cancels unsaved tasks and safely returns their protected cargo to public stores.
+G.tradeIncoming=function(b,exclude=null){
+  if(!b||G.world.bmap[b.id]!==b||b.type!=='tradingpost'||b.state!=='ok')return 0;
+  return G.world.citizens.reduce((n,c)=>n+(c!==exclude&&!c.dead&&c.carry&&[c.task,c.pausedTask].some(t=>t?.kind==='trade'&&t.b===b&&t.phase==='deliver')?c.carry.qty:0),0);
+};
+G.tradeFreeSpace=(b,exclude=null)=>Math.max(0,G.TRADE_CAPACITY-G.tradeStored(b)-G.tradeIncoming(b,exclude));
+
 G.TRADE_VALUES = {wood:2,stone:7,iron:5,tools:8,firewood:4,meat:1,vegetables:1,grain:1,leather:10,wool:5,clothes:15,warmCoats:20,herbs:4,coal:6,steelTools:10};
 G.TRADE_GOODS = {coal:{name:'煤',price:6,stock:100},steelTools:{name:'钢工具',price:10,stock:20},sheep:{name:'羊',price:600,stock:4},cattle:{name:'牛',price:800,stock:4},orchardSeed:{name:'果树种子',price:2500,stock:1},cabbageSeed:{name:'卷心菜种子',price:2500,stock:1},grain:{name:'主食',price:1,stock:400},iron:{name:'铁',price:5,stock:100},leather:{name:'皮革',price:10,stock:80}};
 G.ensureEconomyBuilding = function(b) {
@@ -2327,14 +2335,14 @@ G.setTradeTarget = function(b,type,qty){
   G.ensureEconomyBuilding(b);b.tradeTargets[type]=qty;G.game.schedT=0;return true;
 };
 G.tradeHasWork = function(b){
-  G.ensureEconomyBuilding(b);return Object.keys(G.TRADE_VALUES).some(k=>(b.tradeInventory[k]||0)>(b.tradeTargets[k]||0)||((b.tradeInventory[k]||0)<(b.tradeTargets[k]||0)&&G.game.res[k]>0&&G.tradeStored(b)<G.TRADE_CAPACITY));
+  G.ensureEconomyBuilding(b);return Object.keys(G.TRADE_VALUES).some(k=>(b.tradeInventory[k]||0)>(b.tradeTargets[k]||0)||((b.tradeInventory[k]||0)<(b.tradeTargets[k]||0)&&G.game.res[k]>0&&G.tradeFreeSpace(b)>0));
 };
 G.makeTradeTask = function(b,c){
   G.ensureEconomyBuilding(b);
   for(const type of Object.keys(G.TRADE_VALUES)){
     const stock=b.tradeInventory[type]||0,target=b.tradeTargets[type]||0;
     const returning=stock>target;
-    if(!returning&&!(stock<target&&G.game.res[type]>0&&G.tradeStored(b)<G.TRADE_CAPACITY))continue;
+    if(!returning&&!(stock<target&&G.game.res[type]>0&&G.tradeFreeSpace(b)>0))continue;
     const route=returning?null:G.storageRoute(c.x,c.y,type),spot=returning?G.workSpot(G.world,b,c.x,c.y):route&&route.spot;
     if(!spot){b.noWork=true;b.warnText='搬运路线不可达';return null;}
     return G.withTaskRoute({kind:'trade',b,tx:spot.x,ty:spot.y,phase:returning?'return':'fetch',resource:type,work:0.25,workLeft:0},spot.route);
@@ -2346,13 +2354,18 @@ G.completeTradeTask = function(c,t){
   G.ensureEconomyBuilding(b);const type=t.resource;
   if(t.phase==='fetch'){
     if(!G.atStorageDoor(c,type)){G.requestTask(c);return;}
-    const room=Math.min(Math.max(0,(b.tradeTargets[type]||0)-(b.tradeInventory[type]||0)),Math.max(0,G.TRADE_CAPACITY-G.tradeStored(b)));
+    const room=Math.min(Math.max(0,(b.tradeTargets[type]||0)-(b.tradeInventory[type]||0)),G.tradeFreeSpace(b));
     const spot=G.workSpot(G.world,b,c.x,c.y);if(!spot){G.requestTask(c);return;}
     const qty=G.withdrawResource(type,Math.min(20,room));if(!qty){G.requestTask(c);return;}
-    c.carry={type,qty};t.phase='deliver';t.tx=spot.x;t.ty=spot.y;t.workLeft=t.work;c.task=t;
+    c.carry={type,qty,staffingReturn:true};t.phase='deliver';t.tx=spot.x;t.ty=spot.y;t.workLeft=t.work;c.task=t;
     G.sendTo(c,t.tx,t.ty,spot.route);return;
   }
-  if(t.phase==='deliver'&&c.carry){b.tradeInventory[c.carry.type]=(b.tradeInventory[c.carry.type]||0)+c.carry.qty;c.carry=null;}
+  if(t.phase==='deliver'&&c.carry){
+    const accepted=Math.min(c.carry.qty,G.tradeFreeSpace(b,c));
+    b.tradeInventory[c.carry.type]=(b.tradeInventory[c.carry.type]||0)+accepted;c.carry.qty-=accepted;
+    if(c.carry.qty>0){c.carry.staffingReturn=true;c.task=null;c.pausedTask=null;G.startHaul(c);return;}
+    c.carry=null;
+  }
   if(t.phase==='return'){
     const qty=Math.min(20,Math.max(0,(b.tradeInventory[type]||0)-(b.tradeTargets[type]||0)));
     if(qty){b.tradeInventory[type]-=qty;c.carry={type,qty};G.startHaul(c);return;}
@@ -2365,7 +2378,7 @@ G.executeTrade = function(b,good,qty,payment){
   if(!offer||!value||!Number.isInteger(qty)||qty<=0||qty>(b.merchant.stock[good]||0))return {ok:false,reason:'交易数量或货物无效'};
   const seedReason=G.seedTradeReason(good,qty);if(seedReason)return {ok:false,reason:seedReason};
   const cost=Math.ceil(offer.price*qty/value);if((b.tradeInventory[payment]||0)<cost)return {ok:false,reason:'待售库存不足，请先让商人搬入'};
-  if(!G.isLivestockType(good)&&!G.seedUnlockKey(good)&&G.tradeStored(b)-cost+qty>G.TRADE_CAPACITY)return {ok:false,reason:'贸易站库存容量不足（共2000）'};
+  if(!G.isLivestockType(good)&&!G.seedUnlockKey(good)&&G.tradeStored(b)+G.tradeIncoming(b)-cost+qty>G.TRADE_CAPACITY)return {ok:false,reason:'贸易站容量不足（含在途占位，共2000）'};
   b.tradeInventory[payment]-=cost;b.merchant.stock[good]-=qty;
   if(G.isLivestockType(good))G.game.livestock[good]=(G.game.livestock[good]||0)+qty;
   else if(G.seedUnlockKey(good))G.game.unlocks[G.seedUnlockKey(good)]=true;

@@ -373,4 +373,9 @@ test('reading farm facts and refreshing the DOM do not change seeds, crop, stock
   assert.equal(snapshot(), before);
 });
 
+test('trade quote and live capacity include real inbound reservation without rebuilding focused form',()=>{
+ const f=farm(),{G,c}=f,b=trader(f);b.tradeInventory={stone:1980};b.merchant.stock.grain=400;c.job=b.id;c.carry={type:'wood',qty:20,staffingReturn:true};c.task={kind:'trade',phase:'deliver',b,resource:'wood'};c.state='walk';f.select(b);const form=tradeSelection(f,'grain',7,'stone'),good=f.doc.getElementById('trade-good');good.focus();const writes=f.info.htmlWrites;G.ui.renderInfo();assert.equal(G.ui.tradeQuote(b).ok,false);assert.match(G.ui.tradeQuote(b).reason,/含在途占位/);assert.match(f.info.querySelector('[data-economy-live="trade-capacity"]').textContent,/已入站 1980.*在途占位 20.*可用空位 0/);assert.equal(f.doc.getElementById('trade-execute').disabled,true);form.emit('submit');assert.equal(b.tradeInventory.stone,1980);assert.equal(b.merchant.stock.grain,400);
+ c.pausedTask=c.task;c.task=null;G.ui.renderInfo();assert.equal(G.ui.tradeQuote(b).ok,false);c.pausedTask=null;G.ui.renderInfo();assert.equal(G.ui.tradeQuote(b).ok,true);assert.equal(f.doc.getElementById('trade-execute').disabled,false);assert.equal(f.doc.activeElement,good);assert.equal(f.info.htmlWrites,writes);
+});
+
 console.log(`Crop seeds UI: ${passed} DOM and live-simulation suites passed (browser visual acceptance not performed).`);
