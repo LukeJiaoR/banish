@@ -250,7 +250,7 @@ G.prepareSaveData = function (d) {
   const hasFoodClasses = G.FOOD_KEYS.some(k => gd.res[k] !== undefined);
   if (hasFoodClasses && Math.abs(G.FOOD_KEYS.reduce((n,k) => n + g.res[k], 0) - g.res.food) > 0.00001) bad('食物分类合计');
   if (!hasFoodClasses) g.res.grain = g.res.food; // legacy stock is preserved once
-  if (gd.unlocks !== undefined) {record(gd.unlocks,'产业解锁');if(typeof gd.unlocks.orchard !== 'boolean')bad('果树种子解锁');if(gd.unlocks.cabbage!==undefined&&typeof gd.unlocks.cabbage!=='boolean')bad('卷心菜种子解锁');g.unlocks={orchard:gd.unlocks.orchard,cabbage:gd.unlocks.cabbage===true};}
+  if (gd.unlocks !== undefined) {record(gd.unlocks,'产业解锁');if(typeof gd.unlocks.orchard !== 'boolean')bad('果树种子解锁');for(const key of ['cabbage','beans'])if(gd.unlocks[key]!==undefined&&typeof gd.unlocks[key]!=='boolean')bad('农田种子解锁');g.unlocks={orchard:gd.unlocks.orchard,cabbage:gd.unlocks.cabbage===true,beans:gd.unlocks.beans===true};}
   if (gd.livestock !== undefined) {record(gd.livestock,'待安置牲畜');g.livestock={sheep:integer(gd.livestock.sheep,'待安置羊',0,1000000),cattle:gd.livestock.cattle===undefined?0:integer(gd.livestock.cattle,'待安置牛',0,1000000)};}
   if(gd.farmPests!==undefined){const p=record(gd.farmPests,'农田虫害设置');if(typeof p.enabled!=='boolean')bad('农田虫害开关');
     g.farmPests={enabled:p.enabled,graceUntil:integer(p.graceUntil,'虫害宽限日',0,g.day+G.FARM_PESTS.graceDays),lastDay:integer(p.lastDay,'虫害结算日',-1,g.day)};
@@ -491,7 +491,7 @@ G.prepareSaveData = function (d) {
       if(bd.farmSize!==undefined)b.farmSize=[...bd.farmSize];
       b.cropType=bd.cropType===undefined?'wheat':bd.cropType;b.cropChoice=bd.cropChoice===undefined?b.cropType:bd.cropChoice;
       if(typeof b.cropType!=='string'||typeof b.cropChoice!=='string'||!Object.hasOwn(G.CROPS,b.cropType)||!Object.hasOwn(G.CROPS,b.cropChoice))bad('农田作物种类');
-      if((b.cropType==='cabbage'||b.cropChoice==='cabbage')&&!g.unlocks.cabbage)bad('农田作物种子未解锁');
+      if([b.cropType,b.cropChoice].some(k=>k!=='wheat'&&!g.unlocks[k]))bad('农田作物种子未解锁');
       if (!Array.isArray(bd.farm) || bd.farm.length !== b.w * b.h) bad('农田格数');
       b.farm = bd.farm.map((row, k) => {
         if (!Array.isArray(row) || ![2,3].includes(row.length) || !row.every(v => v === 0 || v === 1 || v === false || v === true)) bad('农田状态');
@@ -507,8 +507,8 @@ G.prepareSaveData = function (d) {
       if (bd.sowingCommitted === true) b.sowingCommitted = true;
       b.growth = bd.growth === undefined ? 0 : number(bd.growth, '农田生长', 0, 1);
       if(bd.earlyHarvestYield!==undefined){
-        b.earlyHarvestYield=integer(bd.earlyHarvestYield,'抢收基础产量',1,G.PROD.farm.perTile);
-        if(b.state!=='ok'||!b.sownAll||!b.farm.every(f=>f.sown)||b.earlyHarvestYield!==Math.floor(G.PROD.farm.perTile*b.growth+1e-9))bad('抢收农田状态');
+        b.earlyHarvestYield=integer(bd.earlyHarvestYield,'抢收基础产量',1,G.farmBaseYield(b));
+        if(b.state!=='ok'||!b.sownAll||!b.farm.every(f=>f.sown)||b.earlyHarvestYield!==Math.floor(G.farmBaseYield(b)*b.growth+1e-9))bad('抢收农田状态');
       }
     }
     for (let yy = y; yy < y + b.h; yy++) for (let xx = x; xx < x + b.w; xx++) {

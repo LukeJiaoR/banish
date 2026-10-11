@@ -1380,11 +1380,12 @@ G.ui = {
     return { summary: s, pests, data: {
       status: s.status,
       workers: `${s.workers} 人${workerNames.length ? ' · ' + workerNames.join('、') : '（等待可用农夫）'}`,
-      plot: `地块 ${b.w}×${b.h} · ${s.total}格 · 成熟满收理论 ${s.total*G.PROD.farm.perTile} 食物；实际受种收工时、工具、冬损和仓容影响`,
+      plot: `地块 ${b.w}×${b.h} · ${s.total}格 · 成熟满收理论 ${s.total*G.farmBaseYield(b)} 食物；实际受种收工时、工具、冬损和仓容影响`,
       current: `本季作物：${crop.name} → ${G.RES[s.output].name}`,
       choice: `下季 / 空田选择：${choice.name} → ${G.RES[s.choiceOutput].name}${s.pending ? '（下一春生效）' : '（与本季一致）'}`,
+      timing: `本季${crop.name}：全田播完后成长 ${s.growDays} 天，${s.summerHarvest ? '夏、秋全熟后正常收获' : '秋季全熟后正常收获'}；基础每格 ${G.farmBaseYield(b)} ${G.RES[s.output].name}，每年只种收一季`,
       reason: s.reason,
-      seeds: `种子：小麦已解锁 · 卷心菜${s.unlocked.cabbage ? '已永久解锁' : '未解锁，需贸易购买卷心菜种子'}（永久解锁，不是库存物品，不占仓位）`,
+      seeds: `种子：${Object.keys(crops).map(type => `${crops[type].name}${type === 'wheat' ? '已解锁' : s.unlocked[type] ? '已永久解锁' : '未解锁，需贸易购买' + crops[type].name + '种子'}`).join(' · ')}（永久解锁，不是库存物品，不占仓位）`,
       progress: `播种 ${s.sown}/${s.total} · 成长 ${Math.floor(s.growth * 100)}% · 实际收获 ${s.harvested}/${s.total} · 虫害损失 ${pests.lost}/${s.total}`,
       pestField: this.farmPestFieldText(pests),
       rotation: this.farmRotationText(pests),
@@ -1417,8 +1418,9 @@ G.ui = {
         <div class="economy-actions"><button type="button" id="early-harvest-confirm">确认本季抢收</button><button type="button" id="early-harvest-cancel">继续等待</button></div>
       </div>
       <p class="economy-message" data-farm-message role="status" aria-live="polite"></p>
-      <p class="desc">全田播完才开始成长；默认秋季成熟后收获，也可确认提前抢收，按当时成熟度锁定较低产量并停止继续成长，本季不能复种。等待能提高成熟产量；若开启虫害，等候和收割期间仍可能损失未收格。冬季未收作物损失；农夫仍须收割并实际搬运入仓。</p>
-      <p class="desc">食物仍分肉类、蔬菜、主食三类。小麦产主食，卷心菜产蔬菜；多种作物不额外增加饮食类别，也不产肉。</p>
+      <p class="desc">全田播完才开始成长；小麦和卷心菜成长 ${G.CROPS.wheat.growDays} 天、秋季全熟后收获；早熟豆类成长 ${G.CROPS.beans.growDays} 天，夏、秋全熟即可正常收获。早熟的代价是基础每格 ${G.CROPS.beans.perTile} 蔬菜，低于小麦和卷心菜的 ${G.CROPS.wheat.perTile}。播种、走路、收割和送仓仍需时间，大田或农夫不足会推迟入库，不保证夏初就有粮。每年只种收一季，收完不能在夏季再次播种。</p>
+      <p class="desc">也可确认提前抢收，按当时成熟度锁定较低产量并停止继续成长，本季不能复种。等待能提高成熟产量；若开启虫害，等候和收割期间仍可能损失未收格。冬季未收作物损失；农夫仍须收割并实际搬运入仓。</p>
+      <p class="desc">食物仍分肉类、蔬菜、主食三类。小麦产主食，卷心菜产蔬菜，早熟豆类也计入蔬菜；多种作物不额外增加饮食类别，也不产肉。</p>
     </section>`;
   },
   refreshFarmInfo: function (b) {
@@ -1478,7 +1480,8 @@ G.ui = {
   },
   farmRotationText: function (p) {
     const crop = G.CROPS[p.crop].name, choice = G.CROPS[p.choice].name;
-    const action = !p.rotationAvailable ? '卷心菜未解锁，须在贸易站购买种子后才能选择不同作物' :
+    const locked = Object.keys(G.CROPS).filter(type => type !== p.crop && !G.cropUnlocked(type)).map(type => G.CROPS[type].name + '未解锁').join('、');
+    const action = !p.rotationAvailable ? `${locked || '尚无已解锁的其他作物'}，须在贸易站购买种子后才能选择不同作物` :
       p.rotationPlanned ? `已选下一春种${choice}，本季仍是${crop}，当前虫害不会因改选消失` : `可用上方作物选择安排不同于本季${crop}的作物`;
     return `轮作：${action}。${p.recurrence ? `本田已有${crop}虫害记录，继续同种会提高未来复发风险。` : ''}连续种受过虫害的同种作物会提高风险；实际播下不同作物才重置复发风险，只改下季选择不会重置。`;
   },
@@ -2166,7 +2169,7 @@ G.ui = {
           <label for="trade-payment">用一种待售物资支付</label><select id="trade-payment">${payments}</select>
           <p data-economy-live="quote" class="trade-quote" role="status" aria-live="polite"></p>
           <button type="submit" id="trade-execute">确认交易</button>
-          <p class="desc">付款数量向上取整，不找零。买入普通物资先进入本站库存，低于现存数量的待售目标会让商人搬回；羊或牛购入后进入各自待安置数量，到同种牧场放入。果树种子与卷心菜种子各买 1 次永久解锁，不能复购，不是库存物品，也不占贸易站或仓库容量。卷心菜解锁后到农田选择种植，产出计入蔬菜。</p>
+          <p class="desc">付款数量向上取整，不找零。买入普通物资先进入本站库存，低于现存数量的待售目标会让商人搬回；羊或牛购入后进入各自待安置数量，到同种牧场放入。果树、卷心菜与早熟豆类种子各买 1 次永久解锁，不能复购，不是库存物品，也不占贸易站或仓库容量。卷心菜和早熟豆类解锁后到农田选择种植，产出都计入蔬菜。</p>
         </form>
         <form id="trade-order-form" class="economy-form">
           <h3>③ 向这位商人订货</h3>
@@ -2248,7 +2251,7 @@ G.ui = {
         if (!quote.ok) { message(quote.reason); return; }
         const result = G.executeTrade(b, quote.good, quote.qty, quote.payment, renderedMerchant);
         const seed = G.seedUnlockKey ? G.seedUnlockKey(quote.good) : quote.good === 'orchardSeed' ? 'orchard' : null;
-        message(result.ok ? `已购买${G.TRADE_GOODS[quote.good].name} × ${quote.qty}，支付${G.RES[quote.payment].name} × ${result.paid}。${G.isLivestockType(quote.good) ? `到${G.TRADE_GOODS[quote.good].name}牧场放入，不能混养。` : seed === 'orchard' ? '所有果园已永久解锁种植，种子不占仓位。' : seed === 'cabbage' ? '所有农田已永久解锁卷心菜，请到农田选择；本季已开始的作物保留，改选留到下一春。种子不占仓位。' : '物资已到本站，等待商人按目标搬回仓库。'}` : result.reason || '交易未完成。');
+        message(result.ok ? `已购买${G.TRADE_GOODS[quote.good].name} × ${quote.qty}，支付${G.RES[quote.payment].name} × ${result.paid}。${G.isLivestockType(quote.good) ? `到${G.TRADE_GOODS[quote.good].name}牧场放入，不能混养。` : seed === 'orchard' ? '所有果园已永久解锁种植，种子不占仓位。' : seed && G.CROPS[seed] ? `所有农田已永久解锁${G.CROPS[seed].name}，请到农田选择；本季已开始的作物保留，改选留到下一春。种子不占仓位。` : '物资已到本站，等待商人按目标搬回仓库。'}` : result.reason || '交易未完成。');
         this.refreshHUD();
       });
       for (const id of ['trade-order-good', 'trade-order-quantity']) {
