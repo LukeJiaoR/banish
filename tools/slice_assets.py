@@ -13,6 +13,9 @@ from scipy import ndimage
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, 'assets')
+# Independently edited/reviewed PNGs are no longer derived from the old sheet.
+# Never silently put its known label/neighbor contamination back into these files.
+PRESERVED_EDITS = {'buildings/storage.png', 'buildings/site_3x3.png'}
 
 
 def load(name):
@@ -96,10 +99,42 @@ def cut(arr, box, pad=1):
     return arr[y0:y1, x0:x1]
 
 
+def cut_component(arr, window, min_px=60):
+    """Export only the selected sheet component, not every object in its bbox.
+
+    For future sheet slicing only. Reviewed standalone edits are skipped below.
+    Preserve the selected body's RGBA and one-pixel low-alpha antialias fringe.
+    """
+    x0, y0, x1, y1 = window
+    win = arr[y0:y1, x0:x1]
+    labels, n = ndimage.label(win[..., 3] > 12)
+    if not n:
+        return None
+    counts = np.bincount(labels.ravel()); counts[0] = 0
+    selected = counts.argmax()
+    if counts[selected] < min_px:
+        return None
+    body = labels == selected
+    ys, xs = np.where(body)
+    lx, ty = max(0, xs.min()-1), max(0, ys.min()-1)
+    rx, by = min(win.shape[1], xs.max()+2), min(win.shape[0], ys.max()+2)
+    fringe = ndimage.binary_dilation(body, structure=np.ones((3, 3))) & (win[..., 3] <= 12)
+    keep = (body | fringe)[ty:by, lx:rx]
+    result = win[ty:by, lx:rx].copy()
+    result[..., 3][~keep] = 0
+    return result
+
+
 def save(arr, rel):
     path = os.path.join(OUT, rel)
+    if rel in PRESERVED_EDITS:
+        if not os.path.isfile(path):
+            raise FileNotFoundError('Restore reviewed standalone sprite from git: ' + rel)
+        print('  preserve reviewed standalone edit:', rel)
+        return False
     os.makedirs(os.path.dirname(path), exist_ok=True)
     Image.fromarray(arr).save(path, optimize=True)
+    return True
 
 
 def despeckle_red(arr, max_px=36):
@@ -211,11 +246,14 @@ def main():
         'icons/alert.png':           (1378, 1002, 1436, 1058),
     }
     for rel, (x0, y0, x1, y1) in singles1.items():
-        box = largest_comp_box(s1, x0, y0, x1, y1)
-        if box is None:
+        if rel in PRESERVED_EDITS:
+            save(None, rel)
+            continue
+        sprite = cut_component(s1, (x0, y0, x1, y1))
+        if sprite is None:
             print('!! 未找到内容:', rel)
             continue
-        save(cut(s1, box), rel); n += 1
+        save(sprite, rel); n += 1
 
     # ---------- 补充图（无标签）：最大连通域 ----------
     print('sheet2:')
@@ -227,11 +265,11 @@ def main():
         'props/tree_young.png':     (975, 455, 1195, 724),
         'props/tree_mature.png':    (1235, 360, 1545, 724),
     }.items():
-        box = largest_comp_box(s2, x0, y0, x1, y1, min_px=500)
-        if box is None:
+        sprite = cut_component(s2, (x0, y0, x1, y1), min_px=500)
+        if sprite is None:
             print('!! 未找到内容:', rel)
             continue
-        save(cut(s2, box), rel); n += 1
+        save(sprite, rel); n += 1
 
     print('共输出', n, '个文件 →', OUT)
 
