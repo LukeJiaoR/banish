@@ -74,6 +74,10 @@ G.ui = {
     if (b.type === 'tavern' && G.tavernSummary) return G.tavernSummary(b).reason || '等待酒馆酿造或接待任务';
     if (b.type === 'pasture' && !(b.animals > 0)) return '等待放入同种牲畜';
     if (b.type === 'orchard' && !(G.game.unlocks && G.game.unlocks.orchard)) return '等待贸易购入果树种子';
+    if (['mine', 'stonequarry'].includes(b.type) && G.mineralSummary) {
+      const mineral = G.mineralSummary(b);
+      if (mineral.finite && mineral.reason) return mineral.reason;
+    }
     if (G.productionLimited(b) && G.buildingGoalStatus(b)) return G.buildingGoalStatus(b);
     if (G.fuelLimited(b)) return '暂停生产（柴火已达目标）';
     if (G.toolLimited(b)) return '暂停生产（工具已达目标）';
@@ -335,9 +339,17 @@ G.ui = {
     if (status) {
       const t = G.tool && (G.tool.kind === 'build' ? G.tool.type : G.tool.kind==='road' ? (G.tool.surface==='bridge'?'bridge':G.tool.surface==='stone'?'stoneroad':'road') : G.tool.kind);
       const names = { fell: '砍伐', quarry: '采石采铁', demolish: '拆除', road: '铺路' };
-      status.textContent = t ? `当前：${names[t] || G.BDEF[t].name} · ${t === 'demolish' ? '点击建筑或道路立即拆除' : ['fell', 'quarry'].includes(t) ? '框选范围后确认标记' : ['road','stoneroad','bridge'].includes(t) ? '选起终点后预览并确认' : t==='farm'?'选两个角或拖出矩形，再确认开田' : '点击地图放置，可连续建造'} · Esc / 右键取消` :
+      status.textContent = t ? `当前：${names[t] || G.BDEF[t].name} · ${t === 'demolish' ? '点击建筑或道路拆除；已开采的有限矿点须确认永久废坑' : ['fell', 'quarry'].includes(t) ? '框选范围后确认标记' : ['road','stoneroad','bridge'].includes(t) ? '选起终点后预览并确认' : t==='farm'?'选两个角或拖出矩形，再确认开田' : '点击地图放置，可连续建造'} · Esc / 右键取消${this.mineralBuildRisk(t) ? '\n' + this.mineralBuildRisk(t) : ''}` :
         group ? '未选择工具。点击一项开始；返回分类可切换功能。' : '选择分类，再选择建筑或操作。';
     }
+  },
+
+  mineralBuildRisk: function (type) {
+    if (!['mine', 'stonequarry'].includes(type)) return '';
+    const capacity = G.MINERAL_RULES?.[type]?.capacity || (type === 'mine' ? 7000 : 4000);
+    const reserve = type === 'mine' ? `新矿井共 ${capacity} 储量单位，最多采 ${Math.floor(capacity / 2)} 铁或 ${capacity} 煤（共享储量，切换不补充）`
+      : `新采石场最多采 ${capacity} 石头（本作适配数值）`;
+    return `${reserve}。首次实际开采后拆除会永久留下 3×3 废矿坑，无法复垦、建造或通行；未开采时取消/拆除不留坑。`;
   },
 
   setToolActive: function () {
@@ -719,7 +731,7 @@ G.ui = {
       this._placementWorld = G.world;
       this._placementKey = key;
       this._placement = G.placementInfo(type, x, y);
-      el.textContent = this._placement.text;
+      el.textContent = this._placement.text + (this.mineralBuildRisk(type) ? '\n' + this.mineralBuildRisk(type) : '');
       el.dataset.state = !this._placement.ok ? 'blocked' : this._placement.warning ? 'warning' : 'ready';
     }
     el.classList.remove('hidden');
@@ -732,6 +744,8 @@ G.ui = {
     this.renderInfo();
   },
   hideInfo: function () {
+    const panel = this.el.info.querySelector && this.el.info.querySelector('[data-mineral-removal-panel]');
+    if (panel) this.resetMineralRemoval(panel);
     G.sel = null;
     this.el.info.classList.add('hidden');
     this._infoSelection = null; // Reopening mounts new controls; dismissed callbacks stay stale.
@@ -1642,17 +1656,115 @@ G.ui = {
     this.refreshTailorInfo(b);
   },
   cargoText: function(cargo){return cargo?[{type:cargo.type,qty:cargo.qty},...Object.entries(cargo.extra||{}).map(([type,qty])=>({type,qty}))].filter(x=>x.qty>0&&G.RES[x.type]).map(x=>`${G.RES[x.type].name} ${Number(x.qty)}`).join(' + '):'无';},
+  mineralEquivalentText: function (summary) {
+    return summary.source === 'stonequarry' ? `${summary.stone} 石头` : `${summary.iron} 铁或 ${summary.coal} 煤（共享储量，不能相加）`;
+  },
+  mineralRemovalMarkup: function (b) {
+    if (!G.finiteMineral || !G.finiteMineral(b) || b.type === 'mineralpit') return '';
+    return `<section class="economy-form" data-mineral-removal-panel aria-label="有限矿点拆除确认">
+      <div class="hidden" data-mineral-removal-confirm role="group" aria-label="确认永久留下废矿坑">
+        <p class="desc" data-mineral-removal-quote></p>
+        <div class="economy-actions"><button type="button" id="mineral-removal-confirm" class="danger" disabled>确认拆除并永久留坑</button><button type="button" id="mineral-removal-cancel">取消，保留矿点</button></div>
+      </div>
+      <p class="economy-message" data-mineral-removal-message role="status" aria-live="polite"></p>
+    </section>`;
+  },
+  mineralRemovalControlValid: function (b, context, node, allowModal) {
+    const { world, game, el, panel, type, state } = context;
+    return G.world === world && G.game === game && this.el.info === el && !el.classList.contains('hidden') &&
+      G.sel && G.sel.kind === 'b' && G.sel.id === b.id && world.bmap[b.id] === b && b.type === type && b.state === state &&
+      el.querySelector('[data-mineral-removal-panel]') === panel && (!node || (!node.disabled && panel.querySelector('#' + node.id) === node)) &&
+      (allowModal || !(G.hasOpenModal && G.hasOpenModal()));
+  },
+  resetMineralRemoval: function (panel, message, restoreFocus) {
+    const box = panel.querySelector('[data-mineral-removal-confirm]'), confirm = panel.querySelector('#mineral-removal-confirm');
+    const status = panel.querySelector('[data-mineral-removal-message]'), el = this.el.info;
+    const hadFocus = box && box.contains && box.contains(document.activeElement);
+    panel._mineralPending = null;
+    if (box) box.classList.add('hidden');
+    if (confirm) confirm.disabled = true;
+    if (message !== undefined && status) status.textContent = message;
+    const start = el.querySelector && el.querySelector('#info-demolish');
+    if (restoreFocus && hadFocus && start && start.focus) start.focus();
+  },
+  refreshMineralRemoval: function (b) {
+    const el = this.el.info, panel = el.querySelector && el.querySelector('[data-mineral-removal-panel]');
+    if (!panel || !panel._mineralContext) return false;
+    if (!this.mineralRemovalControlValid(b, panel._mineralContext, null, true)) { this.resetMineralRemoval(panel); return false; }
+    if (G.hasOpenModal && G.hasOpenModal()) this.resetMineralRemoval(panel, '拆除确认已取消，请关闭弹窗后重新查看。');
+    else if (panel._mineralPending !== null) {
+      const quote = G.mineralRemovalQuote(b);
+      if (!quote.ok || !quote.leavesPit || quote.key !== panel._mineralPending)
+        this.resetMineralRemoval(panel, '储量或矿点状态已变化。未拆除，请重新查看最新拆除确认。', true);
+    }
+    return true;
+  },
+  confirmMineralRemoval: function (b, quote) {
+    const world = G.world, game = G.game;
+    if (!b || !world || world.bmap[b.id] !== b || !quote?.ok || !quote.leavesPit ||
+        (G.hasOpenModal && G.hasOpenModal()) || G.mineralRemovalQuote(b).key !== quote.key) return false;
+    // Map-tool demolition has no selected details yet. Open the same owned panel.
+    G.sel = { kind: 'b', id: b.id };
+    this.showInfo();
+    const el = this.el.info, panel = el.querySelector && el.querySelector('[data-mineral-removal-panel]');
+    if (G.world !== world || G.game !== game || !panel || !panel._mineralContext ||
+        !this.mineralRemovalControlValid(b, panel._mineralContext)) return false;
+    const current = G.mineralRemovalQuote(b);
+    if (!current.ok || !current.leavesPit || current.key !== quote.key) return false;
+    panel._mineralPending = current.key;
+    panel.querySelector('[data-mineral-removal-quote]').textContent =
+      `拆除${G.BDEF[b.type].name}后永久留下 3×3 废矿坑：土地无法复垦、无法建造、不可通行，废坑也不能再次拆除。剩余 ${current.remaining} 储量单位（最多 ${this.mineralEquivalentText(current)}）将全部永久丢弃。按当前普通拆除规则退还一半已付建材，仅退一次；已经实际开采并随身携带的矿物保留，继续送仓。`;
+    panel.querySelector('[data-mineral-removal-confirm]').classList.remove('hidden');
+    panel.querySelector('[data-mineral-removal-message]').textContent = '尚未拆除、弃矿或退料。请确认以上永久后果，或取消保留矿点。';
+    const confirm = panel.querySelector('#mineral-removal-confirm');
+    confirm.disabled = false;
+    if (confirm.focus) confirm.focus();
+    return true;
+  },
+  initMineralRemoval: function (b) {
+    const el = this.el.info, panel = el.querySelector && el.querySelector('[data-mineral-removal-panel]');
+    if (!panel) return;
+    const context = { world: G.world, game: G.game, el, panel, type: b.type, state: b.state };
+    panel._mineralContext = context;
+    this.resetMineralRemoval(panel, '');
+    const confirm = panel.querySelector('#mineral-removal-confirm'), cancel = panel.querySelector('#mineral-removal-cancel');
+    for (const button of [confirm, cancel]) button.addEventListener('keydown', e => {
+      if (e.repeat && ['Enter', ' '].includes(e.key)) e.preventDefault();
+    });
+    cancel.addEventListener('click', () => {
+      if (!this.mineralRemovalControlValid(b, context, cancel)) { this.resetMineralRemoval(panel); return; }
+      this.resetMineralRemoval(panel, '已取消确认，矿点、储量和建材均未改变。', true);
+    });
+    confirm.addEventListener('click', e => {
+      if ((e && e.detail > 1) || !this.mineralRemovalControlValid(b, context, confirm) || panel._mineralPending === null) {
+        this.resetMineralRemoval(panel); return;
+      }
+      const key = panel._mineralPending;
+      this.refreshMineralRemoval(b);
+      if (panel._mineralPending !== key) return;
+      this.resetMineralRemoval(panel);
+      const removed = G.removeBuilding(b, key);
+      if (!removed) this.resetMineralRemoval(panel, '矿点状态已改变，未拆除。请重新查看。', true);
+      else {
+        this.renderInfo(true);
+        const close = el.querySelector('#info-close');
+        if (!el.classList.contains('hidden') && close && close.focus) close.focus();
+      }
+    });
+  },
   resourceChainInfoData: function (b) {
     if (b.state !== 'ok' || !['mine', 'stonequarry', 'blacksmith'].includes(b.type)) return null;
     const smith = b.type === 'blacksmith', outputs = G.productionOutputsOf(b);
     const output = smith ? G.blacksmithOutput(b) : null;
     const mode = b.type === 'mine' ? G.mineModeOf(b) : null;
+    const mineral = !smith && G.mineralSummary ? G.mineralSummary(b) : null;
     const names = outputs.map(type => G.RES[type].name).join(' · ');
     const workers = b.workers.map(id => G.world.cmap[id]).filter(Boolean);
     const goal = G.buildingGoalStatus(b);
     let status;
     if(smith&&workers.some(c=>[c.task,c.pausedTask].some(t=>t?.kind==='smith'&&t.phase==='process')))status='原料已整批出库，继续返屋或加工；公共原料库存只决定后续新批次';
     else if(smith&&workers.some(c=>c.carry?.smithInput))status='未消耗原料正在退仓；仓满或无通路时随身保留';
+    else if (mineral?.finite && mineral.reason) status = mineral.reason;
     else if (G.productionLimited(b) && goal) status = goal;
     else if (smith && G.toolLimited(b)) status = `${G.RES[output].name}已达本屋目标，暂停新批次`;
     else if (!G.jobCanProduce(b)) {
@@ -1688,6 +1800,12 @@ G.ui = {
       data.inputs = '公共可用原料（不含已出库批次）：' + recipe.map(item => `${G.RES[item.type].name} ${Math.floor(G.game.res[item.type] || 0)}`).join(' · ');
       data.target = `本屋${G.RES[output].name}目标：${G.toolLimitOf(b)}（只看当前所选产物库存）`;
       data.lifetime = `寿命：铁工具 ${G.LIFE.toolLifeDays} / 钢工具 ${G.LIFE.steelToolLifeDays} 成人天；生产效率相同，优先磨损钢工具。工具不限仓储。`;
+    } else {
+      data.reserve = mineral?.finite ? `有限储量：剩余 ${mineral.remaining} / ${mineral.capacity} 单位；最多 ${this.mineralEquivalentText(mineral)}。` : '旧版无限：无限矿源，保留旧存档既有矿点的产出规则，不会耗尽。';
+      data.reserved = mineral?.finite ? `已接/夜间暂停批次预留 ${mineral.reserved} 单位；可供新批次 ${mineral.available} 单位。预留尚未扣除，实际开采才减少剩余储量；已产随身矿不再占储量。` : '旧版无限不占有限储量；切换模式不会把既有矿点改为有限矿点。';
+      data.mineralWarning = mineral?.finite ? mineral.exhausted ? '⚠ 储量已耗尽，不能再开采。' : mineral.low ? '⚠ 剩余储量已到 20% 及以下，请安排其他矿源。' : '储量会随实际开采减少，切换模式不会补充。' : '旧版矿点沿用普通拆除，不留下永久废矿坑。';
+      data.mineralRule = mineral?.finite ? b.type === 'mine' ? '每产 1 铁消耗 2 单位，每产 1 煤消耗 1 单位，共用同一矿藏；不足整批时只接剩余可产数量。' : '每产 1 石头消耗 1 单位；初始 4000 石头为本作适配数值，不足整批时只接剩余可产数量。' : '旧版矿点的已接批次按原产物完成。';
+      data.ground = mineral?.finite ? mineral.willLeavePit ? '已经实际开采：拆除须再次确认，永久留下 3×3 不可复垦、不可建造、不可通行的废矿坑，并丢弃全部剩余矿藏。' : '尚未实际开采：取消或拆除不留废坑；首次实际开采后拆除将永久留下 3×3 废矿坑，无法复垦、建造或通行。' : '开采后须搬运入仓才可使用；满仓余矿保留随身，腾出空间后继续送仓。';
     }
     return data;
   },
@@ -1709,7 +1827,7 @@ G.ui = {
       <div class="row" data-resource-chain-live="goals">${this.escHtml(data.goals)}</div>
       <div class="row" data-resource-chain-live="batches">${this.escHtml(data.batches)}</div>
       ${smith ? `<div class="row desc" data-resource-chain-live="lifetime">${this.escHtml(data.lifetime)}</div><div class="row desc">铁工具、钢工具各有独立的全镇目标。本屋目标随当前配方生效；已接批次仍可能完成并超过目标。</div>`
-        : '<div class="row desc">无限矿源（当前原型）：不设矿量耗尽。开采后须搬运入仓才可使用；满仓余矿保留随身，腾出空间后继续送仓。</div>'}
+        : ['reserve', 'reserved', 'mineralWarning', 'mineralRule', 'ground'].map(key => `<div class="row desc" data-resource-chain-live="${key}">${this.escHtml(data[key])}</div>`).join('') + '<div class="row desc">实际开采所得须搬运入仓才可使用；满仓余矿保留随身，腾出空间后继续送仓。</div>'}
       ${choice ? '<p class="economy-message" data-resource-chain-message role="status" aria-live="polite"></p>' : ''}
     </section>`;
   },
@@ -1727,17 +1845,18 @@ G.ui = {
     // Leave a keyboard user's uncommitted choice alone during the timed tick.
     const select = el.querySelector(b.type === 'mine' ? '#mine-mode' : '#tool-recipe');
     if (select && document.activeElement !== select) select.value = b.type === 'mine' ? G.mineModeOf(b) : G.blacksmithOutput(b) === 'steelTools' ? 'steel' : 'iron';
+    this.refreshMineralRemoval(b);
     return true;
   },
   initResourceChainInfo: function (b) {
-    const el = this.el.info, w = G.world;
+    const el = this.el.info, w = G.world, game = G.game, type = b.type;
     if (!el.querySelector || !el.querySelector('[data-resource-chain]')) return;
     const id = b.type === 'mine' ? 'mine-mode' : b.type === 'blacksmith' ? 'tool-recipe' : null;
     const select = id && el.querySelector('#' + id);
     if (!select) return;
     select.addEventListener('change', () => {
-      if (G.world !== w || !G.sel || G.sel.kind !== 'b' || G.sel.id !== b.id || w.bmap[b.id] !== b || b.state !== 'ok' ||
-          el.querySelector('#' + id) !== select || (G.hasOpenModal && G.hasOpenModal())) return;
+      if (G.world !== w || G.game !== game || this.el.info !== el || !G.sel || G.sel.kind !== 'b' || G.sel.id !== b.id || w.bmap[b.id] !== b || b.state !== 'ok' || b.type !== type ||
+          el.querySelector('#' + id) !== select || (el.classList.contains && el.classList.contains('hidden')) || (G.hasOpenModal && G.hasOpenModal())) return;
       const accepted = b.type === 'mine' ? G.setMineMode(b, select.value) : G.setToolRecipe(b, select.value);
       if (!accepted) select.value = b.type === 'mine' ? G.mineModeOf(b) : G.blacksmithOutput(b) === 'steelTools' ? 'steel' : 'iron';
       this.refreshResourceChainInfo(b);
@@ -1896,6 +2015,9 @@ G.ui = {
     const selected = G.sel.kind === 'b' ? w.bmap[G.sel.id] : w.cmap[G.sel.id];
     if (!selected) { this.hideInfo(); return; }
     const sameSelection = this._infoWorld === w && this._infoGame === G.game && this._infoElement === el && this._infoSelection === selected;
+    const mineralPanel = el.querySelector && el.querySelector('[data-mineral-removal-panel]');
+    if (mineralPanel && !sameSelection) this.resetMineralRemoval(mineralPanel);
+    else if (mineralPanel) this.refreshMineralRemoval(selected);
     const tradePanel = sameSelection && selected.type === 'tradingpost' && el.querySelector && el.querySelector('[data-economy="tradingpost"]');
     const merchantChanged = tradePanel && tradePanel._merchant !== selected.merchant;
     // A new boat gets new callbacks. Keep drafts, but never reuse a previous
@@ -1958,10 +2080,12 @@ G.ui = {
       const farmData = this.farmInfoData(b);
       const schoolData=this.schoolInfoData(b);
       const cemeteryData=b.type==='cemetery'&&b.state==='ok'?this.cemeteryInfoData(b):null;
-      const workforceData = this.workforceInfoData(b);
+      const pit = b.type === 'mineralpit', mineral = G.mineralSummary && G.mineralSummary(b);
+      const workforceData = pit ? null : this.workforceInfoData(b);
       const homeData = this.homeInfoData(b), upgradeData = this.houseUpgradeInfoData(b);
       let status;
-      if (fuelData) status = fuelData.status;
+      if (pit) status = '永久废矿坑：不可复垦、不可建造、不可通行，也不能拆除。';
+      else if (fuelData) status = fuelData.status;
       else if (siteData) status = siteData.status;
       else if(cemeteryData)status=cemeteryData.status;
       else if(schoolData)status=schoolData.status;
@@ -1988,6 +2112,7 @@ G.ui = {
         workers = `<div class="row">${medicalData ? b.type === 'hospital' ? '医师' : '采药员' : tavernData ? '酿酒工（需 18 岁以上且健康）' : '工人'}：<span${siteData ? ' data-site-workers' : ''}${fuelData ? ' data-fuel="workers"' : ''}${medicalData ? ' data-medical="workers"' : ''}${chainData ? ' data-resource-chain-live="workers"' : ''}${tavernData ? ' data-tavern="workers"' : ''}${tailorData ? ' data-tailor="workers"' : ''}${farmData ? ' data-farm="workers"' : ''}${b.state === 'ok' && ['tradingpost', 'pasture', 'orchard'].includes(b.type) ? ' data-economy-workers' : ''}>${names || (b.state === 'site' ? '等待建筑工人' : '无')}</span></div>`;
       }
       let extra = '';
+      if (pit) extra = `<div class="row" data-mineral-pit-source>原址：${this.escHtml(G.BDEF[mineral?.source]?.name || '矿点')} · 永久占地 3×3；没有岗位和产出。</div><div class="row desc" data-mineral-pit-reserve>拆除时丢弃的剩余矿藏：${Number(mineral?.remaining) || 0} 储量单位，永久不可恢复。</div>`;
       if (homeData) extra = `<div class="row" data-home-residents>${this.escHtml(homeData.residents)}</div>`;
       if(homeData)extra+=this.heatingInfoMarkup(b);
       if (upgradeData) extra += this.houseUpgradeInfoMarkup(upgradeData);
@@ -2044,8 +2169,8 @@ G.ui = {
         <div class="row"${siteData ? ' data-site-status' : ''}${homeData ? ' data-home-status' : ''}${fuelData ? ' data-fuel="status"' : ''}${medicalData ? ' data-medical="status"' : ''}${chainData ? ' data-resource-chain-live="status"' : ''}${hallData ? ' data-townhall="status"' : ''}${tavernData ? ' data-tavern="status"' : ''}${tailorData ? ' data-tailor="status"' : ''}${farmData ? ' data-farm="status"' : ''}${cemeteryData?' data-cemetery="status"':''}${schoolData?' data-school="status"':''}${b.state === 'ok' && ['tradingpost', 'pasture', 'orchard'].includes(b.type) ? ' data-economy-status' : ''}>${this.escHtml(status)}</div>
         ${workers}${this.workforceInfoMarkup(b, workforceData)}${extra}
         <div class="row desc">${def.desc}</div>
-        <div class="row desc" data-info-refund${fuelData ? ' data-fuel="refund"' : ''}>${fuelData ? fuelData.refund : siteData ? siteData.refund : '已开工：拆除退还一半已付建材，已砍树不恢复'}</div>
-        <button id="info-demolish" class="danger">${b.state === 'site' ? '取消工地' : '拆除'}</button>`;
+        ${pit ? '' : `<div class="row desc" data-info-refund${fuelData ? ' data-fuel="refund"' : ''}>${fuelData ? fuelData.refund : siteData ? siteData.refund : '已开工：拆除退还一半已付建材，已砍树不恢复'}</div>
+        <button id="info-demolish" class="danger">${b.state === 'site' ? '取消工地' : '拆除'}</button>${this.mineralRemovalMarkup(b)}`}`;
       if (fuelData) this._fuelInfoState = b.state;
       this._economyInfoState = b.state;
       this._medicalInfoState = b.state;
@@ -2067,6 +2192,7 @@ G.ui = {
       if(schoolData)this.refreshSchoolStudents(b);
       if (medicalData) this.refreshMedicalPatients(b);
       if (chainData) this.initResourceChainInfo(b);
+      this.initMineralRemoval(b);
       if (b.state === 'ok') this.initEconomyInfo(b);
       if (tradeDraft) {
         for (const [id, value] of Object.entries(tradeDraft)) {
@@ -2624,6 +2750,8 @@ G.ui = {
   enterDialog: function (id) {
     const el = document.getElementById(id);
     if (!el) return;
+    const mineralPanel = this.el.info && this.el.info.querySelector && this.el.info.querySelector('[data-mineral-removal-panel]');
+    if (mineralPanel) this.resetMineralRemoval(mineralPanel, '拆除确认已取消，请关闭弹窗后重新查看。');
     this._dialogFocus = this._dialogFocus || {};
     this._dialogFocus[id] = document.activeElement;
     if (el.setAttribute) { el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true'); }

@@ -1116,6 +1116,7 @@ G.markGroundDirty = G.markGroundDirty || (() => {}); // render.js 未加载时�
   b.mineTick = 4; // 下一趟是第 5 趟
   const t5 = G.makeTask(b, c);
   check('每 5 趟 1 趟铁', t5 && t5.yield.type === 'iron' && t5.yield.qty === 6);
+  c.x=t1.tx;c.y=t1.ty; // Fixture reaches the real mine entrance before completion.
   c.task = t1; c.state = 'work'; t1.workLeft = 0;
   G.completeTask(c);
   check('采石完工6石入库', g.res.stone === 100 + 6);

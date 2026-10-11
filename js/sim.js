@@ -668,9 +668,9 @@ G.sendTo = function (c, tx, ty, planned = null) {
   }
   const p = G.routeCanReuse(route,c,tx,ty) ? route.path : G.findPath(G.world, Math.round(c.x), Math.round(c.y), tx, ty);
   if (!p) { c.state = 'idle'; c.task = null; return false; }
-  // The path planner rounds its start cell. Input-carrying tasks still need to walk
-  // the final fraction of that cell after an interrupted commute.
-  if(['fuel','tailor'].includes(c.task?.kind) && p.length===0 && G.d2(c.x,c.y,tx,ty)>1e-8) {
+  // The path planner rounds its start cell. Physically checked factory/mineral
+  // tasks still walk the final fraction after an interrupted commute.
+  if((c.task?.mineral||['fuel','tailor'].includes(c.task?.kind)) && p.length===0 && G.d2(c.x,c.y,tx,ty)>1e-8) {
     c.path=[{x:tx,y:ty}];c.pi=0;c.state='walk';c.walkKind='task';return true;
   }
   c.path = p; c.pi = 0;
@@ -738,6 +738,8 @@ G.resumeTask = function (c) {
     ok = G.farmTaskCurrent(t) && t.b.farm[t.ti].sown && !t.b.farm[t.ti].harvested;
   } else if(ok&&t.kind==='orchard'){
     ok=G.orchardTaskCurrent(c,t);
+  } else if(ok&&t.mineral){
+    ok=G.mineralTaskCurrent(c,t);
   } else if(ok&&t.kind==='teach'){
     ok=G.schoolTeachers(t.b).includes(c)&&!G.isSick(c)&&c.hunger<1;
   } else if (ok && ['firewood','smith','fuel','tailor'].includes(t.kind)) {
@@ -1281,6 +1283,11 @@ G.stepCitizen = function (c, dtH) {
       return;
     }
     case 'work': {
+      if(c.task?.mineral&&!G.atMineralTask(c,c.task)){
+        const t=c.task,spot=G.mineralTaskCurrent(c,t)&&G.workSpot(G.world,t.b,c.x,c.y);
+        if(spot){t.tx=spot.x;t.ty=spot.y;G.sendTo(c,t.tx,t.ty,spot.route);}
+        else{c.task=null;c.state='idle';c.wanderT=1;}return;
+      }
       if(c.task?.kind==='orchard'&&!G.atOrchardTree(c,c.task)){G.sendTo(c,c.task.tx,c.task.ty);return;}
       if(c.task?.kind==='tailor'&&!G.tailorAtTask(c,c.task)){
         const t=c.task;if(!G.tailorTaskCurrent(c,t)||!G.sendTo(c,t.tx,t.ty))G.returnSmithBatch(c);return;
@@ -1761,6 +1768,7 @@ G.completeTask = function (c) {
     case 'tailor': { G.completeTailorTask(c,t); return; }
     case 'orchard': { G.completeOrchardTask(c,t); break; }
     case 'work': {
+      if(t.mineral){G.completeMineralTask(c,t);break;}
       if (t.economy) { G.completeEconomyWork(c,t); break; }
       if (t.consume) {
         const cons = Array.isArray(t.consume) ? t.consume : [t.consume];
@@ -1925,7 +1933,7 @@ G.jobCanProduce = function (b) {
   if (b.type === 'forester') return (b.doCut && !G.goalPaused('wood') && G.treesInRadius(w, b.x, b.y, p.forester.radius, true).length > p.forester.minMature) ||
     (b.doPlant && !!G.nearestPlantSpot(w, b.x, b.y, p.forester.radius));
   if (b.type === 'gatherer' || b.type === 'hunting') return G.foodForestCanWork(b);
-  if (['mine', 'stonequarry'].includes(b.type)) return G.productionOutputsOf(b).some(type => !G.goalPaused(type) && r[type] < G.storageCap(type));
+  if (['mine', 'stonequarry'].includes(b.type)) return G.productionOutputsOf(b).some(type => !G.goalPaused(type) && r[type] < G.storageCap(type) && (!G.finiteMineral(b)||G.mineralAvailable(b)>=G.mineralUnitCost(type)));
   return true;
 };
 
@@ -2132,6 +2140,7 @@ G.siteTrees = function (b) {
 G.addBuilding = function (type, x, y, opt) {
   opt = opt || {};
   const def=type==='farm'?G.farmDefinition(opt.farmSize):G.BDEF[type];
+  if(def?.unbuildable)return {ok:false,reason:'永久矿坑不能主动建造或重新开发'};
   if(!def||(opt.farmSize!==undefined&&type!=='farm'))return {ok:false,reason:'农田每边须为4至15格的整数'};
   const w = G.world;
   if (!opt.free) {
@@ -2165,6 +2174,7 @@ G.addBuilding = function (type, x, y, opt) {
     b.sownAll = false; b.growth = 0; b.harvestDone = false;
   }
   if (type === 'forester') { b.doCut = true; b.doPlant = true; } // 原版 Forester 的 Cut / Plant 开关
+  if(G.MINERAL_RULES[type])b.mineralUnits=G.MINERAL_RULES[type].capacity;
   if (type === 'mine') { b.mineMode = 'iron'; b.legacyMine = false; b.mineTick = 0; }
   if (type === 'blacksmith') { b.toolLimit = G.PROD.blacksmith.toolLimit; b.toolRecipe = 'iron'; }
   if(type==='cemetery')b.graves=[];
@@ -2267,9 +2277,16 @@ G.finishBuilding = function (b) {
   G.ui.refreshHUD();
 };
 
-G.removeBuilding = function (b) {
+G.removeBuilding = function (b, confirmationKey) {
   const w = G.world;
-  if(!b||w.bmap[b.id]!==b)return; // A consumed/cancelled site cannot refund twice.
+  if(!b||w.bmap[b.id]!==b)return false; // A consumed/cancelled site cannot refund twice.
+  if(b.type==='mineralpit'){G.ui.toast('永久矿坑不能拆除、重建或恢复储量','warn');return false;}
+  const mineralQuote=G.mineralRemovalQuote(b),leavesPit=mineralQuote.leavesPit;
+  if(leavesPit&&confirmationKey!==mineralQuote.key){
+    if(confirmationKey===undefined&&G.ui.confirmMineralRemoval)G.ui.confirmMineralRemoval(b,mineralQuote);
+    else G.ui.toast('已开采矿点拆除将永久留坑，储量或状态可能已变，请重新确认','warn');
+    return false;
+  }
   if(b.type==='cemetery'&&G.activeGraves(b).length){G.ui.toast('墓园仍有未到期墓位，需等自然释放后才能拆除','warn');return;}
   if(b.type==='townhall'&&G.game.nomads.offer?.hallId===b.id)G.game.nomads.offer=null;
   if (b.type === 'bridge') { const check=G.bridgeRemovalStatus(w,b); if(!check.ok){G.ui.toast(check.reason,'warn');return;} }
@@ -2282,7 +2299,7 @@ G.removeBuilding = function (b) {
   }
   for (const id of b.workers) {
     const c = w.cmap[id];
-    if(c&&b.state==='site'&&b.upgradeFrom==='house')G.markStaffingCargo(c);
+    if(c&&((b.state==='site'&&b.upgradeFrom==='house')||leavesPit))G.markStaffingCargo(c);
     if (c) { c.job = null; delete c.staffingRelease; c.task = null; c.pausedTask = null; c.path = null; c.state = 'idle'; }
   }
   for (const c of w.citizens) {
@@ -2304,6 +2321,9 @@ G.removeBuilding = function (b) {
   for(const c of displacedHaulers)G.markStaffingCargo(c);
   w.buildings = w.buildings.filter(x => x !== b);
   delete w.bmap[b.id];
+  const pit=leavesPit?{id:G.nextId(),type:'mineralpit',x:b.x,y:b.y,w:b.w,h:b.h,state:'ok',progress:1,workLeft:0,totalWork:1,
+    workers:[],family:null,noWork:false,warnText:'',paidCost:{},pitSource:b.type,mineralUnits:b.mineralUnits}:null;
+  if(pit){w.buildings.push(pit);w.bmap[pit.id]=pit;}
   if (G.game && G.game.buildLog) {
     G.game.buildLog.push({ d: G.game.day, t: '-' + b.type });
     if (G.game.buildLog.length > 30) G.game.buildLog.shift();
@@ -2311,12 +2331,12 @@ G.removeBuilding = function (b) {
   // 清除占地占位：残留会让该地块成为"幽灵建筑"——点击无详情、原地也无法重建
   for (let j = b.y; j < b.y + b.h; j++)
     for (let i = b.x; i < b.x + b.w; i++)
-      w.bgrid[j * w.N + i] = -1;
+      w.bgrid[j * w.N + i] = pit?pit.id:-1;
   G.bumpNavigation(w);
   for(const c of displacedHaulers)G.startHaul(c);
   if (G.sel && G.sel.kind === 'b' && G.sel.id === b.id) G.ui.hideInfo();
-  G.ui.toast(`🚧 已拆除 ${def.name}${refund.length ? `，返还 ${refund.join(' ')}` : ''}`, 'info');
-  G.scheduleJobs();
+  G.ui.toast(`🚧 已拆除 ${def.name}${pit?'，留下永久3×3矿坑':''}${refund.length ? `，返还 ${refund.join(' ')}` : ''}`, 'info');
+  G.scheduleJobs();return true;
 };
 
 G.demolishAt = function (tx, ty) {
@@ -2866,6 +2886,51 @@ G.setToolRecipe = function (b, recipe) {
   if (!b || G.world.bmap[b.id] !== b || b.type !== 'blacksmith' || b.state !== 'ok' || !['iron','steel'].includes(recipe)) return false;
   b.toolRecipe=recipe; delete b.productionPaused; b.noWork=false; b.warnText=''; G.updateProductionGoals(); G.game.schedT=0; return true;
 };
+/* New points are finite; absence on old saves is an explicit unlimited
+ * legacy contract. Mine units avoid fractional reserves: iron=2, coal=1. */
+G.MINERAL_RULES={mine:{capacity:7000},stonequarry:{capacity:4000}};
+G.finiteMineral=b=>!!(b&&G.MINERAL_RULES[b.type]&&Number.isInteger(b.mineralUnits));
+G.mineralUnitCost=type=>type==='iron'?2:1;
+G.mineralReserved=function(b,exclude){
+  if(!G.finiteMineral(b))return 0;
+  const seen=new Set();let units=0;
+  for(const c of G.world.citizens)if(c!==exclude&&!c.dead&&c.job===b.id)for(const t of [c.task,c.pausedTask])
+    if(t?.mineral&&!t.mineralDone&&t.b===b&&!seen.has(t)){seen.add(t);units+=t.mineralUnits||0;}
+  return units;
+};
+G.mineralAvailable=(b,c)=>G.finiteMineral(b)?Math.max(0,b.mineralUnits-G.mineralReserved(b,c)):Infinity;
+G.mineralSummary=function(b){
+  const pit=b?.type==='mineralpit',source=pit?b.pitSource:b?.type,finite=pit||G.finiteMineral(b),capacity=G.MINERAL_RULES[source]?.capacity||0;
+  if(!finite)return {finite:false,pit:false,source,capacity:null,remaining:null,reserved:0,available:null,iron:null,coal:null,stone:null,low:false,exhausted:false,willLeavePit:false,reason:'旧版无限矿点：保留原产出和普通拆除规则'};
+  const remaining=b.mineralUnits,reserved=pit?0:G.mineralReserved(b),available=pit?0:Math.max(0,remaining-reserved),type=source==='mine'?G.mineModeOf(b):'stone';
+  const reason=pit?'永久矿坑：不能移除、重建或继续采矿':remaining===0?'储量已耗尽，请扩建新矿点或贸易补给':available<G.mineralUnitCost(type)?
+    reserved>0?'剩余储量已被当前开采批次预留':type==='iron'?'剩余储量不足1铁，可切换采煤取出末量':'剩余储量不足':'';
+  return {finite:true,pit,source,capacity,remaining,reserved,available,iron:source==='mine'?Math.floor(remaining/2):0,coal:source==='mine'?remaining:0,stone:source==='stonequarry'?remaining:0,
+    low:remaining<=capacity*.2,exhausted:remaining===0,willLeavePit:!pit&&remaining<capacity,reason};
+};
+G.mineralRemovalQuote=function(b){
+  if(!b||G.world.bmap[b.id]!==b)return {ok:false,leavesPit:false,reason:'建筑已改变'};
+  const s=G.mineralSummary(b);
+  if(s.pit)return {ok:false,leavesPit:false,reason:s.reason};
+  return {ok:true,leavesPit:s.willLeavePit,source:s.source,remaining:s.remaining,iron:s.iron,coal:s.coal,stone:s.stone,
+    key:[b.id,b.type,b.state,b.mineralUnits??'legacy'].join(':'),reason:s.willLeavePit?'永久留下3×3矿坑，剩余矿物不可再采；已背出货物继续送仓':''};
+};
+G.mineralTaskCurrent=function(c,t){
+  const b=t?.b;
+  return !!(t?.mineral&&!t.mineralDone&&b&&G.world.bmap[b.id]===b&&b.state==='ok'&&G.MINERAL_RULES[b.type]&&c.job===b.id&&!c.dead&&
+    t.finite===G.finiteMineral(b)&&(!t.finite||b.mineralUnits>=t.mineralUnits));
+};
+G.atMineralTask=(c,t)=>G.mineralTaskCurrent(c,t)&&G.atMedicalDoor(c,t.b)&&G.d2(c.x,c.y,t.tx,t.ty)<.04&&!G.tileBlocked(G.world,Math.round(c.x),Math.round(c.y));
+G.completeMineralTask=function(c,t){
+  if(c.carry||!G.atMineralTask(c,t))return false;
+  const b=t.b;t.mineralDone=true;
+  if(t.finite){
+    const before=b.mineralUnits;b.mineralUnits-=t.mineralUnits;
+    if(before>G.MINERAL_RULES[b.type].capacity*.2&&b.mineralUnits<=G.MINERAL_RULES[b.type].capacity*.2)G.ui.toast(`⚠ ${G.BDEF[b.type].name}储量已降至20%及以下，请准备新矿点或贸易补给`,'warn');
+    if(before>0&&b.mineralUnits===0)G.ui.toast(`⛏ ${G.BDEF[b.type].name}已耗尽；已采矿物继续送仓，拆除会留下永久矿坑`,'warn');
+  }
+  c.carry={type:t.yield.type,qty:t.yield.qty};G.recordProduction(b,t.yield.type,t.yield.qty);return true;
+};
 G.makeMineralTask = function (b, c) {
   const w=G.world, g=G.game, p=b.type==='stonequarry'?G.PROD.stonequarry:G.PROD.mine;
   let type=b.type==='stonequarry'?'stone':G.mineModeOf(b);
@@ -2878,8 +2943,10 @@ G.makeMineralTask = function (b, c) {
   } else if (blocked(type)) { b.noWork=true; b.warnText=G.RES[type].name+'仓容或目标已满'; return null; }
   const spot=G.workSpot(w,b,c.x,c.y);
   if (!spot) { b.noWork=true; b.warnText='采矿入口不可达'; return null; }
-  const qty=type==='coal'?p.coalYield:p.yield;
-  return G.withTaskRoute({kind:'work',b,tx:spot.x,ty:spot.y,work:G.taskWork(c,p.workH),workLeft:0,yield:{type,qty:G.taskYield(qty)}},spot.route);
+  const finite=G.finiteMineral(b),unitCost=G.mineralUnitCost(type),base=type==='coal'?p.coalYield:p.yield;
+  const qty=Math.min(G.taskYield(base),Math.floor(G.mineralAvailable(b,c)/unitCost));
+  if(qty<1){b.noWork=true;b.warnText=G.mineralSummary(b).reason;return null;}
+  return G.withTaskRoute({kind:'work',mineral:true,finite,mineralUnits:finite?qty*unitCost:0,b,tx:spot.x,ty:spot.y,work:G.taskWork(c,p.workH),workLeft:0,yield:{type,qty}},spot.route);
 };
 
 G.addBridge = function(start,end) {
@@ -3448,6 +3515,7 @@ G.setConstructionPaused=function(b,paused){
 };
 G.workforceBlockReason=function(b){
   const r=G.game.res,status=G.buildingGoalStatus(b);if(status&&G.productionLimited(b))return status;
+  if(G.MINERAL_RULES[b.type]&&G.mineralSummary(b).reason)return G.mineralSummary(b).reason;
   const full=G.productionOutputsOf(b).filter(k=>k!=='food'&&!G.isTool(k)&&G.mineralStorageSpace(k)<=0);
   if(full.length)return full.map(k=>G.RES[k].name).join('、')+'仓满，暂停新生产';
   if(b.type==='woodcutter')return '缺原木：每批需要'+G.PROD.woodcutter.logsIn;

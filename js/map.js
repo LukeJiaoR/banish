@@ -563,6 +563,7 @@ G.canPlace = function (w, type, ox, oy, farmSize) {
   if(type==='farm'&&(!Number.isInteger(ox)||!Number.isInteger(oy)))return {ok:false,reason:'农田坐标须为整数'};
   const def = type==='farm'?G.farmDefinition(farmSize):G.BDEF[type];
   if(!def||(farmSize!==undefined&&type!=='farm'))return {ok:false,reason:'农田每边须为4至15格的整数'};
+  if(def.unbuildable)return {ok:false,reason:'永久矿坑不能主动建造或重新开发'};
   const N = w.N;
   if (ox < 0 || oy < 0 || ox + def.w > N || oy + def.h > N) return { ok: false, reason: '超出地图范围' };
   let hasWater = false;
@@ -576,10 +577,10 @@ G.canPlace = function (w, type, ox, oy, farmSize) {
   // 等距视觉间距：脚印不重叠还不够——新建筑的前墙脚线（南缘）若落在已有建筑的
   // 屋顶投影内，画出来会像“盖在已有建筑上”；反向（新屋顶挡住旧前墙）同理。
   // 屋顶高约 28px ≈ 0.875 格，恰好盖住紧贴北/西侧一格内的墙脚。农田是平的，不参与。
-  if (!['farm', 'pasture', 'orchard'].includes(type)) {
+  if (!['farm', 'pasture', 'orchard', 'mineralpit'].includes(type)) {
     const foot = oy + def.h;
     for (const b of w.buildings) {
-      if (['farm', 'pasture', 'orchard'].includes(b.type)) continue;
+      if (['farm', 'pasture', 'orchard', 'mineralpit'].includes(b.type)) continue;
       if (foot >= b.y && foot < b.y + b.h && ox < b.x + b.w && ox + def.w >= b.x)
         return { ok: false, reason: '与其他建筑贴得太近：会叠在它后面' };
       if (b.y + b.h >= oy && b.y + b.h < oy + def.h && b.x < ox + def.w && b.x + b.w >= ox)
