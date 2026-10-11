@@ -81,7 +81,7 @@ test('a finished construction owner cannot reuse or replan an obsolete build dis
 test('woodcutter plans only one search for each real fetch and return leg',()=>{
  const G=fresh(),w=G.world;G.addBuilding('storage',4,2,{instant:true,free:true});const b=G.addBuilding('woodcutter',16,12,{instant:true,free:true}).b,c=G.spawnCitizen({x:5,y:15,age:25,sex:'m'});G.game.res.wood=100;G.game.res.firewood=0;c.job=b.id;b.workers=[c.id];
  let calls=0;const find=G.findPath;G.findPath=(...a)=>{calls++;return find(...a);};G.requestTask(c);assert.equal(calls,1);assert.equal(c.task.phase,'fetch');const t=c.task,wood=G.game.res.wood,end=c.path[c.path.length-1];c.x=end.x;c.y=end.y;calls=0;
- assert(G.firewoodFetchDone(c,t));assert.equal(calls,1);assert.equal(c.task.phase,'work');assert.equal(G.game.res.wood,wood);assert.equal(G.game.res.firewood,0);assert.equal(c.state,'walk');
+ G.completeFuelTask(c,t);assert.equal(calls,1);assert.equal(c.task.phase,'process');assert.equal(G.game.res.wood,wood-2);assert(c.carry.fuelInput);assert.equal(G.game.res.firewood,0);assert.equal(c.state,'walk');
 });
 test('wide warehouse search does not mistake stale heap entries for an unreachable route',()=>{
  const G=fresh(),w=G.world,a=G.addBuilding('storage',1,1,{instant:true,free:true}).b,b=G.addBuilding('storage',124,124,{instant:true,free:true}).b,r=G.makeRng(1);

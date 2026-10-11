@@ -251,16 +251,18 @@ test('control lowering clamps at zero and raising uses the actual definitions up
   assert.doesNotMatch(f.info.textContent, /onerror/);
 });
 
-test('lowering the target does not cancel existing or paused batches; accepted work still consumes wood at completion', () => {
+test('lowering the target does not cancel existing or paused batches; accepted work uses its withdrawn wood once', () => {
   const f = fixture(), { G } = f; const b = f.building('woodcutter', { fuelLimit: 150 });
   const c = G.spawnCitizen({ x: 1, y: 1, age: 30, sex: 'm', name: '工人' });
   c.job = b.id; b.workers.push(c.id); G.game.res.wood = 20; G.game.res.firewood = 104;
-  const task = G.makeTask(b, c); assert.ok(task); assert.equal(task.phase, 'work'); c.task = task;
+  const task = G.makeTask(b, c); assert.ok(task); assert.equal(task.phase, 'fetch'); c.task = task;
   const paused = { ...task }; c.pausedTask = paused;
   f.select(b); for (let i = 0; i < 4; i++) f.button(-G.PROD.woodcutter.fuelStep).click();
   assert.equal(b.fuelLimit, 0); assert.equal(c.task, task); assert.equal(c.pausedTask, paused);
   assert.equal(G.game.res.wood, 20); assert.equal(G.game.res.firewood, 104);
-  G.completeTask(c);
+  c.x=task.tx;c.y=task.ty;G.completeTask(c);
+  assert.equal(c.carry.qty,2);assert.equal(task.phase,'process');
+  for(let i=0;i<200&&G.game.res.firewood===104;i++)G.stepCitizen(c,.1);
   assert.equal(G.game.res.wood, 20 - G.PROD.woodcutter.logsIn);
   assert.equal(G.game.res.firewood, 104 + G.PROD.woodcutter.firewoodOut);
   assert.equal(c.task, null, 'no new batch is accepted above target'); assert.equal(c.pausedTask, paused);

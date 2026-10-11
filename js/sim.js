@@ -606,9 +606,9 @@ G.alternateTaskEndpoint = function (c, t) {
   if (t.kind === 'clearSite' && (!t.tree || G.world.trees[G.world.treeIdx[t.tree.i]] !== t.tree)) return null;
   if (['care', 'clinic', 'arrival', 'leisure', 'host', 'study', 'teach'].includes(t.kind)) return G.workSpot(G.world, t.b, c.x, c.y, true);
   if (t.kind === 'clearSite') return G.siteClearSpot(c, t.b, t.tree);
-  if(t.kind==='smith'&&t.phase==='fetch'&&!G.hasStorageBuilding())return G.workSpot(G.world,t.b,c.x,c.y,true);
-  if (['firewood', 'trade', 'brew', 'smith'].includes(t.kind) && t.phase === 'fetch') return G.storageRoute(c.x,c.y,G.fetchStorageTypes(t))?.spot || null;
-  if (t.kind === 'build' || t.kind === 'firewood' || t.kind === 'trade' || t.kind === 'brew' || t.kind === 'smith' ||
+  if(['smith','fuel'].includes(t.kind)&&t.phase==='fetch'&&!G.hasStorageBuilding())return G.workSpot(G.world,t.b,c.x,c.y,true);
+  if (['firewood', 'trade', 'brew', 'smith', 'fuel'].includes(t.kind) && t.phase === 'fetch') return G.storageRoute(c.x,c.y,G.fetchStorageTypes(t))?.spot || null;
+  if (t.kind === 'build' || t.kind === 'firewood' || t.kind === 'trade' || t.kind === 'brew' || t.kind === 'smith' || t.kind === 'fuel' ||
       (t.kind === 'work' && ['dock', 'mine', 'stonequarry', 'blacksmith', 'pasture', 'orchard'].includes(t.b.type)))
     return G.workSpot(G.world, t.b, c.x, c.y, true);
   return null;
@@ -630,7 +630,7 @@ G.routeCanReuse = function (route, c, tx, ty) {
 G.sendTo = function (c, tx, ty, planned = null) {
   let route=planned||(c.task&&c.task.dispatchRoute);
   if(c.task) delete c.task.dispatchRoute;
-  const buildingTask=c.task && (['build','clearSite','firewood','trade','care','clinic','arrival','leisure','host','brew','smith','study','teach'].includes(c.task.kind) || (c.task.kind==='work' && c.task.b && ['dock','mine','stonequarry','blacksmith','pasture','orchard'].includes(c.task.b.type)));
+  const buildingTask=c.task && (['build','clearSite','firewood','trade','care','clinic','arrival','leisure','host','brew','smith','fuel','study','teach'].includes(c.task.kind) || (c.task.kind==='work' && c.task.b && ['dock','mine','stonequarry','blacksmith','pasture','orchard'].includes(c.task.b.type)));
   if((route && !G.routeCanReuse(route,c,tx,ty)) || (!route && buildingTask)) {
     const spot=G.alternateTaskEndpoint(c,c.task);
     if(!spot){if(c.task)G.dropBlockedTask(c,c.task);c.path=null;c.state='idle';c.wanderT=.5;return false;}
@@ -643,6 +643,11 @@ G.sendTo = function (c, tx, ty, planned = null) {
   }
   const p = G.routeCanReuse(route,c,tx,ty) ? route.path : G.findPath(G.world, Math.round(c.x), Math.round(c.y), tx, ty);
   if (!p) { c.state = 'idle'; c.task = null; return false; }
+  // The path planner rounds its start cell. Fuel tasks still need to walk
+  // the final fraction of that cell after an interrupted commute.
+  if(c.task?.kind==='fuel' && p.length===0 && G.d2(c.x,c.y,tx,ty)>1e-8) {
+    c.path=[{x:tx,y:ty}];c.pi=0;c.state='walk';c.walkKind='task';return true;
+  }
   c.path = p; c.pi = 0;
   if (p.length === 0) { c.state = 'work'; if (c.task && !(c.task.workLeft > 0)) c.task.workLeft = c.task.work; }
   else { c.state = 'walk'; c.walkKind = 'task'; }
@@ -710,7 +715,7 @@ G.resumeTask = function (c) {
     ok=G.orchardTaskCurrent(c,t);
   } else if(ok&&t.kind==='teach'){
     ok=G.schoolTeachers(t.b).includes(c)&&!G.isSick(c)&&c.hunger<1;
-  } else if (ok && ['firewood','smith'].includes(t.kind)) {
+  } else if (ok && ['firewood','smith','fuel'].includes(t.kind)) {
     ok = t.b.state === 'ok';
   } else if (ok && t.kind === 'build') {
     ok = t.b.state === 'site'&&!t.b.sitePaused;
@@ -757,7 +762,7 @@ G.storageRoute = function (x, y, types) {
  * part of a delivery. Tavern output, refundable raw grain and the specific current batch marked
  * on staffing withdrawal share this bounded path. Ordinary unmarked cargo
  * keeps its existing delivery policy; the marker dies with its cargo object. */
-G.isMineralCargo = function (c) { return !!c.carry && (c.carry.staffingReturn===true || ['stone','iron','coal','ale','clothes','warmCoats'].includes(c.carry.type) || (c.carry.type==='grain' && c.carry.brewIngredient===true) || (Number.isInteger(c.carry.pastureId)&&['meat','leather','wool'].includes(c.carry.type)) || (Number.isInteger(c.carry.orchardId)&&c.carry.type==='vegetables')); };
+G.isMineralCargo = function (c) { return !!c.carry && (c.carry.staffingReturn===true || ['stone','iron','coal','ale','clothes','warmCoats'].includes(c.carry.type) || (c.carry.type==='grain' && c.carry.brewIngredient===true) || (Number.isInteger(c.carry.pastureId)&&['meat','leather','wool'].includes(c.carry.type)) || (Number.isInteger(c.carry.orchardId)&&c.carry.type==='vegetables') || (Number.isInteger(c.carry.firewoodId)&&c.carry.type==='firewood')); };
 G.mineralStorageSpace = function (type) { return G.isTool(type) ? Infinity : Math.max(0, G.storageCap(type) - G.game.res[G.isFood(type)?'food':type]); };
 // Ordinary in-flight minerals remain eligible as before; only an already
 // blocked delivery cannot count as available labour or occupy a productive slot.
@@ -772,7 +777,7 @@ G.waitForMineralStorage = function (c, reason) {
 G.warnMineralStorage = function () {
   if (G.game.warned.mineralStorageFull) return;
   G.game.warned.mineralStorageFull = true;
-  G.ui.toast('⚠ 仓位已满，矿物、麦酒、成衣、牧场产物、果园果实、撤岗货批、铁匠原料或退回原粮由市民随身保留；使用库存或建成新仓库后继续送仓', 'warn');
+  G.ui.toast('⚠ 仓位已满，矿物、麦酒、成衣、牧场产物、果园果实、成批柴火、撤岗货批、作坊原料或退回原粮由市民随身保留；使用库存或建成新仓库后继续送仓', 'warn');
 };
 G.cargoWaitReason = function (c) {
   if (!G.isMineralCargo(c) || !c.haulPending || c.state === 'haul') return '';
@@ -993,7 +998,7 @@ G.consumeFood = function (qty) {
   r.food = G.FOOD_KEYS.reduce((n,k) => n + r[k], 0); return [...eaten];
 };
 G.depositCargo = function (cargo) {
-  const accepted = G.deposit(cargo.type, cargo.qty, cargo.staffingReturn===true||cargo.brewIngredient===true||Number.isInteger(cargo.pastureId)||Number.isInteger(cargo.orchardId));
+  const accepted = G.deposit(cargo.type, cargo.qty, cargo.staffingReturn===true||cargo.brewIngredient===true||Number.isInteger(cargo.pastureId)||Number.isInteger(cargo.orchardId)||Number.isInteger(cargo.firewoodId));
   if (cargo.extra&&cargo.staffingReturn!==true) { for (const [type, qty] of Object.entries(cargo.extra)) G.deposit(type, qty); delete cargo.extra; }
   return accepted;
 };
@@ -1015,7 +1020,7 @@ G.deposit = function (type, qty, retain=false) {
 
 /* Blacksmith batches own actual withdrawn input cargo. Unserialized tasks may
  * be abandoned on load, but that one bounded cargo must be returned, not charged
- * again or promoted into a new batch. Other workshops keep their old contracts. */
+ * again or promoted into a new batch. Fuel uses its own bounded raw batch below; other workshops retain their old contracts. */
 G.makeBlacksmithTask=function(b,c){
   if(G.toolLimited(b)){b.noWork=true;b.warnText='工具已达上限';return null;}
   const consume=G.blacksmithRecipe(b).map(item=>({...item})),r=G.game.res;
@@ -1053,6 +1058,39 @@ G.completeSmithTask=function(c,t){
   }
   if(t.phase!=='process'||!G.smithCargoMatches(c,t)){G.returnSmithBatch(c);return;}
   c.carry={type:t.yield.type,qty:t.yield.qty};G.startHaul(c);
+};
+
+/* Fuel inputs are a distinct bounded batch; the tailor keeps its legacy
+ * completion-time ingredient contract. No public stock is charged twice. */
+G.makeFuelTask=function(b,c){
+  const p=G.PROD.woodcutter;
+  if(G.fuelLimited(b)){b.noWork=true;b.warnText='柴火已达上限';return null;}
+  if(G.game.res.wood<p.logsIn){b.noWork=true;b.warnText='缺木材';return null;}
+  const stored=G.hasStorageBuilding(),route=stored?G.storageRoute(c.x,c.y,'wood'):null;
+  const spot=stored?route?.spot:G.workSpot(G.world,b,c.x,c.y);
+  if(!spot){b.noWork=true;b.warnText=stored?'取木堆料场或仓库不可达':'伐木屋入口不可达';return null;}
+  b.noWork=false;b.warnText='';
+  return G.withTaskRoute({kind:'fuel',phase:'fetch',b,tx:spot.x,ty:spot.y,work:.1,workLeft:.1,craftWork:p.workH,
+    consume:{type:'wood',qty:p.logsIn},yield:{type:'firewood',qty:G.taskYield(c.educated?p.logsIn*p.eduFirewoodPerLog:p.firewoodOut)}},spot.route);
+};
+G.fuelTaskCurrent=(c,t)=>!!t&&!t.completed&&t.kind==='fuel'&&G.world.cmap[c.id]===c&&!c.dead&&t.b?.type==='woodcutter'&&G.world.bmap[t.b.id]===t.b&&t.b.state==='ok'&&c.job===t.b.id;
+G.fuelAtTask=function(c,t){
+  if(!G.fuelTaskCurrent(c,t)||G.tileBlocked(G.world,Math.round(c.x),Math.round(c.y))||G.d2(c.x,c.y,t.tx,t.ty)>.04)return false;
+  return t.phase==='fetch'&&G.hasStorageBuilding()?G.atStorageDoor(c,'wood'):G.atMedicalDoor(c,t.b);
+};
+G.completeFuelTask=function(c,t){
+  if(t?.completed||G.world.cmap[c.id]!==c)return;
+  if(!G.fuelAtTask(c,t)){G.returnSmithBatch(c);return;}
+  if(t.phase==='fetch'){
+    if(c.carry||G.game.res.wood<t.consume.qty){G.returnSmithBatch(c);return;}
+    const spot=G.workSpot(G.world,t.b,c.x,c.y);if(!spot){t.b.warnText='伐木屋入口不可达';G.returnSmithBatch(c);return;}
+    G.withdrawResource('wood',t.consume.qty);c.carry={type:'wood',qty:t.consume.qty,fuelInput:true,staffingReturn:true};
+    t.inputCargo=c.carry;t.phase='process';t.tx=spot.x;t.ty=spot.y;t.work=t.workLeft=t.craftWork;c.task=t;
+    if(!G.sendTo(c,t.tx,t.ty,spot.route))G.returnSmithBatch(c);return;
+  }
+  const cargo=c.carry;
+  if(t.phase!=='process'||!cargo||cargo!==t.inputCargo||!cargo.fuelInput||!cargo.staffingReturn||cargo.type!=='wood'||cargo.qty!==t.consume.qty||cargo.extra){G.returnSmithBatch(c);return;}
+  t.completed=true;c.carry={type:'firewood',qty:t.yield.qty,firewoodId:t.b.id};G.recordProduction(t.b,'firewood',t.yield.qty);G.startHaul(c);
 };
 
 /* 背料到达仓库：转入回屋加工段。返回 false = 仓库没料（白跑） */
@@ -1116,14 +1154,14 @@ G.detourCitizen = function (c, dtH) {
     if (G.physicalTaskEndpoint(t)) { G.dropBlockedTask(c, t); return; }
     if (t) {
       const spot = G.alternateTaskEndpoint(c, t);
-      if (!spot) { if(t.kind==='smith'){G.returnSmithBatch(c);return;} if (t.kind === 'care') G.cancelMedicalCare(c); else if(t.kind==='leisure')G.cancelLeisure(c);else if(['study','teach'].includes(t.kind)){G.clearSchoolTasks(c);c.schoolWaitReason='上学路线受阻，保留学籍等待通路';c.wanderT=4;} return; }
+      if (!spot) { if(['smith','fuel'].includes(t.kind)){G.returnSmithBatch(c);return;} if (t.kind === 'care') G.cancelMedicalCare(c); else if(t.kind==='leisure')G.cancelLeisure(c);else if(['study','teach'].includes(t.kind)){G.clearSchoolTasks(c);c.schoolWaitReason='上学路线受阻，保留学籍等待通路';c.wanderT=4;} return; }
       goal = spot; t.tx = spot.x; t.ty = spot.y;
     } else if (c.walkKind === 'wander') { c.path = null; c.state = 'idle'; c.wanderT = 2; return; }
     else return;
   }
   const path = G.routeCanReuse(goal.route,c,goal.x,goal.y) ? goal.route.path : G.findPath(G.world, Math.round(c.x), Math.round(c.y), goal.x, goal.y);
   if (!path) {
-    if(c.task?.kind==='smith'){G.returnSmithBatch(c);return;}
+    if(c.task&&['smith','fuel'].includes(c.task.kind)){G.returnSmithBatch(c);return;}
     if(c.task&&['study','teach'].includes(c.task.kind)){const b=c.task.b;b.warnText='上学路线受阻';G.clearSchoolTasks(c);c.schoolWaitReason='上学路线受阻，保留学籍等待通路';c.wanderT=4;return;}
     if (c.task && c.task.kind === 'care') { G.cancelMedicalCare(c); return; }
     if(G.isLeisureVisitor(c)){G.cancelLeisure(c);return;}
@@ -1187,6 +1225,10 @@ G.stepCitizen = function (c, dtH) {
     }
     case 'work': {
       if(c.task?.kind==='orchard'&&!G.atOrchardTree(c,c.task)){G.sendTo(c,c.task.tx,c.task.ty);return;}
+      if(c.task?.kind==='fuel'&&!G.fuelAtTask(c,c.task)){
+        const t=c.task;if(!G.fuelTaskCurrent(c,t)||!G.sendTo(c,t.tx,t.ty))G.returnSmithBatch(c);
+        return;
+      }
       if(c.task?.kind==='smith'&&!G.smithAtTask(c,c.task)){
         const t=c.task;if(!G.smithTaskCurrent(c,t)||!G.sendTo(c,t.tx,t.ty))G.returnSmithBatch(c);
         return;
@@ -1447,30 +1489,7 @@ G.makeTask = function (b, c) {
     case 'herbalist': return G.makeHerbalistTask(b, c);
     case 'hospital': return G.makeClinicTask(b, c);
     case 'tavern': return G.makeTavernTask(b,c);
-    case 'woodcutter': {
-      if (G.fuelLimited(b)) { // 燃料上限：库存够用时自动停工（原版 Fuel Limit）
-        b.noWork = true; b.warnText = '柴火已达上限';
-        return null;
-      }
-      if (g.res.wood >= P.woodcutter.logsIn) {
-        // Plan only the current leg. The return workshop route is chosen from
-        // the warehouse at fetchDone, against the then-current map.
-        const st = G.hasStorageBuilding();
-        const route = st ? G.storageRoute(c.x,c.y,'wood') : null;
-        if (st && !route) { b.noWork = true; b.warnText = '仓库不可达'; return null; }
-        const target = route ? route.spot : G.workSpot(w, b, c.x, c.y);
-        if (!target) { b.noWork = true; b.warnText = '工作入口不可达'; return null; }
-        return G.withTaskRoute({
-          kind: 'firewood', b, tx: target.x, ty: target.y, phase: st ? 'fetch' : 'work',
-          work: P.woodcutter.workH, workLeft: 0,
-          consume: { type: 'wood', qty: P.woodcutter.logsIn },
-          // 原版：受教育工人 1 原木出 4 柴火（配比加成，而非提速）
-          yield: { type: 'firewood', qty: G.taskYield(c.educated ? P.woodcutter.logsIn * P.woodcutter.eduFirewoodPerLog : P.woodcutter.firewoodOut) },
-        }, target.route);
-      }
-      b.noWork = true; b.warnText = '缺木材';
-      return null;
-    }
+    case 'woodcutter': return G.makeFuelTask(b,c);
     case 'forester': {
       const R = P.forester.radius;
       const reachable = G.foresterReachability(w, c);
@@ -1688,6 +1707,7 @@ G.completeTask = function (c) {
     }
     case 'trade': { G.completeTradeTask(c,t); return; }
     case 'smith': { G.completeSmithTask(c,t); return; }
+    case 'fuel': { G.completeFuelTask(c,t); return; }
     case 'orchard': { G.completeOrchardTask(c,t); break; }
     case 'work': {
       if (t.economy) { G.completeEconomyWork(c,t); break; }
