@@ -42,7 +42,7 @@ G.SPRITE_SIZES = {
     tiles: ['grass_spring', 'grass_summer', 'grass_autumn', 'grass_winter',
       'sand_spring', 'sand_summer', 'sand_autumn', 'sand_winter',
       'water_spring', 'water_summer', 'water_summer_b', 'water_autumn', 'water_winter',
-      'road_spring', 'road_summer', 'road_autumn', 'road_winter', 'farm_soil', 'farm_soil_snow'],
+      'road_spring', 'road_summer', 'road_autumn', 'road_winter', 'farm_soil', 'farm_soil_snow', 'mountain_rock', 'mountain_rock_snow'],
     props: ['tree_sapling', 'tree_young', 'tree_mature',
       'tree_sapling_snow', 'tree_young_snow', 'tree_mature_snow',
       'rock_a', 'rock_b', 'rock_a_snow', 'rock_b_snow',

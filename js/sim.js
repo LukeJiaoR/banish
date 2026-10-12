@@ -515,7 +515,8 @@ G.tryBirths = function () {
     if (G.chance(G.LIFE.birthChance)) {
       // 出生点必须在房屋脚印之外：占位格不可通行，站进去寻路全失败，
       // 夜里回不了家按露宿挨冻、白天也挪不动（冬季婴儿冻死的根源）
-      const spot = G.nearestWalkable(w, house.x + 1, house.y + 1, 4);
+      const spot = w.mapVersion===2?G.workSpot(w,house,mother.x,mother.y):G.nearestWalkable(w, house.x + 1, house.y + 1, 4);
+      if(w.mapVersion===2&&!spot)continue; // A sealed mountain home cannot spawn a trapped child.
       G.spawnCitizen({
         x: spot ? spot.x : house.x + 1,
         y: spot ? spot.y : house.y + 1,
@@ -1651,7 +1652,7 @@ G.huntingNow=(g=G.game)=>g.day+g.h/G.DAY_H;
 G.inHuntingRange=(b,d)=>Math.abs(b.x-d.x)<=G.PROD.hunting.radius&&Math.abs(b.y-d.y)<=G.PROD.hunting.radius;
 G.deerHabitat=function(w,x,y){
   if(!Number.isInteger(x)||!Number.isInteger(y)||x<0||y<0||x>=w.N||y>=w.N)return false;
-  const i=y*w.N+x;if(w.water[i]||w.rock[i]||w.bgrid[i]>=0)return false;
+  const i=y*w.N+x;if(G.isMountain(w,x,y)||w.water[i]||w.rock[i]||w.bgrid[i]>=0)return false;
   for(let dy=-2;dy<=2;dy++)for(let dx=-2;dx<=2;dx++){
     const tx=x+dx,ty=y+dy;if(tx>=0&&ty>=0&&tx<w.N&&ty<w.N&&w.treeIdx[ty*w.N+tx]>=0)return true;
   }
@@ -2417,6 +2418,17 @@ G.addBuilding = function (type, x, y, opt) {
   const chk = G.canPlace(w, type, x, y, type==='cemetery'?opt.cemeterySize:type==='pasture'?opt.pastureSize:type==='orchard'?opt.orchardSize:opt.farmSize);
   if (!chk.ok) return chk;
   if (opt.instant && G.siteTrees({ x, y, w: def.w, h: def.h }).length) return { ok: false, reason: '立即放置需要已清场的地面' };
+  // Mountain terrain is static. Eviction must have an actual pre-placement
+  // exit; nearestWalkable alone can jump over a ridge into another component.
+  const exits=new Map();
+  if(w.mapVersion===2&&!def.passable)for(const c of w.citizens){
+    const cx=Math.round(c.x),cy=Math.round(c.y);
+    if(cx>=x&&cx<x+def.w&&cy>=y&&cy<y+def.h){
+      const spot=G.workSpot(w,{x,y,w:def.w,h:def.h},c.x,c.y);
+      if(!spot)return {ok:false,reason:'占地内居民没有可达出口，请先留出山谷通路'};
+      exits.set(c.id,spot);
+    }
+  }
   if (opt.instant && !opt.free) for (const k in def.cost) G.game.res[k] -= def.cost[k];
 
   // 保留占地资源；工地先安排真实砍伐与搬运，清场完毕才开始建造。
@@ -2474,7 +2486,7 @@ G.addBuilding = function (type, x, y, opt) {
   for (const c of w.citizens) {
     const cx = Math.round(c.x), cy = Math.round(c.y);
     if (cx >= x && cx < x + def.w && cy >= y && cy < y + def.h) {
-      const spot = G.nearestWalkable(w, cx, cy, 8);
+      const spot = w.mapVersion===2?exits.get(c.id):G.nearestWalkable(w, cx, cy, 8);
       if (spot) {
         c.x = spot.x; c.y = spot.y; c.path = null; c.pi = 0;
         if (c.state === 'walk' || c.state === 'haul') { c.state = 'idle'; c.wanderT = 0.5; }
@@ -3364,12 +3376,27 @@ G.makeMineralTask = function (b, c) {
 G.addBridge = function(start,end) {
   const w=G.world,plan=G.planBridge(w,start,end);if(!plan.ok)return plan;
   for(const [type,qty]of Object.entries(plan.materials))if(G.game.res[type]<qty)return {ok:false,reason:`${G.RES[type].name}不足（需要${qty}）`};
-  const b={id:G.nextId(),type:'bridge',x:Math.min(start.x,end.x),y:Math.min(start.y,end.y),w:Math.abs(start.x-end.x)+1,h:Math.abs(start.y-end.y)+1,bridgeAxis:plan.axis,state:'site',progress:0,workLeft:plan.length*3,totalWork:plan.length*3,workers:[],family:null,noWork:false,warnText:'',paidCost:{...plan.materials},constructionStarted:false};
+  const footprint={x:Math.min(start.x,end.x),y:Math.min(start.y,end.y),w:Math.abs(start.x-end.x)+1,h:Math.abs(start.y-end.y)+1},exits=new Map();
+  if(w.mapVersion===2)for(const c of w.citizens){
+    if(c.dead)continue;const cx=Math.round(c.x),cy=Math.round(c.y);
+    if(cx>=footprint.x&&cx<footprint.x+footprint.w&&cy>=footprint.y&&cy<footprint.y+footprint.h){
+      const spot=G.workSpot(w,footprint,c.x,c.y);
+      if(!spot)return {ok:false,reason:'桥头居民没有可达出口，请先留出岸边通路'};
+      exits.set(c.id,spot);
+    }
+  }
+  const b={id:G.nextId(),type:'bridge',...footprint,bridgeAxis:plan.axis,state:'site',progress:0,workLeft:plan.length*3,totalWork:plan.length*3,workers:[],family:null,noWork:false,warnText:'',paidCost:{...plan.materials},constructionStarted:false};
   // Only shoreline workers can start a bridge. Never grant walkable water early.
   const shadow={...w,bmap:{...w.bmap,[b.id]:b},bgrid:w.bgrid.slice(),_pf:null};for(const p of plan.path)shadow.bgrid[p.y*w.N+p.x]=b.id;
   if(!w.citizens.some(c=>!c.dead&&c.adult&&G.workSpot(shadow,b,c.x,c.y)))return {ok:false,reason:'没有居民能到达桥头施工；请从现有城镇可达的岸边起桥'};
   b.construction=G.newConstruction(plan.materials);
   w.buildings.push(b);w.bmap[b.id]=b;for(const p of plan.path){w.bgrid[p.y*w.N+p.x]=b.id;G.markGroundDirty(p.x,p.y);}
+  // Keep the accepted cargo/task owner; only the newly solid bridge banks
+  // displace people to preflighted, genuinely reachable exterior land.
+  for(const c of w.citizens){const spot=exits.get(c.id);if(!spot)continue;
+    c.x=spot.x;c.y=spot.y;c.path=null;c.pi=0;
+    if(c.state==='walk'||c.state==='haul'){c.state='idle';c.wanderT=.5;}
+  }
   G.bumpNavigation(w);G.game.buildLog.push({d:G.game.day,t:'bridge'});if(G.game.buildLog.length>30)G.game.buildLog.shift();G.scheduleJobs();return {ok:true,b};
 };
 

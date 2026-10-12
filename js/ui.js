@@ -4200,10 +4200,11 @@ G.ui = {
     seed?.addEventListener('input',()=>{if(current(this._startSession))this.invalidateStartDraft();});
     seed?.addEventListener('change',()=>{if(current(this._startSession))this.invalidateStartDraft();});
     for(const preset of ['classic','hard'])bind('new-game-preset-'+preset,s=>{s.preset=preset;this.invalidateStartDraft();});
+    for(const terrain of ['classic','mountain'])bind('new-game-terrain-'+terrain,s=>{s.terrain=terrain;this.invalidateStartDraft();});
     bind('new-game-random',()=>{seed.value=String(Math.floor(Math.random()*0x100000000));this.invalidateStartDraft('随机数只用于本次草稿，当前村未改变。');});
     bind('new-game-reuse',s=>{seed.value=String(s.world.seed);this.invalidateStartDraft('已复用当前地图种子；开局配置仍按下方选择。');});
     bind('new-game-review-button',s=>{
-      if(s.phase!=='edit')return;const q=G.startConfigQuote({seed:seed.value,preset:s.preset});
+      if(s.phase!=='edit')return;const q=G.startConfigQuote({seed:seed.value,preset:s.preset,terrain:s.terrain});
       if(!q.ok){s.message=q.reason;return;}
       s.intent={world:s.world,game:s.game,key:q.key,config:{...q.config}};s.phase='review';s.rev++;s.message='请核对新村参数和旧进度处理，再单独确认。';
       this.refreshNewGameSettings();document.getElementById('new-game-confirm')?.focus();
@@ -4211,7 +4212,7 @@ G.ui = {
     bind('new-game-back',()=>{this.invalidateStartDraft('已返回修改，尚未创建新村。');seed?.focus();});
     bind('new-game-confirm',s=>{
       if(s.phase!=='review'||!s.intent)return;
-      const q=G.startConfigQuote({seed:seed.value,preset:s.preset});
+      const q=G.startConfigQuote({seed:seed.value,preset:s.preset,terrain:s.terrain});
       if(!q.ok||q.key!==s.intent.key){this.invalidateStartDraft('参数已变，请重新检查开局。');return;}
       let result;try{result=G.confirmNewGame(s.intent);}catch(error){result={ok:false,reason:error.message||'新村生成失败'};}
       if(result.ok)this.closeNewGameSettings(true);
@@ -4235,7 +4236,7 @@ G.ui = {
     if(!modal.classList.contains('hidden'))return;
     this.initNewGameSettings();
     const esc=value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-    this._startSession={world:G.world,game:G.game,paused:!!G.game.paused,preset:'classic',phase:'edit',rev:0,intent:null,message:''};
+    this._startSession={world:G.world,game:G.game,paused:!!G.game.paused,preset:'classic',terrain:'classic',phase:'edit',rev:0,intent:null,message:''};
     G.game.paused=true;document.getElementById('new-game-seed').value=String(Math.floor(Math.random()*0x100000000));
     for(const preset of ['classic','hard']){
       const p=G.startConfigQuote({seed:0,preset}).presetSummary,card=document.getElementById('new-game-preset-'+preset);
@@ -4259,14 +4260,17 @@ G.ui = {
     const seed=document.getElementById('new-game-seed'),status=document.getElementById('new-game-status'),review=document.getElementById('new-game-review'),check=document.getElementById('new-game-review-button'),confirm=document.getElementById('new-game-confirm');
     if(s.world!==G.world||s.game!==G.game){s.phase='edit';s.intent=null;review.classList.add('hidden');check.disabled=confirm.disabled=true;status.textContent='当前村已改变，此设置已过期；请取消后重新打开。';return;}
     const recorded=G.game.startConfig,known=recorded&&G.startConfigQuote(recorded),currentName=known?.ok?known.presetSummary.name:'旧档未记录开局配置（不根据现存资源猜测）';
-    document.getElementById('new-game-current').textContent=`当前村：地图种子 ${G.world.seed} · ${currentName}。打开、修改和取消不会替换此村或删除存档。`;
+    document.getElementById('new-game-current').textContent=`当前村：地图种子 ${G.world.seed} · ${currentName} · ${G.world.mapVersion===2?'山地':'原地形'}。打开、修改和取消不会替换此村或删除存档。`;
     for(const preset of ['classic','hard'])document.getElementById('new-game-preset-'+preset).setAttribute('aria-pressed',String(s.preset===preset));
-    const q=G.startConfigQuote({seed:seed.value,preset:s.preset}),summary=document.getElementById('new-game-summary');
-    if(q.ok){const p=q.presetSummary;summary.textContent=`新村预览：种子 ${q.config.seed} · ${p.name}\n${p.families}家庭 / ${p.population}人（${p.adults}成人、${p.children}儿童）；仅有储物车，住房需自行建设\n${['wood','stone','iron','food','firewood','tools'].map(k=>`${G.RES[k].name} ${p.resources[k]}`).join(' · ')}\n${p.seedNote}\n${p.equipmentNote} ${p.adaptationNote}`;}
+    for(const terrain of ['classic','mountain'])document.getElementById('new-game-terrain-'+terrain)?.setAttribute('aria-pressed',String(s.terrain===terrain));
+    const terrainName=s.terrain==='mountain'?'山地（开局保障谷地）':'原地形';
+    const terrainNote=s.terrain==='mountain'?'山体不能步行或建造；隧道尚未接入。开局谷地保障住房用地、可达水岸与有限原料，仍需自行采运施工；没有额外库存或住房。山地使用 v2 地形存档，旧版本不能读取。':'原地图生成与开局规则保持。';
+    const q=G.startConfigQuote({seed:seed.value,preset:s.preset,terrain:s.terrain}),summary=document.getElementById('new-game-summary');
+    if(q.ok){const p=q.presetSummary;summary.textContent=`新村预览：种子 ${q.config.seed} · ${p.name} · ${terrainName}\n${p.families}家庭 / ${p.population}人（${p.adults}成人、${p.children}儿童）；仅有储物车，住房需自行建设\n${['wood','stone','iron','food','firewood','tools'].map(k=>`${G.RES[k].name} ${p.resources[k]}`).join(' · ')}\n${p.seedNote}\n${p.equipmentNote} ${p.adaptationNote}\n${terrainNote}`;}
     else summary.textContent=q.reason;
     const reviewing=s.phase==='review'&&!!s.intent&&q.ok&&s.intent.key===q.key;
     review.classList.toggle('hidden',!reviewing);check.classList.toggle('hidden',reviewing);check.disabled=!q.ok;confirm.disabled=!reviewing;
-    if(reviewing)document.getElementById('new-game-confirm-summary').textContent=`将创建：种子 ${s.intent.config.seed} · ${q.presetSummary.name} · ${q.presetSummary.population}人。不会重放或搬入当前村的库存、建筑和居民。`;
+    if(reviewing)document.getElementById('new-game-confirm-summary').textContent=`将创建：种子 ${s.intent.config.seed} · ${q.presetSummary.name} · ${terrainName} · ${q.presetSummary.population}人。不会重放或搬入当前村的库存、建筑和居民。`;
     status.textContent=s.message||(!q.ok?q.reason:'草稿不会触发开局发放；先检查，再单独确认。');
   },
 

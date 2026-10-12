@@ -204,8 +204,12 @@
         <button type="button" id="new-game-preset-classic" data-start-preset="classic" aria-pressed="true"></button>
         <button type="button" id="new-game-preset-hard" data-start-preset="hard" aria-pressed="false"></button>
       </div>
+      <div id="new-game-terrain" class="start-presets" role="group" aria-label="选择新村地形">
+        <button type="button" id="new-game-terrain-classic" aria-pressed="true"><strong>原地形</strong><span>现有河流、森林与采集矿石</span></button>
+        <button type="button" id="new-game-terrain-mountain" aria-pressed="false"><strong>山地</strong><span>阻路山脊与开局保障谷地 · 新村可选</span></button>
+      </div>
       <p id="new-game-summary"></p>
-      <p class="fb-hint">本片为小地图经济适配。地图大小、气候与地形类型保持现状；可选灾难仍默认关闭。</p>
+      <p class="fb-hint">本片为小地图经济适配。地图大小与气候保持现状；地形选择只用于新村，可选灾难仍默认关闭。</p>
       <p id="new-game-status" class="fb-status" role="status" aria-live="polite"></p>
       <button type="button" id="new-game-review-button">检查开局并继续</button>
       <section id="new-game-review" class="hidden" aria-label="新村最终确认">
