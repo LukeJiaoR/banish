@@ -335,7 +335,7 @@ G.prepareSaveData = function (d) {
   const hasFoodClasses = G.FOOD_KEYS.some(k => gd.res[k] !== undefined);
   if (hasFoodClasses && Math.abs(G.FOOD_KEYS.reduce((n,k) => n + g.res[k], 0) - g.res.food) > 0.00001) bad('食物分类合计');
   if (!hasFoodClasses) g.res.grain = g.res.food; // legacy stock is preserved once
-  if (gd.unlocks !== undefined) {record(gd.unlocks,'产业解锁');if(typeof gd.unlocks.orchard !== 'boolean')bad('果树种子解锁');for(const key of ['wheat','cabbage','beans','apple','pear'])if(gd.unlocks[key]!==undefined&&typeof gd.unlocks[key]!=='boolean')bad('农田种子解锁');g.unlocks={wheat:gd.unlocks.wheat!==false,orchard:gd.unlocks.orchard,cabbage:gd.unlocks.cabbage===true,beans:gd.unlocks.beans===true,apple:gd.unlocks.apple===true,pear:gd.unlocks.pear===true};}
+  if (gd.unlocks !== undefined) {record(gd.unlocks,'产业解锁');if(typeof gd.unlocks.orchard !== 'boolean')bad('果树种子解锁');for(const key of ['wheat','cabbage','beans','squash','apple','pear'])if(gd.unlocks[key]!==undefined&&typeof gd.unlocks[key]!=='boolean')bad('农田种子解锁');g.unlocks={wheat:gd.unlocks.wheat!==false,orchard:gd.unlocks.orchard,cabbage:gd.unlocks.cabbage===true,beans:gd.unlocks.beans===true,squash:gd.unlocks.squash===true,apple:gd.unlocks.apple===true,pear:gd.unlocks.pear===true};}
   if (gd.livestock !== undefined) {record(gd.livestock,'待安置牲畜');g.livestock={sheep:integer(gd.livestock.sheep,'待安置羊',0,1000000),cattle:gd.livestock.cattle===undefined?0:integer(gd.livestock.cattle,'待安置牛',0,1000000),chicken:gd.livestock.chicken===undefined?0:integer(gd.livestock.chicken,'待安置鸡',0,1000000)};}
   if(gd.fishingRules!==undefined&&!['classic','shared'].includes(gd.fishingRules))bad('渔场规则');
   g.fishingRules=gd.fishingRules===undefined?'classic':gd.fishingRules;
@@ -723,6 +723,12 @@ G.prepareSaveData = function (d) {
       b.growth = bd.growth === undefined ? 0 : number(bd.growth, '农田生长', 0, 1);
       // A locked wheat label is an empty-field placeholder, never a crop grant.
       if(!G.cropUnlocked(b.cropType,g)&&(b.farm.some(f=>f.sown||f.harvested)||b.sownAll||b.harvestDone||b.sowingCommitted||b.growth||b.pestInfestation||bd.earlyHarvestYield!==undefined))bad('未解锁作物不能已有播种或收获');
+      // The new winter crop cannot import a planted field beyond its cutoff.
+      // Fully harvested fields and every real carried batch remain valid.
+      if(b.cropType==='squash'){
+        if(b.farm.some(f=>f.harvested&&!f.sown)||b.sownAll!==b.farm.every(f=>f.sown)||b.harvestDone!==b.farm.every(f=>f.harvested)||b.growth>0&&!b.sownAll)bad('耐寒瓜田格与季节进度不符');
+        if(g.season===3&&!G.farmWinterWindow(b,g).active&&G.farmSeasonCommitted(b)&&!b.harvestDone)bad('耐寒瓜冬季收获窗口已结束');
+      }
       if(bd.earlyHarvestYield!==undefined){
         b.earlyHarvestYield=integer(bd.earlyHarvestYield,'抢收基础产量',1,G.farmBaseYield(b));
         if(b.state!=='ok'||!b.sownAll||!b.farm.every(f=>f.sown)||b.earlyHarvestYield!==Math.floor(G.farmBaseYield(b)*b.growth+1e-9))bad('抢收农田状态');
