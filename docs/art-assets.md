@@ -177,3 +177,16 @@ assets/
   icons/      资源与工具图标
   ui/         界面底材
 ```
+
+## 0.3.70 原创野鹿（#77）
+
+- 新增 `assets/props/deer.png`，仅单只成年无角鹿，没有重绘既有动物/人物/建筑。
+- 生成前实际查看 `cattle.png`、`sheep.png`、`chicken.png` 并读上文原始风格提示词。内置 imagegen 生成，透明 RGBA 1429×1100，非透明包围盒 (33,56)–(1365,1066)；直接使用原生成像素，没有后处理改画。
+- 游戏显示宽26，处于羊24、牛32之间；脚点底中，投影仍为原2:1，阴影由引擎画。无角成年鹿避免小比例角枝过密；镜像只改变朝向，不改尺度。渲染只读实际鹿实体，补入中的鹿不画。
+- 本次完整提示词：
+
+```
+Use case: stylized-concept. Original game sprite for Banish, a cozy medieval frontier settlement simulation. Match the animal references just viewed in this conversation (brown-and-white cow, woolly sheep, buff chicken) in their warm muted hand-painted stylized sprite treatment, crisp restrained edges and simple readable shading. Established exact style prefix: isometric game asset, 2:1 dimetric projection, cozy medieval frontier village style like Banished, hand-painted stylized, soft natural light from upper left, muted warm earthy colors, single object, centered, clean transparent background, no baked shadow, no ground plane, no watermark. Subject: ONE adult antlerless brown deer, slender legs, modest ears, small cream underside and tail, standing relaxed with head slightly lowered, three-quarter side view facing lower-left along the same isometric direction as the cow reference. Natural adult anatomy, four clear hooves, no oversized head. It will display only 26 game pixels wide, between existing sheep (24px) and cattle (32px), so prioritize a recognizable compact deer silhouette rather than detailed fur. Framing: tight asset-only transparent canvas, entire animal with nothing cropped, little empty padding; hooves near the lower canvas edge and animal footpoint bottom center. No other animals, no scenery, no grass, no text, no shadows or ground, no checkerboard baked into pixels. Produce a transparent PNG suitable for directly adding to a game repository.
+```
+
+离线实际Canvas场景与原牛/羊/人物等比例对照另见本片验证说明；不把离线渲染称为浏览器试玩。

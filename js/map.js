@@ -167,6 +167,7 @@ G.removeTree = function (w, x, y) {
     w.treeIdx[last.i] = idx;
   }
   w.treeIdx[i] = -1;
+  if(w===G.world&&G.reconcileDeerHabitat)G.reconcileDeerHabitat(w);
 };
 /* 「砍伐」工具：标记一棵树（原版 Harvest Trees），散工会来砍 */
 G.markFellAt = function (w, x, y) {

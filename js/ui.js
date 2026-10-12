@@ -51,6 +51,7 @@ G.ui = {
       return G.homeOf(c) ? '户外休息（未入屋）' : '露宿（无住房）';
     }
     if (c.state === 'work') {
+      if(c.task?.kind==='hunt')return '狩猎鹿 #'+c.task.deerId+'（完成后才获得肉皮）';
       if(c.task?.kind==='toolFetch')return '在通用仓领取个人工具（完成领取才扣库存）';
       if(c.task?.kind==='tailor')return c.task.phase==='fetch'?'在库领取整批衣料':`制作${G.RES[c.task.yield.type].name}（使用随身衣料）`;
       if(c.task?.kind==='fuel')return c.task.phase==='fetch'?'在库领取原木（整批出库）':'劈柴中（使用随身已取原木）';
@@ -65,6 +66,8 @@ G.ui = {
       return c.task ? (labels[c.task.kind] || (b && b.type === 'tailor' ? '制作衣物' : b && b.type === 'orchard' ? '果园劳作' : b && b.type === 'pasture' ? `照料${G.LIVESTOCK[G.pastureTypeOf(b)].name}群` : '工作中')) : '等待下一项任务';
     }
     if (c.state === 'walk' || c.state === 'haul') {
+      if(Number.isInteger(c.carry?.huntingId))return (c.carry.huntingId===0?'运送遗留肉皮入仓：':'运送猎物入仓：')+this.cargoText(c.carry);
+      if(c.task?.kind==='hunt'&&c.walkKind!=='home')return '步行追踪鹿 #'+c.task.deerId;
       if(c.carry?.coatInput)return c.state==='haul'?'退回未使用衣料':c.walkKind==='home'?'带衣料回家休息':'携衣料返回裁缝铺';
       if(c.carry?.fuelInput)return c.state==='haul'?'退回未使用的原木':c.walkKind==='home'?'带原木回家休息':'携原木返回伐木屋';
       if(c.carry?.smithInput)return c.state==='haul'?'退回铁匠原料（已出库，未消耗）':c.walkKind==='home'?'带铁匠原料回家休息':c.task?.kind==='smith'?'携铁、木或煤返回铁匠铺':'铁匠原料待退仓';
@@ -1452,6 +1455,29 @@ G.ui = {
     });
   },
   fishingNumber: function (n) { return Number(n).toFixed(2).replace(/\.?0+$/, ''); },
+  huntingInfoData: function(b) {
+    if(b.type!=='hunting'||b.state!=='ok')return null;
+    const h=G.huntingSummary(b),p=G.HUNTING;
+    return {
+      prey:`鹿群：圈内 ${h.count} 只 · 未被追踪 ${h.free} 只 · 从猎屋门外可达 ${h.reachable} 只`,
+      cooldown:h.cooldownDays>0?`全屋共用猎杀间隔：还需 ${h.cooldownDays.toFixed(1)} 天`:`全屋共用猎杀间隔：已就绪，每次成功后等待 ${p.cooldownDays} 天`,
+      status:h.reason||'猎人须实际到鹿的位置完成工作，才能获得猎物。',
+      batch:`每鹿基础肉 ${p.meat} / 受教育 ${p.eduMeat}，皮革 ${p.leather} / ${p.eduLeather}；肉皮另受当前工具规则影响。两名猎人共用一个冷却，不会各算一次。`,
+      losses:`猎获及遗留肉皮运输死亡损失：全镇累计肉 ${G.game.huntingLost?.meat||0}、皮革 ${G.game.huntingLost?.leather||0}（肉另计食物账本，皮革在此保留记录）。`,
+      delivery:'猎物先成为实背肉皮，走到可达通用仓才入库；仓满或断路保留携货，减少岗位先运完。旧档来源不明的肉皮同样保货，标为遗留货物，不推定是鹿肉。',
+      wildlife:`鹿会在栖地附近活动，被猎后 ${p.replenishDays} 天后补入；无永久灭绝、不吃庄稼。圈内数量不是入库保证。`,
+      source:'原版每屋两月间隔按48日年折为8日；鹿群规模、产量和补入节奏为本作适配。旧档首次读入补建野生鹿，库存与携货不变；之后猎屋也按此间隔工作。',
+    };
+  },
+  huntingInfoMarkup:function(b){const d=this.huntingInfoData(b);return d?`<section class="economy-form" data-hunting-panel><div class="row"><b>鹿群与狩猎</b></div>${Object.entries(d).map(([k,v])=>`<div class="row${['batch','delivery','wildlife','source'].includes(k)?' desc':''}" data-hunting="${k}">${this.escHtml(v)}</div>`).join('')}</section>`:'';},
+  refreshHuntingInfo:function(b){
+    const panel=this.el.info.querySelector?.('[data-hunting-panel]'),d=this.huntingInfoData(b);if(!panel||!d)return false;
+    for(const[k,v]of Object.entries(d)){const n=panel.querySelector(`[data-hunting="${k}"]`);if(!n)return false;if(n.textContent!==v)n.textContent=v;}
+    const status=this.el.info.querySelector('[data-hunting-status]');if(status)status.textContent=d.status;
+    const workers=this.el.info.querySelector('[data-hunting-workers]');if(workers)workers.textContent=(b.workers||[]).map(id=>G.world.cmap[id]?.name).filter(Boolean).join('、')||'无';
+    return true;
+  },
+
   fishingInfoData: function (b) {
     if (!['dock', 'townhall'].includes(b.type) || b.state !== 'ok') return null;
     const shared = G.game.fishingRules === 'shared', quote = shared ? { ok: false, rows: [], key: null } : G.fishingPolicyQuote();
@@ -2949,6 +2975,7 @@ G.ui = {
     // selection or a site finishing construction still gets its own full panel.
     if (!force && sameSelection && homeFire?.summary.ruin && this._infoBuildType === selected.type && this._infoBuildState === selected.state && this.refreshHomeFireInfo(selected)) return;
     if (!force && sameSelection && selected.state === 'ok' && this._townHallInfoState === selected.state && this.refreshTownHallInfo(selected)) return;
+    if (!force && sameSelection && selected.type === 'hunting' && this._infoBuildState === 'ok' && selected.state === 'ok' && this.refreshHuntingInfo(selected)) return;
     if (!force && sameSelection && selected.type === 'dock' && this._infoBuildState === 'ok' && selected.state === 'ok' && this.refreshFishingInfo(selected)) return;
     if (!force && sameSelection && selected.type === 'chapel' && selected.state === 'ok' && this._infoBuildState === 'ok' && this.refreshChapelInfo(selected)) return;
     if (sameSelection && selected.state === 'ok' && this._tavernInfoState === selected.state && this.refreshTavernInfo(selected)) return;
@@ -3012,6 +3039,7 @@ G.ui = {
       else if (pit) status = '永久废矿坑：不可复垦、不可建造、不可通行，也不能拆除。';
       else if (fuelData) status = fuelData.status;
       else if (siteData) status = siteData.status;
+      else if (b.type==='hunting') status=G.huntingSummary(b,{reachability:false}).reason;
       else if(cemeteryData)status=cemeteryData.status;
       else if(schoolData)status=schoolData.status;
       else if (medicalData) status = medicalData.status;
@@ -3036,7 +3064,7 @@ G.ui = {
       let workers = '';
       if ((def.jobs > 0 || b.state === 'site') && !schoolData && !chapelData) {
         const names = b.workers.map(id => w.cmap[id]).filter(Boolean).map(c => this.escHtml(c.name)).join('、');
-        workers = `<div class="row">${medicalData ? b.type === 'hospital' ? '医师' : '采药员' : tavernData ? '酿酒工（需 18 岁以上且健康）' : '工人'}：<span${b.type === 'dock' && b.state === 'ok' ? ' data-fishing-workers' : ''}${marketData ? ' data-market-workers' : ''}${siteData ? ' data-site-workers' : ''}${fuelData ? ' data-fuel="workers"' : ''}${medicalData ? ' data-medical="workers"' : ''}${chainData ? ' data-resource-chain-live="workers"' : ''}${tavernData ? ' data-tavern="workers"' : ''}${tailorData ? ' data-tailor="workers"' : ''}${farmData ? ' data-farm="workers"' : ''}${b.state === 'ok' && ['tradingpost', 'pasture', 'orchard'].includes(b.type) ? ' data-economy-workers' : ''}>${names || (b.state === 'site' ? '等待建筑工人' : '无')}</span></div>`;
+        workers = `<div class="row">${medicalData ? b.type === 'hospital' ? '医师' : '采药员' : tavernData ? '酿酒工（需 18 岁以上且健康）' : '工人'}：<span${b.type === 'dock' && b.state === 'ok' ? ' data-fishing-workers' : ''}${b.type === 'hunting' && b.state === 'ok' ? ' data-hunting-workers' : ''}${marketData ? ' data-market-workers' : ''}${siteData ? ' data-site-workers' : ''}${fuelData ? ' data-fuel="workers"' : ''}${medicalData ? ' data-medical="workers"' : ''}${chainData ? ' data-resource-chain-live="workers"' : ''}${tavernData ? ' data-tavern="workers"' : ''}${tailorData ? ' data-tailor="workers"' : ''}${farmData ? ' data-farm="workers"' : ''}${b.state === 'ok' && ['tradingpost', 'pasture', 'orchard'].includes(b.type) ? ' data-economy-workers' : ''}>${names || (b.state === 'site' ? '等待建筑工人' : '无')}</span></div>`;
       }
       let extra = '';
       if (pit) extra = `<div class="row" data-mineral-pit-source>原址：${this.escHtml(G.BDEF[mineral?.source]?.name || '矿点')} · 永久占地 3×3；没有岗位和产出。</div><div class="row desc" data-mineral-pit-reserve>拆除时丢弃的剩余矿藏：${Number(mineral?.remaining) || 0} 储量单位，永久不可恢复。</div>`;
@@ -3074,6 +3102,7 @@ G.ui = {
       if (hallData) extra += this.townHallInfoMarkup(b, hallData);
       if (marketData) extra += this.marketSupplyInfoMarkup(b) + this.supplyModeInfoMarkup(b);
       if (b.type === 'dock' && b.state === 'ok') extra += this.fishingInfoMarkup(b);
+      if (b.type === 'hunting' && b.state === 'ok') extra += this.huntingInfoMarkup(b);
       if (tavernData) extra += this.tavernInfoMarkup(tavernData);
       if (chapelData) extra += this.chapelInfoMarkup(chapelData);
       if (tailorData) extra += this.tailorInfoMarkup(tailorData);
@@ -3090,7 +3119,7 @@ G.ui = {
       if (produced.length) extra += `<div class="row resource-output"${b.type==='pasture'?' data-pasture-output':b.type==='orchard'?' data-orchard-output':''}>产出：${produced.map(type => `${this.resourceIcon(type)}${G.RES[type].name}`).join(' · ')}</div>`;
       if (b.type === 'tailor' && !tailorData) extra += `<div class="row">原料库存：皮革 ${Math.floor(G.game.res.leather || 0)} · 羊毛 ${Math.floor(G.game.res.wool || 0)}</div><div class="row">成衣库存：${Math.floor(G.game.res.clothes || 0)}</div>`;
       if (b.type !== 'woodcutter' && !medicalData && !chainData && !tavernData && !chapelData && !tailorData && !farmData && G.buildingGoalStatus(b)) extra += `<div class="row desc"${['tradingpost', 'pasture', 'orchard'].includes(b.type) ? ' data-economy-goals' : ''}>${this.escHtml(G.buildingGoalStatus(b))}</div>`;
-      if (['gatherer', 'hunting', 'forester'].includes(b.type)) {
+      if (['gatherer', 'forester'].includes(b.type)) {
         const trees = G.treesInRadius(w, b.x, b.y, G.PROD[b.type].radius, false);
         const mature = trees.filter(t => G.treeStage(t) >= 2).length;
         extra += `<div class="row">工作圈：${trees.length} 棵树 · 成熟 ${mature}（砍伐、建造清林会影响产出）</div>`;
@@ -3100,7 +3129,7 @@ G.ui = {
       }
       el.innerHTML = `
         <div class="info-head"><span>${def.icon} ${def.name}</span><button id="info-close">✕</button></div>
-        <div class="row"${b.type === 'dock' && b.state === 'ok' ? ' data-fishing-status' : ''}${siteData ? ' data-site-status' : ''}${homeData ? ' data-home-status' : ''}${fuelData ? ' data-fuel="status"' : ''}${medicalData ? ' data-medical="status"' : ''}${chainData ? ' data-resource-chain-live="status"' : ''}${hallData ? ' data-townhall="status"' : ''}${marketData ? ' data-market-supply="status"' : ''}${tavernData ? ' data-tavern="status"' : ''}${chapelData ? ' data-chapel="status"' : ''}${tailorData ? ' data-tailor="status"' : ''}${farmData ? ' data-farm="status"' : ''}${cemeteryData?' data-cemetery="status"':''}${schoolData?' data-school="status"':''}${b.state === 'ok' && ['tradingpost', 'pasture', 'orchard'].includes(b.type) ? ' data-economy-status' : ''}>${this.escHtml(status)}</div>
+        <div class="row"${b.type === 'dock' && b.state === 'ok' ? ' data-fishing-status' : ''}${b.type === 'hunting' && b.state === 'ok' ? ' data-hunting-status' : ''}${siteData ? ' data-site-status' : ''}${homeData ? ' data-home-status' : ''}${fuelData ? ' data-fuel="status"' : ''}${medicalData ? ' data-medical="status"' : ''}${chainData ? ' data-resource-chain-live="status"' : ''}${hallData ? ' data-townhall="status"' : ''}${marketData ? ' data-market-supply="status"' : ''}${tavernData ? ' data-tavern="status"' : ''}${chapelData ? ' data-chapel="status"' : ''}${tailorData ? ' data-tailor="status"' : ''}${farmData ? ' data-farm="status"' : ''}${cemeteryData?' data-cemetery="status"':''}${schoolData?' data-school="status"':''}${b.state === 'ok' && ['tradingpost', 'pasture', 'orchard'].includes(b.type) ? ' data-economy-status' : ''}>${this.escHtml(status)}</div>
         ${workers}${this.workforceInfoMarkup(b, workforceData)}${extra}
         <div class="row desc">${def.desc}</div>
         ${pit ? '' : `<div class="row desc" data-info-refund${fuelData ? ' data-fuel="refund"' : ''}>${ruin ? '清理烧毁废墟退还 0 材料；不能回收原屋材料。' : fireData?.summary.active ? '火灾进行中，暂不能拆除；关闭新增火灾也不会停止当前损伤。' : fuelData ? fuelData.refund : siteData ? siteData.refund : '已开工：拆除退还一半已付建材，已砍树不恢复'}</div>
@@ -4322,12 +4351,19 @@ G.placementInfo = function (type, x, y) {
     const trees = G.treesInRadius(w, x, y, p.radius, false).filter(t => !(t.x >= x && t.x < x + def.w && t.y >= y && t.y < y + def.h));
     result.trees = trees.length; result.mature = trees.filter(t => G.treeStage(t) >= 2).length;
     lines.push(`工作范围 ±${p.radius} 格（方形，建筑原点） · 占地清场后 ${result.trees} 棵树 / 成熟 ${result.mature}`);
-    if (['gatherer', 'hunting', 'herbalist'].includes(type)) {
+    if (['gatherer', 'herbalist'].includes(type)) {
       const n = type !== 'gatherer' ? result.mature : result.trees;
       if (n < p.needTrees) { result.warning = true; lines.push(`⚠ 可建但当前无法生产：至少需 ${p.needTrees} 棵${type !== 'gatherer' ? '成熟' : ''}树`); }
       else if (result.mature < p.fullForest) { result.warning = true; lines.push(`△ 林量偏低：产量随成熟林增加，充足参考 ${p.fullForest} 棵`); }
     }
     if (type === 'forester') lines.push('砍伐会降低重叠食物林产量；可在建筑面板关闭砍伐育林。');
+  }
+  if(type==='hunting'){
+    const h=G.huntingSummary({type,x,y,w:def.w,h:def.h,state:'ok',workers:[]});result.hunting=h;
+    lines.push(`鹿群：圈内 ${h.count} 只 · 未被追踪 ${h.free} 只 · 当前门外可达 ${h.reachable} 只（排除拟建占地）`);
+    lines.push(`最多2名猎人共用每 ${G.HUNTING.cooldownDays} 天一次猎杀；实际追踪、劳动和肉皮送仓后才有库存。`);
+    lines.push('林木是栖地参考，不按树数直接发肉。鹿会补入，不啃食作物；数量会随活动和猎杀变化。');
+    if(!h.reachable){result.warning=true;lines.push('⚠ 当前没有可达且未被追踪的鹿；建成后须等待鹿群或改善通路。');}
   }
   if (type === 'dock') {
     const fish = G.fishingPlacementSummary(x, y); result.fishing = fish; result.water = fish.raw;
