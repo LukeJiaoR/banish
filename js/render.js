@@ -373,6 +373,7 @@ G.drawBuilding = function (ctx, b, time) {
     return;
   }
 
+  if(b.type==='graveremnant'){if(b.grave.expiresDay>G.game.day)G.drawEconomyFieldPart(ctx,{kind:'grave',...G.remnantGravePoint(b)});return;}
   // Direct-draw compatibility. The main frame sorts field props individually below.
   if (b.type === 'orchard' || b.type === 'pasture' || b.type === 'cemetery') {
     G.drawEconomyFieldGround(ctx, b);
@@ -511,6 +512,22 @@ G.drawOrchardPlan=function(ctx){
   ctx.restore();
 };
 
+G.drawCemeteryPlan=function(ctx){
+  if(!G.isCemeteryPlanning||!G.isCemeteryPlanning())return;
+  const p=G.cemeteryDrag||G.cemeteryPlan;if(!p||p.world!==G.world)return;
+  const bounds=G.farmBounds(p.end?p:{...p,end:p.start});if(!bounds)return;
+  const {x,y,w,h}=bounds,size=[w,h],def=G.cemeteryDefinition(size),check=def?G.canPlace(G.world,'cemetery',x,y,size):{ok:false};
+  const ok=check.ok&&Object.entries(def.cost).every(([k,v])=>G.game.res[k]>=v);
+  ctx.save();ctx.fillStyle=ok?'rgba(120,230,140,.28)':'rgba(230,90,80,.25)';ctx.strokeStyle=ok?'#c4e89b':'#e78f80';ctx.lineWidth=1/G.cam.z;
+  if(def)for(let yy=y;yy<y+h;yy++)for(let xx=x;xx<x+w;xx++){G.diamondPath(ctx,...G.T2S(xx,yy));ctx.fill();ctx.stroke();}
+  else{ctx.beginPath();[[x,y],[x+w,y],[x+w,y+h],[x,y+h]].forEach(([xx,yy],i)=>{const [sx,sy]=G.T2S(xx,yy);if(i)ctx.lineTo(sx,sy);else ctx.moveTo(sx,sy);});ctx.closePath();ctx.fill();ctx.stroke();}
+  if(def){
+    const b={type:'cemetery',x,y,w,h,cemeterySize:size};ctx.fillStyle=ok?'#ecdda5':'#dc9b86';
+    for(let i=0;i<G.cemeteryCapacity(b);i++){const p=G.cemeteryGravePoint(b,i),[sx,sy]=G.T2S(p.x,p.y);ctx.beginPath();ctx.ellipse(sx,sy,2.8/G.cam.z,1.4/G.cam.z,0,0,Math.PI*2);ctx.fill();}
+  }
+  ctx.restore();
+};
+
 G.drawFarmGround = function (ctx, b, bounds) {
   const pal = G.PAL[G.game.season];
   const soilTex = pal.snow ? 'farm_soil_snow' : 'farm_soil';
@@ -620,6 +637,7 @@ G.addEconomyFieldParts = function (items, b, bounds) {
     if (bounds && (part.x < bounds.tx0 - 2 || part.x > bounds.tx1 + 2 || part.y < bounds.ty0 - 2 || part.y > bounds.ty1 + 2)) return;
     items.push({ ...part, b, k: 5, d: part.x + part.y + (part.kind === 'fence' ? 0.025 : 0.01) });
   };
+  if(b.type==='graveremnant'){if(b.grave.expiresDay>G.game.day)add({kind:'grave',...G.remnantGravePoint(b)});return;}
   const x0 = b.x + 0.12, y0 = b.y + 0.12, x1 = b.x + b.w - 0.12, y1 = b.y + b.h - 0.12;
   const fence = (ax, ay, bx, by) => add({ kind: 'fence', x: (ax + bx) / 2, y: (ay + by) / 2, ax, ay, bx, by });
   for (let i = 0; i < b.w; i++) {
@@ -632,7 +650,7 @@ G.addEconomyFieldParts = function (items, b, bounds) {
     fence(x0, a, x0, c); fence(x1, a, x1, c);
   }
   if(b.type==='cemetery'){
-    for(const r of G.activeGraves(b))add({kind:'grave',x:b.x+.85+(r.slot%2)*1.7,y:b.y+.5+Math.floor(r.slot/2)*.85});
+    for(const r of G.activeGraves(b))add({kind:'grave',...G.cemeteryGravePoint(b,r.slot)});
   } else if (b.type === 'orchard') {
     for(let ti=0;ti<G.orchardTreeCount(b);ti++){const point=G.orchardDisplayPoint(b,ti);add({kind:'fruitTree',...point,ti});}
   } else {
@@ -977,7 +995,7 @@ G.frame = function (dtReal) {
 
   // 建造幽灵：贴着地面画、在建筑之前——后面的建筑/树会正确把它挡住，
   // 不会出现“绿色预览浮在已有建筑上”的误导
-  if (G.tool && G.tool.kind === 'build' && G.hover.tx >= 0 && !(G.isFarmPlanning&&G.isFarmPlanning()) && !(G.isPasturePlanning&&G.isPasturePlanning()) && !(G.isOrchardPlanning&&G.isOrchardPlanning())) {
+  if (G.tool && G.tool.kind === 'build' && G.hover.tx >= 0 && !(G.isFarmPlanning&&G.isFarmPlanning()) && !(G.isPasturePlanning&&G.isPasturePlanning()) && !(G.isOrchardPlanning&&G.isOrchardPlanning()) && !(G.isCemeteryPlanning&&G.isCemeteryPlanning())) {
     const def = G.BDEF[G.tool.type];
     const ox = G.hover.tx - ((def.w - 1) >> 1), oy = G.hover.ty - ((def.h - 1) >> 1);
     const chk = G.canPlace(w, G.tool.type, ox, oy);
@@ -1008,6 +1026,7 @@ G.frame = function (dtReal) {
   G.drawFarmPlan(ctx);
   G.drawPasturePlan(ctx);
   G.drawOrchardPlan(ctx);
+  G.drawCemeteryPlan(ctx);
 
   // 矿石与道路工具悬停（同样贴地）
   if (G.tool && G.tool.kind === 'quarry' && G.hover.tx >= 0 && G.hover.ty >= 0 && G.hover.tx < w.N && G.hover.ty < w.N) {
@@ -1077,11 +1096,11 @@ G.frame = function (dtReal) {
     if (f.sown && !f.harvested && f.x >= tx0 && f.x <= tx1 && f.y >= ty0 && f.y <= ty1)
       items.push({ d: f.x + f.y + 1, k: 4, b, f });
   }
-  for (const b of w.buildings) if (b.state === 'ok' && (b.type === 'pasture' || b.type === 'orchard' || b.type === 'cemetery'))
+  for (const b of w.buildings) if (b.state === 'ok' && (b.type === 'pasture' || b.type === 'orchard' || b.type === 'cemetery' || b.type==='graveremnant'))
     G.addEconomyFieldParts(items, b, { tx0, ty0, tx1, ty1 });
   // 建筑
   for (const b of w.buildings) {
-    if(b.type==='bridge')continue; // Decks sit above water, below people and bankside objects.
+    if(b.type==='bridge'||b.type==='graveremnant')continue; // Decks sit above water, below people and bankside objects.
     const cx = b.x + b.w / 2, cy = b.y + b.h / 2;
     if (cx < tx0 - 3 || cx > tx1 + 3 || cy < ty0 - 3 || cy > ty1 + 3) continue;
     items.push({ d: b.x + b.y + b.w + b.h - 2 - 0.5, k: 1, b });

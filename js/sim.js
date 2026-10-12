@@ -2405,16 +2405,16 @@ G.siteTrees = function (b) {
 };
 G.addBuilding = function (type, x, y, opt) {
   opt = opt || {};
-  const def=type==='farm'?G.farmDefinition(opt.farmSize):type==='pasture'?G.pastureDefinition(opt.pastureSize):type==='orchard'?G.orchardDefinition(opt.orchardSize):G.BDEF[type];
+  const def=type==='farm'?G.farmDefinition(opt.farmSize):type==='pasture'?G.pastureDefinition(opt.pastureSize):type==='orchard'?G.orchardDefinition(opt.orchardSize):type==='cemetery'?G.cemeteryDefinition(opt.cemeterySize):G.BDEF[type];
   if(def?.unbuildable)return {ok:false,reason:def.name+'不能主动建造或重新开发'};
-  if(!def||(opt.farmSize!==undefined&&type!=='farm')||(opt.pastureSize!==undefined&&type!=='pasture')||(opt.orchardSize!==undefined&&type!=='orchard'))return {ok:false,reason:type==='pasture'?'牧场每边须为7至20格的整数':(type==='orchard'?'果园':'农田')+'每边须为4至15格的整数'};
+  if(!def||(opt.farmSize!==undefined&&type!=='farm')||(opt.pastureSize!==undefined&&type!=='pasture')||(opt.orchardSize!==undefined&&type!=='orchard')||(opt.cemeterySize!==undefined&&type!=='cemetery'))return {ok:false,reason:type==='cemetery'?'墓园每边须为7至20格的整数':type==='pasture'?'牧场每边须为7至20格的整数':(type==='orchard'?'果园':'农田')+'每边须为4至15格的整数'};
   const w = G.world;
   if (!opt.free) {
     for (const k in def.cost) {
       if (G.game.res[k] < def.cost[k]) return { ok: false, reason: `${G.RES[k].name}不足（需要 ${def.cost[k]}）` };
     }
   }
-  const chk = G.canPlace(w, type, x, y, type==='pasture'?opt.pastureSize:type==='orchard'?opt.orchardSize:opt.farmSize);
+  const chk = G.canPlace(w, type, x, y, type==='cemetery'?opt.cemeterySize:type==='pasture'?opt.pastureSize:type==='orchard'?opt.orchardSize:opt.farmSize);
   if (!chk.ok) return chk;
   if (opt.instant && G.siteTrees({ x, y, w: def.w, h: def.h }).length) return { ok: false, reason: '立即放置需要已清场的地面' };
   if (opt.instant && !opt.free) for (const k in def.cost) G.game.res[k] -= def.cost[k];
@@ -2432,6 +2432,7 @@ G.addBuilding = function (type, x, y, opt) {
   };
   if(!opt.instant)b.construction=G.newConstruction(b.paidCost);
   else if(!opt.free){b.construction=G.newConstruction(b.paidCost);b.construction.consumed=true;}
+  if(type==='cemetery'&&opt.cemeterySize!==undefined)b.cemeterySize=[...opt.cemeterySize];
   if(type==='orchard'&&opt.orchardSize!==undefined){b.orchardSize=[...opt.orchardSize];b.workerLimit=G.initialOrchardWorkers(b.orchardSize);}
   if(type==='pasture'&&opt.pastureSize!==undefined){b.pastureSize=[...opt.pastureSize];b.workerLimit=G.initialPastureWorkers(b.pastureSize);}
   if (type === 'farm') {
@@ -2539,7 +2540,7 @@ G.finishBuilding = function (b) {
   G.bumpNavigation(G.world);
   // 建造工人多于正式岗位时，释放多余人员
   const def = G.buildingDefinition(b);
-  if(b.pastureSize||b.orchardSize)b.workLeft=0;
+  if(b.pastureSize||b.orchardSize||b.cemeterySize)b.workLeft=0;
   while (b.workers.length > def.jobs) {
     const id = b.workers.pop();
     const c = G.world.cmap[id];
@@ -2555,6 +2556,7 @@ G.removeBuilding = function (b, confirmationKey) {
   const w = G.world;
   if(!b||w.bmap[b.id]!==b)return false; // A consumed/cancelled site cannot refund twice.
   if(b.houseFire){G.ui.toast('火情期间不能拆屋消除火灾，请先真实取水扑救','warn');return false;}
+  if(b.type==='graveremnant'){G.ui.toast('墓位沿用原到期日，不能主动拆除或退款','warn');return false;}
   if(b.type==='mineralpit'){G.ui.toast('永久矿坑不能拆除、重建或恢复储量','warn');return false;}
   const mineralQuote=G.mineralRemovalQuote(b),leavesPit=mineralQuote.leavesPit;
   if(leavesPit&&confirmationKey!==mineralQuote.key){
@@ -2562,7 +2564,12 @@ G.removeBuilding = function (b, confirmationKey) {
     else G.ui.toast('已开采矿点拆除将永久留坑，储量或状态可能已变，请重新确认','warn');
     return false;
   }
-  if(b.type==='cemetery'&&G.activeGraves(b).length){G.ui.toast('墓园仍有未到期墓位，需等自然释放后才能拆除','warn');return;}
+  const cemeteryQuote=b.type==='cemetery'&&b.state==='ok'?G.cemeteryRemovalQuote(b):null;
+  if(cemeteryQuote&&(!cemeteryQuote.ok||confirmationKey!==cemeteryQuote.key)){
+    if(cemeteryQuote.ok&&confirmationKey===undefined&&G.ui.confirmCemeteryRemoval)G.ui.confirmCemeteryRemoval(b,cemeteryQuote);
+    else G.ui.toast(cemeteryQuote.ok?'墓园墓位、日期或退款已改变，请重新查看并确认拆除':cemeteryQuote.reason,'warn');
+    return false;
+  }
   if(b.type==='townhall'&&G.game.nomads.offer?.hallId===b.id)G.game.nomads.offer=null;
   if (b.type === 'bridge') { const check=G.bridgeRemovalStatus(w,b); if(!check.ok){G.ui.toast(check.reason,'warn');return;} }
   if (b.type === 'tradingpost' && Object.values(b.tradeInventory || {}).some(q => q > 0)) { G.ui.toast('先把待售目标设0，搬空贸易库存再拆除','warn'); return; }
@@ -2606,12 +2613,17 @@ G.removeBuilding = function (b, confirmationKey) {
   // 清除占地占位：残留会让该地块成为"幽灵建筑"——点击无详情、原地也无法重建
   for (let j = b.y; j < b.y + b.h; j++)
     for (let i = b.x; i < b.x + b.w; i++)
-      w.bgrid[j * w.N + i] = pit?pit.id:-1;
+      if(w.bgrid[j*w.N+i]===b.id)w.bgrid[j * w.N + i] = pit?pit.id:-1;
+  if(cemeteryQuote)for(const row of cemeteryQuote.graves){
+    const cell=G.cemeteryGraveCell(b,row.slot),grave={...row},graveSource={id:b.id,x:b.x,y:b.y,w:b.w,h:b.h,...(b.cemeterySize?{cemeterySize:[...b.cemeterySize]}:{})};
+    const remnant={id:G.nextId(),type:'graveremnant',...cell,w:1,h:1,state:'ok',progress:1,workLeft:0,totalWork:1,workers:[],family:null,noWork:false,warnText:'',paidCost:{},grave,graveSource};
+    w.buildings.push(remnant);w.bmap[remnant.id]=remnant;w.bgrid[cell.y*w.N+cell.x]=remnant.id;
+  }
   G.bumpNavigation(w);
   for(const c of w.citizens)if(G.constructionCargo(c)&&c.carry.constructionId===b.id)G.returnConstructionCargo(c);
   for(const c of displacedHaulers)G.startHaul(c);
   if (G.sel && G.sel.kind === 'b' && G.sel.id === b.id) G.ui.hideInfo();
-  G.ui.toast(`🚧 已拆除 ${def.name}${pit?'，留下永久3×3矿坑':''}${refund.length ? `，返还 ${refund.join(' ')}` : ''}`, 'info');
+  G.ui.toast(`🚧 已拆除 ${def.name}${pit?'，留下永久3×3矿坑':cemeteryQuote?.graves.length?'，保留 '+cemeteryQuote.graves.length+' 个原墓位':''}${refund.length ? `，返还 ${refund.join(' ')}` : ''}`, 'info');
   G.scheduleJobs();return true;
 };
 
@@ -4073,8 +4085,38 @@ G.workforceSummary=function(b){
  * not a new job or a transported-body simulation. Values adapt the original. */
 G.MEMORIAL={capacity:8,graveDays:4*G.YEAR_DAYS,griefDays:G.YEAR_DAYS,buriedLoss:.25,unburiedLoss:1,maxLoss:1.5};
 G.activeGraves=(b,day=G.game.day)=>(b.graves||[]).filter(r=>r.expiresDay>day);
+// Stable identities derive from the original cemetery, slot and death day. A
+// slot cannot expire/reopen on its death day, so this also migrates old rows
+// without inventing citizens, dates, materials or memorials.
+G.graveIdentity=(b,r)=>'grave:'+b.id+':'+r.slot+':'+r.deathDay;
+G.graveRecord=(b,r)=>({...r,id:r.id===undefined?G.graveIdentity(b,r):r.id});
+G.cemeteryQuoteObjects=new WeakMap();G.cemeteryQuoteSerial=0;
+G.cemeteryQuoteIdentity=function(object){if(!G.cemeteryQuoteObjects.has(object))G.cemeteryQuoteObjects.set(object,++G.cemeteryQuoteSerial);return G.cemeteryQuoteObjects.get(object);};
+G.cemeteryRemovalQuote=function(b){
+  const w=G.world,g=G.game;
+  if(!b||w.bmap[b.id]!==b||b.type!=='cemetery'||b.state!=='ok')return {ok:false,reason:'只能确认拆除本村已建成的墓园'};
+  const graves=G.activeGraves(b).map(r=>G.graveRecord(b,r)),cells=graves.map(r=>G.cemeteryGraveCell(b,r.slot));
+  const seen=new Set();
+  for(const p of cells){if(!p||seen.has(p.y*w.N+p.x)||w.bgrid[p.y*w.N+p.x]!==b.id)return {ok:false,reason:'墓位占地记录不一致，不能拆除'};seen.add(p.y*w.N+p.x);}
+  const released=[];for(let y=b.y;y<b.y+b.h;y++)for(let x=b.x;x<b.x+b.w;x++){const i=y*w.N+x;if(w.bgrid[i]!==b.id)return {ok:false,reason:'墓园占地记录不一致，不能拆除'};if(!seen.has(i))released.push({x,y});}
+  const refund=G.constructionRefund(b),key=JSON.stringify([G.cemeteryQuoteIdentity(w),G.cemeteryQuoteIdentity(g),G.cemeteryQuoteIdentity(b),b.id,b.x,b.y,b.w,b.h,b.cemeterySize||null,g.day,g.stats.died,graves,refund]);
+  return {ok:true,key,graves,refund,retainedTiles:cells,releaseTiles:released,day:g.day};
+};
+G.releaseExpiredRemnants=function(w=G.world,day=G.game.day){
+  const expired=w.buildings.filter(b=>b.type==='graveremnant'&&b.grave.expiresDay<=day);
+  if(!expired.length)return 0;
+  const gone=new Set(expired);
+  for(const b of expired){const i=b.y*w.N+b.x;if(w.bgrid[i]===b.id)w.bgrid[i]=-1;if(w.bmap[b.id]===b)delete w.bmap[b.id];}
+  w.buildings=w.buildings.filter(b=>!gone.has(b));G.bumpNavigation(w);return expired.length;
+};
+G.graveRemnantSummary=function(b){
+  if(!b||b.type!=='graveremnant')return null;
+  return {name:b.grave.name,id:b.grave.id,slot:b.grave.slot,sourceId:b.graveSource.id,deathDay:b.grave.deathDay,expiresDay:b.grave.expiresDay,daysLeft:Math.max(0,b.grave.expiresDay-G.game.day),canRemove:false,
+    status:'墓园围栏已拆除；仅此格保留到原墓位期限，可步行通过，不能拆除、重葬或再次退款'};
+};
 G.griefLoss=c=>c.grief&&c.grief.days>0?c.grief.loss:0;
 G.advanceMemorials=function(){
+  G.releaseExpiredRemnants();
   for(const b of G.world.buildings)if(b.type==='cemetery')b.graves=G.activeGraves(b);
   for(const c of G.world.citizens)if(c.grief){
     if(c.grief.days<=1)c.grief=null;
@@ -4084,7 +4126,7 @@ G.advanceMemorials=function(){
 G.burialPlace=function(c){
   let best=null;
   for(const b of G.world.buildings){
-    if(b.type!=='cemetery'||b.state!=='ok'||G.activeGraves(b).length>=G.MEMORIAL.capacity)continue;
+    if(b.type!=='cemetery'||b.state!=='ok'||G.activeGraves(b).length>=G.cemeteryCapacity(b))continue;
     const spot=G.workSpot(G.world,b,c.x,c.y);
     if(spot&&(!best||spot.route.eta<best.spot.route.eta))best={b,spot};
   }
@@ -4093,7 +4135,7 @@ G.burialPlace=function(c){
 G.mournCitizen=function(c){
   const g=G.game,w=G.world,place=G.burialPlace(c),buried=!!place,name=c.name.slice(0,80);
   if(place){const b=place.b;b.graves=G.activeGraves(b);const used=new Set(b.graves.map(r=>r.slot));let slot=0;while(used.has(slot))slot++;
-    b.graves.push({slot,name,deathDay:g.day,expiresDay:g.day+G.MEMORIAL.graveDays});}
+    b.graves.push(G.graveRecord(b,{slot,name,deathDay:g.day,expiresDay:g.day+G.MEMORIAL.graveDays}));}
   let affected=0;
   for(const other of w.citizens){
     if(other===c||other.dead)continue;
@@ -4108,10 +4150,10 @@ G.mournCitizen=function(c){
 };
 G.cemeterySummary=function(b){
   if(!b||b.type!=='cemetery')return null;
-  const graves=G.activeGraves(b),next=graves.length?Math.min(...graves.map(r=>r.expiresDay)):null;
-  return {used:graves.length,capacity:G.MEMORIAL.capacity,free:G.MEMORIAL.capacity-graves.length,nextDays:next===null?null:next-G.game.day,
-    status:b.state!=='ok'?'施工中，尚不能安葬':graves.length>=G.MEMORIAL.capacity?'墓位已满，需等自然释放或新建墓园':'有空墓位；死亡时仍需检查实际可达路线',
-    graves:graves.map(r=>({slot:r.slot,name:r.name,daysLeft:r.expiresDay-G.game.day})),canRemove:graves.length===0};
+  const graves=G.activeGraves(b),capacity=G.cemeteryCapacity(b),next=graves.length?Math.min(...graves.map(r=>r.expiresDay)):null;
+  return {used:graves.length,capacity,free:capacity-graves.length,dimensions:[b.w,b.h],legacy:b.cemeterySize===undefined,nextDays:next===null?null:next-G.game.day,
+    status:b.state!=='ok'?'施工中，尚不能安葬':graves.length>=capacity?'墓位已满，需等自然释放或新建墓园':'有空墓位；死亡时仍需检查实际可达路线',
+    graves:graves.map(r=>({id:G.graveIdentity(b,r),slot:r.slot,name:r.name,daysLeft:r.expiresDay-G.game.day})),canRemove:true,remainsAfterRemoval:graves.length};
 };
 
 

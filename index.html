@@ -56,6 +56,11 @@
       <button type="button" id="orchard-plan-confirm">确认开园</button>
       <button type="button" id="orchard-plan-cancel">重选两个角</button>
     </div>
+    <div id="cemetery-plan-controls" class="hidden" role="group" aria-label="墓园矩形规划">
+      <p id="cemetery-plan-status" role="status" aria-live="polite"></p>
+      <button type="button" id="cemetery-plan-confirm">确认建园</button>
+      <button type="button" id="cemetery-plan-cancel">重选两个角</button>
+    </div>
     <div id="road-controls" class="hidden" role="group" aria-label="道路规划">
       <p id="road-plan-status" role="status" aria-live="polite"></p>
       <button type="button" id="road-confirm">确认铺路</button>
@@ -88,6 +93,7 @@
       <h3>生存要点（数值对齐原版 Banished）</h3>
       <ul>
         <li>🍖 每人每年吃 100 食物。食物分为肉类、蔬菜、主食，顶栏总食物是三类之和，共享食物仓容。猎人实际追踪鹿并实背肉皮入仓，同屋共用8日猎杀间隔；狩猎与捕鱼产肉，采集与果园产蔬菜，农田小麦产主食，卷心菜、早熟豆类和耐寒瓜产蔬菜；羊牧场提供肉和羊毛。多样饮食比长期只吃一类更均衡，可在居民详情查看。</li>
+        <li>新墓园每边7–20格，先预览墓位、石材与工时，再实运施工。拆围栏须确认，已有墓碑只占自身地格直到原到期日，不能覆盖建造或再次拆除；仍可走过。旧4×4八位保全，192日墓期是本作适配。</li>
         <li>耐寒瓜须贸易买种永久解锁。入冬后的前两日，已种耐寒瓜不再成长，但可继续收成熟作物或确认抢收；第3日零时只清除未收作物，已背起的收成保留。这是48日历的耐寒适配，不是气温模拟；冬季仍不能播种。</li>
         <li>农田虫害默认关闭，可在农田详情主动开启全村选项。开启后12天宽限，发现后先2天预警，再逐格损失未收作物；抢收可救粮，下一季实际换种降低复发风险。已收粮和携货不被虫害扣除。</li>
         <li>⛵ 贸易站建在水边，由商人按待售目标把物资搬入，用一种待售资源换商船货物。各资源共享本站容量，没有金币；待售物资不供居民使用。目标设为 0 后工人搬回，普通买入货也需送回仓库。买羊后在牧场放入，果树种子购买一次永久解锁，果园照料约 4 年成熟。</li>
