@@ -653,6 +653,7 @@ G.dropBlockedTask = function (c, t) {
   }
 };
 G.alternateTaskEndpoint = function (c, t) {
+  if(t?.kind==='roadPave')return G.roadWorkTaskSpot(c,t);
   if(t?.kind==='constructionMaterial')return G.constructionLegSpot(c,t);
   if(t?.kind==='firefight')return G.fireLegSpot(c,t);
   if(t?.kind==='supply')return G.supplyLegSpot(c,t);
@@ -686,7 +687,7 @@ G.routeCanReuse = function (route, c, tx, ty) {
 G.sendTo = function (c, tx, ty, planned = null) {
   let route=planned||(c.task&&c.task.dispatchRoute);
   if(c.task) delete c.task.dispatchRoute;
-  const buildingTask=c.task && (['constructionMaterial','build','clearSite','firewood','trade','care','clinic','arrival','leisure','host','worship','cleric','brew','smith','fuel','tailor','study','teach','firefight','supply','toolFetch'].includes(c.task.kind) || (c.task.kind==='work' && c.task.b && ['dock','mine','stonequarry','blacksmith','pasture','orchard'].includes(c.task.b.type)));
+  const buildingTask=c.task && (['constructionMaterial','build','clearSite','firewood','trade','care','clinic','arrival','leisure','host','worship','cleric','brew','smith','fuel','tailor','study','teach','firefight','supply','toolFetch','roadPave'].includes(c.task.kind) || (c.task.kind==='work' && c.task.b && ['dock','mine','stonequarry','blacksmith','pasture','orchard'].includes(c.task.b.type)));
   if((route && !G.routeCanReuse(route,c,tx,ty)) || (!route && buildingTask)) {
     const spot=G.alternateTaskEndpoint(c,c.task);
     if(!spot){if(c.task)G.dropBlockedTask(c,c.task);c.path=null;c.state='idle';c.wanderT=.5;return false;}
@@ -701,7 +702,7 @@ G.sendTo = function (c, tx, ty, planned = null) {
   if (!p) { c.state = 'idle'; c.task = null; return false; }
   // The path planner rounds its start cell. Physically checked factory/mineral
   // tasks still walk the final fraction after an interrupted commute.
-  if((['build','constructionMaterial'].includes(c.task?.kind)||c.task?.kind==='hunt'||c.task?.mineral||c.task?.economy==='pasture'||['firefight','supply','toolFetch','cleric','worship'].includes(c.task?.kind)||['fuel','tailor','brew'].includes(c.task?.kind)) && p.length===0 && G.d2(c.x,c.y,tx,ty)>1e-8) {
+  if((['build','constructionMaterial'].includes(c.task?.kind)||c.task?.kind==='hunt'||c.task?.mineral||c.task?.economy==='pasture'||['firefight','supply','toolFetch','cleric','worship'].includes(c.task?.kind)||['fuel','tailor','brew','roadPave'].includes(c.task?.kind)) && p.length===0 && G.d2(c.x,c.y,tx,ty)>1e-8) {
     c.path=[{x:tx,y:ty}];c.pi=0;c.state='walk';c.walkKind='task';return true;
   }
   c.path = p; c.pi = 0;
@@ -748,6 +749,7 @@ G.resumeTask = function (c) {
   if(t?.kind==='toolFetch'){if(G.tryHouseholdSupply&&G.tryHouseholdSupply(c))return true;c.task=t;return G.planToolFetch(c,t);}
   if(t?.kind==='supply'){c.task=t;return G.planSupplyLeg(c,t);}
   if(t&&['teach','clinic','host','cleric'].includes(t.kind)&&G.tryHouseholdSupply&&G.tryHouseholdSupply(c))return true;
+  if(t?.kind==='roadPave'){return G.resumeRoadWork(c,t);}
   if(t?.kind==='constructionMaterial'){if(!G.constructionTaskCurrent(c,t)){if(G.constructionCargo(c))G.returnConstructionCargo(c);return false;}if(G.constructionCargo(c))return G.startConstructionCargo(c);c.task=t;return G.sendTo(c,t.tx,t.ty);}
   if (!t) return false;
   const w = G.world;
@@ -1234,6 +1236,7 @@ G.coldStep = function (c, dtH) {
  * tiles. Failed detours retain the task/cargo and retry every two hours. */
 G.pathStepBlocked = (w,c,t)=>!G.tunnelSegmentAllowed(w,c.x,c.y,t.x,t.y);
 G.detourCitizen = function (c, dtH) {
+  if(c.task?.kind==='roadPave'){G.resumeRoadWork(c,c.task);return;}
   if(c.task?.kind==='toolFetch'){G.planToolFetch(c,c.task);return;}
   if(c.task?.kind==='constructionMaterial'){const t=c.task,spot=G.constructionLegSpot(c,t);if(spot){t.tx=spot.x;t.ty=spot.y;G.sendTo(c,t.tx,t.ty,spot.route);}else if(G.constructionCargo(c))G.returnConstructionCargo(c);else G.dropBlockedTask(c,t);return;}
   if(c.task?.kind==='firefight'){G.planFireLeg(c,c.task);return;}
@@ -1336,6 +1339,7 @@ G.stepCitizen = function (c, dtH) {
       return;
     }
     case 'work': {
+      if(c.task?.kind==='roadPave'){G.stepRoadWork(c,dtH);return;}
       if(c.task?.kind==='constructionMaterial'){const t=c.task;if(!G.atConstructionTask(c,t)){const spot=G.constructionLegSpot(c,t);if(spot){t.tx=spot.x;t.ty=spot.y;G.sendTo(c,t.tx,t.ty,spot.route);}else if(G.constructionCargo(c))G.returnConstructionCargo(c);else G.dropBlockedTask(c,t);return;}t.workLeft-=dtH;if(t.workLeft<=0)G.completeConstructionMaterial(c,t);return;}
       if(c.task?.kind==='build'&&dtH<=0)return;
       if(c.task?.kind==='build'&&!G.beginConstruction(c,c.task)){const t=c.task;if(G.validBuildTask(c,t))G.sendTo(c,t.tx,t.ty);else G.dropBlockedTask(c,t);return;}
@@ -1506,6 +1510,7 @@ G.requestTask = function (c) {
   }
   if(G.workerLimitOf(b)<=0){G.detachStaffingRole(c);G.requestTask(c);return;}
   if (b.state === 'site') {
+    if(b.type==='roadwork'){G.requestRoadWork(c,b);return;}
     if(!c.carry&&!c.pausedTask&&G.tryConstructionPriorityHandoff(c,b))return;
     const trees = G.siteTrees(b);
     if (trees.length) {
@@ -2329,33 +2334,34 @@ G.scheduleJobs = function () {
 G.CONSTRUCTION_HAUL=20;
 G.newConstruction=(required,onsite={})=>({required:{...required},onsite:{...onsite},consumed:false});
 G.constructionCargo=c=>!!c?.carry&&Number.isInteger(c.carry.constructionId);
+G.constructionUsed=(b,type)=>b?.type==='roadwork'&&type==='stone'?b.roadWork.cells.filter(c=>c.used).length:0;
 G.constructionIncoming=function(b,type,except=null){return G.world.citizens.reduce((sum,c)=>sum+(c!==except&&!c.dead&&G.constructionCargo(c)&&!c.carry.constructionReturn&&c.carry.constructionId===b.id&&c.carry.type===type?c.carry.qty:0),0);};
 G.constructionReady=b=>!!b?.construction&&(b.construction.consumed||Object.entries(b.construction.required).every(([k,n])=>(b.construction.onsite[k]||0)>=n));
 G.constructionEntitlement=b=>b.construction?(b.construction.consumed?b.construction.required:b.construction.onsite):(b.paidCost||G.buildingDefinition(b).cost);
-G.constructionRefund=function(b){const paid=G.constructionEntitlement(b),full=b.construction?b.state==='site'&&!b.construction.consumed&&!b.construction.legacyRefundHalf:b.state==='site'&&!b.constructionStarted&&b.progress===0&&b.workLeft>=b.totalWork;
+G.constructionRefund=function(b){if(b.type==='roadwork')return {...b.construction.onsite};const paid=G.constructionEntitlement(b),full=b.construction?b.state==='site'&&!b.construction.consumed&&!b.construction.legacyRefundHalf:b.state==='site'&&!b.constructionStarted&&b.progress===0&&b.workLeft>=b.totalWork;
  return Object.fromEntries(Object.entries(paid).map(([k,n])=>[k,full?n:Math.floor(n/2)]).filter(([,n])=>n>0));};
 G.recordConstructionLoss=function(items){const lost=G.game.constructionLost||(G.game.constructionLost={});for(const [k,n]of Object.entries(items))if(n>0)lost[k]=(lost[k]||0)+n;};
-G.constructionSummary=function(b){const state=b.construction,required=state?.required||b.paidCost||G.buildingDefinition(b).cost;
+G.constructionSummary=function(b){if(b.type==='roadwork')return G.roadWorkSummary(b);const state=b.construction,required=state?.required||b.paidCost||G.buildingDefinition(b).cost;
  const materials=Object.entries(required).map(([type,n])=>{const onsite=state&&!state.consumed?(state.onsite[type]||0):0,incoming=state?G.constructionIncoming(b,type):0,incorporated=state?.consumed||!state&&b.state==='ok'?n:0;return {type,required:n,onsite,incoming,incorporated,missing:Math.max(0,n-onsite-incoming-incorporated)};});
  const ready=G.constructionReady(b),clearing=b.state==='site'?G.siteTrees(b).length:0,phase=b.state!=='site'?'complete':b.sitePaused?'paused':clearing?'clearing':ready?'building':'materials';
  const status=phase==='complete'?'已完工':phase==='paused'?'施工已暂停，现场建材保留；在途建材退回仓库':phase==='clearing'?'先清理占地树木并送仓':phase==='building'?(state?.consumed||b.progress>0?`建造中 ${Math.floor(b.progress*100)}%`:'建材齐备，等待工人到达工地施工'):materials.some(r=>r.incoming)?'工人正携带建材前往工地':materials.some(r=>r.missing>0&&(G.game.res[r.type]||0)<=0)?'库存不足，等待采集或生产补料':'等待工人从可达仓库取料并送抵工地';
  return {phase,status:phase==='materials'&&b.warnText?b.warnText:status,materials,ready,clearing,consumed:!!state?.consumed,refund:G.constructionRefund(b),legacyRefundHalf:!!state?.legacyRefundHalf};};
-G.constructionCarryState=function(c){if(G.constructionCargo(c))return c.carry.constructionReturn?'建材退回仓库：'+(G.cargoWaitReason(c)||'前往可达仓库'):'携带建材前往工地 #'+c.carry.constructionId;
+G.constructionCarryState=function(c){if(G.constructionCargo(c)&&!c.carry.constructionReturn&&G.world.bmap[c.carry.constructionId]?.type==='roadwork')return c.carry.roadPaving?'从现场带石前往待铺路格':'从仓库实运石材前往路线首格料场';if(G.constructionCargo(c))return c.carry.constructionReturn?'建材退回仓库：'+(G.cargoWaitReason(c)||'前往可达仓库'):'携带建材前往工地 #'+c.carry.constructionId;
  const t=c.task||c.pausedTask;return t?.kind==='constructionMaterial'?'前往仓库领取工地建材':'';};
 G.constructionTaskCurrent=(c,t)=>!!t&&!t.completed&&G.world.cmap[c.id]===c&&!c.dead&&c.adult&&!c.student&&G.world.bmap[t.b?.id]===t.b&&t.b.state==='site'&&!t.b.sitePaused&&c.job===t.b.id&&!t.b.construction?.consumed;
-G.constructionDoor=(c,b)=>(b.type==='tunnel'?G.d2(c.x,c.y,G.tunnelEndpoints(b).start.x,G.tunnelEndpoints(b).start.y)<1e-8:G.atMedicalDoor(c,b))&&G.d2(c.x,c.y,Math.round(c.x),Math.round(c.y))<1e-8;
+G.constructionDoor=(c,b)=>(b.type==='roadwork'?G.d2(c.x,c.y,b.x,b.y)<1e-8:b.type==='tunnel'?G.d2(c.x,c.y,G.tunnelEndpoints(b).start.x,G.tunnelEndpoints(b).start.y)<1e-8:G.atMedicalDoor(c,b))&&G.d2(c.x,c.y,Math.round(c.x),Math.round(c.y))<1e-8;
 G.atConstructionTask=(c,t)=>G.constructionTaskCurrent(c,t)&&G.d2(c.x,c.y,t.tx,t.ty)<1e-8&&!G.tileBlocked(G.world,t.tx,t.ty)&&(t.phase==='fetch'?G.atStorageDoor(c,t.resource):G.constructionDoor(c,t.b));
 G.returnConstructionCargo=function(c){if(!G.constructionCargo(c))return false;c.carry.constructionReturn=true;c.carry.staffingReturn=true;
  if(c.task?.kind==='constructionMaterial')c.task=null;if(c.pausedTask?.kind==='constructionMaterial')c.pausedTask=null;
  G.startMineralHaul(c);return true;};
 G.constructionLegSpot=function(c,t){if(!G.constructionTaskCurrent(c,t))return null;return t.phase==='fetch'?G.storageRoute(c.x,c.y,t.resource)?.spot:G.workSpot(G.world,t.b,c.x,c.y);};
-G.startConstructionCargo=function(c){const cargo=c.carry,b=G.world.bmap[cargo.constructionId];
+G.startConstructionCargo=function(c){if(c.carry?.roadPaving&&!c.carry.constructionReturn)return G.startRoadPavingCargo(c);const cargo=c.carry,b=G.world.bmap[cargo.constructionId];
  if(cargo.constructionReturn||!b||b.state!=='site'||b.sitePaused||c.job!==b.id||b.construction?.consumed)return G.returnConstructionCargo(c);
  const spot=G.workSpot(G.world,b,c.x,c.y);if(!spot){b.warnText='工地入口不可达，已领建材退回仓库';return G.returnConstructionCargo(c);}b.warnText='';
  const t={kind:'constructionMaterial',phase:'deliver',b,resource:cargo.type,tx:spot.x,ty:spot.y,work:.1,workLeft:.1};c.task=t;c.pausedTask=null;c.haulPending=false;c.haulWait='';c.haulTo=null;return G.sendTo(c,t.tx,t.ty,spot.route);};
 G.requestConstructionMaterial=function(c,b){const state=b.construction;
  for(const [type,n]of Object.entries(state.required)){
-  const need=n-(state.onsite[type]||0)-G.constructionIncoming(b,type);if(need<=0||G.game.res[type]<=0)continue;
+  const need=n-(state.onsite[type]||0)-G.constructionIncoming(b,type)-G.constructionUsed(b,type);if(need<=0||G.game.res[type]<=0)continue;
   const route=G.storageRoute(c.x,c.y,type);if(!route){b.warnText='取料仓库不可达，等待仓库或通路';continue;}b.warnText='';
   const t={kind:'constructionMaterial',phase:'fetch',b,resource:type,tx:route.spot.x,ty:route.spot.y,work:.1,workLeft:.1};c.task=t;G.sendTo(c,t.tx,t.ty,route.spot.route);return true;
  }
@@ -2364,12 +2370,12 @@ G.completeConstructionMaterial=function(c,t){if(!t||t.completed||c.task!==t||t.w
  const b=t.b,s=b.construction;
  if(t.phase==='fetch'){
   if(c.carry){c.task=null;G.startHaul(c);return false;}
-  const qty=Math.min(G.CONSTRUCTION_HAUL,(s.required[t.resource]||0)-(s.onsite[t.resource]||0)-G.constructionIncoming(b,t.resource),G.game.res[t.resource]);
+  const qty=Math.min(G.CONSTRUCTION_HAUL,(s.required[t.resource]||0)-(s.onsite[t.resource]||0)-G.constructionIncoming(b,t.resource)-G.constructionUsed(b,t.resource),G.game.res[t.resource]);
   if(qty<=0||!G.workSpot(G.world,b,c.x,c.y)){t.completed=true;c.task=null;G.requestTask(c);return false;}
   const taken=G.withdrawResource(t.resource,qty);t.completed=true;c.task=null;c.carry={type:t.resource,qty:taken,constructionId:b.id,staffingReturn:true};G.startConstructionCargo(c);return true;
  }
  if(!G.constructionCargo(c)||c.carry.constructionReturn||c.carry.constructionId!==b.id||c.carry.type!==t.resource){c.task=null;G.requestTask(c);return false;}
- const accepted=Math.min(c.carry.qty,(s.required[t.resource]||0)-(s.onsite[t.resource]||0));
+ const accepted=Math.min(c.carry.qty,(s.required[t.resource]||0)-(s.onsite[t.resource]||0)-G.constructionUsed(b,t.resource));
  if(accepted>0){s.onsite[t.resource]=(s.onsite[t.resource]||0)+accepted;c.carry.qty-=accepted;}
  t.completed=true;c.task=null;if(c.carry.qty>0){G.returnConstructionCargo(c);return true;}c.carry=null;c.haulPending=false;G.requestTask(c);return true;
 };
@@ -2399,6 +2405,7 @@ G.siteTrees = function (b) {
 };
 G.addBuilding = function (type, x, y, opt) {
   opt = opt || {};
+  if(type==='roadwork')return {ok:false,reason:'铺路工程须从道路规划建立'};
   if(type==='tunnel')return {ok:false,reason:'隧道须通过道路工具选择两个洞口'};
   const def=type==='farm'?G.farmDefinition(opt.farmSize):type==='pasture'?G.pastureDefinition(opt.pastureSize):type==='orchard'?G.orchardDefinition(opt.orchardSize):type==='cemetery'?G.cemeteryDefinition(opt.cemeterySize):G.BDEF[type];
   if(def?.unbuildable)return {ok:false,reason:def.name+'不能主动建造或重新开发'};
@@ -2561,6 +2568,7 @@ G.finishBuilding = function (b) {
 G.removeBuilding = function (b, confirmationKey) {
   const w = G.world;
   if(!b||w.bmap[b.id]!==b)return false; // A consumed/cancelled site cannot refund twice.
+  if(b.type==='roadwork')return G.cancelRoadWork(b);
   if(b.houseFire){G.ui.toast('火情期间不能拆屋消除火灾，请先真实取水扑救','warn');return false;}
   if(b.type==='graveremnant'){G.ui.toast('墓位沿用原到期日，不能主动拆除或退款','warn');return false;}
   if(b.type==='mineralpit'){G.ui.toast('永久矿坑不能拆除、重建或恢复储量','warn');return false;}
@@ -2649,6 +2657,7 @@ G.demolishAt = function (tx, ty) {
     if (b) G.removeBuilding(b); // 拆除提示（含返还材料）在 removeBuilding 内
     return;
   }
+  const roadwork=G.roadWorkAt(w,tx,ty);if(roadwork){G.ui.toast('此格属于铺路工程：请在详情取消剩余工程，已铺道路保留','info');G.sel={kind:'b',id:roadwork.id};G.ui.showInfo?.(G.sel);return;}
   if (w.road[i]) { G.setRoad(w, tx, ty, false); G.markGroundDirty(tx, ty); return; }
   if (w.treeIdx[i] >= 0) { G.removeTree(w, tx, ty); return; }
   if (w.rock[i]) { G.markRockAt(w, tx, ty); return; } // 岩石改为标记后由散工清除（资源入库需劳动）
@@ -3995,7 +4004,7 @@ G.schoolSummary=function(b){
 /* Player ceilings supplement the existing automatic scheduler, never reserve people. */
 G.workerMaximumOf=b=>G.buildingDefinition(b)?.jobs||0;
 G.workerLimitOf=function(b){
-  if(!b)return 0;if(b.state==='site')return b.sitePaused?0:4;
+  if(!b)return 0;if(b.state==='site')return b.sitePaused?0:b.type==='roadwork'?2:4;
   const max=G.workerMaximumOf(b);return Number.isInteger(b.workerLimit)?G.clamp(b.workerLimit,0,max):max;
 };
 G.markStaffingCargo=c=>{if(c.carry)c.carry.staffingReturn=true;};
@@ -4221,7 +4230,7 @@ G.toolLifeHours=type=>(type==='steelTools'?G.LIFE.steelToolLifeDays:G.LIFE.toolL
 G.toolReserveCount=(type,g=G.game)=>(g.res[type]||0)+(g.toolMode==='individual'&&g.toolRemainders?.[type]>0?1:0);
 G.toolEquipped=c=>G.isTool(c?.toolType)&&c.toolHours>0;
 G.toolRemainingHours=function(g=G.game,w=G.world){return ['tools','steelTools'].reduce((n,k)=>n+(g.res[k]||0)*G.toolLifeHours(k)+(g.toolRemainders?.[k]||0),0)+w.citizens.filter(c=>!c.dead).reduce((n,c)=>n+(G.toolEquipped(c)?c.toolHours:0),0);};
-G.toolProductiveTask=t=>!!t&&(['build','clearSite','clearrock','chop','plant','sow','harvest','orchard','hunt','work'].includes(t.kind)||['smith','fuel','tailor','brew','firewood'].includes(t.kind)&&t.phase==='process');
+G.toolProductiveTask=t=>!!t&&(['build','clearSite','clearrock','chop','plant','sow','harvest','orchard','hunt','work','roadPave'].includes(t.kind)||['smith','fuel','tailor','brew','firewood'].includes(t.kind)&&t.phase==='process');
 G.toolWorker=function(c){
  if(!c||c.dead||!c.adult||c.student||G.isArriving(c))return false;
  const b=G.world.bmap[c.job];if(!b)return !!(G.world.marked.size||G.world.markedRocks.size);
@@ -4310,3 +4319,66 @@ G.tunnelRemovalQuote=function(b){
  return {...base,ok:true,reason:'拆除后山体恢复阻路；两端原地面道路保留',key:JSON.stringify([b.id,b.state,b.progress,b.workLeft,b.construction,refund])};
 };
 G.tunnelSummary=function(b){const {start,end}=G.tunnelEndpoints(b);return {start,end,length:b.w+b.h-1,inside:G.world.citizens.filter(c=>!c.dead&&G.tunnelInteriorAt(G.world,Math.round(c.x),Math.round(c.y))===b).length,looseGoods:G.tunnelLooseGoods(b).reduce((n,p)=>n+G.supplySum(p.supplyStock),0)};};
+
+/* One nonblocking road order reuses the construction cargo ledger. Materials
+ * stage at its first cell; a worker then physically carries one stone to a cell.
+ * Per-cell embedded stone/progress is saved, but no cell is a blocking building. */
+G.ROAD_WORK_H=1;
+G.roadWorkCellOpen=(w,b,p)=>!!p&&!p.done&&G.roadWorkAt(w,p.x,p.y)===b&&!G.isMountain(w,p.x,p.y)&&w.water[p.y*w.N+p.x]!==1&&!w.rock[p.y*w.N+p.x]&&w.treeIdx[p.y*w.N+p.x]<0&&w.bgrid[p.y*w.N+p.x]<0&&w.road[p.y*w.N+p.x]===p.base;
+G.addRoadWork=function(path,surface='dirt'){
+ const w=G.world,q=G.roadWorkPlanQuote(w,path,surface);if(!q.ok)return q;
+ if(q.cells.some(p=>w.treeIdx[p.y*w.N+p.x]>=0))return {ok:false,reason:'须先让散工实际清树，再确认铺路；木材仍须实运入仓'};
+ if(!q.cells.length)return {ok:true,queued:0,reused:q.reused,alreadyQueued:q.alreadyQueued};
+ const first=q.cells[0],cost=surface==='stone'?{stone:q.cells.length}:{};
+ const b={id:G.nextId(),type:'roadwork',x:first.x,y:first.y,w:1,h:1,state:'site',progress:0,workLeft:q.work,totalWork:q.work,workers:[],family:null,noWork:false,warnText:'',paidCost:cost,constructionStarted:false,construction:G.newConstruction(cost),roadWork:{surface,cells:q.cells}};
+ w.buildings.push(b);w.bmap[b.id]=b;G.reindexRoadWorks(w);G.game.buildLog.push({d:G.game.day,t:'roadwork'});if(G.game.buildLog.length>30)G.game.buildLog.shift();G.scheduleJobs();return {ok:true,b,projectId:b.id,queued:q.cells.length,reused:q.reused,alreadyQueued:q.alreadyQueued};
+};
+G.roadWorkTaskCurrent=(c,t)=>!!t&&!t.completed&&t.kind==='roadPave'&&G.world.cmap[c.id]===c&&!c.dead&&c.adult&&!c.student&&G.world.bmap[t.b?.id]===t.b&&t.b.type==='roadwork'&&t.b.state==='site'&&!t.b.sitePaused&&c.job===t.b.id&&G.roadWorkCellOpen(G.world,t.b,t.b.roadWork.cells[t.cell]);
+G.roadWorkClaims=function(b,except){const used=new Set();for(const c of G.world.citizens)if(c!==except&&!c.dead)for(const t of [c.task,c.pausedTask])if(t?.kind==='roadPave'&&t.b===b&&!t.completed)used.add(t.cell);return used;};
+G.roadWorkTaskSpot=function(c,t){if(!G.roadWorkTaskCurrent(c,t))return null;const p=t.phase==='load'?t.b:t.b.roadWork.cells[t.cell];return G.routeSpot(G.findPathToAny(G.world,c.x,c.y,[{x:p.x,y:p.y,building:t.b,state:t.b.state}]));};
+G.roadWorkDrop=function(c,t){if(c.task===t)c.task=null;if(c.pausedTask===t)c.pausedTask=null;c.path=null;c.state='idle';c.wanderT=2;if(G.constructionCargo(c))G.returnConstructionCargo(c);};
+G.resumeRoadWork=function(c,t){if(!G.roadWorkTaskCurrent(c,t)){G.roadWorkDrop(c,t);return false;}const spot=G.roadWorkTaskSpot(c,t);if(!spot){t.b.warnText='待铺路格或料场不可达，保留进度等待通路';G.roadWorkDrop(c,t);return false;}c.task=t;c.pausedTask=null;t.tx=spot.x;t.ty=spot.y;return G.sendTo(c,t.tx,t.ty,spot.route);};
+G.requestRoadWork=function(c,b){
+ if(G.world.bmap[b.id]!==b||b.sitePaused||c.job!==b.id)return;
+ if(!c.carry&&!c.pausedTask&&G.tryConstructionPriorityHandoff(c,b))return;
+ if(b.roadWork.cells.every(p=>p.done)){G.finishRoadWork(b);return;}
+ const claims=G.roadWorkClaims(b,c),available=b.roadWork.cells.map((p,i)=>({p,i})).filter(({p,i})=>!claims.has(i)&&G.roadWorkCellOpen(G.world,b,p));
+ const ready=available.filter(({p})=>b.roadWork.surface==='dirt'||p.used||(b.construction.onsite.stone||0)>=1);
+ for(const {p,i}of ready){const phase=b.roadWork.surface==='stone'&&!p.used?'load':'pave',t={kind:'roadPave',phase,b,cell:i,tx:0,ty:0,work:phase==='load'?.1:p.workLeft,workLeft:phase==='load'?.1:p.workLeft};if(G.resumeRoadWork(c,t)){b.warnText='';return;}}
+ if(b.roadWork.surface==='stone'&&(b.construction.required.stone||0)-(b.construction.onsite.stone||0)-G.constructionIncoming(b,'stone')-G.constructionUsed(b,'stone')>0){G.requestConstructionMaterial(c,b);return;}
+ b.warnText=available.length?'等待现场石材或其他铺路者完成当前格':'剩余路格正由其他工人施工，或被新障碍占用';c.state='idle';c.wanderT=2;
+};
+G.startRoadPavingCargo=function(c){const b=G.world.bmap[c.carry?.constructionId];
+ if(!b||b.type!=='roadwork'||b.sitePaused||c.job!==b.id||c.carry.constructionReturn)return G.returnConstructionCargo(c);
+ const claims=G.roadWorkClaims(b,c),i=b.roadWork.cells.findIndex((p,i)=>!p.used&&!claims.has(i)&&G.roadWorkCellOpen(G.world,b,p));
+ if(i<0)return G.returnConstructionCargo(c);
+ const t={kind:'roadPave',phase:'pave',b,cell:i,work:b.roadWork.cells[i].workLeft,workLeft:b.roadWork.cells[i].workLeft};return G.resumeRoadWork(c,t);
+};
+G.stepRoadWork=function(c,dt){const t=c.task;if(!G.roadWorkTaskCurrent(c,t)){G.roadWorkDrop(c,t);return;}
+ const p=t.b.roadWork.cells[t.cell],at=t.phase==='load'?t.b:p;
+ if(G.d2(c.x,c.y,at.x,at.y)>1e-8){G.resumeRoadWork(c,t);return;}if(!(dt>0))return;
+ if(t.phase==='load'){
+  t.workLeft-=dt;if(t.workLeft>0)return;
+  if(c.carry||(t.b.construction.onsite.stone||0)<1){G.roadWorkDrop(c,t);return;}
+  t.b.construction.onsite.stone--;c.carry={type:'stone',qty:1,constructionId:t.b.id,staffingReturn:true,roadPaving:true};t.phase='pave';t.work=t.workLeft=p.workLeft;G.resumeRoadWork(c,t);return;
+ }
+ if(t.b.roadWork.surface==='stone'&&!p.used){
+  const cargo=c.carry;if(!cargo?.roadPaving||cargo.constructionReturn||cargo.constructionId!==t.b.id||cargo.type!=='stone'||cargo.qty!==1){G.roadWorkDrop(c,t);return;}
+  c.carry=null;p.used=true;
+ }
+ const progress=Math.min(p.workLeft,G.toolWorkProgress(c,t,dt));p.workLeft=Math.max(0,p.workLeft-progress);t.workLeft=p.workLeft;t.b.workLeft=t.b.roadWork.cells.reduce((n,p)=>n+p.workLeft,0);t.b.progress=1-t.b.workLeft/t.b.totalWork;t.b.constructionStarted=true;c.animT+=dt*12;
+ if(p.workLeft>0)return;
+ // The current identity and unoccupied ground were checked again this step.
+ p.done=true;t.completed=true;G.reindexRoadWorks(G.world);G.setRoad(G.world,p.x,p.y,p.target);G.markGroundDirty(p.x,p.y);c.task=null;c.path=null;c.state='idle';c.wanderT=0;
+ if(t.b.roadWork.cells.every(p=>p.done))G.finishRoadWork(t.b);else G.requestTask(c);
+};
+G.releaseRoadWork=function(b){const w=G.world;w.buildings=w.buildings.filter(x=>x!==b);delete w.bmap[b.id];G.reindexRoadWorks(w);for(const c of w.citizens){if(c.job===b.id)G.releaseWorker(c);else if(G.constructionCargo(c)&&c.carry.constructionId===b.id)G.returnConstructionCargo(c);}if(G.sel?.kind==='b'&&G.sel.id===b.id){G.sel=null;G.ui.hideInfo();}G.game.schedT=0;};
+G.finishRoadWork=function(b){if(G.world.bmap[b.id]!==b||b.roadWork.cells.some(p=>!p.done))return false;G.releaseRoadWork(b);G.ui.toast('铺路工程已完成，全部路格开始按实际路面通行','good');return true;};
+G.cancelRoadWork=function(b){if(G.world.bmap[b.id]!==b||b.type!=='roadwork')return false;const refund=b.construction.onsite.stone||0,loss=b.roadWork.cells.filter(p=>p.used&&!p.done).length;
+ if(refund)G.game.res.stone+=refund;if(loss)G.recordConstructionLoss({stone:loss});const done=b.roadWork.cells.filter(p=>p.done).length;G.releaseRoadWork(b);G.ui.toast(`已取消剩余铺路，保留${done}格已成道路${refund?'，退回现场未用石材'+refund:''}${loss?'；未完路基已投入石材'+loss+'计入损失':''}`,'info');return true;};
+G.roadWorkSummary=function(b){const rw=b.roadWork,completed=rw.cells.filter(p=>p.done).length,stoneRequired=b.construction.required.stone||0,onsite=b.construction.onsite.stone||0,incorporated=G.constructionUsed(b,'stone');let fetchCarried=0,pavingCarried=0;
+ for(const c of G.world.citizens)if(!c.dead&&G.constructionCargo(c)&&!c.carry.constructionReturn&&c.carry.constructionId===b.id){if(c.carry.roadPaving)pavingCarried+=c.carry.qty;else fetchCarried+=c.carry.qty;}
+ const incoming=fetchCarried+pavingCarried,missing=Math.max(0,stoneRequired-onsite-incoming-incorporated),workers=G.world.citizens.filter(c=>!c.dead&&c.job===b.id),working=workers.some(c=>c.state==='work'&&G.roadWorkTaskCurrent(c,c.task)&&c.task.phase==='pave'&&G.d2(c.x,c.y,c.task.tx,c.task.ty)<1e-8);
+ const status=b.sitePaused?'铺路已暂停；现场余料与分格进度保留，在途石材退仓':working?'工人正在目标格实际铺路，完成该格后才加速':pavingCarried?'铺路者正把现场石材带往目标格':fetchCarried?'工人正从仓库实运石材到路线首格料场':!workers.length?'等待分配铺路工人':b.warnText||(missing>0&&G.game.res.stone<1?'缺石材，等待采集或生产；旧路仍可走':onsite?'现场有料，等待工人取料到格施工':'工人正前往路格或可达仓库');
+ return {surface:rw.surface,total:rw.cells.length,completed,pending:rw.cells.length-completed,workLeft:b.workLeft,totalWork:b.totalWork,stoneRequired,onsite,incoming,fetchCarried,pavingCarried,incorporated,status,materials:stoneRequired?[{type:'stone',required:stoneRequired,onsite,incoming,incorporated,missing}]:[],refund:onsite?{stone:onsite}:{},phase:b.sitePaused?'paused':working?'building':missing?'materials':'building',ready:!missing,clearing:0,consumed:false};
+};

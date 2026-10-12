@@ -549,6 +549,7 @@ G.drawBuilding = function (ctx, b, time) {
   const L = G.T2S(b.x, b.y + b.h);
   const def = G.BDEF[b.type];
 
+  if(b.type==='roadwork'){G.drawRoadWorkGround(ctx,b);return;}
   if (b.type === 'bridge') { G.drawBridge(ctx,b); return; }
   if(b.type==='tunnel'){const ends=G.tunnelEndpoints(b);G.drawTunnelPortal(ctx,b,ends.start,true);G.drawTunnelPortal(ctx,b,ends.end,false);return;}
   if (b.type === 'farm') { G.drawFarm(ctx, b); return; }
@@ -1041,7 +1042,7 @@ G.drawCitizen = function (ctx, c, time, homes) {
   const rescue=G.fireTaskOf&&G.fireTaskOf(c);
   const shopping=G.supplyTaskOf&&G.supplyTaskOf(c);
   // Loading/unloading uses the existing empty/holding pose, not a hammer swing.
-  const materialTransfer = c.task?.kind === 'constructionMaterial';
+  const materialTransfer = c.task?.kind === 'constructionMaterial'||c.task?.kind==='roadPave'&&c.task.phase==='load';
   const working = c.state === 'work'&&!rescue&&!shopping&&!materialTransfer;
   const bob = walking ? Math.abs(Math.sin(c.animT)) * 1.2 : (working ? Math.abs(Math.sin(c.animT)) * 0.6 : 0);
   const target = G.citizenWorkTarget(c);
@@ -1205,6 +1206,7 @@ G.frame = function (dtReal) {
     G.drawEconomyFieldGround(ctx, b, { tx0, ty0, tx1, ty1 });
 
   for(const b of w.buildings)if(b.type==='bridge')G.drawBridge(ctx,b);
+  for(const b of w.buildings)if(b.type==='roadwork')G.drawRoadWorkGround(ctx,b,{tx0,ty0,tx1,ty1});
 
   const harvesting = G.tool && (G.tool.kind === 'fell' || G.tool.kind === 'quarry');
   if (harvesting) G.drawFoodForestBounds(ctx);
@@ -1318,7 +1320,7 @@ G.frame = function (dtReal) {
   // 建筑
   for (const b of w.buildings) {
     if(b.type==='tunnel'){const ends=G.tunnelEndpoints(b);for(const [p,first]of [[ends.start,true],[ends.end,false]])if(p.x>=tx0-2&&p.x<=tx1+2&&p.y>=ty0-2&&p.y<=ty1+2)items.push({d:p.x+p.y+.62,k:9,b,p,first});continue;}
-    if(b.type==='bridge'||b.type==='graveremnant')continue; // Decks sit above water, below people and bankside objects.
+    if(['bridge','graveremnant','roadwork'].includes(b.type))continue; // Decks sit above water, below people and bankside objects.
     const cx = b.x + b.w / 2, cy = b.y + b.h / 2;
     if (cx < tx0 - 3 || cx > tx1 + 3 || cy < ty0 - 3 || cy > ty1 + 3) continue;
     items.push({ d: b.x + b.y + b.w + b.h - 2 - 0.5, k: 1, b });
@@ -1500,4 +1502,11 @@ G.drawTunnelPortal=function(ctx,b,p,first){
 };
 G.drawTunnelGuide=function(ctx,start,end,valid){
  const a=G.T2S(start.x,start.y),b=G.T2S(end.x,end.y);ctx.save();ctx.strokeStyle=valid?'rgba(220,188,124,.8)':'rgba(203,121,92,.9)';ctx.lineWidth=1.2/G.cam.z;ctx.setLineDash([5/G.cam.z,4/G.cam.z]);ctx.beginPath();ctx.moveTo(a[0],a[1]+16);ctx.lineTo(b[0],b[1]+16);ctx.stroke();ctx.setLineDash([]);ctx.font='10px sans-serif';ctx.textAlign='center';ctx.fillStyle='#edddb5';ctx.fillText('A',a[0],a[1]+29);ctx.fillText('B',b[0],b[1]+29);ctx.restore();
+};
+
+/* Pending road markers sit on ground; they never paint a finished road or own a hit target. */
+G.drawRoadWorkGround=function(ctx,b,bounds){const selected=G.sel?.kind==='b'&&G.sel.id===b.id;ctx.save();ctx.lineWidth=selected?1.3:.85;
+ for(const p of b.roadWork.cells){if(p.done||bounds&&(p.x<bounds.tx0||p.x>bounds.tx1||p.y<bounds.ty0||p.y>bounds.ty1))continue;const [x,y]=G.T2S(p.x,p.y);ctx.strokeStyle=b.sitePaused?'#8c8678':p.used?'#c19762':selected?'#d2ae75':'#a18a65';ctx.setLineDash(selected?[4,4]:[2,10]);G.diamondPath(ctx,x,y);ctx.stroke();if(p.workLeft<G.ROAD_WORK_H){ctx.setLineDash([]);ctx.strokeStyle='#d3b784';ctx.beginPath();ctx.moveTo(x-9,y+16);ctx.lineTo(x-9+18*(1-p.workLeft/G.ROAD_WORK_H),y+16);ctx.stroke();}}
+ if(!bounds||b.x>=bounds.tx0&&b.x<=bounds.tx1&&b.y>=bounds.ty0&&b.y<=bounds.ty1){const [x,y]=G.T2S(b.x,b.y);ctx.setLineDash([]);ctx.strokeStyle='#765e43';ctx.lineWidth=1.2;ctx.beginPath();ctx.moveTo(x-10,y+22);ctx.lineTo(x-10,y+9);ctx.stroke();ctx.fillStyle=b.sitePaused?'#989184':'#c69a64';ctx.fillRect(x-10,y+9,8,5);const n=Math.min(4,Math.ceil((b.construction.onsite.stone||0)/5));for(let i=0;i<n;i++){ctx.fillStyle=i%2?'#aaa391':'#8c8b80';ctx.beginPath();ctx.ellipse(x+1+(i%2)*4,y+21-Math.floor(i/2)*3,3.5,2,0,0,Math.PI*2);ctx.fill();}if(selected){ctx.fillStyle='#e1cda9';ctx.font='9px sans-serif';ctx.textAlign='center';ctx.fillText('料',x-6,y+5);}}
+ ctx.restore();
 };

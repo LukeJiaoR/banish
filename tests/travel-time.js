@@ -91,8 +91,10 @@ test('blocked home doorstep uses another real doorway, not a nearby arbitrary re
 test('known road counts survive all supported writes/load; unknown maps use safe lower bound',()=>{
  const {loadGame}=require('./helpers/playability'),G=loadGame(root);G.newGame(1);const w=G.world;assert.equal(w.roadCount,0);
  const spots=[];for(let y=2;y<w.N-2&&spots.length<3;y++)for(let x=2;x<w.N-2&&spots.length<3;x++)if(G.canPlaceRoad(w,x,y)&&w.treeIdx[y*w.N+x]<0)spots.push({x,y});assert.equal(spots.length,3);
- const [a,b,c]=spots;G.paintRoad(a.x,a.y,a.x,a.y);assert.equal(w.roadCount,1);G.paintRoad(a.x,a.y,a.x,a.y);assert.equal(w.roadCount,1);
- G.tool={kind:'road'};G.hasOpenModal=()=>false;G.roadPlan={world:w,start:b,end:c,result:{ok:true,path:[b,c]},message:''};assert.equal(G.confirmRoadPlan().placed,2);assert.equal(w.roadCount,3);
+ // This cache test writes completed surfaces directly; queued construction is
+ // independently exercised by road-work.js and must not affect roadCount early.
+ const [a,b,c]=spots;G.setRoad(w,a.x,a.y,1);assert.equal(w.roadCount,1);G.setRoad(w,a.x,a.y,1);assert.equal(w.roadCount,1);
+ G.setRoad(w,b.x,b.y,1);G.setRoad(w,c.x,c.y,1);assert.equal(w.roadCount,3);
  G.demolishAt(a.x,a.y);assert.equal(w.roadCount,2);const save=JSON.parse(JSON.stringify(G.serializeGame())),loaded=G.prepareSaveData(save);assert.equal(loaded.world.roadCount,2);assert.equal(loaded.world.road.reduce((n,x)=>n+x,0),2);
  G.newGame(2);assert.equal(G.world.roadCount,0);
  const H=fresh(),hw=H.world;uRoad(hw);assert.equal(hw.roadCount,undefined);assert(Math.abs(cost(hw,{x:3,y:12},H.findPath(hw,3,12,23,12))-oracle(H,{x:3,y:12},{x:23,y:12}))<1e-5);
