@@ -1231,15 +1231,16 @@ G.markGroundDirty = G.markGroundDirty || (() => {}); // render.js 未加载时�
   const c = G.spawnCitizen({ x: 4, y: 4, sex: 'm', age: 25 });
   c.job = b.id;
   let t = G.makeTask(b, c);
-  check('附近没有成熟林 → 停工', t === null && b.noWork === true && b.warnText === '附近成熟林太少，猎物绝迹');
-  seedMatureTrees(w, 5, 5, 20); // 圈内成熟树达满产基准
+  check('范围内没有鹿 → 停工', t === null && b.noWork === true && b.warnText === '范围内暂时没有鹿，等待鹿群回归');
+  seedMatureTrees(w, 5, 5, 20);
+  G.initializeDeer(w, g); // A real bounded population, not synthetic tree-count output.
   b.noWork = false;
   t = G.makeTask(b, c);
-  check('密林狩猎满产10肉类', t && t.kind === 'work' && t.yield.type === 'meat' && t.yield.qty === 10);
+  check('真实鹿派单锁定160肉与4皮革，尚未入库', t && t.kind === 'hunt' && Number.isInteger(t.deerId) && t.yield.type === 'meat' && t.yield.qty === 160 && t.extra.leather === 4);
   g.res.tools = 0;
   b.noWork = false;
   t = G.makeTask(b, c);
-  check('无工具狩猎减半（10→5）', t && t.yield.qty === 5);
+  check('无工具猎获减半（160肉/4皮→80肉/2皮）', t && t.yield.qty === 80 && t.extra.leather === 2);
 }
 /* ---- 森林自然播种：护林屋之外森林也能再生 ---- */
 {

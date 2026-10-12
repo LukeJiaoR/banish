@@ -83,6 +83,7 @@ G.prepareNewGame = function (config) {
       }
     }
     if(G.normalizeFamilyRelations)G.normalizeFamilyRelations(w);
+    G.initializeDeer(w,G.game);
     G.scheduleJobs();
     if(w.buildings.length!==1||w.buildings[0]!==storage.b||w.citizens.length!==quote.presetSummary.population||w.families.length!==kidPlan.length||
       w.families.some((f,i)=>f.members.length!==kidPlan[i]+2||f.members.some(id=>w.cmap[id]?.familyId!==f.id)))throw new Error('起始家庭数据无效');
@@ -136,6 +137,10 @@ G.confirmNewGame = function (request) {
 G.serializeGame = function () {
   const w = G.world, g = G.game;
   G.reconcileFood(g);
+  // Build a detached wildlife snapshot; saving never moves live prey or claims.
+  const deerWorld={...w,deer:w.deer?.map(d=>({...d}))};
+  if(deerWorld.deer===undefined)G.initializeDeer(deerWorld,g);
+  G.reconcileDeerHabitat(deerWorld,g);
   return {
     v: 1, seed: w.seed, N: w.N, mapVersion: w.mapVersion || 0, // N：地图尺寸（旧档跨尺寸迁移裸索引用）
     game: {
@@ -143,9 +148,11 @@ G.serializeGame = function () {
       h: g.h, day: g.day, season: g.season, year: g.year,
       res: g.res, stats: g.stats, prevFood: g.prevFood, foodNet: g.foodNet, foodUrgent: g.foodUrgent, warned: g.warned,
       supplyMode:g.supplyMode,clothingSupply:g.clothingSupply,supplyStartedDay:g.supplyStartedDay,supplyUsed:g.supplyUsed,supplyLost:g.supplyLost,
+      huntingLost:{...g.huntingLost},
       heating:g.heating, fishingRules:g.fishingRules, fireDisasters:g.fireDisasters, farmPests:g.farmPests, pasturePests:g.pasturePests, townLedger:g.townLedger, challenges:g.challenges, hist: g.hist, buildLog: g.buildLog, toolMode:g.toolMode,toolRemainders:g.toolRemainders,toolWear: g.toolWear, steelToolWear: g.steelToolWear, healthStartDay: g.healthStartDay, nomads:g.nomads, unlocks: g.unlocks, livestock: g.livestock,
       productionGoals: g.productionGoals && { ...g.productionGoals }, productionPaused: g.productionPaused && { ...g.productionPaused },
     },
+    deer:deerWorld.deer.map(d=>({...d})),
     roads: Array.from(w.road).flatMap((road, i) => road ? [i] : []),
     stoneRoads: Array.from(w.road).flatMap((road, i) => road === 2 ? [i] : []),
     trees: w.trees.map(t => [t.i, t.x, t.y, t.b]),
@@ -159,6 +166,7 @@ G.serializeGame = function () {
       bridgeAxis: b.bridgeAxis, bridgeLength: b.type === 'bridge' ? b.w + b.h - 1 : undefined,
       houseFire:b.houseFire&&{...b.houseFire},ruinFrom:b.ruinFrom,ruinIncident:b.ruinIncident,
       mineralUnits:b.mineralUnits, pitSource:b.pitSource, mineMode: b.mineMode, legacyMine: b.legacyMine, mineTick: b.mineTick, toolRecipe: b.toolRecipe, reserveDays:b.reserveDays, brewRecipe:b.brewRecipe, coatRecipe:b.coatRecipe, coatMaterial:b.coatMaterial,
+      huntingReadyDay:b.type==='hunting'?(b.huntingReadyDay||0):undefined,
       doCut: b.doCut, doPlant: b.doPlant, fuelLimit: b.fuelLimit, toolLimit: b.toolLimit,
       farmSize:b.type==='farm'&&b.farmSize?[...b.farmSize]:undefined,
       pastureSize:b.type==='pasture'&&b.pastureSize?[...b.pastureSize]:undefined,
@@ -307,6 +315,12 @@ G.prepareSaveData = function (d) {
   }
   g.h = number(gd.h, '小时', 0, G.DAY_H); if (g.h === G.DAY_H) bad('小时');
   g.day = integer(gd.day, '天数'); g.season = integer(gd.season, '季节', 0, 3); g.year = integer(gd.year, '年份', 1);
+  const currentDeer=d.deer!==undefined;
+  if(currentDeer!==(gd.huntingLost!==undefined))bad('鹿群存档状态不完整');
+  if(currentDeer){const loss=record(gd.huntingLost,'猎获损失');
+    if(Object.keys(loss).length!==2||Object.keys(loss).some(k=>!['meat','leather'].includes(k)))bad('猎获损失字段');
+    g.huntingLost={meat:number(loss.meat,'肉类猎获损失',0),leather:number(loss.leather,'皮革猎获损失',0)};
+  }
   record(gd.res, '资源');
   for (const key of G.RES_KEYS) {
     const value = gd.res[key] === undefined && ['iron', ...G.FOOD_KEYS, 'leather', 'wool', 'clothes', 'herbs', 'coal', 'steelTools', 'ale', 'warmCoats'].includes(key) ? 0 : gd.res[key] === undefined && key === 'tools' ? 10 : gd.res[key];
@@ -501,6 +515,11 @@ G.prepareSaveData = function (d) {
       if(bd.totalWork!==def.buildWork||bd.workLeft===undefined||bd.progress===undefined||b.workLeft<0||b.workLeft>def.buildWork||Math.abs(b.progress-(1-b.workLeft/def.buildWork))>1e-8)bad('面积牧场施工工时');
       if((b.state==='ok'&&(b.workLeft!==0||b.progress!==1))||(b.state==='site'&&b.workLeft<=0))bad('面积牧场施工状态');
     }
+    if(bd.type==='hunting'){
+      if(currentDeer!==(bd.huntingReadyDay!==undefined))bad('猎人小屋冷却状态不完整');
+      b.huntingReadyDay=currentDeer?number(bd.huntingReadyDay,'猎人小屋冷却',0,G.huntingNow(g)+G.HUNTING.cooldownDays):0;
+      if(b.state==='site'&&b.huntingReadyDay!==0)bad('未完工猎人小屋冷却');
+    }else if(bd.huntingReadyDay!==undefined)bad('非猎人小屋冷却');
     if(bd.brewRecipe!==undefined&&(bd.type!=='tavern'||typeof bd.brewRecipe!=='string'||!Object.hasOwn(G.BREW_RECIPES,bd.brewRecipe)))bad('酿酒配方');
     if(bd.type==='tavern')b.brewRecipe=bd.brewRecipe===undefined?'grain':bd.brewRecipe;
     if(bd.houseFire!==undefined){const h=record(bd.houseFire,'住房火情');if(!['house','stonehouse'].includes(b.type)||b.state!=='ok'||b.family!==null||b.workers.length||g.fireDisasters.startedDay===null)bad('住房火情状态');
@@ -697,6 +716,23 @@ G.prepareSaveData = function (d) {
     }
     w.buildings.push(b); w.bmap[b.id] = b;
   }
+  if(currentDeer){
+    const rows=array(d.deer,'鹿群');if(rows.length!==G.HUNTING.population)bad('鹿群槽位数量');
+    const seen=new Set(),activeTiles=new Set(),keys=['id','x','y','homeX','homeY','returnDay','moveDay','generation'];
+    w.deer=rows.map(row=>{
+      record(row,'鹿群槽位');if(Object.keys(row).length!==keys.length||Object.keys(row).some(k=>!keys.includes(k)))bad('鹿群槽位字段');
+      const deer={id:integer(row.id,'鹿群 ID',1,G.HUNTING.population),x:integer(row.x,'鹿群 x',0,w.N-1),y:integer(row.y,'鹿群 y',0,w.N-1),
+        homeX:integer(row.homeX,'鹿群栖息地 x',0,w.N-1),homeY:integer(row.homeY,'鹿群栖息地 y',0,w.N-1),
+        returnDay:row.returnDay===null?null:number(row.returnDay,'鹿群回归日期',0,G.huntingNow(g)+G.HUNTING.replenishDays),
+        moveDay:integer(row.moveDay,'鹿群下次移动日',0,g.day+G.HUNTING.moveDays),generation:integer(row.generation,'鹿群代次',0)};
+      if(seen.has(deer.id))bad('重复鹿群 ID');seen.add(deer.id);
+      if(Math.abs(deer.x-deer.homeX)>G.HUNTING.roamRadius||Math.abs(deer.y-deer.homeY)>G.HUNTING.roamRadius)bad('鹿群越出本地栖息地');
+      if(deer.returnDay===null){
+        const tile=deer.y*w.N+deer.x;if(!G.deerHabitat(w,deer.x,deer.y)||activeTiles.has(tile))bad('鹿群位置非法或重叠');activeTiles.add(tile);
+      }
+      return deer;
+    });
+  }else G.initializeDeer(w,g);
   if(w.buildings.filter(b=>b.pastureInfestation).length>G.PASTURE_PESTS.maxActive)bad('牧场疫情上限');
   // Loading is not a daily mortality event; old settlement timestamps never replay.
   if(g.pasturePests.enabled)g.pasturePests.lastDay=g.day;
@@ -715,6 +751,13 @@ G.prepareSaveData = function (d) {
     if (cd.carry != null) {
       record(cd.carry, '随身资源'); if (!G.RES_KEYS.includes(cd.carry.type)) bad('随身资源类型');
       carry = { type: cd.carry.type === 'food' ? 'grain' : cd.carry.type, qty: number(cd.carry.qty, '随身资源数量', 0) };
+      if(cd.carry.huntingId!==undefined){
+        if(!currentDeer||!['meat','leather'].includes(carry.type)||cd.carry.staffingReturn!==true||
+          ['smithInput','coatInput','tailorId','fuelInput','firewoodId','orchardId','pastureId','brewIngredient','supplyBatch'].some(k=>cd.carry[k]!==undefined)||
+          (cd.carry.extra!==undefined&&(carry.type!=='meat'||Object.keys(record(cd.carry.extra,'猎获副批')).some(k=>k!=='leather'))))bad('猎获携货标记冲突');
+        carry.huntingId=integer(cd.carry.huntingId,'猎获来源',0,0x7ffffffe);
+        if(w.bmap[carry.huntingId]&&w.bmap[carry.huntingId].type!=='hunting')bad('猎获来源类型');
+      }
       if(cd.carry.staffingReturn!==undefined){if(cd.carry.staffingReturn!==true)bad('撤岗保货标记');carry.staffingReturn=true;}
       if(cd.carry.smithInput!==undefined){if(cd.carry.smithInput!==true||!carry.staffingReturn||!['iron','wood','coal'].includes(carry.type)||carry.qty>(carry.type==='iron'?1:2)||cd.carry.brewIngredient!==undefined||cd.carry.pastureId!==undefined)bad('铁匠原料货批');carry.smithInput=true;}
       if(cd.carry.coatInput!==undefined){if(!['leather','wool'].includes(carry.type)||!carry.staffingReturn||carry.qty>2||['smithInput','fuelInput','brewIngredient','pastureId','orchardId','firewoodId','tailorId'].some(k=>cd.carry[k]!==undefined))bad('裁缝衣料货批');carry.coatInput=integer(cd.carry.coatInput,'衣料来源',1);}
@@ -740,6 +783,16 @@ G.prepareSaveData = function (d) {
           carry.extra[type] = number(cd.carry.extra[type], '副产物数量', 0);
         }
       }
+    }
+    // Old snapshots omitted tasks and cargo provenance. Meat/skin may belong
+    // to a hunter whose cabin was removed, a reassigned worker, or another old
+    // producer. Keep every unmarked old batch under unknown source 0; current
+    // employment cannot identify where it came from. Explicit batch markers
+    // keep their existing factory/pasture/household delivery contracts.
+    if(!currentDeer&&carry&&['meat','leather'].includes(carry.type)&&
+      (!carry.extra||(carry.type==='meat'&&Object.keys(carry.extra).every(k=>k==='leather')))&&
+      !['smithInput','coatInput','tailorId','fuelInput','firewoodId','orchardId','pastureId','brewIngredient','supplyBatch'].some(k=>cd.carry[k]!==undefined)){
+      carry.staffingReturn=true;carry.huntingId=0;
     }
     if(carry?.supplyBatch&&(carry.qty<=0||G.supplySum(G.supplyCargoItems(carry))>(carry.supplyBatch.kind==='home'?G.SUPPLY.homeCarry:G.SUPPLY.vendorCarry)+1e-6))bad('生活配送批量');
     if(carry?.supplyBatch)for(const k of G.CLOTHING_KEYS){const n=G.supplyCargoItems(carry)[k]||0;if(!Number.isSafeInteger(n)||n>0&&!g.clothingSupply)bad('随身配送衣物');}

@@ -73,7 +73,11 @@ test('road and mark indices remap across sizes without wrapping outside rows', (
   assert.deepEqual(Array.from(G.world.rockCleared), [3 * G.world.N + 9]);
 });
 test('76-tile saves expand to the current map without shifting roads', () => {
-  const { G } = fixture(); const d = snapshot(G); d.N = 76;
+  const { G } = fixture(); const d = snapshot(G);
+  // This fixture predates wildlife; do not retain current deer on its replaced map.
+  delete d.deer; delete d.game.huntingLost;
+  for (const b of d.buildings) delete b.huntingReadyDay;
+  d.N = 76;
   d.trees = d.trees.filter(row => row[1] < 76 && row[2] < 76);
   d.roads = [2 * 76 + 3, 75 * 76 + 75]; d.marked = [5 * 76 + 4];
   G.applySaveData(d); assert.deepEqual(roadCoords(G.world), [[3, 2], [75, 75]]);

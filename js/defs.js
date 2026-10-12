@@ -131,13 +131,13 @@ G.BDEF = {
     id: 'hunting', name: '猎人小屋', icon: '🏹', w: 2, h: 2,
     cost: { wood: 44, stone: 10 }, buildWork: 80, jobs: 2, passable: false,
     wall: '#5e6b4a', wallD: '#485238', roof: '#4d5e3e',
-    desc: '2 名专业猎人，满林基础每趟 10 肉类，并带回皮革，受成熟林密度、工具和往返路程影响。成熟树太少会停工；与采集小屋不同，幼林不能支持狩猎。',
+    desc: '2名猎人在原点±12格方形圈内寻找真实可达的鹿；每屋共用8天狩猎冷却。每只鹿产肉160/受教育200、皮革4/受教育6（本作适配，另受工具规则影响），工作后实际送仓才入库；鹿群会回归，不永久耗尽。',
   },
   forester: {
     id: 'forester', name: '护林小屋', icon: '🌲', w: 2, h: 2,
     cost: { wood: 32, stone: 12 }, buildWork: 70, jobs: 2, passable: false,
     wall: '#6b5a3e', wallD: '#54462f', roof: '#4a6b3a',
-    desc: '2 名专业护林人。基础砍伐4小时、补种1.5小时；每棵树仍产2原木（受教育3），最多背8原木一批。就近连续采伐后真实送仓，原地补种生长速度不变。可分别关闭砍伐/补种；同址采集和狩猎仍受成熟林减少影响。',
+    desc: '2 名专业护林人。基础砍伐4小时、补种1.5小时；每棵树仍产2原木（受教育3），最多背8原木一批。就近连续采伐后真实送仓，原地补种生长速度不变。可分别关闭砍伐/补种；同址采集仍受成熟林减少影响，清空林地也会使野鹿另寻栖地。',
   },
   woodcutter: {
     id: 'woodcutter', name: '伐木屋', icon: '🪓', w: 2, h: 2,
@@ -222,7 +222,7 @@ G.PROD = {
   mine:      { workH: 9, yield: 6, coalYield: 8, ironEvery: 5 }, // 新井专采铁/煤；旧档混采每5趟1趟铁，其余石（旧档仍无限）
   stonequarry: { workH: 9, yield: 6 },
   blacksmith: { toolLimit: 30, toolMax: 500, workH: 4, consume: [{ type: 'iron', qty: 1 }, { type: 'wood', qty: 2 }], toolsOut: 2, eduToolsOut: 3 }, // 1铁+2木→2工具（受教育 3）
-  hunting:   { workH: 5, yield: 10, radius: 12, needTrees: 10, fullForest: 20 }, // 狩猎依赖成熟林（鹿群栖息地），猎物随森林再生
+  hunting:   { workH: 5, radius: 12 }, // 遇见真实鹿群；每屋共用八天冷却
   // perTile 14/格：原版 7/格但田块可放大到 15×15，本作固定 8×8，翻倍对齐原版人均产出；
   // haulCap 28：收获攒满 4 格再送一趟仓，否则 64 趟搬运会把秋收窗口耗在走路 上
   farm:      { perTile: 14, tileWorkH: 0.5, growDays: 24, haulCap: 28 },
@@ -308,3 +308,6 @@ G.emptySupplyStock=()=>Object.fromEntries(G.SUPPLY.types.map(k=>[k,0]));
 G.supplySum=s=>G.SUPPLY.types.reduce((n,k)=>n+(s?.[k]||0),0);
 G.supplyFood=s=>G.FOOD_KEYS.reduce((n,k)=>n+(s?.[k]||0),0);
 G.supplyCargoItems=cargo=>cargo?{[cargo.type]:cargo.qty,...cargo.extra}:{};
+
+// Encounter hunting values are this game's explicit bounded adaptation.
+G.HUNTING={population:24,cooldownDays:8,replenishDays:8,moveDays:1,roamRadius:4,workH:5,meat:160,eduMeat:200,leather:4,eduLeather:6};

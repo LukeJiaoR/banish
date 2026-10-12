@@ -642,6 +642,29 @@ G.addEconomyFieldParts = function (items, b, bounds) {
   }
 };
 
+/* Wildlife uses the same bottom-center anchor and scene depth as citizens.
+ * Dead/replenishing slots are never painted; drawing never advances wildlife. */
+G.addDeerDrawItems = function(items, w, bounds) {
+  for(const deer of w.deer||[]) if(deer.returnDay===null &&
+    (!bounds || (deer.x>=bounds.tx0-1&&deer.x<=bounds.tx1+1&&deer.y>=bounds.ty0-1&&deer.y<=bounds.ty1+1)))
+    items.push({d:deer.x+deer.y+.015,k:7,deer});
+};
+G.drawDeer = function(ctx, deer) {
+  if(deer.returnDay!==null)return;
+  const [x,y]=G.T2S(deer.x,deer.y);
+  ctx.fillStyle='rgba(26,32,19,.16)';ctx.beginPath();ctx.ellipse(x,y-1,8,2.6,0,0,Math.PI*2);ctx.fill();
+  if(G.sprDraw(ctx,'deer',x,y,{w:26,flip:deer.id%2===0}))return;
+  // Missing-image fallback, consistent with other entity fallbacks.
+  ctx.save();ctx.translate(x,y);if(deer.id%2===0)ctx.scale(-1,1);
+  ctx.strokeStyle='#705039';ctx.lineWidth=1.5;ctx.beginPath();
+  for(const dx of [-6,-3,4,7]){ctx.moveTo(dx,-7);ctx.lineTo(dx-1,-1);}ctx.stroke();
+  ctx.fillStyle='#a77c51';ctx.beginPath();ctx.ellipse(0,-9,9,4,0,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.ellipse(-8,-13,2.4,5,-.25,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.ellipse(-10,-16,4,2.5,.15,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle='#936a44';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(-9,-18);ctx.lineTo(-10,-21);ctx.moveTo(-7,-18);ctx.lineTo(-5,-20);ctx.stroke();
+  ctx.fillStyle='#ded0ad';ctx.fillRect(6,-10,2,3);ctx.fillStyle='#30291d';ctx.fillRect(-12,-17,1,1);ctx.restore();
+};
+
 G.drawEconomyFieldPart = function (ctx, p) {
   const [sx, sy] = G.T2S(p.x, p.y);
   if (p.kind === 'fence') {
@@ -1069,6 +1092,7 @@ G.frame = function (dtReal) {
     items.push({ d: c.x + c.y + 0.01, k: 2, c });
   }
   for(const pile of [...(w.supplyCaches||[]),...(w.families||[]).map(f=>f.supplyCamp).filter(Boolean)])if(G.supplySum(pile.supplyStock)>1e-8&&pile.x>=tx0-3&&pile.x<=tx1+3&&pile.y>=ty0-3&&pile.y<=ty1+3)items.push({d:pile.x+pile.y+.005,k:6,pile});
+  G.addDeerDrawItems(items,w,{tx0,ty0,tx1,ty1});
   items.sort((a, b) => a.d - b.d);
   const now = performance.now() / 1000;
   for (const it of items) {
@@ -1092,6 +1116,7 @@ G.frame = function (dtReal) {
     else if (it.k === 4) G.drawFarmCrop(ctx, it.b, it.f);
     else if (it.k === 5) G.drawEconomyFieldPart(ctx, it);
     else if (it.k === 6) G.drawSupplyPile(ctx,it.pile);
+    else if (it.k === 7) G.drawDeer(ctx,it.deer);
     else if (it.k === 1) {
       if(it.b.type==='farm')G.drawFarmPestBadge(ctx,it.b);
       if(it.b.type==='pasture')G.drawPasturePestBadge(ctx,it.b);

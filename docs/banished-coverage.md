@@ -3,7 +3,7 @@
 ## 核查口径
 
 - 核查日期：2026-10-12。已交付基线为 [`main@6cfbe2d7f91d4a41fe3cc06caa3b6954d1fefdea`](https://github.com/LukeJiaoR/banish/tree/6cfbe2d7f91d4a41fe3cc06caa3b6954d1fefdea)，版本 **0.3.64**；[鸡牧场 PR #66](https://github.com/LukeJiaoR/banish/pull/66) 已在此基线上。
-- 本文记录 **0.3.65** 牧场疫病/整群搬空增量（[Issue #67](https://github.com/LukeJiaoR/banish/issues/67)，[PR #68](https://github.com/LukeJiaoR/banish/pull/68)已合并），以及 **0.3.66** 两果树/果品酿酒增量（[Issue #69](https://github.com/LukeJiaoR/banish/issues/69)，[PR #70](https://github.com/LukeJiaoR/banish/pull/70)已合并），以及 **0.3.67** 面积牧场增量（[Issue #71](https://github.com/LukeJiaoR/banish/issues/71)，[PR #72](https://github.com/LukeJiaoR/banish/pull/72)已合并），以及 **0.3.68** 地图种子/无种子困难开局增量（[Issue #73](https://github.com/LukeJiaoR/banish/issues/73)，[PR #74](https://github.com/LukeJiaoR/banish/pull/74)已合并），以及 **0.3.69** 可变果园增量（[Issue #75](https://github.com/LukeJiaoR/banish/issues/75)）。增量源码用同提交相对链接；本文若位于未合并分支，最新增量仅是候选，交付仍以普通PR合并main为准。
+- 本文记录 **0.3.65** 牧场疫病/整群搬空增量（[Issue #67](https://github.com/LukeJiaoR/banish/issues/67)，[PR #68](https://github.com/LukeJiaoR/banish/pull/68)已合并），以及 **0.3.66** 两果树/果品酿酒增量（[Issue #69](https://github.com/LukeJiaoR/banish/issues/69)，[PR #70](https://github.com/LukeJiaoR/banish/pull/70)已合并），以及 **0.3.67** 面积牧场增量（[Issue #71](https://github.com/LukeJiaoR/banish/issues/71)，[PR #72](https://github.com/LukeJiaoR/banish/pull/72)已合并），以及 **0.3.68** 地图种子/无种子困难开局增量（[Issue #73](https://github.com/LukeJiaoR/banish/issues/73)，[PR #74](https://github.com/LukeJiaoR/banish/pull/74)已合并），以及 **0.3.69** 可变果园增量（[Issue #75](https://github.com/LukeJiaoR/banish/issues/75)、[PR #76](https://github.com/LukeJiaoR/banish/pull/76)已合并），以及 **0.3.70** 鹿群狩猎增量（[Issue #77](https://github.com/LukeJiaoR/banish/issues/77)）。增量源码用同提交相对链接；本文若位于未合并分支，最新增量仅是候选，交付仍以普通PR合并main为准。
 - 共列 40 项核心系统，按玩家能够做出的经营选择核查，不计算没有统一分母的“整体完成百分比”。本文件是范围审计，不是全功能、全平台或真实浏览器试玩通过证明。
 - 查验了实际定义、模拟、菜单、序列化及加载逻辑；先核完整 Git 树，再以固定 SHA 读取本地缺少的相关设计文档。README、旧片文档中的“下一步”不能单独证明现在缺失。例如旧医疗文档称游民传染未做，但当前 `advanceNomads` / `decideNomads` 已接上疾病；旧市政厅文档称市场配送未做，当前 `supply.js` 已实现。
 - 以下源码链接固定到上述基线，定位以函数或字段名为准。与原版比较的依据使用用户指定的 [Banished Wiki](https://banished-wiki.com/)；Wiki 里有旧版、预发布及互相不一致的描述，疑点单列，不把本作数值冒称为原版数值。
@@ -34,7 +34,7 @@
 | 编号 / 系统 | 状态 | 真实实现与源码证据 | 相对原版的差异 / 剩余缺口及依据 |
 | --- | --- | --- | --- |
 | F1 森林采集 | 有适配简化 | [定义][defs] `gatherer`、`PROD.gatherer`；[模拟][sim] `foodForestCanWork` 及采集任务，林况、工具、工人、往返和送仓共同制约产出。 | 根茎、浆果、蘑菇、洋葱被汇成蔬菜；没有逐个野生食物实体。森林与实际搬运的基础链已做，不列为缺失。Wiki 对树龄的文字有冲突，不能直接以其中一句推翻现有林况玩法。[Gatherer's Hut](https://banished-wiki.com/wiki/Gatherer%27s_Hut) |
-| F2 狩猎与皮革 | 有适配简化 | [定义][defs] `hunting`；[模拟][sim] 狩猎 `work` 任务产肉并附皮革，成熟林不足停工、真实送仓。 | 用成熟林密度代理猎物，没有移动鹿群或原版按小屋限制猎杀频率的机制；肉类也未细分鹿肉。这是可独立追加的生态玩法，不能称狩猎未做。[Hunting Cabin](https://banished-wiki.com/wiki/Hunting_Cabin) |
+| F2 狩猎与鹿群 | 有适配简化 | [模拟](../js/sim.js) `huntingSummary`、`makeHuntingTask`、可见 `world.deer`；每屋8日猎杀间隔、可达实际鹿、肉皮实背运仓；[鹿群说明](deer-hunting.md)、[#77](https://github.com/LukeJiaoR/banish/issues/77)。 | 单一引擎，旧档补建野生鹿且保留实货；原两人岗位/成本/范围不变。24鹿、产量和补充节奏为本作适配，肉品未细分鹿肉。专页与Tips对可见鹿是否影响产量有矛盾，本作明确采用前者的实际猎物模型，不做永久灭绝或啃食作物。[Hunting Cabin](https://banished-wiki.com/wiki/Hunting_Cabin)、[Deer](https://banished-wiki.com/wiki/Deer) |
 | F3 渔业选址、共享水域与桥占水 | 有适配简化 | [模拟][sim] `fishingWaterSummary`、`fishingPlacementSummary`、`enableSharedFishing`；新村共享规则扣除桥占水，有工人的重叠渔场分摊水域；鱼产为肉类并送仓。 | 两人岗位、范围和产量为适配，旧村可保留经典规则。已做水域竞争，不再立“渔场重叠”重复票；并未实现有限鱼群，但不把旧概述页的“灭绝”文字自动升级成下一轮必做。[Fishing Dock](https://banished-wiki.com/wiki/Fishing_Dock) |
 | F4 自由农田、季节劳动与抢收 | 已交付 | [地图][map] `farmDefinition` / `initialFarmWorkers`；[模拟][sim] 逐格播种/收割、`earlyHarvestQuote` / `beginEarlyHarvest`；[主程序][main] 农田框选与 `farmSize` 保存；[界面][ui] 预览确认。新田每边 4–15 格。 | 面积、用工、播种承诺、秋收/早熟收获、冬季未收损失都已有决策；14/格等产量、播种窗口和成熟日数为适配，不是原版精确气温模型。[Crop Field](https://banished-wiki.com/wiki/Crop_Field)、[Farming](https://banished-wiki.com/wiki/Farming) |
 | F5 作物种子、换种及生长期差异 | 有适配简化 | [模拟][sim] `CROPS` 为小麦、卷心菜、早熟豆类；`cropUnlocked`、`setFarmCrop`、`cropChoiceOf`、`seedUnlockKey`；交易永久解锁，开种后变更留给下一季，豆类夏季成熟。 | 原版还有玉米、辣椒、马铃薯、南瓜、笋瓜等；当前未覆盖完整八作物，也无逐作物耐寒阈值。**已有三作物而非只有小麦**；12 日/10 每格的豆类是本作适配。[Farming](https://banished-wiki.com/wiki/Farming)、[Seeds](https://banished-wiki.com/wiki/Seeds) |
@@ -109,11 +109,17 @@
 
 0.3.69按 [#75](https://github.com/LukeJiaoR/banish/issues/75) 补果园矩形、可复算树列、实际用工与旧9株合同保护。见[本片说明](orchard-area.md)。苹果梨可变面积已经覆盖，不再反复排同一功能；并不表示原版其余果/坚果品种已完成。
 
+### 已交付的下一片：鹿群与猎屋间隔（F2）
+
+0.3.70按 [#77](https://github.com/LukeJiaoR/banish/issues/77) 接入可见且补充的鹿群、猎人实际追踪、每屋共享冷却和肉皮实货。保留2岗位；不把Wiki矛盾隐藏为原版精确结论。见[本片说明](deer-hunting.md)。
+
 ### 后续取舍：真实试玩问题优先，剩余玩法按明确闭环拆票
 
 **已核可见问题：**人物劳作仍按任务固定挥工具或抱筐单帧，仅做上下轻动；这是已有反馈所述机械感的真实来源。后续若补帧，应沿原提示词锁同一角色、现17像素显示高、脚点和原透视，区分工具动作/采收动作；不重绘整套人物，也不把未复现的布局朝向问题先当bug修。
 
-**真实玩法缺口仍保留：**移动鹿群/按狩猎小屋冷却、其余作物/果树目录、逐仓实物库存、山地隧道、地图/气候选择。不可把它们一口气扩成框架；气候需要真实霜期/冷伤/取暖差异与旧档保全，隧道先需真实山体。新预设标签没有这些规则就没有玩家价值。
+**真实玩法缺口仍保留：**其余作物/果树目录、逐仓实物库存、山地隧道、地图/气候选择。不可把它们一口气扩成框架；气候需要真实霜期/冷伤/取暖差异与旧档保全，隧道先需真实山体。新预设标签没有这些规则就没有玩家价值。
+
+优先候选可缩为**坚果果园（栗子/核桃）**：两类种子交易、现有逐株种养/换种、独立坚果采运与消费/贸易，不扩气候或果树平台。[Chestnut](https://banished-wiki.com/wiki/Chestnut) 与 [Walnut](https://banished-wiki.com/wiki/Walnut) 均确认果园种植、种子2500与果品贸易价1；现源码 `ORCHARD_TYPES` 只有旧树/苹果/梨，确实尚无坚果物品。营养组及产量须在对应Issue明确适配，不能把既有肉或苹果换名成坚果。这里只记录范围候选，尚未建票/开发。
 
 下一片先查现有Issue和具体试玩证据，再选一个最小完整玩法。不得把本段候选当成已经启动或已经交付，也不因一个PR结束就宣称整个原版复刻完成。
 

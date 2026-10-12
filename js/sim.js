@@ -75,6 +75,7 @@ G.newGameState = function (startConfig = null) {
     res: { wood: 80, stone: 48, iron: 0, tools: 15, food: 500, meat: 0, eggs:0, vegetables: 0, apples:0, pears:0, grain: 500, leather: 0, wool: 0, clothes: 0, warmCoats: 0, herbs: 0, coal: 0, steelTools: 0, ale: 0, firewood: 50 }, // 开局（原版中难度 5 家庭，工具 15 件≈第一轮磨损周期）；存粮较原版加厚：15 人 6 天食物跑道撑不到第一座采集屋建成
     heating:{allowCoal:false,coalReserve:20}, fishingRules:'shared', supplyMode:'automatic',clothingSupply:false,toolMode:'pooled',toolRemainders:{tools:0,steelTools:0},
     fireDisasters:{enabled:false,startedDay:null,graceUntil:0,lastDay:-1,nextIgnitionDay:0,serial:0,incidentHomes:[]},
+    huntingLost:{meat:0,leather:0},
     healthStartDay: 0, farmPests:{enabled:false,graceUntil:0,lastDay:-1}, pasturePests:{enabled:false,graceUntil:0,lastDay:-1}, challenges:{v:1,completed:{}},
     nomads: {nextDay:G.YEAR_DAYS,serial:0,offer:null,accepted:0,declined:0},
     schedT: 1,
@@ -112,6 +113,7 @@ G.advanceSim = function (dtH) {
   g.h += dtH;
   let guard = 0;
   while (g.h >= G.DAY_H && guard++ < 20) { g.h -= G.DAY_H; G.endDay(); if (g.over) return; }
+  G.advanceDeer();
   if(G.advanceHousingFires)G.advanceHousingFires(dtH);
   g.schedT -= dtH;
   if (g.schedT <= 0) { g.schedT = 2; G.scheduleJobs(); }
@@ -131,6 +133,7 @@ G.endDay = function () {
   // Midnight meals/heating below belong to the new day, not the closed one.
   G.closeTownLedgerDay();
   g.day++;
+  G.advanceDeer();
   G.advanceMemorials();
   const born0 = g.stats.born, died0 = g.stats.died; // 当日生死增量（进滚动日志）
   const oldSeason = g.season;
@@ -570,6 +573,7 @@ G.spawnCitizen = function (opt) {
 
 G.killCitizen = function (c, why) {
   if (!c || c.dead || G.world.cmap[c.id]!==c) return;
+  G.loseHuntingCargo(c);
   if(G.recoverCitizenSupply)G.recoverCitizenSupply(c);
   G.mournCitizen(c);
   c.dead = true;
@@ -636,7 +640,7 @@ G.wander = function (c) {
 /* A forest/field task owns a physical tile; a factory task owns a building
  * perimeter. Never turn the former into work at a nearby arbitrary doorway. */
 G.physicalTaskEndpoint = function (t) {
-  return !!t && (['chop', 'clearrock', 'plant', 'sow', 'harvest', 'orchard'].includes(t.kind) ||
+  return !!t && (['chop', 'clearrock', 'plant', 'sow', 'harvest', 'orchard', 'hunt'].includes(t.kind) ||
     (t.kind === 'work' && t.b && ['gatherer', 'hunting', 'herbalist'].includes(t.b.type)));
 };
 G.dropBlockedTask = function (c, t) {
@@ -695,7 +699,7 @@ G.sendTo = function (c, tx, ty, planned = null) {
   if (!p) { c.state = 'idle'; c.task = null; return false; }
   // The path planner rounds its start cell. Physically checked factory/mineral
   // tasks still walk the final fraction after an interrupted commute.
-  if((c.task?.mineral||c.task?.economy==='pasture'||['firefight','supply','toolFetch','cleric','worship'].includes(c.task?.kind)||['fuel','tailor','brew'].includes(c.task?.kind)) && p.length===0 && G.d2(c.x,c.y,tx,ty)>1e-8) {
+  if((c.task?.kind==='hunt'||c.task?.mineral||c.task?.economy==='pasture'||['firefight','supply','toolFetch','cleric','worship'].includes(c.task?.kind)||['fuel','tailor','brew'].includes(c.task?.kind)) && p.length===0 && G.d2(c.x,c.y,tx,ty)>1e-8) {
     c.path=[{x:tx,y:ty}];c.pi=0;c.state='walk';c.walkKind='task';return true;
   }
   c.path = p; c.pi = 0;
@@ -766,6 +770,8 @@ G.resumeTask = function (c) {
     ok = G.farmTaskCurrent(t) && t.b.farm[t.ti].sown && !t.b.farm[t.ti].harvested;
   } else if(ok&&t.kind==='orchard'){
     ok=G.orchardTaskCurrent(c,t);
+  } else if(ok&&t.kind==='hunt'){
+    ok=G.huntingTaskCurrent(c,t);
   } else if(ok&&t.mineral){
     ok=G.mineralTaskCurrent(c,t);
   } else if(ok&&t.kind==='teach'){
@@ -844,7 +850,7 @@ G.finishMineralHaul = function (c) {
   if (c.carry.qty > 0) { G.warnMineralStorage(); G.waitForMineralStorage(c, 'space'); return; }
   if(c.carry.staffingReturn&&c.carry.extra){
     const next=Object.keys(c.carry.extra).find(k=>c.carry.extra[k]>0);
-    if(next){const qty=c.carry.extra[next],extra={...c.carry.extra};delete extra[next];c.carry={type:next,qty,staffingReturn:true,...(c.carry.smithInput?{smithInput:true}:{}),...(c.carry.coatInput?{coatInput:c.carry.coatInput}:{}),...(Object.keys(extra).length?{extra}:{})};G.startMineralHaul(c);return;}
+    if(next){const qty=c.carry.extra[next],extra={...c.carry.extra};delete extra[next];c.carry={type:next,qty,staffingReturn:true,...(Number.isInteger(c.carry.huntingId)?{huntingId:c.carry.huntingId}:{}),...(c.carry.smithInput?{smithInput:true}:{}),...(c.carry.coatInput?{coatInput:c.carry.coatInput}:{}),...(Object.keys(extra).length?{extra}:{})};G.startMineralHaul(c);return;}
   }
   c.carry = null; c.haulPending = false; c.haulWait = ''; c.haulTo = null;
   G.requestTask(c);
@@ -856,12 +862,13 @@ G.startMineralHaul = function (c) {
   if (!G.hasStorageBuilding()) {
     // Explicit orchard/brewing trips must retain their cargo until a real
     // warehouse exists, including legacy saves with no finished store.
-    if(c.carry.brewIngredient||Number.isInteger(c.carry.orchardId)||['ale','apples','pears'].includes(c.carry.type)){G.waitForMineralStorage(c,'route');return;}
+    if(Number.isInteger(c.carry.huntingId)||c.carry.brewIngredient||Number.isInteger(c.carry.orchardId)||['ale','apples','pears'].includes(c.carry.type)){G.waitForMineralStorage(c,'route');return;}
     G.finishMineralHaul(c); return;
   } // Other legacy no-warehouse cargo retains its earlier contract.
   const route = G.storageRoute(c.x,c.y,G.cargoStorageTypes(c.carry));
   if (!route) { G.waitForMineralStorage(c, 'route'); return; }
   c.haulWait = ''; c.haulTo = route.storage.id; c.path = route.path; c.pi = 0; c.task = null;
+  if(Number.isInteger(c.carry.huntingId)&&!c.path.length&&G.d2(c.x,c.y,route.spot.x,route.spot.y)>1e-8)c.path=[{x:route.spot.x,y:route.spot.y}];
   if (!c.path.length) G.finishMineralHaul(c);
   else c.state = 'haul';
 };
@@ -1256,6 +1263,7 @@ G.detourCitizen = function (c, dtH) {
   }
   const path = G.routeCanReuse(goal.route,c,goal.x,goal.y) ? goal.route.path : G.findPath(G.world, Math.round(c.x), Math.round(c.y), goal.x, goal.y);
   if (!path) {
+    if(c.task?.kind==='hunt'){G.dropBlockedTask(c,c.task);return;}
     if(c.task?.kind==='brew'){G.returnBrewGrain(c);return;}
     if(c.task&&['smith','fuel','tailor'].includes(c.task.kind)){G.returnSmithBatch(c);return;}
     if(c.task&&['study','teach'].includes(c.task.kind)){const b=c.task.b;b.warnText='上学路线受阻';G.clearSchoolTasks(c);c.schoolWaitReason='上学路线受阻，保留学籍等待通路';c.wanderT=4;return;}
@@ -1278,6 +1286,7 @@ G.stepCitizen = function (c, dtH) {
   if (c.dead) return;
   c.toolRetryH=Math.max(0,(c.toolRetryH||0)-dtH);
   if(c.student)G.restrictStudentWork(c);
+  if(c.task?.kind==='hunt'&&!G.huntingTaskCurrent(c,c.task))G.dropBlockedTask(c,c.task);
   if(c.task?.kind==='orchard'&&!G.orchardTaskCurrent(c,c.task))G.dropBlockedTask(c,c.task);
   if(c.task&&['study','teach'].includes(c.task.kind)&&!G.validSchoolTask(c)){G.clearSchoolTasks(c);c.wanderT=0;}
   G.coldStep(c, dtH);
@@ -1327,6 +1336,7 @@ G.stepCitizen = function (c, dtH) {
       return;
     }
     case 'work': {
+      if(c.task?.kind==='hunt'&&!G.atHuntingTarget(c,c.task)){G.sendTo(c,c.task.tx,c.task.ty);return;}
       if(c.task?.kind==='toolFetch'){G.stepToolFetch(c,dtH);return;}
       if(c.task?.mineral&&!G.atMineralTask(c,c.task)){
         const t=c.task,spot=G.mineralTaskCurrent(c,t)&&G.workSpot(G.world,t.b,c.x,c.y);
@@ -1617,9 +1627,134 @@ G.foresterReachability = function (w, c) {
 
 // Preserve forest density/yield rules, but require an actual legal work tile.
 G.foodForestCanWork = function (b) {
+  if(b.type==='hunting'){const q=G.huntingSummary(b,{reachability:false});return q.busy||(!q.cooldownDays&&q.free>0);}
   const p = G.PROD[b.type];
   const trees = G.treesInRadius(G.world, b.x, b.y, p.radius, b.type === 'hunting');
   return trees.length >= p.needTrees && trees.some(t => !G.tileBlocked(G.world, t.x, t.y));
+};
+
+
+/* Small replenishing wildlife population, deliberately an encounter-based
+ * gameplay adaptation. Hash-based local movement never consumes settlement RNG.
+ * Claims are derived from current tasks; no deer owner survives cancellation. */
+G.huntingNow=(g=G.game)=>g.day+g.h/G.DAY_H;
+G.inHuntingRange=(b,d)=>Math.abs(b.x-d.x)<=G.PROD.hunting.radius&&Math.abs(b.y-d.y)<=G.PROD.hunting.radius;
+G.deerHabitat=function(w,x,y){
+  if(!Number.isInteger(x)||!Number.isInteger(y)||x<0||y<0||x>=w.N||y>=w.N)return false;
+  const i=y*w.N+x;if(w.water[i]||w.rock[i]||w.bgrid[i]>=0)return false;
+  for(let dy=-2;dy<=2;dy++)for(let dx=-2;dx<=2;dx++){
+    const tx=x+dx,ty=y+dy;if(tx>=0&&ty>=0&&tx<w.N&&ty<w.N&&w.treeIdx[ty*w.N+tx]>=0)return true;
+  }
+  return false;
+};
+G.huntingDoors=function(w,b){
+  const doors=[],width=b.w||G.BDEF.hunting.w,height=b.h||G.BDEF.hunting.h;
+  for(let y=b.y-1;y<=b.y+height;y++)for(let x=b.x-1;x<=b.x+width;x++)
+    if((x<b.x||x>=b.x+width||y<b.y||y>=b.y+height)&&!G.tileBlocked(w,x,y))doors.push({x,y});
+  return doors;
+};
+G.deerCandidates=function(w){
+  return w.trees.filter(t=>G.deerHabitat(w,t.x,t.y)).map(t=>({x:t.x,y:t.y,rank:G.h2(w.seed^0x6de37,t.x,t.y)})).sort((a,b)=>a.rank-b.rank||a.y-b.y||a.x-b.x);
+};
+G.initializeDeer=function(w=G.world,g=G.game){
+  const all=G.deerCandidates(w),near=all.filter(p=>G.d2(p.x,p.y,w.start.x,w.start.y)<=28*28),cabins=w.buildings.filter(b=>b.type==='hunting'&&b.state==='ok').sort((a,b)=>a.id-b.id),chosen=[];
+  const habitatByCabin=new Map(cabins.slice(0,8).map(b=>{const routes=G.huntingDoors(w,b).map(p=>G.foresterReachability(w,p));return [b.id,all.filter(p=>G.inHuntingRange(b,p)&&routes.some(can=>can(p.x,p.y)))];}));
+  w.deer=Array.from({length:G.HUNTING.population},(_,i)=>{
+    const cabin=i<8?cabins[i%Math.max(1,cabins.length)]:null,cabinRange=cabin?(habitatByCabin.get(cabin.id)||[]):[];
+    const candidates=cabinRange.length?cabinRange:i<12&&near.length?near:all;
+    const p=candidates.find(p=>chosen.every(q=>G.d2(p.x,p.y,q.x,q.y)>=16))||candidates.find(p=>chosen.every(q=>p.x!==q.x||p.y!==q.y));
+    if(p)chosen.push(p);const at=p||w.start;
+    return {id:i+1,x:at.x,y:at.y,homeX:at.x,homeY:at.y,returnDay:p?null:G.huntingNow(g)+G.HUNTING.replenishDays,moveDay:g.day+G.HUNTING.moveDays,generation:0};
+  });
+};
+G.reconcileDeerHabitat=function(w=G.world,g=G.game){
+  if(!w?.deer)return;
+  for(const d of w.deer)if(d.returnDay===null&&!G.deerHabitat(w,d.x,d.y)){d.returnDay=G.huntingNow(g)+G.HUNTING.replenishDays;d.generation++;}
+};
+G.huntingTaskValid=function(c,t){
+  const w=G.world,b=t?.b,d=w.deer?.find(d=>d.id===t?.deerId);
+  return !!(t&&t.kind==='hunt'&&!t.done&&w.cmap[c.id]===c&&!c.dead&&c.adult&&!c.student&&!c.carry&&
+    b?.type==='hunting'&&w.bmap[b.id]===b&&b.state==='ok'&&c.job===b.id&&b.workers.includes(c.id)&&
+    (G.workerLimitOf(b)>0||c.staffingRelease===b.id)&&G.huntingNow()>=(b.huntingReadyDay||0)&&
+    d&&d.generation===t.deerGeneration&&d.returnDay===null&&d.x===t.tx&&d.y===t.ty&&G.deerHabitat(w,d.x,d.y)&&G.inHuntingRange(b,d));
+};
+G.huntingClaims=function(except=null){
+  const deer=new Set(),cabins=new Set();
+  for(const c of G.world.citizens)if(c!==except)for(const t of [c.task,c.pausedTask])if(G.huntingTaskValid(c,t)){deer.add(t.deerId);cabins.add(t.b.id);}
+  return {deer,cabins};
+};
+G.huntingTaskCurrent=function(c,t){
+  if(!G.huntingTaskValid(c,t))return false;
+  // Duplicated task objects/citizens cannot both win; the stable lower ID owns
+  // a conflicting claim, including while resting or fetching household goods.
+  return !G.world.citizens.some(other=>other.id<c.id&&[other.task,other.pausedTask].some(q=>G.huntingTaskValid(other,q)&&(q.deerId===t.deerId||q.b===t.b)));
+};
+G.atHuntingTarget=(c,t)=>G.huntingTaskCurrent(c,t)&&G.d2(c.x,c.y,t.tx,t.ty)<1e-8;
+G.huntingSummary=function(b,query={}){
+  let w=G.world;const preview=b.id==null;
+  if(preview){w={...w,bgrid:new Int32Array(w.bgrid),bmap:{...w.bmap,0:{type:'hunting',state:'ok',x:b.x,y:b.y,w:2,h:2}}};for(let y=b.y;y<b.y+G.BDEF.hunting.h;y++)for(let x=b.x;x<b.x+G.BDEF.hunting.w;x++)if(x>=0&&y>=0&&x<w.N&&y<w.N)w.bgrid[y*w.N+x]=0;}
+  const claims=G.huntingClaims(query.citizen),deer=(w.deer||[]).filter(d=>d.returnDay===null&&G.deerHabitat(w,d.x,d.y)&&G.inHuntingRange(b,d));
+  const free=deer.filter(d=>!claims.deer.has(d.id)),cooldownDays=Math.max(0,(b.huntingReadyDay||0)-G.huntingNow()),busy=claims.cabins.has(b.id);
+  let reachable=null;
+  if(query.reachability!==false){
+    // The UI promises reachability from the cabin's perimeter, not from the
+    // old starting cart, which may be on another now-disconnected landmass.
+    const origins=query.citizen?[query.citizen]:G.huntingDoors(w,b),routes=origins.map(p=>G.foresterReachability(w,p));
+    reachable=free.filter(d=>routes.some(can=>can(d.x,d.y))).length;
+  }
+  const reason=b.state==='site'?'猎人小屋尚未完工':b.id!=null&&G.workerLimitOf(b)<=0?'已暂停新狩猎':
+    b.id!=null&&G.productionLimited(b)?'肉类生产目标已满足，暂停新狩猎':cooldownDays>0?`本屋共用冷却，尚余 ${cooldownDays.toFixed(1)} 天`:busy?'本屋已有猎人在追踪或处理猎物':
+    !deer.length?'范围内暂时没有鹿，等待鹿群回归':!free.length?'附近鹿已被其他猎人认领':reachable===0?'附近鹿不可达，请打通陆路':'有可狩猎的鹿；须实际走到猎物旁工作并送仓';
+  return {count:deer.length,free:free.length,reachable,cooldownDays,busy,reason};
+};
+G.makeHuntingTask=function(b,c){
+  if(G.world.bmap[b.id]!==b||b.state!=='ok'||G.world.cmap[c.id]!==c||c.dead||!c.adult||c.student||c.job!==b.id)return null;
+  const q=G.huntingSummary(b,{citizen:c,reachability:false});
+  if(c.carry||q.cooldownDays||q.busy||!q.free){b.noWork=!q.busy;b.warnText=q.reason;return null;}
+  const claims=G.huntingClaims(c),targets=(G.world.deer||[]).filter(d=>d.returnDay===null&&!claims.deer.has(d.id)&&G.deerHabitat(G.world,d.x,d.y)&&G.inHuntingRange(b,d));
+  const route=G.findPathToAny(G.world,c.x,c.y,targets.map(d=>({x:d.x,y:d.y,deerId:d.id})));
+  if(!route){b.noWork=true;b.warnText='附近鹿不可达，请打通陆路';return null;}
+  b.noWork=false;b.warnText='';
+  const work=G.taskWork(c,G.HUNTING.workH);
+  return G.withTaskRoute({kind:'hunt',b,deerId:route.target.deerId,deerGeneration:G.world.deer.find(d=>d.id===route.target.deerId).generation,tx:route.target.x,ty:route.target.y,work,workLeft:work,
+    yield:{type:'meat',qty:G.taskYield(c.educated?G.HUNTING.eduMeat:G.HUNTING.meat)},extra:{leather:G.taskYield(c.educated?G.HUNTING.eduLeather:G.HUNTING.leather)}},route);
+};
+G.completeHuntingTask=function(c,t){
+  // Identity, work, location, claim, prey and cooldown all belong to this one
+  // atomic kill. Mark consumed before production or recursive dispatch.
+  if(c.task!==t||t.workLeft>1e-8||!G.atHuntingTarget(c,t)){
+    if(c.task===t)G.dropBlockedTask(c,t);return false;
+  }
+  const deer=G.world.deer.find(d=>d.id===t.deerId),now=G.huntingNow();
+  t.done=true;deer.generation++;deer.returnDay=now+G.HUNTING.replenishDays;t.b.huntingReadyDay=now+G.HUNTING.cooldownDays;
+  c.task=null;if(c.pausedTask===t)c.pausedTask=null;
+  c.carry={type:'meat',qty:t.yield.qty,extra:{leather:t.extra.leather},staffingReturn:true,huntingId:t.b.id};
+  G.recordProduction(t.b,'meat',t.yield.qty);G.recordProduction(t.b,'leather',t.extra.leather);
+  G.startHaul(c);return true;
+};
+G.advanceDeer=function(){
+  const w=G.world,g=G.game;if(!w.deer)return;G.reconcileDeerHabitat();const claims=G.huntingClaims();let all=null;
+  const occupied=(x,y,except)=>w.deer.some(d=>d!==except&&d.returnDay===null&&d.x===x&&d.y===y);
+  for(const d of w.deer){
+    if(d.returnDay!==null){
+      if(G.huntingNow()<d.returnDay)continue;
+      const local=[];for(let y=d.homeY-G.HUNTING.roamRadius;y<=d.homeY+G.HUNTING.roamRadius;y++)for(let x=d.homeX-G.HUNTING.roamRadius;x<=d.homeX+G.HUNTING.roamRadius;x++)if(G.deerHabitat(w,x,y)&&!occupied(x,y,d))local.push({x,y});
+      const options=local.length?local:(all||(all=G.deerCandidates(w))).filter(p=>!occupied(p.x,p.y,d));
+      if(!options.length)continue;
+      const p=options[Math.floor(G.h2(w.seed^d.id,g.day,d.id)*options.length)%options.length];
+      d.x=p.x;d.y=p.y;if(!local.length){d.homeX=p.x;d.homeY=p.y;}d.returnDay=null;d.moveDay=g.day+G.HUNTING.moveDays;continue;
+    }
+    if(g.day<d.moveDay)continue;d.moveDay=g.day+G.HUNTING.moveDays;
+    if(claims.deer.has(d.id))continue; // no moving-target remote kills
+    const options=[[1,0],[0,1],[-1,0],[0,-1]].map(([dx,dy])=>({x:d.x+dx,y:d.y+dy})).filter(p=>Math.abs(p.x-d.homeX)<=G.HUNTING.roamRadius&&Math.abs(p.y-d.homeY)<=G.HUNTING.roamRadius&&G.deerHabitat(w,p.x,p.y)&&!occupied(p.x,p.y,d));
+    if(options.length){const p=options[Math.floor(G.h2(w.seed^d.id,g.day,d.id)*options.length)%options.length];d.x=p.x;d.y=p.y;}
+  }
+};
+G.loseHuntingCargo=function(c){
+  if(!Number.isInteger(c.carry?.huntingId))return;
+  const cargo=c.carry,items={[cargo.type]:cargo.qty,...cargo.extra};
+  for(const type of ['meat','leather'])if(items[type]>0){G.game.huntingLost[type]+=items[type];G.ledgerRecord('discarded',type,items[type]);}
+  G.ui.toast(`${cargo.huntingId===0?'遗留肉皮运输遗失':'猎获运输遗失'}：肉 ${items.meat||0}、皮革 ${items.leather||0}（已计入损失）`,'warn');c.carry=null;
 };
 
 /* 按建筑类型生成任务 */
@@ -1728,30 +1863,7 @@ G.makeTask = function (b, c) {
     case 'orchard': return G.makeOrchardTask(b,c);
     case 'tailor': return G.makeTailorTask(b,c);
     case 'blacksmith': return G.makeBlacksmithTask(b,c);
-    case 'hunting': {
-      const R = P.hunting.radius;
-      // 狩猎依赖成熟林（鹿群栖息地）：成熟树不足不开工，产出随林况浮动——与采集互补的食物来源
-      const trees = G.treesInRadius(w, b.x, b.y, R, true);
-      if (trees.length < P.hunting.needTrees) {
-        b.noWork = true; b.warnText = '附近成熟林太少，猎物绝迹';
-        return null;
-      }
-      const mature = trees.reduce((s, t2) => s + (G.treeStage(t2) >= 2 ? 1 : 0), 0);
-      const qty = G.taskYield(Math.max(1, Math.round(P.hunting.yield * (0.4 + 0.6 * Math.min(1, mature / P.hunting.fullForest)))));
-      // 走最近的猎场（小抖动分散站位）：随机选树会把猎人的工作日耗在路上
-      let best = null, bd = Infinity;
-      for (const t2 of trees) {
-        if (G.tileBlocked(w, t2.x, t2.y)) continue;
-        const d = G.d2(b.x, b.y, t2.x, t2.y) + G.rng() * 8;
-        if (d < bd) { bd = d; best = t2; }
-      }
-      if (!best) { b.noWork = true; b.warnText = '猎场目标被工地覆盖，需先清场'; return null; }
-      return {
-        kind: 'work', b, tx: best.x, ty: best.y,
-        work: G.taskWork(c, P.hunting.workH), workLeft: 0, yield: { type: 'meat', qty },
-        extra: G.goalPaused('leather') ? null : { leather: c.educated ? 2 : 1 },
-      };
-    }
+    case 'hunting': return G.makeHuntingTask(b,c);
     case 'farm': {
       if (b.state !== 'ok') return null;
       if (!G.cropUnlocked(G.farmCropOf(b))) { b.noWork=true; b.warnText='尚无此作物种子：需在贸易站购买后才能播种'; return null; }
@@ -1787,6 +1899,7 @@ G.makeTask = function (b, c) {
 
 G.completeTask = function (c) {
   const t = c.task;
+  if(t?.kind==='hunt'){G.completeHuntingTask(c,t);return;}
   c.task = null;
   if (!t) { G.requestTask(c); return; }
   const b = t.b;
@@ -2263,6 +2376,7 @@ G.addBuilding = function (type, x, y, opt) {
         b.farm.push({ x: i, y: j, sown: false, harvested: false });
     b.sownAll = false; b.growth = 0; b.harvestDone = false;
   }
+  if(type==='hunting')b.huntingReadyDay=0;
   if (type === 'forester') { b.doCut = true; b.doPlant = true; } // 原版 Forester 的 Cut / Plant 开关
   if(G.MINERAL_RULES[type])b.mineralUnits=G.MINERAL_RULES[type].capacity;
   if (type === 'mine') { b.mineMode = 'iron'; b.legacyMine = false; b.mineTick = 0; }
@@ -2287,6 +2401,7 @@ G.addBuilding = function (type, x, y, opt) {
   if (!def.passable) for (const c of w.citizens) for (const task of [c.task, c.pausedTask])
     if (G.physicalTaskEndpoint(task) && task.tx >= x && task.tx < x + def.w && task.ty >= y && task.ty < y + def.h)
       G.dropBlockedTask(c, task);
+  G.reconcileDeerHabitat();
   // 把站在占地内的市民挤到最近的可站立格（防止被封死在建筑里）
   for (const c of w.citizens) {
     const cx = Math.round(c.x), cy = Math.round(c.y);
@@ -3851,7 +3966,8 @@ G.workforceBlockReason=function(b){
   if(b.type==='tradingpost')return '待售目标已满足，或仓库没有所需备货';
   if(b.type==='pasture')return G.pastureSummary(b).status;
   if(b.type==='orchard')return G.orchardSummary(b).status;
-  if(['gatherer','hunting','forester'].includes(b.type))return b.warnText||'工作范围内没有合适森林或种植位置';
+  if(b.type==='hunting')return G.huntingSummary(b).reason;
+  if(['gatherer','forester'].includes(b.type))return b.warnText||'工作范围内没有合适森林或种植位置';
   return b.warnText||'暂时没有可执行工作';
 };
 G.workforceSummary=function(b){
@@ -3951,7 +4067,7 @@ G.toolLifeHours=type=>(type==='steelTools'?G.LIFE.steelToolLifeDays:G.LIFE.toolL
 G.toolReserveCount=(type,g=G.game)=>(g.res[type]||0)+(g.toolMode==='individual'&&g.toolRemainders?.[type]>0?1:0);
 G.toolEquipped=c=>G.isTool(c?.toolType)&&c.toolHours>0;
 G.toolRemainingHours=function(g=G.game,w=G.world){return ['tools','steelTools'].reduce((n,k)=>n+(g.res[k]||0)*G.toolLifeHours(k)+(g.toolRemainders?.[k]||0),0)+w.citizens.filter(c=>!c.dead).reduce((n,c)=>n+(G.toolEquipped(c)?c.toolHours:0),0);};
-G.toolProductiveTask=t=>!!t&&(['build','clearSite','clearrock','chop','plant','sow','harvest','orchard','work'].includes(t.kind)||['smith','fuel','tailor','brew','firewood'].includes(t.kind)&&t.phase==='process');
+G.toolProductiveTask=t=>!!t&&(['build','clearSite','clearrock','chop','plant','sow','harvest','orchard','hunt','work'].includes(t.kind)||['smith','fuel','tailor','brew','firewood'].includes(t.kind)&&t.phase==='process');
 G.toolWorker=function(c){
  if(!c||c.dead||!c.adult||c.student||G.isArriving(c))return false;
  const b=G.world.bmap[c.job];if(!b)return !!(G.world.marked.size||G.world.markedRocks.size);
