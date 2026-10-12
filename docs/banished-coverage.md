@@ -37,7 +37,7 @@
 | F2 狩猎与鹿群 | 有适配简化 | [模拟](../js/sim.js) `huntingSummary`、`makeHuntingTask`、可见 `world.deer`；每屋8日猎杀间隔、可达实际鹿、肉皮实背运仓；[鹿群说明](deer-hunting.md)、[#77](https://github.com/LukeJiaoR/banish/issues/77)。 | 单一引擎，旧档补建野生鹿且保留实货；原两人岗位/成本/范围不变。24鹿、产量和补充节奏为本作适配，肉品未细分鹿肉。专页与Tips对可见鹿是否影响产量有矛盾，本作明确采用前者的实际猎物模型，不做永久灭绝或啃食作物。[Hunting Cabin](https://banished-wiki.com/wiki/Hunting_Cabin)、[Deer](https://banished-wiki.com/wiki/Deer) |
 | F3 渔业选址、共享水域与桥占水 | 有适配简化 | [模拟][sim] `fishingWaterSummary`、`fishingPlacementSummary`、`enableSharedFishing`；新村共享规则扣除桥占水，有工人的重叠渔场分摊水域；鱼产为肉类并送仓。 | 两人岗位、范围和产量为适配，旧村可保留经典规则。已做水域竞争，不再立“渔场重叠”重复票；并未实现有限鱼群，但不把旧概述页的“灭绝”文字自动升级成下一轮必做。[Fishing Dock](https://banished-wiki.com/wiki/Fishing_Dock) |
 | F4 自由农田、季节劳动与抢收 | 已交付 | [地图][map] `farmDefinition` / `initialFarmWorkers`；[模拟][sim] 逐格播种/收割、`earlyHarvestQuote` / `beginEarlyHarvest`；[主程序][main] 农田框选与 `farmSize` 保存；[界面][ui] 预览确认。新田每边 4–15 格。 | 面积、用工、播种承诺、秋收/早熟收获、冬季未收损失都已有决策；14/格等产量、播种窗口和成熟日数为适配，不是原版精确气温模型。[Crop Field](https://banished-wiki.com/wiki/Crop_Field)、[Farming](https://banished-wiki.com/wiki/Farming) |
-| F5 作物种子、换种及生长期差异 | 有适配简化 | [模拟][sim] `CROPS` 为小麦、卷心菜、早熟豆类；`cropUnlocked`、`setFarmCrop`、`cropChoiceOf`、`seedUnlockKey`；交易永久解锁，开种后变更留给下一季，豆类夏季成熟。 | 原版还有玉米、辣椒、马铃薯、南瓜、笋瓜等；当前未覆盖完整八作物，也无逐作物耐寒阈值。**已有三作物而非只有小麦**；12 日/10 每格的豆类是本作适配。[Farming](https://banished-wiki.com/wiki/Farming)、[Seeds](https://banished-wiki.com/wiki/Seeds) |
+| F5 作物种子、换种及生长期差异 | 有适配简化（0.3.72 增量） | [模拟](../js/sim.js) `CROPS` 有小麦、卷心菜、早熟豆类、耐寒瓜；`setFarmCrop` 保留当季实际作物，`farmWinterWindow` / `expireWinterFarms` 接入入冬实收截止；[规则](cold-squash.md)、[Issue #81](https://github.com/LukeJiaoR/banish/issues/81)。种子真实支付、永久解锁，豆类夏收；耐寒瓜入冬后的前两日可收但不成长，已采实货保全。 | 仍缺玉米、辣椒、马铃薯、南瓜四种目录；没有逐作物真实温度阈值。两日耐寒窗口、成熟日数和每格产量是48日历适配，不是气候平台；旧村不赠种子，三营养组不变。[Farming](https://banished-wiki.com/wiki/Farming)、[Seeds](https://banished-wiki.com/wiki/Seeds) |
 | F6 果园逐树生长、采果和补种 | 已交付 | [模拟][sim] `newOrchardTrees`、`makeOrchardTask`、`completeOrchardTask`、`advanceOrchard`、`setOrchardReplant`；[存档][main] `orchardTrees`。农夫逐株种植/养护/采果，老树死亡、空位补种，货物仍需送仓。 | 已有多年投资和更新空窗。旧场9株保留，新场树位见F7；4年有效养护、12–20年错峰寿命、每株20果为适配；不要再次开发“老树死亡/补种”。[Orchard](https://banished-wiki.com/wiki/Orchard)、[已交付说明][orchard-doc] |
 | F7 果树品种与可变果园面积 | 有适配简化（0.3.66 / 0.3.69 增量） | [模拟](../js/sim.js) `ORCHARD_TYPES` / `orchardLayout` / `orchardPoint`、[地图](../js/map.js) `orchardDefinition` 和[主程序](../js/main.js) 矩形规划与 `orchardSize` 保存；[两果品](fruit-brewing.md)、[可变果园](orchard-area.md)，[Issue #75](https://github.com/LukeJiaoR/banish/issues/75)。苹果梨独立买种/实采/实运；新场4–15边长、东西2格/南北3格树列、实际用工与产物守恒。 | 原版其余果/坚果品种仍缺，营养保留三组。新场按Wiki正文树距，披露尾部矛盾表；成本/岗位为适配。旧6×6/9株/2岗独立保全，寿命12–20年不随树数延长；可变面积不再列缺失。[Orchard](https://banished-wiki.com/wiki/Orchard) |
 | F8 羊、牛、鸡及牧产品 | 已交付 | [模拟][sim] `LIVESTOCK`、`setPastureType`、`stockPasture`、`advanceChickenEggs`、`completeEconomyWork`；[核心][core] 独立鸡蛋；[界面][ui] 选种、放入、保留量与生产；[鸡牧场说明](chickens.md)。 | 三物种已覆盖，禁止混养，照料繁殖、羊毛、肉、皮、鸡蛋及真实运出可玩。肉品合并、固定容量和繁殖/蛋产量是适配；鸡已经合并，不再作为下一片。[Pasture](https://banished-wiki.com/wiki/Pasture) |
@@ -119,11 +119,13 @@
 
 **真实玩法缺口仍保留：**其余作物/果树目录、逐仓实物库存、山地隧道、地图/气候选择。不可把它们一口气扩成框架；气候需要真实霜期/冷伤/取暖差异与旧档保全，隧道先需真实山体。新预设标签没有这些规则就没有玩家价值。
 
-当前优先片改为**建材实际配送**，范围见 [#79](https://github.com/LukeJiaoR/banish/issues/79) 与 [建材实运](construction-delivery.md)：原 0.3.70 仅在放置时全额扣库存，没有工人取料到场；本片补真实运入并守住旧已付工地合同，仍不扩成逐仓库存。
+**建材实际配送已于0.3.71交付**，范围见 [#79](https://github.com/LukeJiaoR/banish/issues/79) 与 [建材实运](construction-delivery.md)：原 0.3.70 仅在放置时全额扣库存，没有工人取料到场；本片补真实运入并守住旧已付工地合同，仍不扩成逐仓库存。
 
 坚果目录暂缓：玩家现有三营养组是“肉、蔬菜、主食”，不能为了植物蛋白悄悄把“肉”改为泛蛋白组。栗子/核桃虽有原版物品依据，但分类尚未约定；新增两种品名的收益低于缺失的建材运输链。
 
-建材配送之后的候选按玩家经营影响排序：工业邻近住房的幸福影响、剩余作物与有真实区别的收成时序，再到剩余果品目录。幸福惩罚若会改变旧村需先写清保护与预览；作物气候差异不能靠标签假装已实现。上述仍是候选，不是已建票或已开工。
+0.3.72按 [#81](https://github.com/LukeJiaoR/banish/issues/81) 选择有实际时序区别的耐寒瓜，详见[规则](cold-squash.md)。没有同时扩展气候平台或其他作物目录。
+
+幸福度低落休息 / 工业邻近惩罚仅是后续设计讨论，尚无任务票或实现。已有玩家对不明闲置的反馈，需先决定这一版是否需要可见休息，并定义解释、恢复、已接任务 / 货物保护和旧村过渡；不为补表格而默认增加处罚。剩余果品和纯目录扩充也须先衡量玩家收益。
 
 下一片先查现有Issue和具体试玩证据，再选一个最小完整玩法。不得把本段候选当成已经启动或已经交付，也不因一个PR结束就宣称整个原版复刻完成。
 

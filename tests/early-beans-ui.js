@@ -150,14 +150,14 @@ const live = (f, key) => f.info.querySelector(`[data-economy-live="${key}"]`).te
 
 test('locked beans are visible with accurate growth, lower yield and three-food-category explanation', () => {
   const f = farm(); f.select(f.b);
-  assert.deepEqual(f.get('farm-crop').querySelectorAll('option').map(option => option.value), ['wheat', 'cabbage', 'beans']);
+  assert.deepEqual(f.get('farm-crop').querySelectorAll('option').map(option => option.value), ['wheat', 'cabbage', 'beans', 'squash']);
   assert.equal(f.get('farm-crop').querySelectorAll('option').find(option => option.value === 'beans').disabled, true);
   assert.match(f.node('seeds').textContent, /早熟豆类未解锁.*贸易购买早熟豆类种子.*永久解锁.*不占仓位/);
   assert.match(f.node('timing').textContent, /本季小麦.*全田播完后成长 24 天.*秋季全熟.*每格 14 主食/);
   assert.match(f.info.textContent, /全田播完才开始成长.*早熟豆类成长 12 天.*夏、秋全熟即可正常收获/);
   assert.match(f.info.textContent, /基础每格 10 蔬菜.*低于.*14.*播种、走路、收割和送仓仍需时间/);
   assert.match(f.info.textContent, /大田或农夫不足会推迟入库.*不保证夏初.*每年只种收一季.*不能在夏季再次播种/);
-  assert.match(f.info.textContent, /肉类、蔬菜、主食三类.*早熟豆类也计入蔬菜.*不额外增加饮食类别/);
+  assert.match(f.info.textContent, /肉类（含鸡蛋）、蔬菜（含苹果和梨）、主食三组.*早熟豆类和耐寒瓜也计入蔬菜.*不额外增加饮食类别/);
   choose(f, 'beans'); assert.equal(f.G.farmCropOf(f.b), 'wheat'); assert.equal(f.get('farm-crop').value, 'wheat');
   assert.match(f.info.querySelector('[data-farm-message]').textContent, /未更改.*购买/);
 });
@@ -278,7 +278,7 @@ test('bean seed trade quotes one permanent unlock, never adds seed inventory and
 test('an old current boat never gains bean stock when details refresh, while bean orders remain available', () => {
   const f = farm(), { G } = f, b = trader(f, { orchardSeed: 1, cabbageSeed: 1 }); f.select(b);
   const before = snapshot(f), writes = f.info.htmlWrites;
-  assert.deepEqual(f.get('trade-order-good').querySelectorAll('option').map(option => option.value), ['orchardSeed', 'cabbageSeed', 'beanSeed']);
+  assert.deepEqual(f.get('trade-order-good').querySelectorAll('option').map(option => option.value), ['orchardSeed','appleSeed','pearSeed','cabbageSeed','beanSeed','squashSeed','wheatSeed']);
   trade(f); order(f); f.get('trade-order-quantity').focus();
   for (let i = 0; i < 5; i++) G.ui.renderInfo();
   assert.equal(G.ui.tradeQuote(b).ok, false); assert.match(live(f, 'quote'), /未带|现货不足/);

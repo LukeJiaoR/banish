@@ -146,8 +146,8 @@ test('new and legacy fields start as wheat and explain the three food categories
   assert.match(f.node('choice').textContent, /下季 \/ 空田选择：小麦/);
   assert.match(f.node('seeds').textContent, /卷心菜未解锁.*贸易购买.*不占仓位/);
   assert.match(f.node('yield').textContent, /每格 14 主食.*每筐达到 28 后送仓.*入仓后才可用/);
-  assert.match(f.info.textContent, /肉类、蔬菜、主食三类.*小麦产主食，卷心菜产蔬菜/);
-  assert.match(f.info.textContent, /全田播完才开始成长.*冬季未收作物损失/);
+  assert.match(f.info.textContent, /肉类（含鸡蛋）、蔬菜（含苹果和梨）、主食三组.*小麦产主食，卷心菜产蔬菜/);
+  assert.match(f.info.textContent, /全田播完才开始成长.*小麦、卷心菜和豆类入冬即损失未收作物/);
   assert.match(f.info.innerHTML, /农夫&lt;甲&gt;/);
   const select = f.doc.getElementById('farm-crop');
   assert.equal(select.getAttribute('aria-describedby'), 'farm-crop-note');

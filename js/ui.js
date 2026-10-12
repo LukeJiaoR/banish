@@ -2332,7 +2332,7 @@ G.ui = {
   farmInfoData: function (b) {
     if (b.type !== 'farm' || b.state !== 'ok' || !G.farmSummary) return null;
     const s = G.farmSummary(b), pests = G.farmPestSummary(b), crops = G.CROPS;
-    const crop = crops[s.crop], choice = crops[s.choice];
+    const crop = crops[s.crop], choice = crops[s.choice], winter = s.winterWindow;
     const workerNames = b.workers.map(id => G.world.cmap[id]).filter(c => c && !c.dead && c.job === b.id).map(c => c.name);
     const target = type => {
       const value = G.productionGoalOf(type);
@@ -2344,7 +2344,8 @@ G.ui = {
       plot: `地块 ${b.w}×${b.h} · ${s.total}格 · 成熟满收理论 ${s.total*G.farmBaseYield(b)} 食物；实际受种收工时、工具、冬损和仓容影响`,
       current: `本季作物：${crop.name} → ${G.RES[s.output].name}`,
       choice: `下季 / 空田选择：${choice.name} → ${G.RES[s.choiceOutput].name}${s.pending ? '（下一春生效）' : '（与本季一致）'}`,
-      timing: `本季${crop.name}：全田播完后成长 ${s.growDays} 天，${s.summerHarvest ? '夏、秋全熟后正常收获' : '秋季全熟后正常收获'}；基础每格 ${G.farmBaseYield(b)} ${G.RES[s.output].name}，每年只种收一季`,
+      timing: `本季${crop.name}：全田播完后成长 ${s.growDays} 天，${s.summerHarvest ? '夏、秋全熟后正常收获' : s.winterHarvestDays ? '秋季全熟后正常收获；入冬后的前两日仍可收割，冬季不成长' : '秋季全熟后正常收获'}；基础每格 ${G.farmBaseYield(b)} ${G.RES[s.output].name}，每年只种收一季`,
+      cold: winter?.enabled ? `耐寒时限（48日年适配）：入冬后的前两日可继续实收，冬季不播种、不成长；第3日零时清除未收作物，已背起的收成保留。${winter.active ? `当前窗口还剩 ${Math.max(0,winter.hoursRemaining).toFixed(1)} 小时；未全熟可确认抢收，不能靠冬季等待增产。` : G.game.season === 3 ? '本冬收割窗口已结束。' : '秋季仍应尽早收获，不保证延后两日就能收完。'}` : '本季作物不耐寒：入冬即清除未收部分；已背起的收成保留。改选下季耐寒瓜不会保护本季作物。',
       reason: s.reason,
       seeds: `种子：${Object.keys(crops).map(type => `${crops[type].name}${s.unlocked[type] ? '已永久解锁' : '未解锁，需贸易购买' + crops[type].name + '种子'}`).join(' · ')}（永久解锁，不是库存物品，不占仓位）`,
       progress: `播种 ${s.sown}/${s.total} · 成长 ${Math.floor(s.growth * 100)}% · 实际收获 ${s.harvested}/${s.total} · 虫害损失 ${pests.lost}/${s.total}`,
@@ -2379,9 +2380,9 @@ G.ui = {
         <div class="economy-actions"><button type="button" id="early-harvest-confirm">确认本季抢收</button><button type="button" id="early-harvest-cancel">继续等待</button></div>
       </div>
       <p class="economy-message" data-farm-message role="status" aria-live="polite"></p>
-      <p class="desc">全田播完才开始成长；小麦和卷心菜成长 ${G.CROPS.wheat.growDays} 天、秋季全熟后收获；早熟豆类成长 ${G.CROPS.beans.growDays} 天，夏、秋全熟即可正常收获。早熟的代价是基础每格 ${G.CROPS.beans.perTile} 蔬菜，低于小麦和卷心菜的 ${G.CROPS.wheat.perTile}。播种、走路、收割和送仓仍需时间，大田或农夫不足会推迟入库，不保证夏初就有粮。每年只种收一季，收完不能在夏季再次播种。</p>
-      <p class="desc">也可确认提前抢收，按当时成熟度锁定较低产量并停止继续成长，本季不能复种。等待能提高成熟产量；若开启虫害，等候和收割期间仍可能损失未收格。冬季未收作物损失；农夫仍须收割并实际搬运入仓。</p>
-      <p class="desc">营养仍分肉类（含鸡蛋）、蔬菜（含苹果和梨）、主食三组。小麦产主食，卷心菜产蔬菜，早熟豆类也计入蔬菜；多种作物不额外增加饮食类别，也不产肉。</p>
+      <p class="desc">全田播完才开始成长；小麦、卷心菜和耐寒瓜成长 ${G.CROPS.wheat.growDays} 天、秋季全熟后收获；早熟豆类成长 ${G.CROPS.beans.growDays} 天，夏、秋全熟即可正常收获。早熟的代价是基础每格 ${G.CROPS.beans.perTile} 蔬菜，低于小麦、卷心菜和耐寒瓜的 ${G.CROPS.wheat.perTile}。播种、走路、收割和送仓仍需时间，大田或农夫不足会推迟入库，不保证夏初就有粮。每年只种收一季，收完不能在夏季再次播种。</p>
+      <p class="desc">也可确认提前抢收，按当时成熟度锁定较低产量并停止继续成长，本季不能复种。等待能提高成熟产量；若开启虫害，等候和收割期间仍可能损失未收格。小麦、卷心菜和豆类入冬即损失未收作物；耐寒瓜可延至入冬后的前两日，第3日零时清除未收部分。所有作物冬季都不播种、不成长；农夫仍须收割并实际搬运入仓。耐寒窗口是48日历适配，不是气温模拟。</p>
+      <p class="desc">营养仍分肉类（含鸡蛋）、蔬菜（含苹果和梨）、主食三组。小麦产主食，卷心菜产蔬菜，早熟豆类和耐寒瓜也计入蔬菜；多种作物不额外增加饮食类别，也不产肉。</p>
     </section>`;
   },
   refreshFarmInfo: function (b) {
