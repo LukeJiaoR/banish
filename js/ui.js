@@ -194,7 +194,7 @@ G.ui = {
     // 资源栏
     const foodKeys = ['food', ...(G.FOOD_KEYS || [])].filter(k => G.RES_KEYS.includes(k));
     const resourceChip = k => `<span class="res${k === 'food' ? ' res-total' : ''}" id="res-${k}" title="${G.RES[k].name}">${this.resourceIcon(k)}<span class="res-label">${k === 'food' ? '总食物' : G.RES[k].name}</span><b>0</b>${k === 'food' ? '<i id="net-food"></i>' : ''}</span>`;
-    this.el.resRow.innerHTML = `<div class="resource-group food-resources" aria-label="食物总量与分类">${foodKeys.map(resourceChip).join('')}</div>` +
+    this.el.resRow.innerHTML = `<div class="resource-group food-resources" aria-label="食物总量与物品明细">${foodKeys.map(resourceChip).join('')}</div>` +
       `<div class="resource-group materials-resources" aria-label="材料与用品">${G.RES_KEYS.filter(k => !foodKeys.includes(k)).map(resourceChip).join('')}</div>`;
 
     // 速度按钮（原版：暂停 / 1x / 2x / 5x）
@@ -627,8 +627,8 @@ G.ui = {
         const tool = k === 'tools' || k === 'steelTools';
         const label = el.querySelector('.res-label');
         if (label) label.textContent = (physical ? '公共' : '') + (k === 'food' ? '总食物' : G.RES[k].name);
-        el.title = `${physical ? '公共库存 · ' : ''}${G.RES[k].name}：${Math.floor(g.res[k])}${tool ? '（工具不限仓储）' : foodClass ? '（三类食物共享总食物仓容 ' + cap + '）' : ' / ' + cap}`;
-        if (k === 'food' && G.FOOD_KEYS) el.title += ' · ' + G.FOOD_KEYS.map(type => `${G.RES[type].name} ${Math.floor(g.res[type] || 0)}`).join(' + ') + '（分类之和，不重复计入库存）';
+        el.title = `${physical ? '公共库存 · ' : ''}${G.RES[k].name}：${Math.floor(g.res[k])}${tool ? '（工具不限仓储）' : foodClass ? '（各食物物品共享总食物仓容 ' + cap + '）' : ' / ' + cap}`;
+        if (k === 'food' && G.FOOD_KEYS) el.title += ' · ' + G.FOOD_KEYS.map(type => `${G.RES[type].name} ${Math.floor(g.res[type] || 0)}`).join(' + ') + '（物品之和，不重复计入库存）';
         if (hauling.carry[k]) el.title += ` · 另有 ${this.supplyNumber(hauling.carry[k])} 随身待入库（尚不可用）`;
         const supplyTransit = physical ? (k === 'food' ? G.supplyFood(supplies.transit) : supplies.transit[k] || 0) : 0;
         if (supplyTransit > 1e-8) el.title += ` · 配送在途 ${this.supplyNumber(supplyTransit)}（送往市场/住处或退仓，不是新产出）`;
@@ -647,8 +647,9 @@ G.ui = {
           const unprotected = G.world.citizens.filter(c => !(c.clothingLeft > 0)).length;
           el.title += ` · ${unprotected} 人衣物已耗尽；${k === 'warmCoats' ? '暖衣需 2 皮革 + 2 羊毛，户外受冻降低 70%（较普通衣物再减半）' : '普通衣物需 2 皮革或 2 羊毛，户外受冻降低 40%'}；每件 ${G.YEAR_DAYS} 天，日终穿坏才优先领暖衣，再领普通衣物；不替代住房与柴火` + (G.clothingSupplyEnabled?.() ? '；只从家中/临时补给点现货换衣，公共成衣需先实际配送' : '；沿用远程公共领取');
         }
+        if (k === 'eggs') el.title += ' · 鸡蛋独立库存；与肉类同属肉类营养组，不增加第4组；鸡肉仍计入肉类库存';
         if (k === 'herbs') el.title += ' · 采药屋在成熟林中采集，送仓后用于草药保健；诊所治疗不消耗草药';
-        if (k === 'ale') el.title += ' · 麦酒不计入三类食物，不可充饥；仅供 18 岁以上居民到酒馆休闲，每次消耗 1 麦酒';
+        if (k === 'ale') el.title += ' · 麦酒不计入食物，不可充饥；仅供 18 岁以上居民到酒馆休闲，每次消耗 1 麦酒';
         if (k === 'ale' && hauling.carry[k] && g.res[k] >= cap) el.title += ' · 仓满保留麦酒，腾出空间后继续送仓';
         if (k === 'firewood') {
           el.title += ` · ${this.heatDemandText(this.heatDemand())}`;
@@ -682,7 +683,7 @@ G.ui = {
     if (!G.healthSummary) return '';
     const h = G.healthSummary();
     const average = Number.isFinite(h.average) ? h.average.toFixed(1) : '—';
-    return `<span class="town-health${h.sick ? ' warn-txt' : ''}" title="全镇平均健康；三类食物搭配有助健康。草药库存 ${Math.floor(h.herbs || 0)}">健康 ${average}/5 · 患病 ${h.sick} · 治疗 ${h.treated}</span>`;
+    return `<span class="town-health${h.sick ? ' warn-txt' : ''}" title="全镇平均健康；三组营养（肉类含鸡蛋、蔬菜、主食）搭配有助健康。草药库存 ${Math.floor(h.herbs || 0)}">健康 ${average}/5 · 患病 ${h.sick} · 治疗 ${h.treated}</span>`;
   },
 
   refreshGuide: function () {
@@ -707,9 +708,10 @@ G.ui = {
     const stage = !food ? '① 先保持续食物：在近仓森林建采集小屋；不要先连盖五屋耗尽木石。'
       : !fuel ? '② 近仓建伐木屋备柴；在食物林外标记砍伐和矿石，保留散工。'
       : homeless ? `③ 入冬前安家：还有 ${homeless} 家无房；逐步补住房和取暖柴。`
-      : '④ 补齐肉、蔬菜、主食与衣物，再扩教育、医疗和贸易，为下一代留空房。';
+      : '④ 补齐肉类（含鸡蛋）、蔬菜、主食三组营养与衣物，再扩教育、医疗和贸易，为下一代留空房。';
     const foodKinds = (G.FOOD_KEYS || []).filter(type => supplies[type] > 0);
-    const variety = G.FOOD_KEYS && foodKinds.length < G.FOOD_KEYS.length ? ` · 食物种类 ${foodKinds.length}/${G.FOOD_KEYS.length}` : '';
+    const foodGroups = G.foodGroupsOf(foodKinds);
+    const variety = G.FOOD_KEYS ? ` · 营养组 ${foodGroups.length}/3（肉类含鸡蛋）` : '';
     const progress = harvest.total ? `\n采运标记：待领 ${harvest.queued} · 执行 ${harvest.active} · 夜间保留 ${harvest.paused}${harvest.reason ? '；' + harvest.reason : ''}` : '';
     el.textContent = (G.autosaveBlocked ? '⚠ 原自动档已保护：临时局不自动保存，请打开存档管理备份/手动保存。\n' : '') + `${physical ? '全村粮食合计' : '粮食'}约 ${days.toFixed(1)} 天（不计新产出${physical ? '，含在途与待回收，逐户现货才可食用' : ''}）${variety} · ${G.isWinter() ? '寒冬中' : '距入冬 ' + untilWinter + ' 天'} · ${g.paused ? '已暂停' : '运行中'}\n${stage}${risks.length ? '\n⚠ ' + risks.join(' ') : ''}${progress}`;
   },
@@ -1703,7 +1705,7 @@ G.ui = {
       flowTodayCoverage: current ? `${current.partial ? '从本日记账起点开始，首日不足全天。' : ''}今日尚未结算，未折算全天，也不纳入上方比较。` : '尚未记录的时段不能视为零产出。',
     };
     const valueOf = (totals, metric) => !totals ? NaN : metric === 'used' ? totals.used + (totals.distributedUsed || 0) : metric === 'publicUsed' ? totals.used : metric === 'distributedLost' ? totals.distributedLost || 0 : totals[metric];
-    for (const resource of ['food', 'firewood', 'meat', 'vegetables', 'grain']) {
+    for (const resource of ['food', 'firewood', ...G.FOOD_KEYS]) {
       for (const metric of ['produced', 'received', 'used', 'publicUsed', 'distributedLost', 'withdrawn', 'discarded', 'delta', 'opening', 'closing']) {
         for (const period of ['recent', 'previous', 'current']) {
           const p = s && s[period], known = p && (period === 'current' || p.days > 0);
@@ -1718,7 +1720,7 @@ G.ui = {
     const text = key => `<span data-townhall="${key}">${this.escHtml(data[key])}</span>`;
     const metrics = resource => [['produced', '真实产出'], ['received', '实际入库'], ['used', resource === 'firewood' ? '住宅燃烧（实际合计）' : '居民食用（实际合计）'], ['publicUsed', '其中：公共直接消耗'], ['distributedLost', '实物火灾损失'], ['withdrawn', '出库转运'], ['discarded', '仓满弃货'], ['delta', '库存净变']];
     const history = resource => `<div class="townledger-table-wrap" tabindex="0" role="region" aria-label="${G.RES[resource].name}历史流水表，可横向滚动"><table class="townledger-table">
-      <caption>${G.RES[resource].name}${resource === 'food' ? '合计（三类相加）' : ''}</caption>
+      <caption>${G.RES[resource].name}${resource === 'food' ? '合计（食物物品相加）' : ''}</caption>
       <thead><tr><th scope="col">项目</th><th scope="col">近期</th><th scope="col">前期</th><th scope="col">差额</th></tr></thead>
       <tbody>${metrics(resource).map(([metric, label]) => `<tr><th scope="row">${label}</th>${['recent', 'previous', 'difference'].map(period => `<td>${text(`flow-${resource}-${period}-${metric}`)}</td>`).join('')}</tr>`).join('')}
         <tr class="townledger-stock"><th scope="row">期初库存</th><td>${text(`flow-${resource}-recent-opening`)}</td><td>${text(`flow-${resource}-previous-opening`)}</td><td>—</td></tr>
@@ -1740,9 +1742,9 @@ G.ui = {
         <p class="townledger-note" data-townhall="flowTodayCoverage">${this.escHtml(data.flowTodayCoverage)}</p>
         ${today(['food', 'firewood'])}
       </section>
-      <details data-townledger-food><summary>展开三类食物明细</summary>
-        <p class="townledger-note">近期、前期和差额使用上方相同日期；食物合计仅为肉类、蔬菜、主食之和。</p>
-        ${['meat', 'vegetables', 'grain'].map(history).join('')}${today(['meat', 'vegetables', 'grain'])}
+      <details data-townledger-food><summary>展开食物物品明细</summary>
+        <p class="townledger-note">近期、前期和差额使用上方相同日期；食物合计为肉类、鸡蛋、蔬菜、主食之和；鸡蛋与肉类在营养上合为一组，仍为三组营养。</p>
+        ${G.FOOD_KEYS.map(history).join('')}${today(G.FOOD_KEYS)}
       </details>
       <details data-townledger-help><summary>这些数字怎样记账？</summary>
         <p>真实产出只计实际制成或收获；实际入库只计仓库接收，包含贸易运回与酿酒退料，并非全是本地生产。</p>
@@ -1757,7 +1759,7 @@ G.ui = {
     const f=G.townChallengeFacts(),done=G.game.challenges?.completed||{};
     const status=key=>done[key]!==undefined?`已确认：第 ${done[key]} 天`:(f[key].ready?'当前已满足，待下次日界确认':'进行中');
     return {challengeSettlement:`安居村庄 · ${status('settlement')}：已入村 ${f.settlement.population}/30 人；有完工住房 ${f.settlement.homed}/${f.settlement.population} 人，还缺 ${f.settlement.population-f.settlement.homed} 人住处。`,
-      challengeFood:!f.food.available?'一季多元生产：缺少流水统计，暂不能确认；不把未知产出当作零。':`一季多元生产 · ${status('food')}：最近完整记录 ${f.food.days}/12 日${f.food.days?`（第 ${f.food.fromDay}–${f.food.toDay} 天）`:''}；实际产出食物 ${f.food.produced.toFixed(1)} / 居民食用 ${f.food.used.toFixed(1)}；有实际产出的类别 ${f.food.groups}/3。${!f.food.contiguous?'需紧接今天的连续12个完整日。':''}`,
+      challengeFood:!f.food.available?'一季多元生产：缺少流水统计，暂不能确认；不把未知产出当作零。':`一季多元生产 · ${status('food')}：最近完整记录 ${f.food.days}/12 日${f.food.days?`（第 ${f.food.fromDay}–${f.food.toDay} 天）`:''}；实际产出食物 ${f.food.produced.toFixed(1)} / 居民食用 ${f.food.used.toFixed(1)}；有实际产出的营养组 ${f.food.groups}/3（肉类含鸡蛋）。${!f.food.contiguous?'需紧接今天的连续12个完整日。':''}`,
       challengeEducation:`教育传承 · ${status('education')}：受教育成人 ${f.education.educated}/3 人；已有课时且所属学堂完工的学生 ${f.education.students}/1 人。`};
   },
   townHallInfoData: function (b) {
@@ -1906,9 +1908,9 @@ G.ui = {
       <p class="row" data-tavern="goals">${this.escHtml(data.goals)}</p>
       <p class="economy-message" data-tavern-message role="status" aria-live="polite"></p>
       <p class="desc">工人从仓库取主食，送到酒馆加工，再把麦酒送仓。取粮、开酿与完成前均检查储粮；不足时优先退回未酿原粮，中断和存档不会吞掉原粮。</p>
-      <p class="desc">仅酿主食麦酒；蔬菜不作果酒。麦酒不计入肉类、蔬菜、主食三类食物，也不能充饥。</p>
+      <p class="desc">仅酿主食麦酒；蔬菜不作果酒。麦酒不计入食物，也不能充饥；肉类与鸡蛋同组，加上蔬菜、主食仍为三组营养。</p>
       <p class="desc">仅接待 18 岁以上居民，最多 4 人（含在途预约）。到馆累计服务 2 小时后，每人消耗 1 麦酒，留下 6 天休闲记忆。需健康酿酒工实际在岗；失去服务会等待或取消，夜间照常回家。</p>
-      <p class="desc">三类饮食是幸福基础；休闲可把幸福补到 5。完成休闲即时 +0.4 幸福（上限 5），日终再向目标平滑变化。劳动效率仅获 0～+5% 正向加成，不因低幸福受到负惩罚。</p>
+      <p class="desc">三组营养（肉类含鸡蛋、蔬菜、主食）是幸福基础；休闲可把幸福补到 5。完成休闲即时 +0.4 幸福（上限 5），日终再向目标平滑变化。劳动效率仅获 0～+5% 正向加成，不因低幸福受到负惩罚。</p>
     </section>`;
   },
   refreshTavernInfo: function (b) {
@@ -2091,7 +2093,7 @@ G.ui = {
       <p class="economy-message" data-farm-message role="status" aria-live="polite"></p>
       <p class="desc">全田播完才开始成长；小麦和卷心菜成长 ${G.CROPS.wheat.growDays} 天、秋季全熟后收获；早熟豆类成长 ${G.CROPS.beans.growDays} 天，夏、秋全熟即可正常收获。早熟的代价是基础每格 ${G.CROPS.beans.perTile} 蔬菜，低于小麦和卷心菜的 ${G.CROPS.wheat.perTile}。播种、走路、收割和送仓仍需时间，大田或农夫不足会推迟入库，不保证夏初就有粮。每年只种收一季，收完不能在夏季再次播种。</p>
       <p class="desc">也可确认提前抢收，按当时成熟度锁定较低产量并停止继续成长，本季不能复种。等待能提高成熟产量；若开启虫害，等候和收割期间仍可能损失未收格。冬季未收作物损失；农夫仍须收割并实际搬运入仓。</p>
-      <p class="desc">食物仍分肉类、蔬菜、主食三类。小麦产主食，卷心菜产蔬菜，早熟豆类也计入蔬菜；多种作物不额外增加饮食类别，也不产肉。</p>
+      <p class="desc">营养仍分肉类（含鸡蛋）、蔬菜、主食三组。小麦产主食，卷心菜产蔬菜，早熟豆类也计入蔬菜；多种作物不额外增加饮食类别，也不产肉。</p>
     </section>`;
   },
   refreshFarmInfo: function (b) {
@@ -2650,7 +2652,7 @@ G.ui = {
       memory: days > 0 ? `休闲记忆：约余 ${days.toFixed(1)} 天${s ? ` · 幸福目标 +${s.leisureBonus}` : ''}` : '休闲记忆：暂无（酒馆仅接待 18 岁以上居民）',
       chapel: chapelDays > 0 ? `礼拜记忆：约余 ${chapelDays.toFixed(1)} 天 · 幸福目标 +${chapelBonus}` : '礼拜记忆：暂无（完成礼拜堂实际服务后获得）',
       work: `幸福带来的劳动效率：+${(bonus * 100).toFixed(1)}%（仅 0～+5%，无负惩罚）`,
-      basis: `三类饮食（肉类、蔬菜、主食）是幸福基础${s ? `，当前饮食基础 ${s.dietBase.toFixed(1)} / 5` : ''}；礼拜记忆可叠加休闲记忆，幸福总上限 5；饥饿和亲属哀伤会降低幸福目标。完成酒馆休闲即时 +0.4、完成礼拜即时 +0.2（均不超过 5）；日终向目标最多变化 0.1。`,
+      basis: `三组营养（肉类含鸡蛋、蔬菜、主食）是幸福基础${s ? `，当前饮食基础 ${s.dietBase.toFixed(1)} / 5` : ''}；礼拜记忆可叠加休闲记忆，幸福总上限 5；饥饿和亲属哀伤会降低幸福目标。完成酒馆休闲即时 +0.4、完成礼拜即时 +0.2（均不超过 5）；日终向目标最多变化 0.1。`,
     };
   },
   citizenLeisureMarkup: function (c) {
@@ -2912,7 +2914,7 @@ G.ui = {
         ${this.studentInfoMarkup(c)}
         <div class="row">饥饿 ${'▕'.repeat(Math.min(4, c.hunger)) || '无'} · 受冻 ${c.cold > 1 ? '是' : '无'}</div>
         ${this.citizenClothingMarkup(c)}
-        ${Number.isFinite(c.dietVariety) ? `<div class="row">最近饮食：${Math.max(0, Math.min(3, c.dietVariety))} / 3 类${Number.isFinite(c.dietScore) ? ' · 长期均衡 ' + c.dietScore.toFixed(1) + '/3' : ''}</div>` : ''}
+        ${Number.isFinite(c.dietVariety) ? `<div class="row">最近饮食：${Math.max(0, Math.min(3, c.dietVariety))} / 3 营养组（肉类含鸡蛋）${Number.isFinite(c.dietScore) ? ' · 长期均衡 ' + c.dietScore.toFixed(1) + '/3' : ''}</div>` : ''}
         ${this.citizenHealthMarkup(c)}
         ${this.citizenLeisureMarkup(c)}`;
       const supplyHolder = el.querySelector?.('[data-citizen-household-supply]');
@@ -2994,7 +2996,7 @@ G.ui = {
           <label for="trade-payment">用一种待售物资支付</label><select id="trade-payment">${payments}</select>
           <p data-economy-live="quote" class="trade-quote" role="status" aria-live="polite"></p>
           <button type="submit" id="trade-execute">确认交易</button>
-          <p class="desc">付款数量向上取整，不找零。买入普通物资先进入本站库存，低于现存数量的待售目标会让商人搬回；羊或牛购入后进入各自待安置数量，到同种牧场放入。果树、卷心菜与早熟豆类种子各买 1 次永久解锁，不能复购，不是库存物品，也不占贸易站或仓库容量。卷心菜和早熟豆类解锁后到农田选择种植，产出都计入蔬菜。</p>
+          <p class="desc">付款数量向上取整，不找零。买入普通物资先进入本站库存，低于现存数量的待售目标会让商人搬回；肉类与鸡蛋可分别买卖，鸡蛋价值2，肉类价值1；羊、牛或鸡购入后进入各自待安置数量，到同种牧场放入。果树、卷心菜与早熟豆类种子各买 1 次永久解锁，不能复购，不是库存物品，也不占贸易站或仓库容量。卷心菜和早熟豆类解锁后到农田选择种植，产出都计入蔬菜。</p>
         </form>
         <form id="trade-order-form" class="economy-form">
           <h3>③ 向这位商人订货</h3>
@@ -3011,18 +3013,18 @@ G.ui = {
       </section>`;
     }
     if (b.type === 'pasture' && G.stockPasture && G.setPastureTarget) return `<section class="economy-details" data-economy="pasture">
-      <p class="row" data-economy-live="animals"></p><p class="row" data-economy-live="pasture-production"></p>
-      <form id="pasture-type-form" class="economy-form"><h3>空场选择物种</h3><label for="pasture-type">羊或牛（不能混养）</label><select id="pasture-type"><option value="sheep"${G.pastureTypeOf(b)==='sheep'?' selected':''}>羊：肉、羊毛</option><option value="cattle"${G.pastureTypeOf(b)==='cattle'?' selected':''}>牛：肉、皮革</option></select><button type="submit" id="pasture-type-apply">应用物种</button><p data-economy-live="pasture-switch"></p></form>
+      <p class="row" data-economy-live="animals"></p><p class="row" data-economy-live="pasture-production"></p><p class="row" data-economy-live="pasture-stock"></p><p class="desc" data-economy-live="pasture-logistics"></p>
+      <form id="pasture-type-form" class="economy-form"><h3>空场选择物种</h3><label for="pasture-type">羊、牛或鸡（不能混养）</label><select id="pasture-type"><option value="sheep"${G.pastureTypeOf(b)==='sheep'?' selected':''}>羊：肉、羊毛</option><option value="cattle"${G.pastureTypeOf(b)==='cattle'?' selected':''}>牛：肉、皮革</option><option value="chicken"${G.pastureTypeOf(b)==='chicken'?' selected':''}>鸡：鸡蛋、肉</option></select><button type="submit" id="pasture-type-apply">应用物种</button><p data-economy-live="pasture-switch"></p></form>
       <form id="pasture-stock-form" class="economy-form"><h3>放入已购同种牲畜</h3><p data-economy-live="sheep-bank"></p>
-        <label for="pasture-stock-quantity">放入数量</label><input id="pasture-stock-quantity" type="number" min="1" max="12" step="1" value="2" inputmode="numeric"><button type="submit" id="pasture-stock">放入牧场</button></form>
-      <form id="pasture-target-form" class="economy-form"><h3>繁殖与保留数量</h3><label for="pasture-target-quantity" data-economy-live="pasture-target-range"></label><input id="pasture-target-quantity" type="number" min="2" max="12" step="1" value="${Number(b.animalTarget) || 8}" inputmode="numeric"><button type="submit">应用保留数量</button>
-        <p class="desc" data-economy-live="pasture-rule"></p><p class="desc">至少两头同种牲畜且牧人实际照料才繁殖。保留数只控制超额屠宰。已屠宰产物逐批搬运，库存满则保留；牧场内待送产物未搬空不能拆场。</p></form>
+        <label for="pasture-stock-quantity">放入数量</label><input id="pasture-stock-quantity" type="number" min="1" max="${G.LIVESTOCK[G.pastureTypeOf(b)].cap}" step="1" value="2" inputmode="numeric"><button type="submit" id="pasture-stock">放入牧场</button></form>
+      <form id="pasture-target-form" class="economy-form"><h3>繁殖与保留数量</h3><label for="pasture-target-quantity" data-economy-live="pasture-target-range"></label><input id="pasture-target-quantity" type="number" min="2" max="${G.LIVESTOCK[G.pastureTypeOf(b)].cap}" step="1" value="${Number(b.animalTarget) || 8}" inputmode="numeric"><button type="submit">应用保留数量</button>
+        <p class="desc" data-economy-live="pasture-rule"></p><p class="desc">至少2只/头同种牲畜且牧人实际照料才繁殖。保留数只控制超额屠宰。鸡场沿用本作6×6小地图适配，容量24只，默认保留8只；鸡蛋独立库存，与肉类同属一个营养组。产物逐批实背送仓后才可使用，库存满则保留；牧场内待送产物未搬空不能拆场。</p></form>
       <section data-pasture-split><h3>分群扩场</h3>
         <label for="pasture-split-target">同种空牧场（确认时检查通路）</label><select id="pasture-split-target"></select>
         <p class="desc" data-pasture-split-status></p>
         <div class="economy-actions"><button type="button" id="pasture-split-start">查看分群方案</button></div>
         <div class="hidden" data-pasture-split-confirm role="group" aria-label="确认牲畜分群"><p class="desc" data-pasture-split-quote></p><div class="economy-actions"><button type="button" id="pasture-split-confirm">确认分群</button><button type="button" id="pasture-split-cancel">取消</button></div></div>
-        <p class="desc">满10头后可分出一半到同种空场。沿用按畜群数量直接安置的规则，不模拟逐头赶路；两场必须连通。保留量与工人不自动调整，新场需牧人实际照料。已产羊毛、肉皮和在途货留原场。</p>
+        <p class="desc">满10只/头后可分出一半到同种空场。沿用按畜群数量直接安置的规则，不模拟逐头赶路；两场必须连通。保留量与工人不自动调整，新场需牧人实际照料。已产鸡蛋、未成蛋进度、羊毛、肉皮和在途货留原场。</p>
       </section>
       <p class="economy-message" data-economy-message role="status" aria-live="polite"></p>
     </section>`;
@@ -3105,11 +3107,11 @@ G.ui = {
       onSubmit('pasture-type-form',()=>{const type=el.querySelector('#pasture-type').value;message(G.setPastureType(b,type)?`牧场物种已设为${G.LIVESTOCK[type].name}；下一次放入只接收该物种。`:G.pastureSwitchReason(b)||'物种选择无效');});
       onSubmit('pasture-stock-form', () => {
         const qty = Number(el.querySelector('#pasture-stock-quantity').value);
-        const d=G.pastureSummary(b);message(G.stockPasture(b, qty, d.type) ? `已放入 ${qty} 头${d.name}。` : `无法放入：请检查整数数量、待安置${d.name}数及${d.cap}头容量。`);
+        const d=G.pastureSummary(b),unit=d.type==='chicken'?'只':'头';message(G.stockPasture(b, qty, d.type) ? `已放入 ${qty} ${unit}${d.name}。` : `无法放入：请检查整数数量、待安置${d.name}数及${d.cap}${unit}容量。`);
       });
       onSubmit('pasture-target-form', () => {
         const qty = Number(el.querySelector('#pasture-target-quantity').value);
-        message(G.setPastureTarget(b, qty) ? `保留数量已设为 ${qty} 头，超出部分由牧人屠宰。` : `请输入 2–${G.pastureSummary(b).cap} 的整数。`);
+        message(G.setPastureTarget(b, qty) ? `保留数量已设为 ${qty} ${G.pastureTypeOf(b)==='chicken'?'只':'头'}，超出部分由牧人屠宰。` : `请输入 2–${G.pastureSummary(b).cap} 的整数。`);
       });
       this.initPastureSplit(b);
     }
@@ -3123,7 +3125,8 @@ G.ui = {
     const options=this.pastureSplitOptions(b),signature=options.map(x=>x.id+':'+G.pastureTypeOf(x)).join(',');
     if(panel._splitOptions!==signature){const previous=select.value;select.innerHTML=options.length?options.map(x=>`<option value="${x.id}">牧场 #${x.id}（${x.x},${x.y}）</option>`).join(''):'<option value="">没有同种已建成空场</option>';select.value=options.some(x=>String(x.id)===previous)?previous:options.length?String(options[0].id):'';panel._splitOptions=signature;}
     const target=G.world.bmap[Number(select.value)],q=G.pastureSplitFacts(b,target);start.disabled=!q.ok;
-    status.textContent=q.ok?`本场${q.sourceCount}头，可分${q.qty}头，留下${q.left}头种畜。新场按现有保留量${target.animalTarget||8}头运行；实际连通性在查看与确认时检查。`:q.reason;
+    const unit=G.pastureTypeOf(b)==='chicken'?'只':'头';
+    status.textContent=q.ok?`本场${q.sourceCount}${unit}，可分${q.qty}${unit}，留下${q.left}${unit}种畜。新场按现有保留量${target.animalTarget||8}${unit}运行；实际连通性在查看与确认时检查。`:q.reason;
     if(panel._splitQuote&&(!q.ok||q.key!==panel._splitQuote.key||(G.hasOpenModal&&G.hasOpenModal()))){panel._splitQuote=null;box.classList.add('hidden');const msg=el.querySelector('[data-economy-message]');if(msg&&!(G.hasOpenModal&&G.hasOpenModal()))msg.textContent='畜群、保留量或通路已变，请重新查看分群方案。';if(box.contains&&box.contains(document.activeElement)&&!(G.hasOpenModal&&G.hasOpenModal())){const focus=q.ok?start:el.querySelector('#info-close');if(focus&&focus.focus)focus.focus();}}
   },
   initPastureSplit:function(b){
@@ -3133,9 +3136,9 @@ G.ui = {
     const reset=()=>{panel._splitQuote=null;box.classList.add('hidden');};reset();
     const valid=()=>G.world===w&&G.game===g&&this.el.info===el&&!el.classList.contains('hidden')&&G.sel?.kind==='b'&&G.sel.id===b.id&&w.bmap[b.id]===b&&b.state==='ok'&&el.querySelector('[data-pasture-split]')===panel&&!(G.hasOpenModal&&G.hasOpenModal());
     select.addEventListener('change',()=>{reset();if(valid())this.refreshPastureSplit(b);});
-    start.addEventListener('click',e=>{if(!valid()||e.detail>1){reset();return;}const target=w.bmap[Number(select.value)],q=G.pastureSplitQuote(b,target);if(!q.ok){reset();if(msg)msg.textContent=q.reason;return;}panel._splitQuote={key:q.key,target};quote.textContent=`将${q.qty}头${G.LIVESTOCK[q.type].name}直接分入牧场 #${target.id}（${target.x},${target.y}），本场留下${q.left}头。总头数不增加，繁殖进度守恒；不移动羊毛、肉皮、携货和工人。目标保留量${target.animalTarget||8}头，超过时会由牧人正常屠宰。新场须实际照料才继续繁殖。`;box.classList.remove('hidden');if(confirm.focus)confirm.focus();});
+    start.addEventListener('click',e=>{if(!valid()||e.detail>1){reset();return;}const target=w.bmap[Number(select.value)],q=G.pastureSplitQuote(b,target);if(!q.ok){reset();if(msg)msg.textContent=q.reason;return;}panel._splitQuote={key:q.key,target};const unit=q.type==='chicken'?'只':'头';quote.textContent=`将${q.qty}${unit}${G.LIVESTOCK[q.type].name}直接分入牧场 #${target.id}（${target.x},${target.y}），本场留下${q.left}${unit}。总数量不增加，繁殖进度守恒；不移动鸡蛋、未成蛋进度、羊毛、肉皮、携货和工人。目标保留量${target.animalTarget||8}${unit}，超过时会由牧人正常屠宰。新场须实际照料才继续繁殖。`;box.classList.remove('hidden');if(confirm.focus)confirm.focus();});
     cancel.addEventListener('click',()=>{reset();if(valid()&&start.focus)start.focus();});
-    confirm.addEventListener('click',e=>{if(!valid()||!panel._splitQuote||e.detail>1){reset();return;}const pending=panel._splitQuote;reset();const result=G.splitPasture(b,pending.target,pending.key);if(msg)msg.textContent=result.ok?`已分${result.qty}头${G.LIVESTOCK[result.type].name}到另一牧场；请分别检查保留量和用工。`:result.reason;this.refreshEconomyInfo(b);const close=el.querySelector('#info-close');if(result.ok&&close&&close.focus)close.focus();});
+    confirm.addEventListener('click',e=>{if(!valid()||!panel._splitQuote||e.detail>1){reset();return;}const pending=panel._splitQuote;reset();const result=G.splitPasture(b,pending.target,pending.key);if(msg)msg.textContent=result.ok?`已分${result.qty}${result.type==='chicken'?'只':'头'}${G.LIVESTOCK[result.type].name}到另一牧场；请分别检查保留量和用工。`:result.reason;this.refreshEconomyInfo(b);const close=el.querySelector('#info-close');if(result.ok&&close&&close.focus)close.focus();});
   },
 
   autoTradeInfoMarkup: function (b) {
@@ -3296,7 +3299,7 @@ G.ui = {
       const profile = G.merchantProfile(b), order = G.merchantOrderSummary(b);
       set('[data-economy-live="merchant"]', merchant ? `${profile.name}停靠中，将在 ${b.merchant.leaveDay - G.game.day} 天后离开。` : `下一艘商船约 ${Math.max(0, (b.nextMerchantDay || G.game.day) - G.game.day)} 天后到达；不一定是已订货的商人。`);
       const accepted = Object.keys(G.TRADE_VALUES).filter(type => G.merchantAccepts(b, type)).map(type => G.RES[type].name).join('、');
-      set('[data-economy-live="merchant-payments"]', merchant ? `收购：${accepted}。${profile.acceptsFood ? '接受三类食物付款。' : '拒收食物：肉类、蔬菜、主食。'}` : '各商人有不同目录与收购物资；订货要等同一商人回访。');
+      set('[data-economy-live="merchant-payments"]', merchant ? `收购：${accepted}。${profile.acceptsFood ? '接受肉类、鸡蛋、蔬菜、主食付款。' : '拒收食物：肉类、鸡蛋、蔬菜、主食。'}` : '各商人有不同目录与收购物资；订货要等同一商人回访。');
       const inventory = b.tradeInventory || {}, targets = b.tradeTargets || {};
       const stored = G.tradeStored ? G.tradeStored(b) : Object.values(inventory).reduce((sum, value) => sum + value, 0);
       set('[data-economy-live="trade-capacity"]', `已入站 ${Math.floor(stored)} + 在途占位 ${G.tradeIncoming(b)} / ${G.TRADE_CAPACITY || 2000} · 可用空位 ${G.tradeFreeSpace(b)}（各资源共享；在途货尚不可交易）`);
@@ -3328,13 +3331,18 @@ G.ui = {
       orderQuantity.max = String(G.TRADE_GOODS[orderGood.value]?.stock || 400);
       this.refreshAutoTradeInfo(b);
     } else if (b.type === 'pasture') {
-      const d=G.pastureSummary(b),bank=G.game.livestock;
-      set('[data-economy-live="animals"]', `${d.name}群 ${d.animals}/${d.cap} 头 · 当前保留 ${d.target} 头`);
-      set('[data-economy-live="pasture-production"]', `繁殖进度 ${Math.floor(d.growth*100)}% · ${d.type==='sheep'?`待剪羊毛 ${Math.floor(d.wool)}`:`已屠宰待送：肉 ${d.meat} · 皮革 ${d.leather}`}`);
-      set('[data-economy-live="sheep-bank"]', `已购待安置：羊 ${bank.sheep||0} · 牛 ${bank.cattle||0}。本场只接收${d.name}。`);
+      const d=G.pastureSummary(b),bank=G.game.livestock,unit=d.type==='chicken'?'只':'头';
+      set('[data-economy-live="animals"]', `${d.name}群 ${d.animals}/${d.cap} ${unit} · 当前保留 ${d.target} ${unit}`);
+      const products=d.type==='chicken'?`场内待取鸡蛋 ${Math.floor(d.eggs||0)} / ${G.CHICKEN.eggCap} · 未成蛋进度 ${Math.floor((d.eggProgress||0)*100)}% · 已屠宰待送：肉 ${d.meat}`:d.type==='sheep'?`待剪羊毛 ${Math.floor(d.wool)}`:`已屠宰待送：肉 ${d.meat} · 皮革 ${d.leather}`;
+      set('[data-economy-live="pasture-production"]', `繁殖进度 ${Math.floor(d.growth*100)}% · ${products}`);
+      const eggTarget=G.productionGoalOf('eggs');
+      set('[data-economy-live="pasture-stock"]', d.type==='chicken'?`公共库存：鸡蛋 ${this.supplyNumber(G.game.res.eggs||0)} · 肉类 ${this.supplyNumber(G.game.res.meat||0)}（不含场内与在途）；鸡蛋目标 ${eggTarget===null?'继承原规则':eggTarget}，${G.goalPaused('eggs')?'已达鸡蛋或总食物目标，暂停新产蛋':'受鸡蛋与总食物目标限制'}。`:'');
+      const cargo=G.world.citizens.filter(c=>!c.dead&&c.carry?.pastureId===b.id).map(c=>`${c.name}：${G.RES[c.carry.type].name} ${this.supplyNumber(c.carry.qty)}，${G.cargoWaitReason(c)||'实背送仓途中'}`);
+      set('[data-economy-live="pasture-logistics"]', (d.type==='chicken'?`鸡蛋每批最多取${G.CHICKEN.haul}枚，由牧人实背送仓；满仓保留场内与随身已有鸡蛋。鸡肉计入肉类库存。`:'牧场产物逐批实背送仓。') + (cargo.length?' 当前在途：'+cargo.join('；')+'（未入库，尚不可用）。':' 当前无在途产物。'));
+      set('[data-economy-live="sheep-bank"]', `已购待安置：羊 ${bank.sheep||0} · 牛 ${bank.cattle||0} · 鸡 ${bank.chicken||0}。本场只接收${d.name}。`);
       set('[data-economy-live="pasture-switch"]', d.switchReason||`当前${d.name}场；空场且原任务与产物已清空时可改种类。`);
       set('[data-economy-live="pasture-rule"]', d.rule);
-      set('[data-economy-live="pasture-target-range"]', `保留 2–${d.cap} 头（已有设置 ${d.target}）`);
+      set('[data-economy-live="pasture-target-range"]', `保留 2–${d.cap} ${unit}（已有设置 ${d.target}）`);
       el.querySelector('#pasture-stock').disabled=d.bank<=0||d.animals>=d.cap;
       el.querySelector('#pasture-type-apply').disabled=!!d.switchReason;
       el.querySelector('#pasture-stock-quantity').max=String(d.cap);el.querySelector('#pasture-target-quantity').max=String(d.cap);
@@ -3433,16 +3441,17 @@ G.ui = {
       if (distributedGoal) stock.textContent += `；目标计量 ${this.supplyNumber(type === 'food' ? G.supplyFood(supplies) : supplies[type])}（公共 + 市场/住处/配送在途/待回收，不含火情封存；逐户现货才可使用）`;
       status.textContent = target === null ? '未设置全镇目标，继承原规则' :
         `已应用目标 ${target} · ${target === 0 ? '关闭新自动生产' : `恢复线 ≤${G.productionResumeAt(target)} · ${G.goalPaused(type) ? '达标暂停' : '可生产'}`}`;
-      if (target !== null && !tool && target > cap) status.textContent += distributedGoal ? '；目标高于公共仓容，但已配送存量也计入目标；公共仓满仍需腾位，未保护的普通交货可能损失' : '；目标高于仓容，需扩建仓库；' + (type === 'ale' ? '余麦酒保留随身，等待空间' : ['stone', 'iron', 'coal'].includes(type) ? '余矿保留随身，等待空间' : '满仓交货仍可能损失');
+      if (target !== null && !tool && target > cap) status.textContent += type === 'eggs' ? '；目标高于公共仓容，场内与随身已有鸡蛋保留，需仓库腾位后送入' : distributedGoal ? '；目标高于公共仓容，但已配送存量也计入目标；公共仓满仍需腾位，未保护的普通交货可能损失' : '；目标高于仓容，需扩建仓库；' + (type === 'ale' ? '余麦酒保留随身，等待空间' : ['stone', 'iron', 'coal'].includes(type) ? '余矿保留随身，等待空间' : '满仓交货仍可能损失');
       if (type === 'firewood' || tool) status.textContent += '；各屋原目标保留，实际按全镇与本屋较低值执行（见建筑详情）';
       if (tool) status.textContent += '；只限制正在生产本类工具的铁匠，另一类工具有独立目标';
-      if (type === 'food') status.textContent += '；总量目标与三类各自目标同时生效，总量达标会暂停食物新生产';
-      if (foodClass) status.textContent += '；同时受总食物目标限制，本类达标不拦停其他食物类别';
-      if ((type === 'food' || foodClass) && target !== null) status.textContent += '；已开始的整田继续播种和收获，过低目标可能断粮';
+      if (type === 'food') status.textContent += '；总量目标与各食物物品独立目标同时生效，总量达标会暂停食物新生产';
+      if (foodClass) status.textContent += '；同时受总食物目标限制，本物品达标不拦停其他食物物品';
+      if (type === 'eggs') status.textContent += '；鸡蛋独立目标只暂停新产蛋，已有场内与随身鸡蛋保留并可继续送仓；与肉类同属一个营养组';
+      if ((type === 'food' || foodClass) && target !== null) status.textContent += ['food','vegetables','grain'].includes(type) ? '；已开始的整田继续播种和收获，过低目标可能断粮' : '；过低目标可能断粮';
       if (type === 'firewood' && target !== null) status.textContent += '；过低目标可能挨冻';
       if (type === 'leather') status.textContent += '；仅控制狩猎的新批次皮革副产物，猎人是否继续产肉由肉类和总食物目标控制';
       if (type === 'clothes' || type === 'warmCoats') status.textContent += '；两类衣物目标独立，仅暂停生产本类的新批次；本类衣物仓满也会暂停裁缝，已接批次保留';
-      if (type === 'ale') status.textContent += '；只控制麦酒新酿造，仍受酒馆储粮保护；麦酒不计入三类食物，不能充饥';
+      if (type === 'ale') status.textContent += '；只控制麦酒新酿造，仍受酒馆储粮保护；麦酒不计入食物，不能充饥';
     }
   },
 

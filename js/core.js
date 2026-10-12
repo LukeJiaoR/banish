@@ -6,7 +6,7 @@
 window.G = {};
 
 /* 游戏版本：进反馈 payload 与结算画面——反馈可归因到数值补丁（发版时手动递增） */
-G.VERSION = '0.3.63';
+G.VERSION = '0.3.64';
 
 /* ---------- 常量 ---------- */
 G.TILE_W = 64;            // 等距菱形瓦片宽（缩放 1 时的像素）
@@ -35,6 +35,7 @@ G.RES = {
   steelTools: { name: '钢工具', color: '#b2cad8', icon: '⚒️', iconAsset: 'res_steelTools' },
   food:     { name: '食物', color: '#e0705a', icon: '🍖', iconAsset: 'res_food' },
   meat: { name: '肉类', color: '#c77564', icon: '🍖', iconAsset: 'res_meat' },
+  eggs: { name: '鸡蛋', color: '#e4cda4', icon: '🥚', iconAsset: 'res_eggs' },
   vegetables: { name: '蔬菜', color: '#91aa62', icon: '🥬', iconAsset: 'res_vegetables' },
   grain: { name: '主食', color: '#d5b465', icon: '🌾', iconAsset: 'res_grain' },
   leather: { name: '皮革', color: '#9d704d', icon: '🟫', iconAsset: 'res_leather' },
@@ -45,7 +46,26 @@ G.RES = {
   herbs: { name: '草药', color: '#7b9e5c', icon: '🌿', iconAsset: 'res_herbs' },
   firewood: { name: '柴火', color: '#e8a33d', icon: '🔥', iconAsset: 'res_firewood' },
 };
-G.FOOD_KEYS = ['meat', 'vegetables', 'grain'];
+// Items are individually stored/traded; meat and eggs are one nutritional group.
+G.FOOD_KEYS = ['meat', 'eggs', 'vegetables', 'grain'];
+G.foodGroup = type => type === 'eggs' ? 'meat' : type;
+G.foodGroupsOf = keys => [...new Set(keys.filter(k=>G.FOOD_KEYS.includes(k)).map(G.foodGroup))];
+// Equal shares across the original three groups, then within each available
+// protein item. Pure planning serves both public meals and physical baskets.
+G.foodBasket = function(stock,qty){
+  const out=Object.fromEntries(G.FOOD_KEYS.map(k=>[k,0]));let left=Math.max(0,qty);
+  for(let pass=0;pass<G.FOOD_KEYS.length&&left>1e-9;pass++){
+    const keys=G.FOOD_KEYS.filter(k=>(stock[k]||0)-out[k]>1e-9),groups=G.foodGroupsOf(keys);
+    if(!groups.length)break;const part=left/groups.length;
+    for(const group of groups){let need=part;const members=keys.filter(k=>G.foodGroup(k)===group);
+      for(let round=0;round<members.length&&need>1e-9;round++){
+        const available=members.filter(k=>(stock[k]||0)-out[k]>1e-9),share=need/available.length;
+        for(const k of available){const n=Math.min((stock[k]||0)-out[k],share);out[k]+=n;left-=n;need-=n;}
+      }
+    }
+  }
+  return Object.fromEntries(Object.entries(out).filter(([,n])=>n>1e-9));
+};
 G.RES_KEYS = ['wood', 'stone', 'iron', 'tools', 'food', ...G.FOOD_KEYS, 'firewood', 'leather', 'wool', 'clothes', 'herbs', 'coal', 'steelTools', 'ale', 'warmCoats'];
 G.isFood = type => type === 'food' || G.FOOD_KEYS.includes(type);
 

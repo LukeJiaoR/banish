@@ -5,7 +5,7 @@
 
 /* Measured town flows: bounded observations, never an economy controller.
  * Food total is derived from three groups; held goods are not warehouse stock. */
-G.LEDGER_RES=['meat','vegetables','grain','firewood'];
+G.LEDGER_RES=[...G.FOOD_KEYS,'firewood'];
 G.LEDGER_METRICS=['produced','received','used','withdrawn','discarded','distributedUsed','distributedLost'];
 G.ledgerStock=g=>Object.fromEntries(G.LEDGER_RES.map(k=>[k,Math.max(0,Number(g.res[k])||0)]));
 G.ledgerBucket=(g,day=g.day,fromHour=g.h)=>({day,fromHour,partial:fromHour>0,opening:G.ledgerStock(g),
@@ -54,7 +54,7 @@ G.townChallengeFacts=function(){
   const educated=cs.filter(c=>c.adult&&c.educated).length;
   const students=cs.filter(c=>c.student&&c.studyHours>0&&w.bmap[c.school]?.type==='school'&&w.bmap[c.school].state==='ok').length;
   const available=typeof G.townLedgerSummary==='function';
-  const recent=available?G.townLedgerSummary().recent:{days:0,fromDay:null,toDay:null,totals:G.ledgerTotals([])},totals=recent.totals,groups=G.FOOD_KEYS.filter(k=>totals[k].produced>0).length;
+  const recent=available?G.townLedgerSummary().recent:{days:0,fromDay:null,toDay:null,totals:G.ledgerTotals([])},totals=recent.totals,groups=G.foodGroupsOf(G.FOOD_KEYS.filter(k=>totals[k].produced>0)).length;
   const contiguous=recent.days===12&&recent.toDay-recent.fromDay===11&&recent.toDay===G.game.day-1;
   return {settlement:{population:pop,homed,ready:pop>=30&&homed===pop},
     food:{available,days:recent.days,contiguous,fromDay:recent.fromDay,toDay:recent.toDay,groups,produced:totals.food.produced,used:totals.food.used+totals.food.distributedUsed,
@@ -71,7 +71,7 @@ G.newGameState = function () {
   const g = {
     h: 6, day: 0, season: 0, year: 1,
     speed: 1, paused: false,
-    res: { wood: 80, stone: 48, iron: 0, tools: 15, food: 500, meat: 0, vegetables: 0, grain: 500, leather: 0, wool: 0, clothes: 0, warmCoats: 0, herbs: 0, coal: 0, steelTools: 0, ale: 0, firewood: 50 }, // 开局（原版中难度 5 家庭，工具 15 件≈第一轮磨损周期）；存粮较原版加厚：15 人 6 天食物跑道撑不到第一座采集屋建成
+    res: { wood: 80, stone: 48, iron: 0, tools: 15, food: 500, meat: 0, eggs:0, vegetables: 0, grain: 500, leather: 0, wool: 0, clothes: 0, warmCoats: 0, herbs: 0, coal: 0, steelTools: 0, ale: 0, firewood: 50 }, // 开局（原版中难度 5 家庭，工具 15 件≈第一轮磨损周期）；存粮较原版加厚：15 人 6 天食物跑道撑不到第一座采集屋建成
     heating:{allowCoal:false,coalReserve:20}, fishingRules:'shared', supplyMode:'automatic',clothingSupply:false,toolMode:'pooled',toolRemainders:{tools:0,steelTools:0},
     fireDisasters:{enabled:false,startedDay:null,graceUntil:0,lastDay:-1,nextIgnitionDay:0,serial:0,incidentHomes:[]},
     healthStartDay: 0, farmPests:{enabled:false,graceUntil:0,lastDay:-1}, challenges:{v:1,completed:{}},
@@ -80,7 +80,7 @@ G.newGameState = function () {
     over: false,
     stats: { born: 0, died: 0, deadReasons: {} },
     prevFood: 200,
-    unlocks: { orchard: false, cabbage:false, beans:false }, livestock: { sheep: 0, cattle: 0 },
+    unlocks: { orchard: false, cabbage:false, beans:false }, livestock: { sheep: 0, cattle: 0, chicken:0 },
     foodNet: 0,
     foodUrgent: false,
     warned: {},
@@ -686,7 +686,7 @@ G.sendTo = function (c, tx, ty, planned = null) {
   if (!p) { c.state = 'idle'; c.task = null; return false; }
   // The path planner rounds its start cell. Physically checked factory/mineral
   // tasks still walk the final fraction after an interrupted commute.
-  if((c.task?.mineral||['firefight','supply','toolFetch','cleric','worship'].includes(c.task?.kind)||['fuel','tailor'].includes(c.task?.kind)) && p.length===0 && G.d2(c.x,c.y,tx,ty)>1e-8) {
+  if((c.task?.mineral||c.task?.economy==='pasture'||['firefight','supply','toolFetch','cleric','worship'].includes(c.task?.kind)||['fuel','tailor'].includes(c.task?.kind)) && p.length===0 && G.d2(c.x,c.y,tx,ty)>1e-8) {
     c.path=[{x:tx,y:ty}];c.pi=0;c.state='walk';c.walkKind='task';return true;
   }
   c.path = p; c.pi = 0;
@@ -808,7 +808,7 @@ G.storageRoute = function (x, y, types) {
  * part of a delivery. Tavern output, refundable raw grain and the specific current batch marked
  * on staffing withdrawal share this bounded path. Ordinary unmarked cargo
  * keeps its existing delivery policy; the marker dies with its cargo object. */
-G.isMineralCargo = function (c) { return !!c.carry && (c.carry.staffingReturn===true || ['stone','iron','coal','ale','clothes','warmCoats'].includes(c.carry.type) || (c.carry.type==='grain' && c.carry.brewIngredient===true) || (Number.isInteger(c.carry.pastureId)&&['meat','leather','wool'].includes(c.carry.type)) || (Number.isInteger(c.carry.orchardId)&&c.carry.type==='vegetables') || (Number.isInteger(c.carry.firewoodId)&&c.carry.type==='firewood')); };
+G.isMineralCargo = function (c) { return !!c.carry && (c.carry.staffingReturn===true || ['stone','iron','coal','ale','clothes','warmCoats'].includes(c.carry.type) || (c.carry.type==='grain' && c.carry.brewIngredient===true) || (Number.isInteger(c.carry.pastureId)&&['meat','eggs','leather','wool'].includes(c.carry.type)) || (Number.isInteger(c.carry.orchardId)&&c.carry.type==='vegetables') || (Number.isInteger(c.carry.firewoodId)&&c.carry.type==='firewood')); };
 G.mineralStorageSpace = function (type) { return G.isTool(type) ? Infinity : Math.max(0, G.storageCap(type) - G.game.res[G.isFood(type)?'food':type]); };
 // Ordinary in-flight minerals remain eligible as before; only an already
 // blocked delivery cannot count as available labour or occupy a productive slot.
@@ -1039,13 +1039,9 @@ G.reconcileFood = function (game) {
   r.food = G.FOOD_KEYS.reduce((n,k) => n + r[k], 0);
 };
 G.consumeFood = function (qty) {
-  G.reconcileFood(); const r = G.game.res, eaten = new Set(); let left = Math.min(qty, r.food);
-  // Share a meal across available groups, then fill deficits from what remains.
-  for (let pass = 0; pass < 3 && left > 1e-9; pass++) {
-    const keys = G.FOOD_KEYS.filter(k => r[k] > 1e-9), portion = left / keys.length;
-    for (const k of keys) { const take = Math.min(r[k], portion); r[k] -= take; left -= take; G.ledgerRecord('used',k,take); if (take > 0) eaten.add(k); }
-  }
-  r.food = G.FOOD_KEYS.reduce((n,k) => n + r[k], 0); return [...eaten];
+  G.reconcileFood();const r=G.game.res,basket=G.foodBasket(r,Math.min(qty,r.food));
+  for(const[k,n]of Object.entries(basket)){r[k]-=n;G.ledgerRecord('used',k,n);}
+  r.food=G.FOOD_KEYS.reduce((n,k)=>n+r[k],0);return G.foodGroupsOf(Object.keys(basket));
 };
 G.depositCargo = function (cargo) {
   const accepted = G.deposit(cargo.type, cargo.qty, cargo.staffingReturn===true||cargo.brewIngredient===true||Number.isInteger(cargo.pastureId)||Number.isInteger(cargo.orchardId)||Number.isInteger(cargo.firewoodId));
@@ -2444,8 +2440,8 @@ G.tradeIncoming=function(b,exclude=null){
 };
 G.tradeFreeSpace=(b,exclude=null)=>Math.max(0,G.TRADE_CAPACITY-G.tradeStored(b)-G.tradeIncoming(b,exclude));
 
-G.TRADE_VALUES = {wood:2,stone:7,iron:5,tools:8,firewood:4,meat:1,vegetables:1,grain:1,leather:10,wool:5,clothes:15,warmCoats:20,herbs:4,coal:6,steelTools:10};
-G.TRADE_GOODS = {coal:{name:'煤',price:6,stock:100},steelTools:{name:'钢工具',price:10,stock:20},sheep:{name:'羊',price:600,stock:4},cattle:{name:'牛',price:800,stock:4},orchardSeed:{name:'果树种子',price:2500,stock:1},cabbageSeed:{name:'卷心菜种子',price:2500,stock:1},beanSeed:{name:'早熟豆类种子',price:2500,stock:1},grain:{name:'主食',price:1,stock:400},iron:{name:'铁',price:5,stock:100},leather:{name:'皮革',price:10,stock:80}};
+G.TRADE_VALUES = {wood:2,stone:7,iron:5,tools:8,firewood:4,meat:1,eggs:2,vegetables:1,grain:1,leather:10,wool:5,clothes:15,warmCoats:20,herbs:4,coal:6,steelTools:10};
+G.TRADE_GOODS = {chicken:{name:'鸡',price:400,stock:4},eggs:{name:'鸡蛋',price:2,stock:200},meat:{name:'肉类',price:1,stock:200},coal:{name:'煤',price:6,stock:100},steelTools:{name:'钢工具',price:10,stock:20},sheep:{name:'羊',price:600,stock:4},cattle:{name:'牛',price:800,stock:4},orchardSeed:{name:'果树种子',price:2500,stock:1},cabbageSeed:{name:'卷心菜种子',price:2500,stock:1},beanSeed:{name:'早熟豆类种子',price:2500,stock:1},grain:{name:'主食',price:1,stock:400},iron:{name:'铁',price:5,stock:100},leather:{name:'皮革',price:10,stock:80}};
 // Profile selection and visit timing are compact-map adaptations. Orders follow
 // the original same-merchant / pay-on-purchase / floor(1.25*price) rules.
 G.MERCHANT_CYCLE=['general','supplies','seeds'];
@@ -2539,7 +2535,7 @@ G.tradeQuote=function(b,good,qty,payment){
 };
 G.ensureEconomyBuilding = function(b) {
   if(b.type==='tradingpost'){b.tradeInventory=b.tradeInventory||{};b.tradeTargets=b.tradeTargets||{};if(!Number.isFinite(b.nextMerchantDay))b.nextMerchantDay=G.game.day+G.SEASON_DAYS;if(!Number.isInteger(b.merchantVisits))b.merchantVisits=b.merchant?1:0;b.merchantOrders=b.merchantOrders||{};b.autoTrade=b.autoTrade||G.defaultAutoTrade();}
-  if(b.type==='pasture'){b.animalType=G.pastureTypeOf(b);b.animals=b.animals||0;b.animalGrowth=b.animalGrowth||0;b.woolReady=b.woolReady||0;b.pastureProducts=b.pastureProducts||{meat:0,leather:0};if(!Number.isFinite(b.animalTarget))b.animalTarget=8;}
+  if(b.type==='pasture'){b.animalType=G.pastureTypeOf(b);b.animals=b.animals||0;b.animalGrowth=b.animalGrowth||0;b.woolReady=b.woolReady||0;b.pastureProducts=b.pastureProducts||{meat:0,leather:0};if(b.animalType==='chicken'){if(!Number.isFinite(b.pastureProducts.eggs))b.pastureProducts.eggs=0;if(!Number.isFinite(b.eggProgress))b.eggProgress=0;if(!Number.isInteger(b.eggDay))b.eggDay=G.game.day;}if(!Number.isFinite(b.animalTarget))b.animalTarget=8;}
   if(b.type==='orchard')G.ensureOrchard(b);
 };
 G.withdrawResource = function(type,qty){
@@ -2600,9 +2596,10 @@ G.executeTrade = function(b,good,qty,payment,expectedMerchant){
   G.game.schedT=0;return {ok:true,paid:q.cost};
 };
 // Fixed 6x6 pens and yields are small-map adaptations, not original tile density.
-G.LIVESTOCK={sheep:{name:'羊',cap:12,meat:24,leather:0},cattle:{name:'牛',cap:10,meat:36,leather:4}};
+G.LIVESTOCK={sheep:{name:'羊',cap:12,meat:24,leather:0},cattle:{name:'牛',cap:10,meat:36,leather:4},chicken:{name:'鸡',cap:24,meat:6,leather:0}};
+G.CHICKEN={eggsPerDay:.5,eggCap:96,haul:20,growthYears:1};
 G.isLivestockType=type=>typeof type==='string'&&Object.hasOwn(G.LIVESTOCK,type);
-G.pastureTypeOf=b=>b?.animalType==='cattle'?'cattle':'sheep';
+G.pastureTypeOf=b=>G.isLivestockType(b?.animalType)?b.animalType:'sheep';
 G.pastureHasProducts=b=>Object.values(b.pastureProducts||{}).some(q=>q>0);
 G.pastureSwitchReason=function(b){
   if(b.animals>0)return '已有牲畜，禁止混养或转换物种';
@@ -2614,7 +2611,7 @@ G.setPastureType=function(b,type){
   if(!b||G.world.bmap[b.id]!==b||b.type!=='pasture'||b.state!=='ok'||!G.isLivestockType(type))return false;
   G.ensureEconomyBuilding(b);if(type===G.pastureTypeOf(b))return true;
   if(G.pastureSwitchReason(b))return false;
-  b.animalType=type;b.animalGrowth=0;b.animalTarget=Math.min(b.animalTarget||8,G.LIVESTOCK[type].cap);G.game.schedT=0;return true;
+  b.animalType=type;b.animalGrowth=0;delete b.eggProgress;delete b.eggDay;delete b.pastureProducts.eggs;b.animalTarget=Math.min(b.animalTarget||8,G.LIVESTOCK[type].cap);G.game.schedT=0;return true;
 };
 G.stockPasture = function(b,qty,type=G.pastureTypeOf(b)){
   if(!b||G.world.bmap[b.id]!==b||b.type!=='pasture'||b.state!=='ok'||!Number.isInteger(qty)||qty<=0||!G.isLivestockType(type)||type!==G.pastureTypeOf(b))return false;
@@ -2659,7 +2656,7 @@ G.setPastureTarget = function(b,qty){if(!b||G.world.bmap[b.id]!==b||b.type!=='pa
 G.pastureTaskCurrent=(c,t)=>!!(t?.economy==='pasture'&&t.b?.type==='pasture'&&G.world.bmap[t.b.id]===t.b&&t.b.state==='ok'&&c.job===t.b.id&&(!t.pastureType||t.pastureType===G.pastureTypeOf(t.b)));
 G.atPastureWork=(c,t)=>G.pastureTaskCurrent(c,t)&&G.atMedicalDoor(c,t.b)&&G.d2(c.x,c.y,t.tx,t.ty)<.04&&!G.tileBlocked(G.world,t.tx,t.ty);
 G.pastureSlaughterReason=function(b){
-  if(G.pastureHasProducts(b))return '先搬完已屠宰的肉与皮革';
+  if(G.pastureHasProducts(b))return '先搬完场内待送产物（肉、皮革或鸡蛋）';
   const d=G.LIVESTOCK[G.pastureTypeOf(b)],outputs=d.leather?['meat','leather']:['meat'];
   for(const type of outputs){if(G.goalPaused(type))return G.RES[type].name+'达到目标，暂停新屠宰';if(G.mineralStorageSpace(type)<=0)return G.RES[type].name+'仓满，暂停新屠宰';}
   return '';
@@ -2667,38 +2664,51 @@ G.pastureSlaughterReason=function(b){
 G.pastureSummary=function(b){
   const type=G.pastureTypeOf(b),d=G.LIVESTOCK[type],pending=b.pastureProducts||{};
   return {type,name:d.name,cap:d.cap,animals:b.animals||0,target:b.animalTarget||8,bank:G.game.livestock[type]||0,
-    growth:b.animalGrowth||0,wool:b.woolReady||0,meat:pending.meat||0,leather:pending.leather||0,switchReason:G.pastureSwitchReason(b),
-    status:!b.animals?'空牧场：购买同种牲畜后放入':b.animals<2?'至少2头同种牲畜才能繁殖':!b.workers.length?'等待牧人照料':G.pastureSlaughterReason(b)||'牧人照料中；超保留量才屠宰',
-    rule:type==='cattle'?'牛不产羊毛；每次超额屠宰产36肉＋4皮革，逐批送仓后才可使用':'羊剪毛与超额屠宰产24肉；不会产皮革'};
+    growth:b.animalGrowth||0,wool:b.woolReady||0,meat:pending.meat||0,leather:pending.leather||0,eggs:pending.eggs||0,eggProgress:b.eggProgress||0,switchReason:G.pastureSwitchReason(b),
+    status:!b.animals?'空牧场：购买同种牲畜后放入':type==='chicken'?(G.workerLimitOf(b)<=0||!b.workers.length?'等待牧人照料':G.goalPaused('eggs')?'鸡蛋目标已达，暂停新产蛋；已产鸡蛋继续送仓':pending.eggs>=G.CHICKEN.eggCap?'待取鸡蛋已达96枚，暂停新产蛋':pending.eggs>0?'场内鸡蛋等待牧人实背送仓':b.animals<2?'单鸡可产蛋；至少2只同种鸡才能繁殖':G.pastureSlaughterReason(b)||'照料产蛋中；超保留量才屠宰'):b.animals<2?'至少2头同种牲畜才能繁殖':!b.workers.length?'等待牧人照料':G.pastureSlaughterReason(b)||'牧人照料中；超保留量才屠宰',
+    rule:type==='chicken'?'照料后每只每天0.5鸡蛋，场内最多96枚待取；牧人每趟最多20枚实背送仓。超保留量屠宰每只6肉，不产羊毛皮革；数量和产速为本作适配':type==='cattle'?'牛不产羊毛；每次超额屠宰产36肉＋4皮革，逐批送仓后才可使用':'羊剪毛与超额屠宰产24肉；不会产皮革'};
+};
+G.advanceChickenEggs=function(b){
+  const day=G.game.day;
+  if(b.eggDay>=day)return;b.eggDay=day;
+  // No replay/catch-up on load. Eggs exist in the pen only after real care;
+  // neither public storage nor household food can receive remote production.
+  if(!(b.animals>0)||!(b.tendedDay>=day-2)||G.workerLimitOf(b)<=0||G.goalPaused('eggs')||b.pastureProducts.eggs>=G.CHICKEN.eggCap)return;
+  const progress=(b.eggProgress||0)+b.animals*G.CHICKEN.eggsPerDay;
+  const qty=Math.min(G.CHICKEN.eggCap-b.pastureProducts.eggs,Math.floor(progress));
+  b.eggProgress=progress-Math.floor(progress);
+  if(qty>0){b.pastureProducts.eggs+=qty;G.recordProduction(b,'eggs',qty);}
 };
 G.advanceTownEconomy = function(){
-  const g=G.game;g.unlocks=g.unlocks||{orchard:false};g.livestock=g.livestock||{sheep:0,cattle:0};
+  const g=G.game;g.unlocks=g.unlocks||{orchard:false};g.livestock=g.livestock||{sheep:0,cattle:0,chicken:0};
   for(const b of G.world.buildings){if(b.state!=='ok')continue;G.ensureEconomyBuilding(b);
     if(b.type==='tradingpost'){
       if(b.merchant&&g.day>=b.merchant.leaveDay){b.merchant=null;b.merchantVisits=Math.max(1,b.merchantVisits);b.nextMerchantDay=g.day+G.MERCHANT_INTERVAL-G.SEASON_DAYS;}
       if(!b.merchant&&g.day>=b.nextMerchantDay)G.arriveMerchant(b);
     }
     if(b.type==='pasture'&&b.animals>0&&b.tendedDay>=g.day-2){
-      if(b.animals>=2)b.animalGrowth+=b.animals/(G.YEAR_DAYS*2);while(b.animalGrowth>=1&&b.animals<G.LIVESTOCK[G.pastureTypeOf(b)].cap){b.animals++;b.animalGrowth--;}
+      if(b.animals>=2)b.animalGrowth+=b.animals/(G.YEAR_DAYS*(G.pastureTypeOf(b)==='chicken'?G.CHICKEN.growthYears:2));while(b.animalGrowth>=1&&b.animals<G.LIVESTOCK[G.pastureTypeOf(b)].cap){b.animals++;b.animalGrowth--;}
       b.animalGrowth=Math.min(1,b.animalGrowth);if(G.pastureTypeOf(b)==='sheep')b.woolReady=Math.min(48,b.woolReady+b.animals/G.SEASON_DAYS);
     }
+    if(b.type==='pasture'&&G.pastureTypeOf(b)==='chicken')G.advanceChickenEggs(b);
     if(b.type==='orchard'&&g.unlocks.orchard)G.advanceOrchard(b);
   }
 };
 G.completeEconomyWork = function(c,t){
   const b=t.b;if(G.world.bmap[b.id]!==b||b.state!=='ok')return;
   if(t.economy==='pasture'&&!G.atPastureWork(c,t))return;
-  G.ensureEconomyBuilding(b);b.tendedDay=G.game.day;
+  const canTend=!(t.economy==='pasture'&&G.pastureTypeOf(b)==='chicken'&&(G.isSick(c)||c.hunger>0));
+  G.ensureEconomyBuilding(b);if(canTend)b.tendedDay=G.game.day;
   if(t.economy==='pasture'){
     if(c.carry||(t.pastureType&&t.pastureType!==G.pastureTypeOf(b)))return;
     const d=G.LIVESTOCK[G.pastureTypeOf(b)];
     // Commit both products together once, then move one bounded batch per trip.
-    if(b.animals>b.animalTarget&&!G.pastureSlaughterReason(b)){
+    if(canTend&&b.animals>b.animalTarget&&!G.pastureSlaughterReason(b)){
       b.animals--;G.recordProduction(b,'meat',d.meat);
       if(!d.leather){c.carry={type:'meat',qty:d.meat,pastureId:b.id};return;} // Existing sheep keep their one-trip 24-meat batch.
       b.pastureProducts.meat+=d.meat;b.pastureProducts.leather+=d.leather;G.recordProduction(b,'leather',d.leather);
     }
-    for(const type of ['meat','leather'])if(b.pastureProducts[type]>0&&G.mineralStorageSpace(type)>0){
+    for(const type of ['meat','leather','eggs'])if(b.pastureProducts[type]>0&&G.mineralStorageSpace(type)>0){
       const qty=Math.min(20,b.pastureProducts[type]);b.pastureProducts[type]-=qty;c.carry={type,qty,pastureId:b.id};return;
     }
     if(G.pastureTypeOf(b)==='sheep'&&b.woolReady>=1&&!G.goalPaused('wool')&&G.mineralStorageSpace('wool')>0){const qty=Math.min(8,Math.floor(b.woolReady));b.woolReady-=qty;c.carry={type:'wool',qty,pastureId:b.id};G.recordProduction(b,'wool',qty);}
@@ -2952,7 +2962,7 @@ G.blacksmithOutput = b => b && b.toolRecipe === 'steel' ? 'steelTools' : 'tools'
 G.blacksmithRecipe = b => G.blacksmithOutput(b) === 'steelTools' ? [...G.PROD.blacksmith.consume,{type:'coal',qty:2}] : G.PROD.blacksmith.consume;
 G.productionOutputsOf = function (b) {
   if(b.type==='farm')return ['food',G.farmOutput(b)];
-  if(b.type==='pasture')return ['food','meat',G.pastureTypeOf(b)==='cattle'?'leather':'wool'];
+  if(b.type==='pasture')return ['food','meat',G.pastureTypeOf(b)==='chicken'?'eggs':G.pastureTypeOf(b)==='cattle'?'leather':'wool'];
   if(b.type==='tailor')return [G.tailorOutput(b)];
   if (b.type === 'mine') return G.mineModeOf(b) === 'legacy' ? ['stone','iron'] : [G.mineModeOf(b)];
   if (b.type === 'blacksmith') return [G.blacksmithOutput(b)];

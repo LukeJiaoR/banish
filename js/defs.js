@@ -81,7 +81,7 @@ G.BDEF = {
     id: 'pasture', name: '牧场', icon: '🐑', w: 6, h: 6,
     cost: { wood: 30 }, buildWork: 50, jobs: 1, passable: true,
     wall: '#938060', wallD: '#725e43', roof: '#b09a73',
-    desc: '先贸易购买至少2头同种牲畜，空场选择羊或牛，禁止混养。1名牧人照料繁殖；羊剪毛、超额产肉，牛超额屠宰产肉和皮革。逐批实际送仓；羊毛与皮革可制暖衣。',
+    desc: '先贸易购买至少2头同种牲畜，空场选择羊、牛或鸡，禁止混养。1名牧人照料繁殖；羊剪毛、牛产肉皮，鸡照料后产鸡蛋、超额屠宰产肉。鸡蛋独立库存和贸易，营养归肉/蛋白组。产物实际送仓；6×6场鸡上限24只为小地图适配。',
   },
   orchard: {
     id: 'orchard', name: '果园', icon: '🍎', w: 6, h: 6,
@@ -296,7 +296,7 @@ G.TREE_COLORS = {
 
 /* Serialized household-supply values, shared by the save validator. */
 G.CLOTHING_KEYS=['clothes','warmCoats'];
-G.SUPPLY={types:['grain','vegetables','meat','firewood','coal',...G.CLOTHING_KEYS],marketCap:240,homeCap:350,vendorCarry:80,homeCarry:40,marketRadius:18,foodDays:4,fuelDays:4,fetchH:.35,unloadH:.25};
+G.SUPPLY={types:['grain','vegetables','meat','eggs','firewood','coal',...G.CLOTHING_KEYS],marketCap:240,homeCap:350,vendorCarry:80,homeCarry:40,marketRadius:18,foodDays:4,fuelDays:4,fetchH:.35,unloadH:.25};
 G.emptySupplyStock=()=>Object.fromEntries(G.SUPPLY.types.map(k=>[k,0]));
 G.supplySum=s=>G.SUPPLY.types.reduce((n,k)=>n+(s?.[k]||0),0);
 G.supplyFood=s=>G.FOOD_KEYS.reduce((n,k)=>n+(s?.[k]||0),0);

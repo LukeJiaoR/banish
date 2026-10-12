@@ -127,7 +127,7 @@ G.serializeGame = function () {
       sowingCommitted: b.sowingCommitted, pestInfestation:b.pestInfestation, lastPestCrop:b.lastPestCrop, earlyHarvestYield:b.earlyHarvestYield, productionPaused: b.productionPaused,
       tradeInventory: b.tradeInventory, tradeTargets: b.tradeTargets, merchant: b.merchant, nextMerchantDay: b.nextMerchantDay, merchantVisits:b.merchantVisits, merchantOrders:b.merchantOrders, autoTrade:b.autoTrade, autoTradeLast:b.autoTradeLast,
       supplyStock:b.supplyStock,lastHeating:b.lastHeating, unheated:b.unheated, graves:b.graves,
-      animalType:b.animalType, pastureProducts:b.pastureProducts, animals: b.animals, animalGrowth: b.animalGrowth, animalTarget: b.animalTarget, woolReady: b.woolReady,
+      animalType:b.animalType, pastureProducts:b.pastureProducts, animals: b.animals, animalGrowth: b.animalGrowth, animalTarget: b.animalTarget, woolReady: b.woolReady, eggProgress:b.eggProgress, eggDay:b.eggDay,
       orchardAge: b.orchardAge, orchardYield: b.orchardYield, orchardSeason: b.orchardSeason, tendedDay: b.tendedDay,
       orchardTrees:b.orchardTrees?b.orchardTrees.map(t=>({...t})):undefined,orchardDay:b.orchardDay,orchardReplant:b.orchardReplant,orchardWarnYear:b.orchardWarnYear,
     })),
@@ -239,9 +239,11 @@ G.prepareSaveData = function (d) {
   const ids = (v, field) => array(v, field).map(x => id(x, field));
   const clone = v => JSON.parse(JSON.stringify(v));
   const supplyStock=(value,field,limit=Infinity)=>{
-    record(value,field);const keys=Object.keys(value),legacy=gd.clothingSupply===undefined&&keys.length===5&&['grain','vegetables','meat','firewood','coal'].every(k=>keys.includes(k));
-    if(!legacy&&(keys.length!==G.SUPPLY.types.length||keys.some(k=>!G.SUPPLY.types.includes(k))))bad(field+'种类');
-    const stock=Object.fromEntries(G.SUPPLY.types.map(k=>[k,number(legacy&&G.CLOTHING_KEYS.includes(k)?0:value[k],field,0)]));
+    record(value,field);const keys=Object.keys(value),oldTypes=['grain','vegetables','meat','firewood','coal'];
+    const legacy=gd.clothingSupply===undefined&&(keys.length===5||keys.length===6&&keys.includes('eggs'))&&oldTypes.every(k=>keys.includes(k));
+    const preEggs=keys.length===G.SUPPLY.types.length-1&&G.SUPPLY.types.filter(k=>k!=='eggs').every(k=>keys.includes(k));
+    if(!legacy&&!preEggs&&(keys.length!==G.SUPPLY.types.length||keys.some(k=>!G.SUPPLY.types.includes(k))))bad(field+'种类');
+    const stock=Object.fromEntries(G.SUPPLY.types.map(k=>[k,number((legacy||preEggs)&&k==='eggs'&&value[k]===undefined||legacy&&G.CLOTHING_KEYS.includes(k)?0:value[k],field,0)]));
     for(const k of G.CLOTHING_KEYS)if(!Number.isSafeInteger(stock[k])||stock[k]>0&&!g.clothingSupply)bad(field+'衣物');
     if(G.supplySum(stock)>limit+1e-6)bad(field+'容量');return stock;
   };
@@ -261,7 +263,7 @@ G.prepareSaveData = function (d) {
   if (hasFoodClasses && Math.abs(G.FOOD_KEYS.reduce((n,k) => n + g.res[k], 0) - g.res.food) > 0.00001) bad('食物分类合计');
   if (!hasFoodClasses) g.res.grain = g.res.food; // legacy stock is preserved once
   if (gd.unlocks !== undefined) {record(gd.unlocks,'产业解锁');if(typeof gd.unlocks.orchard !== 'boolean')bad('果树种子解锁');for(const key of ['cabbage','beans'])if(gd.unlocks[key]!==undefined&&typeof gd.unlocks[key]!=='boolean')bad('农田种子解锁');g.unlocks={orchard:gd.unlocks.orchard,cabbage:gd.unlocks.cabbage===true,beans:gd.unlocks.beans===true};}
-  if (gd.livestock !== undefined) {record(gd.livestock,'待安置牲畜');g.livestock={sheep:integer(gd.livestock.sheep,'待安置羊',0,1000000),cattle:gd.livestock.cattle===undefined?0:integer(gd.livestock.cattle,'待安置牛',0,1000000)};}
+  if (gd.livestock !== undefined) {record(gd.livestock,'待安置牲畜');g.livestock={sheep:integer(gd.livestock.sheep,'待安置羊',0,1000000),cattle:gd.livestock.cattle===undefined?0:integer(gd.livestock.cattle,'待安置牛',0,1000000),chicken:gd.livestock.chicken===undefined?0:integer(gd.livestock.chicken,'待安置鸡',0,1000000)};}
   if(gd.fishingRules!==undefined&&!['classic','shared'].includes(gd.fishingRules))bad('渔场规则');
   g.fishingRules=gd.fishingRules===undefined?'classic':gd.fishingRules;
   if(gd.supplyMode!==undefined&&!['automatic','physical'].includes(gd.supplyMode))bad('生活配送规则');
@@ -327,13 +329,15 @@ G.prepareSaveData = function (d) {
     const startDay=integer(l.startDay,'流水起始日',0,g.day),startHour=number(l.startHour,'流水起始小时',0,G.DAY_H);
     if(startHour>=G.DAY_H)bad('流水起始小时');
     const exactKeys=(obj,keys,field)=>{record(obj,field);if(Object.keys(obj).length!==keys.length||Object.keys(obj).some(k=>!keys.includes(k)))bad(field+'字段');};
-    const stock=(value,field)=>{exactKeys(value,G.LEDGER_RES,field);return Object.fromEntries(G.LEDGER_RES.map(k=>[k,number(value[k],field,0)]));};
+    const foodLedgerKeys=value=>Object.hasOwn(value,'eggs')?G.LEDGER_RES:G.LEDGER_RES.filter(k=>k!=='eggs');
+    const stock=(value,field)=>{record(value,field);exactKeys(value,foodLedgerKeys(value),field);return Object.fromEntries(G.LEDGER_RES.map(k=>[k,k==='eggs'&&value[k]===undefined?0:number(value[k],field,0)]));};
     const bucket=(value,closed)=>{
       const r=record(value,'流水日记录'),day=integer(r.day,'流水日',startDay,g.day),fromHour=number(r.fromHour,'流水日开始小时',0,G.DAY_H);
       if(fromHour>=G.DAY_H||fromHour!==(day===startDay?startHour:0)||r.partial!==(fromHour>0))bad('流水部分日');
       if(closed?(day>=g.day||r.toHour!==G.DAY_H):(day!==g.day||fromHour>g.h))bad('流水日范围');
-      exactKeys(r.flows,G.LEDGER_RES,'流水资源');const flows={};
+      record(r.flows,'流水资源');exactKeys(r.flows,foodLedgerKeys(r.flows),'流水资源');const flows={};
       for(const k of G.LEDGER_RES){
+        if(k==='eggs'&&r.flows[k]===undefined){flows[k]=Object.fromEntries(G.LEDGER_METRICS.map(m=>[m,0]));continue;}
         const old=r.flows[k]?.distributedUsed===undefined&&r.flows[k]?.distributedLost===undefined;
         exactKeys(r.flows[k],old?G.LEDGER_METRICS.filter(m=>!m.startsWith('distributed')):G.LEDGER_METRICS,'流水计量');
         flows[k]=Object.fromEntries(G.LEDGER_METRICS.map(m=>[m,old&&m.startsWith('distributed')?0:number(r.flows[k][m],'流水数量',0)]));
@@ -512,14 +516,17 @@ G.prepareSaveData = function (d) {
         if(typeof r.name!=='string'||r.name.length>80)bad('墓碑姓名');const deathDay=integer(r.deathDay,'安葬日期',0,g.day),expiresDay=integer(r.expiresDay,'墓位到期日',deathDay);
         if(expiresDay!==deathDay+G.MEMORIAL.graveDays)bad('墓位期限');return {slot,name:r.name,deathDay,expiresDay};});
     }else if(bd.graves!==undefined)bad('非墓园墓位');
+    if((bd.eggProgress!==undefined||bd.eggDay!==undefined)&&bd.type!=='pasture')bad('非牧场产蛋记录');
     if(bd.type==='pasture'){
       if(bd.animalType!==undefined&&!G.isLivestockType(bd.animalType))bad('牧场物种');
       b.animalType=bd.animalType||'sheep';const cap=G.LIVESTOCK[b.animalType].cap;
       b.animals=bd.animals===undefined?0:integer(bd.animals,'牲畜数量',0,cap);
       b.animalTarget=bd.animalTarget===undefined?8:integer(bd.animalTarget,'保留牲畜数量',2,cap);
-      b.pastureProducts={meat:0,leather:0};if(bd.pastureProducts!==undefined){record(bd.pastureProducts,'待送牧场产物');for(const type of Object.keys(bd.pastureProducts)){if(!['meat','leather'].includes(type))bad('牧场产物类型');b.pastureProducts[type]=number(bd.pastureProducts[type],'牧场待送'+type,0,G.LIVESTOCK[b.animalType][type]);}}
+      b.pastureProducts={meat:0,leather:0};if(bd.pastureProducts!==undefined){record(bd.pastureProducts,'待送牧场产物');for(const type of Object.keys(bd.pastureProducts)){if(!['meat','leather','eggs'].includes(type))bad('牧场产物类型');b.pastureProducts[type]=number(bd.pastureProducts[type],'牧场待送'+type,0,type==='eggs'?(b.animalType==='chicken'?G.CHICKEN.eggCap:0):G.LIVESTOCK[b.animalType][type]);}}
       b.animalGrowth=bd.animalGrowth===undefined?0:number(bd.animalGrowth,'繁殖进度',0,1);
       b.woolReady=bd.woolReady===undefined?0:number(bd.woolReady,'待剪羊毛',0,b.animalType==='sheep'?48:0);
+      if(b.animalType==='chicken'){b.pastureProducts.eggs=b.pastureProducts.eggs||0;b.eggProgress=bd.eggProgress===undefined?0:number(bd.eggProgress,'鸡蛋未成枚进度',0,1);if(b.eggProgress>=1)bad('鸡蛋未成枚进度');b.eggDay=bd.eggDay===undefined?g.day:integer(bd.eggDay,'鸡蛋结算日',0,g.day);}
+      else if(bd.eggProgress!==undefined||bd.eggDay!==undefined)bad('非鸡牧场产蛋记录');
     }
     if(['orchardTrees','orchardDay','orchardReplant','orchardWarnYear'].some(k=>bd[k]!==undefined)&&bd.type!=='orchard')bad('果园树株字段');
     if(bd.type==='orchard'){
@@ -610,7 +617,7 @@ G.prepareSaveData = function (d) {
       if(cd.carry.fuelInput!==undefined){if(cd.carry.fuelInput!==true||carry.type!=='wood'||!carry.staffingReturn||carry.qty>G.PROD.woodcutter.logsIn||['extra','smithInput','brewIngredient','pastureId','orchardId','firewoodId'].some(k=>cd.carry[k]!==undefined))bad('伐木屋原木货批');carry.fuelInput=true;}
       if(cd.carry.firewoodId!==undefined){if(carry.type!=='firewood'||carry.qty>G.PROD.woodcutter.logsIn*G.PROD.woodcutter.eduFirewoodPerLog||['extra','smithInput','brewIngredient','pastureId','orchardId','fuelInput'].some(k=>cd.carry[k]!==undefined))bad('伐木屋成柴货批');carry.firewoodId=integer(cd.carry.firewoodId,'伐木屋成柴来源',1);}
       if(cd.carry.orchardId!==undefined){if(carry.type!=='vegetables'||cd.carry.extra!==undefined||cd.carry.smithInput!==undefined||cd.carry.brewIngredient!==undefined||cd.carry.pastureId!==undefined||carry.qty>G.ORCHARD.fruit)bad('果园携果类型');carry.orchardId=integer(cd.carry.orchardId,'果园携果来源',1);}
-      if(cd.carry.pastureId!==undefined){if(!['meat','leather','wool'].includes(carry.type)||cd.carry.extra!==undefined)bad('牧场携货类型');carry.pastureId=integer(cd.carry.pastureId,'牧场携货来源',1);}
+      if(cd.carry.pastureId!==undefined){if(!['meat','eggs','leather','wool'].includes(carry.type)||cd.carry.extra!==undefined||(carry.type==='eggs'&&carry.qty>G.CHICKEN.haul))bad('牧场携货类型');carry.pastureId=integer(cd.carry.pastureId,'牧场携货来源',1);}
       if(cd.carry.brewIngredient!==undefined){if(cd.carry.brewIngredient!==true||carry.type!=='grain')bad('酿造原粮标记');carry.brewIngredient=true;}
       if(cd.carry.supplyBatch!==undefined){const batch=record(cd.carry.supplyBatch,'生活配送货批');
         if(g.supplyMode!=='physical'||!carry.staffingReturn||!G.SUPPLY.types.includes(carry.type)||['smithInput','coatInput','tailorId','fuelInput','firewoodId','orchardId','pastureId','brewIngredient'].some(k=>cd.carry[k]!==undefined))bad('生活配送货批类型');
