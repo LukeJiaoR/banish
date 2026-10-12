@@ -89,6 +89,12 @@ G.BDEF = {
     wall: '#8b7958', wallD: '#695936', roof: '#77924d',
     desc: '贸易果树种子永久解锁。9株逐株种植、养护4年，成熟每株秋收20蔬菜。老树12–20岁错峰枯尽，农夫可补种；已有果实实际送仓，空位不再凭空产粮。',
   },
+  chapel: {
+    id:'chapel', name:'礼拜堂', icon:'⛪', w:3, h:3,
+    cost:{wood:50,stone:130,iron:30}, buildWork:150, jobs:1, passable:false,
+    wall:'#a18a68', wallD:'#746248', roof:'#5b626b',
+    desc:'1名健康牧师实际到岗后服务至多200名居民。居民步行到场礼拜2小时，获得6天礼拜记忆，幸福目标+0.5；不耗麦酒。最多8人在途或在场，先保口粮、医疗与课业。',
+  },
   tavern: {
     id: 'tavern', name: '酒馆', icon: '🍺', w: 3, h: 3,
     cost: {wood:52,stone:12,iron:20}, buildWork:90, jobs:1, passable:false,
@@ -193,7 +199,7 @@ G.BDEF = {
 };
 
 /* 工具栏顺序 */
-G.TOOLBAR = ['fell', 'quarry', 'house', 'stonehouse', 'boarding', 'storage', 'mine', 'blacksmith', 'gatherer', 'forester', 'woodcutter', 'dock', 'hunting', 'school', 'farm', 'road', 'demolish'];
+G.TOOLBAR = ['fell', 'quarry', 'house', 'stonehouse', 'boarding', 'storage', 'mine', 'blacksmith', 'gatherer', 'forester', 'woodcutter', 'dock', 'hunting', 'school', 'chapel', 'farm', 'road', 'demolish'];
 
 /* 产出参数（workH: 每次工作小时数；专业岗位按本作真实运输成本校准） */
 G.PROD = {

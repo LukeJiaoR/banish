@@ -49,7 +49,7 @@ G.SPRITE_SIZES = {
     bridges: ['bridge_x', 'bridge_y'],
     buildings: ['house', 'stonehouse', 'well', 'burntruins', 'boarding', 'storage', 'market', 'stockpile', 'mine', 'stonequarry', 'mineralpit', 'gatherer',
       'forester', 'woodcutter', 'dock', 'school', 'townhall', 'blacksmith', 'hunting',
-      'tailor', 'tavern', 'tradingpost', 'pasture', 'orchard', 'herbalist', 'hospital', 'site_2x2', 'site_3x3'],
+      'tailor', 'tavern', 'chapel', 'tradingpost', 'pasture', 'orchard', 'herbalist', 'hospital', 'site_2x2', 'site_3x3'],
     citizens: ['adult_walk_0', 'adult_walk_1', 'adult_walk_2', 'adult_walk_3',
       'adult_work_0', 'adult_work_1',
       'adult_carry_walk_0', 'adult_carry_walk_1', 'adult_carry_walk_2', 'adult_carry_walk_3',
