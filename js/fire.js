@@ -43,9 +43,9 @@ G.advanceHousingFires=function(dtH){for(const b of G.activeHouseFires()){
   for(const target of candidates){if(G.chance(G.FIRE.spreadChance*(target.type==='stonehouse'?.5:1))){G.igniteHouse(target,h.incident);break;}}
  }
 }};
-G.isFireBank=function(x,y){const w=G.world;if(G.tileBlocked(w,x,y))return false;return [[x+1,y],[x-1,y],[x,y+1],[x,y-1]].some(([a,b])=>a>=0&&b>=0&&a<w.N&&b<w.N&&w.water[b*w.N+a]===1);};
+G.isFireBank=function(x,y){const w=G.world;if(!G.surfaceAccess(w,x,y))return false;return [[x+1,y],[x-1,y],[x,y+1],[x,y-1]].some(([a,b])=>a>=0&&b>=0&&a<w.N&&b<w.N&&w.water[b*w.N+a]===1);};
 G.fireWaterSpot=function(c){const w=G.world,targets=[];
- for(const b of w.buildings)if(b.type==='well'&&b.state==='ok')for(let y=b.y-1;y<=b.y+b.h;y++)for(let x=b.x-1;x<=b.x+b.w;x++)if((x<b.x||x>=b.x+b.w||y<b.y||y>=b.y+b.h)&&x>=0&&y>=0&&x<w.N&&y<w.N&&!G.tileBlocked(w,x,y))targets.push({x,y,building:b,state:b.state,waterKind:'well'});
+ for(const b of w.buildings)if(b.type==='well'&&b.state==='ok')for(let y=b.y-1;y<=b.y+b.h;y++)for(let x=b.x-1;x<=b.x+b.w;x++)if((x<b.x||x>=b.x+b.w||y<b.y||y>=b.y+b.h)&&x>=0&&y>=0&&x<w.N&&y<w.N&&G.surfaceAccess(w,x,y))targets.push({x,y,building:b,state:b.state,waterKind:'well'});
  for(let y=0;y<w.N;y++)for(let x=0;x<w.N;x++)if(G.isFireBank(x,y))targets.push({x,y,waterKind:'bank'});
  return targets.length?G.routeSpot(G.findPathToAny(w,c.x,c.y,targets)):null;};
 G.fireSourceCurrent=t=>t?.source?.waterKind==='well'?G.world.bmap[t.source.building?.id]===t.source.building&&t.source.building.state==='ok':t?.source?.waterKind==='bank'&&G.isFireBank(t.source.x,t.source.y);

@@ -271,7 +271,7 @@ G.ui = {
       { id: 'food', name: '食物生产', icon: '🌾', tools: ['gatherer', 'hunting', 'dock', 'farm', 'orchard', 'pasture'] },
       { id: 'industry', name: '资源与加工', icon: '⚒️', tools: ['forester', 'woodcutter', 'stonequarry', 'mine', 'blacksmith', 'tailor', 'tavern'] },
       { id: 'services', name: '城镇服务', icon: '🏘️', tools: ['storage', 'stockpile', 'market', 'well', 'school', 'herbalist', 'hospital', 'chapel', 'tradingpost', 'townhall', 'cemetery'] },
-      { id: 'land', name: '道路与采运', icon: '🛣️', tools: ['road', 'stoneroad', 'bridge', 'fell', 'quarry', 'demolish'] },
+      { id: 'land', name: '道路与采运', icon: '🛣️', tools: ['road', 'stoneroad', 'bridge', 'tunnel', 'fell', 'quarry', 'demolish'] },
     ].map(group => ({ ...group, tools: group.tools.filter(available) })).filter(group => group.tools.length);
     const registered = new Set(this.toolGroups.flatMap(group => group.tools));
     const extra = (G.TOOLBAR || []).filter(t => available(t) && !registered.has(t));
@@ -298,7 +298,7 @@ G.ui = {
     document.getElementById('toolbar-back').addEventListener('click', () => this.backToCategories());
     document.getElementById('toolbar-cancel').addEventListener('click', () => {
       if (G.hasOpenModal && G.hasOpenModal()) return;
-      const selected = G.tool && (G.tool.kind === 'build' ? G.tool.type : G.tool.kind==='road' ? (G.tool.surface==='bridge'?'bridge':G.tool.surface==='stone'?'stoneroad':'road') : G.tool.kind);
+      const selected = G.tool && (G.tool.kind === 'build' ? G.tool.type : G.tool.kind==='road' ? (G.tool.surface==='tunnel'?'tunnel':G.tool.surface==='bridge'?'bridge':G.tool.surface==='stone'?'stoneroad':'road') : G.tool.kind);
       G.setTool(null);
       const button = selected && this.el.toolbar.querySelector(`[data-tool="${selected}"]`);
       if (button && button.focus) button.focus({ preventScroll: true });
@@ -329,8 +329,8 @@ G.ui = {
     };
     const def = G.BDEF[t], action = special[t];
     const name = action ? action.name : def.name, icon = action ? action.icon : def.icon;
-    const cost = action ? action.cost : t === 'pasture' ? '7–20格 · 按面积圈地' : t === 'orchard' ? '4–15格 · 按树列开园' : t === 'cemetery' ? '7–20格 · 按墓位规划' : this.resourceCost(def.cost, true);
-    const tip = action ? action.tip : t === 'cemetery' ? '墓园：每边7–20格，选两个角或拖出矩形；预览实际墓位、石材和工时，确认后实运施工。拆围栏不清除墓碑' : t === 'pasture' ? '牧场：每边7–20格，选两个角或拖出矩形；预览羊、牛、鸡容量和建材用工，确认后清场施工' : t === 'orchard' ? '果园：每边4–15格，选两个角或拖矩形；按东西2格/南北3格树距预览株数、成本与农夫用工，确认后清场施工' : t === 'road' ? '道路：点选或鼠标拖出起终点预览连通路线，确认后铺设；树木需先标记由工人清除' :
+    const cost = action ? action.cost : t === 'tunnel' ? '每格4石 · 3工时' : t === 'pasture' ? '7–20格 · 按面积圈地' : t === 'orchard' ? '4–15格 · 按树列开园' : t === 'cemetery' ? '7–20格 · 按墓位规划' : this.resourceCost(def.cost, true);
+    const tip = action ? action.tip : t === 'tunnel' ? '隧道：选两个已清场陆地洞口，沿一个网格轴穿过连续山体；每格4石、3游戏施工小时（含两端）。只在首选洞口实运材料并施工，完工后按土路速度通行' : t === 'cemetery' ? '墓园：每边7–20格，选两个角或拖出矩形；预览实际墓位、石材和工时，确认后实运施工。拆围栏不清除墓碑' : t === 'pasture' ? '牧场：每边7–20格，选两个角或拖出矩形；预览羊、牛、鸡容量和建材用工，确认后清场施工' : t === 'orchard' ? '果园：每边4–15格，选两个角或拖矩形；按东西2格/南北3格树距预览株数、成本与农夫用工，确认后清场施工' : t === 'road' ? '道路：点选或鼠标拖出起终点预览连通路线，确认后铺设；树木需先标记由工人清除' :
       `${def.name}（${this.resourceCost(def.cost, false)}${def.jobs ? ' · 岗位×' + def.jobs : ''}）— ${def.desc}`;
     const imagePath = icons[t] ? `assets/icons/${icons[t]}.png` : ['tailor', 'tradingpost', 'pasture', 'orchard', 'chapel'].includes(t) ? `assets/buildings/${t}.png` : null;
     const image = imagePath ? `<img class="icimg" src="${imagePath}" alt="" onerror="this.remove()">` : '';
@@ -369,9 +369,9 @@ G.ui = {
     const path = document.getElementById('toolbar-path'), status = document.getElementById('toolbar-state');
     if (path) path.textContent = group ? `建造与管理 / ${group.name}` : '建造与管理';
     if (status) {
-      const t = G.tool && (G.tool.kind === 'build' ? G.tool.type : G.tool.kind==='road' ? (G.tool.surface==='bridge'?'bridge':G.tool.surface==='stone'?'stoneroad':'road') : G.tool.kind);
+      const t = G.tool && (G.tool.kind === 'build' ? G.tool.type : G.tool.kind==='road' ? (G.tool.surface==='tunnel'?'tunnel':G.tool.surface==='bridge'?'bridge':G.tool.surface==='stone'?'stoneroad':'road') : G.tool.kind);
       const names = { fell: '砍伐', quarry: '采石采铁', demolish: '拆除', road: '铺路' };
-      status.textContent = t ? `当前：${names[t] || G.BDEF[t].name} · ${t === 'demolish' ? '点击建筑或道路拆除；已开采的有限矿点须确认永久废坑' : ['fell', 'quarry'].includes(t) ? '框选范围后确认标记' : ['road','stoneroad','bridge'].includes(t) ? '选起终点后预览并确认' : t==='farm'?'选两个角或拖出矩形，再确认开田' : t==='pasture'?'选两个角或拖出矩形，再确认圈地' : t==='orchard'?'选两个角或拖出矩形，再确认开园' : t==='cemetery'?'选两个角或拖出矩形，再确认建园' : '点击地图放置，可连续建造'} · Esc / 右键取消${this.mineralBuildRisk(t) ? '\n' + this.mineralBuildRisk(t) : ''}` :
+      status.textContent = t ? `当前：${names[t] || G.BDEF[t].name} · ${t === 'demolish' ? '点击建筑或道路拆除；已开采的有限矿点须确认永久废坑' : ['fell', 'quarry'].includes(t) ? '框选范围后确认标记' : ['road','stoneroad','bridge','tunnel'].includes(t) ? '选起终点后预览并确认' : t==='farm'?'选两个角或拖出矩形，再确认开田' : t==='pasture'?'选两个角或拖出矩形，再确认圈地' : t==='orchard'?'选两个角或拖出矩形，再确认开园' : t==='cemetery'?'选两个角或拖出矩形，再确认建园' : '点击地图放置，可连续建造'} · Esc / 右键取消${this.mineralBuildRisk(t) ? '\n' + this.mineralBuildRisk(t) : ''}` :
         group ? '未选择工具。点击一项开始；返回分类可切换功能。' : '选择分类，再选择建筑或操作。';
     }
   },
@@ -390,7 +390,7 @@ G.ui = {
       if (btn.dataset.tool && btn.setAttribute) btn.setAttribute('aria-pressed', 'false');
     });
     if (G.tool) {
-      const t = G.tool.kind === 'build' ? G.tool.type : G.tool.kind==='road' ? (G.tool.surface==='bridge'?'bridge':G.tool.surface==='stone'?'stoneroad':'road') : G.tool.kind;
+      const t = G.tool.kind === 'build' ? G.tool.type : G.tool.kind==='road' ? (G.tool.surface==='tunnel'?'tunnel':G.tool.surface==='bridge'?'bridge':G.tool.surface==='stone'?'stoneroad':'road') : G.tool.kind;
       const btn = this.el.toolbar.querySelector(`[data-tool="${t}"]`);
       if (btn) { btn.classList.add('active'); if (btn.setAttribute) btn.setAttribute('aria-pressed', 'true'); }
       const group = this.toolGroups && this.toolGroups.find(item => item.tools.includes(t));
@@ -445,7 +445,7 @@ G.ui = {
     const el = document.getElementById('harvest-range-controls'); if (!el) return;
     const visible = !!G.world && !!G.tool && ['fell', 'quarry'].includes(G.tool.kind);
     if (!visible && el.contains(document.activeElement)) {
-      const tool = G.tool ? (G.tool.kind === 'build' ? G.tool.type : G.tool.kind==='road' ? (G.tool.surface==='bridge'?'bridge':G.tool.surface==='stone'?'stoneroad':'road') : G.tool.kind) : this._harvestRangeTool;
+      const tool = G.tool ? (G.tool.kind === 'build' ? G.tool.type : G.tool.kind==='road' ? (G.tool.surface==='tunnel'?'tunnel':G.tool.surface==='bridge'?'bridge':G.tool.surface==='stone'?'stoneroad':'road') : G.tool.kind) : this._harvestRangeTool;
       const button = tool && this.el.toolbar.querySelector(`[data-tool="${tool}"]`);
       if (button) button.focus({ preventScroll: true });
     }
@@ -560,7 +560,7 @@ G.ui = {
     const text = document.getElementById('pasture-plan-status'), button = document.getElementById('pasture-plan-confirm');
     const visible = !!G.world && !!G.isPasturePlanning && G.isPasturePlanning();
     if (!visible && panel.contains(document.activeElement)) {
-      const selected = G.tool && (G.tool.kind === 'build' ? G.tool.type : G.tool.kind === 'road' ? (G.tool.surface === 'bridge' ? 'bridge' : G.tool.surface === 'stone' ? 'stoneroad' : 'road') : G.tool.kind);
+      const selected = G.tool && (G.tool.kind === 'build' ? G.tool.type : G.tool.kind === 'road' ? (G.tool.surface === 'tunnel' ? 'tunnel' : G.tool.surface === 'bridge' ? 'bridge' : G.tool.surface === 'stone' ? 'stoneroad' : 'road') : G.tool.kind);
       const target = this.el.toolbar?.querySelector(`[data-tool="${selected || 'pasture'}"]`);
       if (target?.focus) target.focus({ preventScroll: true });
     }
@@ -653,7 +653,7 @@ G.ui = {
     const text = document.getElementById('orchard-plan-status'), button = document.getElementById('orchard-plan-confirm');
     const visible = !!G.world && !!G.isOrchardPlanning && G.isOrchardPlanning();
     if (!visible && panel.contains(document.activeElement)) {
-      const selected = G.tool && (G.tool.kind === 'build' ? G.tool.type : G.tool.kind === 'road' ? (G.tool.surface === 'bridge' ? 'bridge' : G.tool.surface === 'stone' ? 'stoneroad' : 'road') : G.tool.kind);
+      const selected = G.tool && (G.tool.kind === 'build' ? G.tool.type : G.tool.kind === 'road' ? (G.tool.surface === 'tunnel' ? 'tunnel' : G.tool.surface === 'bridge' ? 'bridge' : G.tool.surface === 'stone' ? 'stoneroad' : 'road') : G.tool.kind);
       const target = this.el.toolbar?.querySelector(`[data-tool="${selected || 'orchard'}"]`);
       if (target?.focus) target.focus({ preventScroll: true });
     }
@@ -744,7 +744,7 @@ G.ui = {
     const text = document.getElementById('cemetery-plan-status'), button = document.getElementById('cemetery-plan-confirm');
     const visible = !!G.world && !!G.isCemeteryPlanning && G.isCemeteryPlanning();
     if (!visible && panel.contains(document.activeElement)) {
-      const selected = G.tool && (G.tool.kind === 'build' ? G.tool.type : G.tool.kind === 'road' ? (G.tool.surface === 'bridge' ? 'bridge' : G.tool.surface === 'stone' ? 'stoneroad' : 'road') : G.tool.kind);
+      const selected = G.tool && (G.tool.kind === 'build' ? G.tool.type : G.tool.kind === 'road' ? (G.tool.surface === 'tunnel' ? 'tunnel' : G.tool.surface === 'bridge' ? 'bridge' : G.tool.surface === 'stone' ? 'stoneroad' : 'road') : G.tool.kind);
       const target = this.el.toolbar?.querySelector(`[data-tool="${selected || 'cemetery'}"]`);
       if (target?.focus) target.focus({ preventScroll: true });
     }
@@ -768,29 +768,34 @@ G.ui = {
   initRoadControls: function () {
     const confirm = document.getElementById('road-confirm'), cancel = document.getElementById('road-cancel');
     if (!confirm || !cancel) return;
-    let armed = null, keyHeld = false;
+    let armed = null, keyHeld = false, interrupted = false;
     const capture = e => {
       if (e.type === 'mousedown' && armed && armed.source === 'touchstart') return;
+      interrupted = false;
       keyHeld = false;
       armed = confirm._roadIntent ? { ...confirm._roadIntent, source: e.type } : null;
     };
     for (const name of (window.PointerEvent ? ['pointerdown'] : ['mousedown', 'touchstart'])) confirm.addEventListener(name, capture);
     confirm.addEventListener('keydown', e => {
       if (!['Enter', ' '].includes(e.key) || e.repeat) return;
+      interrupted = false;
       keyHeld = true;
       armed = confirm._roadIntent ? { ...confirm._roadIntent, source: 'keyboard' } : null;
     });
     confirm.addEventListener('keyup', e => { if (['Enter', ' '].includes(e.key)) keyHeld = false; });
-    confirm.addEventListener('pointercancel', () => { armed = null; keyHeld = false; });
-    confirm.addEventListener('touchcancel', () => { armed = null; keyHeld = false; });
-    window.addEventListener('blur', () => { armed = null; keyHeld = false; });
+    const interrupt = () => { armed = null; keyHeld = false; interrupted = true; };
+    confirm.addEventListener('pointercancel', interrupt);
+    confirm.addEventListener('touchcancel', interrupt);
+    window.addEventListener('blur', interrupt);
     confirm.addEventListener('click', e => {
       e.preventDefault(); e.stopPropagation();
+      if (interrupted || e.detail > 1) return;
       const intent = armed || confirm._roadIntent;
       if (!keyHeld) armed = null;
       if (!intent) { this.refreshRoadControls(); return; }
       const result = G.confirmRoadPlan(intent);
       if (result.reason) this.toast(result.reason, 'warn');
+      else if (result.tunnel && result.ok) this.toast('隧道工地已确认；材料只送首选洞口并在此施工，完工前山内不可通行', 'good');
       else if (result.bridge && result.ok) this.toast('木桥工地已确认；工人完工前不可通行', 'good');
       else if (result.placed != null) this.toast(`已铺设 ${result.placed} 格${result.surface==='stone'?'石路':'土路'}`, 'good');
       this.refreshRoadControls();
@@ -813,19 +818,19 @@ G.ui = {
     let message = status.reason || '';
     if (status.ok) {
       const r = plan.result;
-      const stone=plan.surface==='stone', bridge=plan.surface==='bridge';
+      const stone=plan.surface==='stone', bridge=plan.surface==='bridge', tunnel=plan.surface==='tunnel';
       const changed=stone?status.materials.stone:r.newTiles;
-      message = bridge ? `木桥 ${r.path.length} 格 · 直线跨水\n桥头 (${plan.start.x},${plan.start.y}) → (${plan.end.x},${plan.end.y})\n材料：木材 ${status.materials.wood} / 石头 ${status.materials.stone} · 建造 ${r.path.length*3} 工时\n确认只建工地；材料从仓实运到岸边，送齐才施工，完工前不可通行` :
+      message = tunnel ? `隧道 ${r.length} 格（含两端） · ${r.axis==='x'?'东西':'南北'}直线穿山\n首选洞口 (${r.start.x},${r.start.y}) → 远端洞口 (${r.end.x},${r.end.y})\n材料：石头 ${status.materials.stone} · 建造 ${r.length*3} 游戏施工小时\n确认只建工地，不预扣或预留材料；材料只实运至首选洞口，并在此施工。原洞口道路仍可走，山内完工前不可通行\n完工后沿隧道轴按土路速度实际步行和搬运；无常驻岗位` : bridge ? `木桥 ${r.path.length} 格 · 直线跨水\n桥头 (${plan.start.x},${plan.start.y}) → (${plan.end.x},${plan.end.y})\n材料：木材 ${status.materials.wood} / 石头 ${status.materials.stone} · 建造 ${r.path.length*3} 工时\n确认只建工地；材料从仓实运到岸边，送齐才施工，完工前不可通行` :
         `路线 ${r.path.length} 格 · ${stone?'新铺/升级':'新铺'} ${changed} · 复用 ${r.path.length-changed} · 转弯 ${r.turns} 次\n${stone?'石路每格1石，合计 '+status.materials.stone+' 石':'土路材料消耗：0'} · 尚需清树 ${status.trees.length} 棵`;
       const missing=Object.entries(status.materials).filter(([k,q])=>G.game.res[k]<q).map(([k,q])=>`${G.RES[k].name}差${Math.ceil(q-G.game.res[k])}`);
       if(missing.length)message+='\n材料不足：'+missing.join(' · ');
       if (plan.message) message += '\n' + plan.message;
     }
-    message += G.tool.surface==='bridge'?'\n点选/拖选两岸，终点吸附较长方向轴；需连续水面和清场桥头。Esc/右键退出。':'\n点选起终点，或鼠标拖出起终点、松开预览；再确认铺路。水面、建筑和矿石需绕行。Esc/右键退出。';
+    message += G.tool.surface==='tunnel'?'\n点选/拖选两个洞口，终点吸附较长方向轴；两端清场陆地、中间连续山体，总长3–'+Math.min(G.world.N,128)+'格。二值山体、单端施工和游戏工时为本作适配。Esc/右键退出。':G.tool.surface==='bridge'?'\n点选/拖选两岸，终点吸附较长方向轴；需连续水面和清场桥头。Esc/右键退出。':'\n点选起终点，或鼠标拖出起终点、松开预览；再确认铺路。水面、建筑和矿石需绕行。Esc/右键退出。';
     if (text.textContent !== message) text.textContent = message;
     const waiting = status.ok && status.trees.length && !status.added.length;
-    button._roadIntent = status.ok ? { plan, mode: status.bridge?'bridge':status.trees.length ? 'clear' : 'pave', trees: status.trees.map(p => p.y * G.world.N + p.x).join(',') } : null;
-    button.textContent = status.ok && status.trees.length ? (waiting ? '等待工人清树' : '确认标记清树') : status.bridge?'确认建桥':'确认铺路';
+    button._roadIntent = status.ok ? { plan, mode: status.tunnel?'tunnel':status.bridge?'bridge':status.trees.length ? 'clear' : 'pave', trees: status.trees.map(p => p.y * G.world.N + p.x).join(',') } : null;
+    button.textContent = status.ok && status.trees.length ? (waiting ? '等待工人清树' : '确认标记清树') : status.tunnel||G.tool.surface==='tunnel'?'确认建隧道':status.bridge?'确认建桥':'确认铺路';
     button.disabled = !status.ok || !!waiting || G.hasOpenModal();
   },
 
@@ -858,7 +863,7 @@ G.ui = {
     if (!visible) {
       // Escape or a tool switch must not leave keyboard focus in a hidden group.
       if (el.contains(document.activeElement)) {
-        const tool = G.tool ? (G.tool.kind === 'build' ? G.tool.type : G.tool.kind==='road' ? (G.tool.surface==='bridge'?'bridge':G.tool.surface==='stone'?'stoneroad':'road') : G.tool.kind) : this._harvestTool;
+        const tool = G.tool ? (G.tool.kind === 'build' ? G.tool.type : G.tool.kind==='road' ? (G.tool.surface==='tunnel'?'tunnel':G.tool.surface==='bridge'?'bridge':G.tool.surface==='stone'?'stoneroad':'road') : G.tool.kind) : this._harvestTool;
         const btn = tool && this.el.toolbar.querySelector(`[data-tool="${tool}"]`);
         if (btn) btn.focus({ preventScroll: true });
       }
@@ -1085,6 +1090,8 @@ G.ui = {
     if (fishing) this.resetFishingConfirmation(fishing);
     const panel = this.el.info.querySelector && this.el.info.querySelector('[data-mineral-removal-panel]');
     if (panel) this.resetMineralRemoval(panel);
+    const tunnel = this.el.info.querySelector?.('[data-tunnel-removal-panel]');
+    if (tunnel) this.resetTunnelRemoval(tunnel);
     for (const kind of ['fire-rules', 'fire-rebuild']) {
       const fire = this.el.info.querySelector && this.el.info.querySelector(`[data-${kind}-panel]`);
       if (fire) this.resetFireAction(fire);
@@ -2721,6 +2728,149 @@ G.ui = {
   mineralEquivalentText: function (summary) {
     return summary.source === 'stonequarry' ? `${summary.stone} 石头` : `${summary.iron} 铁或 ${summary.coal} 煤（共享储量，不能相加）`;
   },
+  tunnelInfoData: function (b) {
+    if (b.type !== 'tunnel' || !G.tunnelSummary) return null;
+    const s = G.tunnelSummary(b);
+    return {
+      route: `隧道 ${s.length} 格（含两端） · ${b.tunnelAxis === 'x' ? '东西' : '南北'}直线；首选洞口 (${s.start.x},${s.start.y}) → 远端洞口 (${s.end.x},${s.end.y})。`,
+      use: b.state === 'site' ? '只在首选洞口接收实运建材并施工；原洞口道路仍可走，山内完工前不可通行。' : '已贯通：只沿隧道轴实际步行和搬运，按土路速度通行；无常驻岗位。',
+      cost: `全长建造计划：石头 ${s.length * 4} · ${s.length * 3} 游戏施工小时。工时、二值山体和单端施工为本作适配。`,
+      traffic: `山内居民 ${s.inside} 人 · 洞内遗留生活物资 ${this.supplyNumber(s.looseGoods)}。`,
+      removal: b.state === 'site' ? '取消工地沿用下方建材退款规则；尚未领出的材料计划不退款。' : '拆除须重新预览并确认；洞内或洞口有人、洞内遗留生活物资、或这是唯一通路时禁止拆除。',
+    };
+  },
+  tunnelInfoMarkup: function (data) {
+    return data ? Object.keys(data).map(key => `<div class="row desc" data-tunnel="${key}">${this.escHtml(data[key])}</div>`).join('') : '';
+  },
+  refreshTunnelInfo: function (b) {
+    const data = this.tunnelInfoData(b), el = this.el.info;
+    if (!data || !el.querySelector?.('[data-tunnel="route"]')) return false;
+    for (const [key, value] of Object.entries(data)) {
+      const node = el.querySelector(`[data-tunnel="${key}"]`);
+      if (node && node.textContent !== value) node.textContent = value;
+    }
+    return true;
+  },
+  tunnelRemovalMarkup: function (b) {
+    if (b.type !== 'tunnel' || b.state !== 'ok') return '';
+    return `<section class="economy-form" data-tunnel-removal-panel aria-label="隧道拆除确认">
+      <div class="hidden" data-tunnel-removal-confirm role="group" aria-label="确认关闭穿山通道">
+        <p class="desc" data-tunnel-removal-quote></p>
+        <div class="economy-actions"><button type="button" id="tunnel-removal-confirm" class="danger" disabled>确认拆除隧道</button><button type="button" id="tunnel-removal-cancel">取消，保留隧道</button></div>
+      </div>
+      <p class="economy-message" data-tunnel-removal-message role="status" aria-live="polite"></p>
+    </section>`;
+  },
+  tunnelRemovalControlValid: function (b, context, node, allowModal) {
+    if (!context) return false;
+    const { world, game, el, panel, type, state } = context;
+    return G.world === world && G.game === game && this.el.info === el && !el.classList.contains('hidden') &&
+      G.sel?.kind === 'b' && G.sel.id === b.id && world.bmap[b.id] === b && b.type === type && b.state === state &&
+      el.querySelector('[data-tunnel-removal-panel]') === panel && (!node || (!node.disabled && panel.querySelector('#' + node.id) === node)) &&
+      (allowModal || !(G.hasOpenModal && G.hasOpenModal()));
+  },
+  resetTunnelRemoval: function (panel, message, restoreFocus) {
+    const box = panel.querySelector('[data-tunnel-removal-confirm]'), confirm = panel.querySelector('#tunnel-removal-confirm');
+    const status = panel.querySelector('[data-tunnel-removal-message]'), el = this.el.info;
+    const hadFocus = box && box.contains && box.contains(document.activeElement);
+    panel._tunnelPending = null;
+    panel._tunnelConfirmation = null;
+    if (box) box.classList.add('hidden');
+    if (confirm) confirm.disabled = true;
+    if (message !== undefined && status) status.textContent = message;
+    const start = el.querySelector && el.querySelector('#info-demolish');
+    if (restoreFocus && hadFocus && start && start.focus) start.focus();
+  },
+  refreshTunnelRemoval: function (b) {
+    const el = this.el.info, panel = el.querySelector && el.querySelector('[data-tunnel-removal-panel]');
+    if (!panel || !panel._tunnelContext) return false;
+    if (!this.tunnelRemovalControlValid(b, panel._tunnelContext, null, true)) { this.resetTunnelRemoval(panel); return false; }
+    if (G.hasOpenModal && G.hasOpenModal()) this.resetTunnelRemoval(panel, '拆除确认已取消，请关闭弹窗后重新查看。');
+    else if (panel._tunnelPending !== null) {
+      const quote = G.tunnelRemovalQuote(b);
+      if (!quote.ok || quote.key !== panel._tunnelPending)
+        this.resetTunnelRemoval(panel, quote.reason || '通路、洞内居民或退款已变化。未拆除，请重新查看最新确认。', true);
+    }
+    return true;
+  },
+  confirmTunnelRemoval: function (b, quote) {
+    const world = G.world, game = G.game;
+    if (!b || b.type !== 'tunnel' || b.state !== 'ok' || !world || world.bmap[b.id] !== b || !quote?.ok ||
+        (G.hasOpenModal && G.hasOpenModal())) return false;
+    const fresh = G.tunnelRemovalQuote(b);
+    if (!fresh.ok || fresh.key !== quote.key) return false;
+    // Both map demolition and building details use the same inline confirmation.
+    G.sel = { kind: 'b', id: b.id };
+    this.showInfo();
+    const el = this.el.info, panel = el.querySelector && el.querySelector('[data-tunnel-removal-panel]');
+    if (G.world !== world || G.game !== game || !panel || !this.tunnelRemovalControlValid(b, panel._tunnelContext)) return false;
+    const current = G.tunnelRemovalQuote(b);
+    if (!current.ok || current.key !== quote.key) return false;
+    panel._tunnelPending = current.key;
+    panel._tunnelConfirmation = {};
+    panel.querySelector('[data-tunnel-removal-quote]').textContent =
+      `拆除 ${current.length} 格隧道：首选洞口 (${current.start.x},${current.start.y}) → 远端洞口 (${current.end.x},${current.end.y})。山内恢复不可通行；原有洞口道路保留。此次返还 ${Object.values(current.refund).some(n => n > 0) ? this.resourceCost(current.refund, false) : '0 材料'}，只退一次。确认时会重新检查，洞内或洞口有人、洞内遗留生活物资或隧道是唯一通路时禁止拆除。`;
+    panel.querySelector('[data-tunnel-removal-confirm]').classList.remove('hidden');
+    panel.querySelector('[data-tunnel-removal-message]').textContent = '尚未拆除或退款。请确认关闭穿山通道，或取消保留隧道。';
+    const confirm = panel.querySelector('#tunnel-removal-confirm');
+    confirm.disabled = false;
+    if (confirm.focus) confirm.focus();
+    return true;
+  },
+  initTunnelRemoval: function (b) {
+    const el = this.el.info, panel = el.querySelector && el.querySelector('[data-tunnel-removal-panel]');
+    if (!panel) return;
+    const context = { world: G.world, game: G.game, el, panel, type: b.type, state: b.state };
+    panel._tunnelContext = context;
+    this.resetTunnelRemoval(panel, '');
+    const confirm = panel.querySelector('#tunnel-removal-confirm'), cancel = panel.querySelector('#tunnel-removal-cancel');
+    let activation = null, interrupted = false;
+    const capture = e => {
+      if (e.type === 'mousedown' && activation?.source === 'touchstart') return;
+      interrupted = false;
+      activation = { key: panel._tunnelPending, confirmation: panel._tunnelConfirmation, source: e.type, used: false };
+    };
+    for (const name of (window.PointerEvent ? ['pointerdown'] : ['mousedown', 'touchstart'])) confirm.addEventListener(name, capture);
+    confirm.addEventListener('keydown', e => {
+      if (!['Enter', ' '].includes(e.key)) return;
+      if (e.repeat) { e.preventDefault(); return; }
+      capture(e);
+    });
+    const interrupt = () => { activation = null; interrupted = true; };
+    panel._tunnelInterrupt = interrupt;
+    for (const name of ['pointercancel', 'touchcancel', 'blur']) confirm.addEventListener(name, interrupt);
+    if (!this._tunnelRemovalBlurBound) {
+      this._tunnelRemovalBlurBound = true;
+      window.addEventListener('blur', () => {
+        const current = this.el.info?.querySelector?.('[data-tunnel-removal-panel]');
+        if (current) { current._tunnelInterrupt?.(); this.resetTunnelRemoval(current, '拆除确认已取消，请重新查看。'); }
+      });
+    }
+    cancel.addEventListener('click', () => {
+      if (!this.tunnelRemovalControlValid(b, context, cancel)) { this.resetTunnelRemoval(panel); return; }
+      interrupt();
+      this.resetTunnelRemoval(panel, '已取消确认，隧道和建材均未改变。', true);
+    });
+    confirm.addEventListener('click', e => {
+      if (!this.tunnelRemovalControlValid(b, context, confirm)) { this.resetTunnelRemoval(panel); return; }
+      if (interrupted || e.detail > 1 || activation?.used || panel._tunnelPending === null) return;
+      if (activation && activation.confirmation !== panel._tunnelConfirmation) return;
+      const key = activation ? activation.key : panel._tunnelPending;
+      if (activation) activation.used = true;
+      this.refreshTunnelRemoval(b);
+      if (panel._tunnelPending !== key) return;
+      this.resetTunnelRemoval(panel);
+      const removed = G.removeBuilding(b, key);
+      if (!removed) {
+        const fresh = G.tunnelRemovalQuote(b);
+        this.resetTunnelRemoval(panel, fresh.reason || '隧道状态已改变，未拆除。请重新查看。', true);
+      } else {
+        this.renderInfo(true);
+        const close = el.querySelector('#info-close');
+        if (!el.classList.contains('hidden') && close && close.focus) close.focus();
+      }
+    });
+  },
   cemeteryRemovalMarkup: function (b) {
     if(b.type!=='cemetery'||b.state!=='ok')return '';
     return `<section class="economy-form" data-cemetery-removal-panel aria-label="墓园拆围栏确认">
@@ -3201,6 +3351,9 @@ G.ui = {
     const mineralPanel = el.querySelector && el.querySelector('[data-mineral-removal-panel]');
     if (mineralPanel && !sameSelection) this.resetMineralRemoval(mineralPanel);
     else if (mineralPanel) this.refreshMineralRemoval(selected);
+    const tunnelPanel = el.querySelector?.('[data-tunnel-removal-panel]');
+    if (tunnelPanel && !sameSelection) this.resetTunnelRemoval(tunnelPanel);
+    else if (tunnelPanel) this.refreshTunnelRemoval(selected);
     const tradePanel = sameSelection && selected.type === 'tradingpost' && el.querySelector && el.querySelector('[data-economy="tradingpost"]');
     const merchantChanged = tradePanel && tradePanel._merchant !== selected.merchant;
     // A new boat gets new callbacks. Keep drafts, but never reuse a previous
@@ -3212,6 +3365,10 @@ G.ui = {
     if (sameSelection && G.sel.kind === 'b' && this._infoBuildState === selected.state) this.refreshWorkforceInfo(selected);
     // The shared read-only activity facts must also bypass every early return.
     if (sameSelection && G.sel.kind === 'b') this.refreshBuildingActivity(selected);
+    if (sameSelection && G.sel.kind === 'b' && selected.type === 'tunnel' && this._infoBuildState === selected.state) {
+      const refreshed = this.refreshTunnelInfo(selected);
+      if (!force && selected.state === 'ok' && refreshed) return;
+    }
     if (!force && sameSelection && G.sel.kind === 'b' && this._infoBuildState === 'site' && selected.state === 'site' && this._infoBuildType === selected.type && this.refreshSiteInfo(selected)) return;
     if (!force && sameSelection && selected.type === 'market' && this._infoBuildState === selected.state && this.refreshMarketSupplyInfo(selected)) return;
     if (!force && sameSelection && G.sel.kind === 'b' && this._infoBuildState === selected.state && this._infoBuildType === selected.type && this.refreshHomeInfo(selected)) return;
@@ -3273,6 +3430,7 @@ G.ui = {
       const farmData = this.farmInfoData(b);
       const schoolData=this.schoolInfoData(b);
       const cemeteryData=b.type==='cemetery'&&b.state==='ok'?this.cemeteryInfoData(b):null;
+      const tunnelData = this.tunnelInfoData(b);
       const pit = b.type === 'mineralpit', remnant=b.type==='graveremnant', mineral = G.mineralSummary && G.mineralSummary(b);
       const fireData = this.homeFireInfoData(b), ruin = !!fireData?.summary.ruin;
       const rebuildData = this.fireRebuildInfoData(b);
@@ -3284,6 +3442,7 @@ G.ui = {
       else if (pit) status = '永久废矿坑：不可复垦、不可建造、不可通行，也不能拆除。';
       else if (fuelData) status = fuelData.status;
       else if (siteData) status = siteData.status;
+      else if (tunnelData) status = '隧道已贯通 · 土路速度 · 无常驻岗位';
       else if (b.type==='hunting') status=G.huntingSummary(b,{reachability:false}).reason;
       else if(cemeteryData)status=cemeteryData.status;
       else if(remnant)status=G.graveRemnantSummary(b).status;
@@ -3356,6 +3515,7 @@ G.ui = {
       if (farmData) extra += this.farmInfoMarkup(farmData);
       if(schoolData)extra+=this.schoolInfoMarkup(b);
       if(cemeteryData)extra+=this.cemeteryInfoMarkup(cemeteryData);
+      if (tunnelData) extra += this.tunnelInfoMarkup(tunnelData);
       if(b.type==='stockpile'&&b.state==='ok')extra+=this.stockpileInfoMarkup(b);
       if (b.state === 'ok') extra += this.economyInfoMarkup(b);
       if (medicalData) extra += this.medicalInfoMarkup(b, medicalData);
@@ -3380,7 +3540,7 @@ G.ui = {
         ${this.buildingActivityMarkup(b)}${workers}${this.workforceInfoMarkup(b, workforceData)}${siteData ? this.siteInfoMarkup(siteData) : ''}${extra}
         <div class="row desc">${def.desc}</div>
         ${pit||remnant ? '' : `<div class="row desc" data-info-refund${fuelData ? ' data-fuel="refund"' : ''}>${ruin ? '清理烧毁废墟退还 0 材料；不能回收原屋材料。' : fireData?.summary.active ? '火灾进行中，暂不能拆除；关闭新增火灾也不会停止当前损伤。' : fuelData ? fuelData.refund : siteData ? siteData.refund : '已开工：拆除退还一半已付建材，已砍树不恢复'}</div>
-        <button id="info-demolish" class="danger"${fireData?.summary.active ? ' disabled' : ''}>${b.state === 'site' ? '取消工地' : ruin ? '清理废墟（无返料）' : b.type==='cemetery'?'拆围栏…':'拆除'}</button>${this.mineralRemovalMarkup(b)}${this.cemeteryRemovalMarkup(b)}`}`;
+        <button id="info-demolish" class="danger"${fireData?.summary.active ? ' disabled' : ''}>${b.state === 'site' ? '取消工地' : ruin ? '清理废墟（无返料）' : b.type==='cemetery'?'拆围栏…':b.type==='tunnel'?'拆除隧道…':'拆除'}</button>${this.mineralRemovalMarkup(b)}${this.cemeteryRemovalMarkup(b)}${this.tunnelRemovalMarkup(b)}`}`;
       if (fuelData) this._fuelInfoState = b.state;
       this._economyInfoState = b.state;
       this._medicalInfoState = b.state;
@@ -3407,6 +3567,7 @@ G.ui = {
       if (chainData) this.initResourceChainInfo(b);
       this.initMineralRemoval(b);
       this.initCemeteryRemoval(b);
+      this.initTunnelRemoval(b);
       if (b.state === 'ok') this.initEconomyInfo(b);
       if (tradeDraft) {
         for (const [id, value] of Object.entries(tradeDraft)) {
@@ -4278,7 +4439,7 @@ G.ui = {
     for(const preset of ['classic','hard'])document.getElementById('new-game-preset-'+preset).setAttribute('aria-pressed',String(s.preset===preset));
     for(const terrain of ['classic','mountain'])document.getElementById('new-game-terrain-'+terrain)?.setAttribute('aria-pressed',String(s.terrain===terrain));
     const terrainName=s.terrain==='mountain'?'山地（开局保障谷地）':'原地形';
-    const terrainNote=s.terrain==='mountain'?'山体不能步行或建造；隧道尚未接入。开局谷地保障住房用地、可达水岸与有限原料，仍需自行采运施工；没有额外库存或住房。山地使用 v2 地形存档，旧版本不能读取。':'原地图生成与开局规则保持。';
+    const terrainNote=s.terrain==='mountain'?'山体通常不能步行或建造；可在道路分类规划直线隧道，实运施工完工后通行。开局谷地保障住房用地、可达水岸与有限原料，仍需自行采运施工；没有额外库存或住房。山地使用 v2 地形存档，旧版本不能读取。':'原地图生成与开局规则保持。';
     const q=G.startConfigQuote({seed:seed.value,preset:s.preset,terrain:s.terrain}),summary=document.getElementById('new-game-summary');
     if(q.ok){const p=q.presetSummary;summary.textContent=`新村预览：种子 ${q.config.seed} · ${p.name} · ${terrainName}\n${p.families}家庭 / ${p.population}人（${p.adults}成人、${p.children}儿童）；仅有储物车，住房需自行建设\n${['wood','stone','iron','food','firewood','tools'].map(k=>`${G.RES[k].name} ${p.resources[k]}`).join(' · ')}\n${p.seedNote}\n${p.equipmentNote} ${p.adaptationNote}\n${terrainNote}`;}
     else summary.textContent=q.reason;
@@ -4295,6 +4456,8 @@ G.ui = {
     if (supplyPanel) { this.resetSupplyConfirmation(supplyPanel, '确认已取消，请关闭弹窗后重新预览。'); this.resetClothingConfirmation(supplyPanel, '确认已取消，请关闭弹窗后重新预览。'); this.resetToolModeConfirmation(supplyPanel, '确认已取消，请关闭弹窗后重新预览。'); }
     const mineralPanel = this.el.info && this.el.info.querySelector && this.el.info.querySelector('[data-mineral-removal-panel]');
     if (mineralPanel) this.resetMineralRemoval(mineralPanel, '拆除确认已取消，请关闭弹窗后重新查看。');
+    const tunnelPanel = this.el.info?.querySelector?.('[data-tunnel-removal-panel]');
+    if (tunnelPanel) this.resetTunnelRemoval(tunnelPanel, '拆除确认已取消，请关闭弹窗后重新查看。');
     const pastureFocus = this.resetPastureConfirmations();
     this._dialogFocus = this._dialogFocus || {};
     this._dialogFocus[id] = pastureFocus || document.activeElement;

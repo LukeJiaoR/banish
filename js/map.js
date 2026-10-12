@@ -256,7 +256,7 @@ G.mountainStartReport = function (w, preset) {
     const i=queue[head],x=i%N,y=Math.floor(i/N);
     for(const[dx,dy]of [[1,0],[0,1],[-1,0],[0,-1]]){
       const nx=x+dx,ny=y+dy,ni=ny*N+nx;
-      if(nx<0||ny<0||nx>=N||ny>=N||seen[ni]||G.tileBlocked(shadow,nx,ny))continue;
+      if(nx<0||ny<0||nx>=N||ny>=N||seen[ni]||!G.walkEdgeAllowed(shadow,x,y,nx,ny))continue;
       seen[ni]=1;distance[ni]=distance[i]+1;queue.push(ni);
     }
   }
@@ -357,7 +357,7 @@ G.reachableMarks = function (w) {
       const nx = x + dx, ny = y + dy;
       if (nx < 0 || ny < 0 || nx >= N || ny >= N) continue;
       const ni = ny * N + nx;
-      if (seen[ni] || G.tileBlocked(w, nx, ny)) continue;
+      if (seen[ni] || !G.walkEdgeAllowed(w,x,y,nx,ny)) continue;
       seen[ni] = 1; queue.push(ni);
     }
   }
@@ -461,7 +461,7 @@ G.areaLand = function (w, x, y, ww, hh) {
 G.tileBlocked = function (w, x, y) {
   if (x < 0 || y < 0 || x >= w.N || y >= w.N) return true;
   const i = y * w.N + x;
-  if (G.isMountain(w, x, y)) return true;
+  if (G.isMountain(w, x, y)) return G.tunnelAt(w,x,y)?.state!=='ok';
   const bridge = G.bridgeAt(w, x, y);
   if (bridge) return bridge.state !== 'ok';
   if (w.water[i] === 1) return true;
@@ -474,7 +474,7 @@ G.tileBlocked = function (w, x, y) {
 };
 G.onRoad = function (w, x, y) {
   if (x < 0 || y < 0 || x >= w.N || y >= w.N) return false;
-  return w.road[y * w.N + x] > 0 || G.bridgeAt(w, x, y)?.state === 'ok';
+  return w.road[y * w.N + x] > 0 || G.bridgeAt(w, x, y)?.state === 'ok' || G.tunnelAt(w,x,y)?.state==='ok';
 };
 
 // All normal road writes go through this helper. Unknown maps keep the
@@ -543,19 +543,20 @@ G.routeSpot = function (route) {
 G.findPathToAny = function (w, x, y, targets) {
   if (!targets.length) return null;
   const sx = Math.round(x), sy = Math.round(y);
-  const path = G.findPath(w, sx, sy, targets[0].x, targets[0].y, targets);
+  const path = G.findPath(w, x, y, targets[0].x, targets[0].y, targets);
   if (!path) return null;
   const end = path.length ? path[path.length-1] : {x:sx,y:sy};
   const target = targets.find(p => p.x === end.x && p.y === end.y);
   if (!target) return null;
-  let eta = 0, px = sx, py = sy;
+  let eta = path[0]?.x===sx&&path[0]?.y===sy ? Math.hypot(x-sx,y-sy)/G.surfaceSpeed(w,sx,sy) : 0, px = sx, py = sy;
   for (const p of path) { eta += G.travelEdgeHours(w,px,py,p.x,p.y); px=p.x; py=p.y; }
   return {target,path,eta,world:w,revision:w.navigationRevision||0,fromX:x,fromY:y};
 };
 
 G.findPath = function (w, sx, sy, tx, ty, destinations = null) {
-  sx |= 0; sy |= 0; tx |= 0; ty |= 0;
-  if(G.isMountain(w,sx,sy))return null;
+  const fromX=sx,fromY=sy;
+  sx = Math.round(sx); sy = Math.round(sy); tx |= 0; ty |= 0;
+  if(G.isMountain(w,sx,sy)&&G.tileBlocked(w,sx,sy))return null;
   let goals = null, bounds = null;
   if (destinations) {
     const valid = destinations.filter(p => Number.isInteger(p.x) && Number.isInteger(p.y) && !G.tileBlocked(w, p.x, p.y));
@@ -611,7 +612,7 @@ G.findPath = function (w, sx, sy, tx, ty, destinations = null) {
     }
     return top;
   };
-  const bridges = (w.buildings||[]).some(b => b.type === 'bridge' && b.state === 'ok');
+  const bridges = (w.buildings||[]).some(b => ['bridge','tunnel'].includes(b.type) && b.state === 'ok');
   const fastest = w.roadCount === 0 && !bridges ? G.TRAVEL_SPEED.field : Math.max(G.TRAVEL_SPEED.stone, G.TRAVEL_SPEED.road, G.TRAVEL_SPEED.field);
   const fieldTail = bridges ? 0 : bounds ? G.destinationFieldTail(w, bounds) : G.roadExitDistance(w, tx, ty);
   const heuristic = bounds
@@ -632,10 +633,7 @@ G.findPath = function (w, sx, sy, tx, ty, destinations = null) {
     for (let d = 0; d < 8; d++) {
       const nx = cx + PF_DIRS[d][0], ny = cy + PF_DIRS[d][1], base = PF_DIRS[d][2];
       if (nx < 0 || ny < 0 || nx >= N || ny >= N) continue;
-      if (G.tileBlocked(w, nx, ny)) continue;
-      if (nx !== cx && ny !== cy) { // 禁止穿角
-        if (G.tileBlocked(w, cx + (nx - cx), cy) || G.tileBlocked(w, cx, cy + (ny - cy))) continue;
-      }
+      if (!G.walkEdgeAllowed(w,cx,cy,nx,ny)) continue;
       const ni = ny * N + nx;
       if (pf.closed[ni] === gen) continue;
       const ng = pf.g[cur] + base * 0.5 * (1 / G.surfaceSpeed(w,cx,cy) + 1 / G.surfaceSpeed(w,nx,ny));
@@ -656,6 +654,10 @@ G.findPath = function (w, sx, sy, tx, ty, destinations = null) {
     cur = pf.from[cur];
   }
   path.reverse();
+  // An interrupted diagonal may end inside the ground mouth's rounded cell.
+  // Reach its center physically before entering the axis; never relax a wall.
+  const first=path[0],entry=first&&G.tunnelInteriorAt(w,first.x,first.y);
+  if(entry&&!G.isMountain(w,sx,sy)&&G.tunnelAt(w,sx,sy)===entry&&(entry.tunnelAxis==='x'?Math.abs(fromY-entry.y)>1e-8:Math.abs(fromX-entry.x)>1e-8))path.unshift({x:sx,y:sy});
   return path;
 };
 G.nearestWalkable = function (w, x, y, r) {
@@ -687,13 +689,14 @@ G.nearestPlantSpot = function (w, cx, cy, r, claimed, reachable) {
 /* 建筑（或工地）旁最省预计时间的真实可达入口。
  * reachable 参数保留兼容旧调用；默认也不返回水面隔离的死口。 */
 G.workSpot = function (w, b, fx, fy, reachable = false) {
+  if(b.type==='tunnel'){const p=G.tunnelEndpoints(b).start;return G.routeSpot(G.findPathToAny(w,fx,fy,[p]));}
   const spots = [];
   for (let j = b.y - 1; j <= b.y + b.h; j++)
     for (let i = b.x - 1; i <= b.x + b.w; i++) {
       const edge = (i < b.x || i >= b.x + b.w || j < b.y || j >= b.y + b.h);
       if (!edge) continue;
       if (i < 0 || j < 0 || i >= w.N || j >= w.N) continue;
-      if (G.tileBlocked(w, i, j)) continue;
+      if (!G.surfaceAccess(w,i,j)) continue;
       spots.push({ x: i, y: j, building: b, state: b.state });
     }
   const route = G.findPathToAny(w, fx, fy, spots);
@@ -751,7 +754,7 @@ G.cemeteryGravePoint=function(b,slot){
 };
 G.cemeteryGraveCell=function(b,slot){const p=G.cemeteryGravePoint(b,slot);return p?{x:Math.floor(p.x),y:Math.floor(p.y)}:null;};
 G.remnantGravePoint=b=>b?.type==='graveremnant'?G.cemeteryGravePoint(b.graveSource,b.grave.slot):null;
-G.buildingDefinition=b=>!b?null:b.type==='farm'?G.farmDefinition(b.farmSize):b.type==='pasture'?G.pastureDefinition(b.pastureSize):b.type==='orchard'?G.orchardDefinition(b.orchardSize):b.type==='cemetery'?G.cemeteryDefinition(b.cemeterySize):G.BDEF[b.type];
+G.buildingDefinition=b=>!b?null:b.type==='tunnel'?G.tunnelDefinition(b.tunnelAxis,b.w+b.h-1):b.type==='farm'?G.farmDefinition(b.farmSize):b.type==='pasture'?G.pastureDefinition(b.pastureSize):b.type==='orchard'?G.orchardDefinition(b.orchardSize):b.type==='cemetery'?G.cemeteryDefinition(b.cemeterySize):G.BDEF[b.type];
 G.canPlace = function (w, type, ox, oy, fieldSize) {
   if(['farm','pasture','orchard','cemetery'].includes(type)&&(!Number.isInteger(ox)||!Number.isInteger(oy)))return {ok:false,reason:(type==='farm'?'农田':type==='orchard'?'果园':type==='cemetery'?'墓园':'牧场')+'坐标须为整数'};
   const def = type==='farm'?G.farmDefinition(fieldSize):type==='pasture'?G.pastureDefinition(fieldSize):type==='orchard'?G.orchardDefinition(fieldSize):type==='cemetery'?G.cemeteryDefinition(fieldSize):G.BDEF[type];
@@ -771,10 +774,10 @@ G.canPlace = function (w, type, ox, oy, fieldSize) {
   // 等距视觉间距：脚印不重叠还不够——新建筑的前墙脚线（南缘）若落在已有建筑的
   // 屋顶投影内，画出来会像“盖在已有建筑上”；反向（新屋顶挡住旧前墙）同理。
   // 屋顶高约 28px ≈ 0.875 格，恰好盖住紧贴北/西侧一格内的墙脚。农田是平的，不参与。
-  if (!['farm', 'pasture', 'orchard', 'cemetery', 'graveremnant', 'mineralpit'].includes(type)) {
+  if (!['farm', 'pasture', 'orchard', 'cemetery', 'graveremnant', 'mineralpit', 'tunnel'].includes(type)) {
     const foot = oy + def.h;
     for (const b of w.buildings) {
-      if (['farm', 'pasture', 'orchard', 'cemetery', 'graveremnant', 'mineralpit'].includes(b.type)) continue;
+      if (['farm', 'pasture', 'orchard', 'cemetery', 'graveremnant', 'mineralpit', 'tunnel'].includes(b.type)) continue;
       if (foot >= b.y && foot < b.y + b.h && ox < b.x + b.w && ox + def.w >= b.x)
         return { ok: false, reason: '与其他建筑贴得太近：会叠在它后面' };
       if (b.y + b.h >= oy && b.y + b.h < oy + def.h && b.x < ox + def.w && b.x + b.w >= ox)
@@ -891,9 +894,10 @@ G.bridgeAt = function(w,x,y) {
   const b=w.bmap[w.bgrid[y*w.N+x]];return b&&b.type==='bridge'?b:null;
 };
 G.surfaceSpeed = function(w,x,y) {
+  if(G.isMountain(w,x,y)&&G.tunnelAt(w,x,y)?.state==='ok')return G.TRAVEL_SPEED.road;
   const road=w.road[y*w.N+x];
   if(road===2)return G.TRAVEL_SPEED.stone;
-  return road || G.bridgeAt(w,x,y)?.state==='ok' ? G.TRAVEL_SPEED.road : G.TRAVEL_SPEED.field;
+  return road || G.bridgeAt(w,x,y)?.state==='ok' || G.tunnelAt(w,x,y)?.state==='ok' ? G.TRAVEL_SPEED.road : G.TRAVEL_SPEED.field;
 };
 G.bridgeEnd = function(start,end) {
   return Math.abs(end.x-start.x)>=Math.abs(end.y-start.y)?{x:end.x,y:start.y}:{x:start.x,y:end.y};
@@ -924,9 +928,9 @@ G.bridgeRemovalStatus = function(w,b) {
   // equals our no-corner-cutting eight-way walk graph's connectivity.
   const seen=new Uint8Array(w.N*w.N),queue=new Int32Array(w.N*w.N),dirs=[[1,0],[-1,0],[0,1],[0,-1]];
   let head=0,tail=0;const first=b.y*w.N+b.x;queue[tail++]=first;seen[first]=1;
-  while(head<tail){const i=queue[head++],x=i%w.N,y=Math.floor(i/w.N);for(const[dx,dy]of dirs){const nx=x+dx,ny=y+dy;if(G.tileBlocked(copy,nx,ny))continue;const ni=ny*w.N+nx;if(!seen[ni]){seen[ni]=1;queue[tail++]=ni;}}}
+  while(head<tail){const i=queue[head++],x=i%w.N,y=Math.floor(i/w.N);for(const[dx,dy]of dirs){const nx=x+dx,ny=y+dy;if(!G.walkEdgeAllowed(copy,x,y,nx,ny))continue;const ni=ny*w.N+nx;if(!seen[ni]){seen[ni]=1;queue[tail++]=ni;}}}
   if(!seen[(b.y+b.h-1)*w.N+b.x+b.w-1])return {ok:false,reason:'这是唯一跨岸通道；请先建成替代桥，避免把居民困在对岸'};
-  for(let y=b.y;y<b.y+b.h;y++)for(let x=b.x;x<b.x+b.w;x++)for(const[dx,dy]of dirs){const nx=x+dx,ny=y+dy;if(!G.tileBlocked(copy,nx,ny)&&!seen[ny*w.N+nx])return {ok:false,reason:'拆桥会断开旁接岛屿或岸边通路；请先建成替代通道'};}
+  for(let y=b.y;y<b.y+b.h;y++)for(let x=b.x;x<b.x+b.w;x++)for(const[dx,dy]of dirs){const nx=x+dx,ny=y+dy;if(G.walkEdgeAllowed(w,x,y,nx,ny)&&!G.tileBlocked(copy,nx,ny)&&!seen[ny*w.N+nx])return {ok:false,reason:'拆桥会断开旁接岛屿或岸边通路；请先建成替代通道'};}
   return {ok:true};
 };
 G.bridgeStartStatus = function(w,p) {
@@ -935,3 +939,45 @@ G.bridgeStartStatus = function(w,p) {
   if(G.isMountain(w,p.x,p.y)||w.water[i]===1||w.rock[i]||w.treeIdx[i]>=0||w.bgrid[i]>=0)return {ok:false,reason:'请选择已清场且无建筑的陆地桥头'};
   return {ok:true,path:[p]};
 };
+
+
+/* Tunnels leave terrain authoritative. Only an open axis edge crosses a
+ * mountain; making an interior tile walkable never permits side/diagonal entry. */
+G.tunnelAt=function(w,x,y){if(x<0||y<0||x>=w.N||y>=w.N)return null;const b=w.bmap[w.bgrid[y*w.N+x]];return b?.type==='tunnel'?b:null;};
+G.tunnelDefinition=function(axis,length){return ['x','y'].includes(axis)&&Number.isInteger(length)&&length>=3&&length<=G.MAP?{...G.BDEF.tunnel,w:axis==='x'?length:1,h:axis==='y'?length:1,cost:{stone:4*length},buildWork:3*length}:null;};
+G.tunnelEndpoints=function(b){const lo={x:b.x,y:b.y},hi={x:b.x+b.w-1,y:b.y+b.h-1};return b.tunnelStart===1?{start:hi,end:lo}:{start:lo,end:hi};};
+G.tunnelInteriorAt=(w,x,y)=>G.isMountain(w,x,y)&&G.tunnelAt(w,x,y)?.state==='ok'?G.tunnelAt(w,x,y):null;
+G.walkEdgeAllowed=function(w,sx,sy,tx,ty){
+ const dx=tx-sx,dy=ty-sy;if(Math.abs(dx)>1||Math.abs(dy)>1||G.tileBlocked(w,tx,ty))return false;
+ if(!dx&&!dy)return true;
+ for(const [x,y,ox,oy] of [[sx,sy,tx,ty],[tx,ty,sx,sy]])if(G.isMountain(w,x,y)){
+  const b=G.tunnelAt(w,x,y);if(!b||b.state!=='ok'||(b.tunnelAxis==='x'?dy!==0:dx!==0)||G.tunnelAt(w,ox,oy)!==b)return false;
+ }
+ if(dx&&dy)return G.walkEdgeAllowed(w,sx,sy,tx,sy)&&G.walkEdgeAllowed(w,sx,sy,sx,ty)&&G.walkEdgeAllowed(w,tx,sy,tx,ty)&&G.walkEdgeAllowed(w,sx,ty,tx,ty);
+ return true;
+};
+G.tunnelSegmentAllowed=function(w,x,y,tx,ty){
+ for(const [px,py]of [[Math.round(x),Math.round(y)],[tx,ty]]){const b=G.tunnelInteriorAt(w,px,py);if(b&&(b.tunnelAxis==='x'?Math.abs(y-b.y)>1e-8||ty!==b.y:Math.abs(x-b.x)>1e-8||tx!==b.x))return false;}
+ return G.walkEdgeAllowed(w,Math.round(x),Math.round(y),tx,ty);
+};
+G.tunnelStartStatus=function(w,p){
+ if(!p||!Number.isInteger(p.x)||!Number.isInteger(p.y)||p.x<0||p.y<0||p.x>=w.N||p.y>=w.N)return {ok:false,reason:'洞口必须在地图内'};
+ const i=p.y*w.N+p.x;if(G.isMountain(w,p.x,p.y)||w.water[i]===1||w.rock[i]||w.treeIdx[i]>=0||w.bgrid[i]>=0)return {ok:false,reason:'首洞口需清场且无建筑的陆地，工人将从这里收料施工'};
+ return {ok:true,path:[p]};
+};
+G.planTunnel=function(w,start,end,options={}){
+ const valid=p=>p&&Number.isInteger(p.x)&&Number.isInteger(p.y)&&p.x>=0&&p.y>=0&&p.x<w.N&&p.y<w.N;
+ if(!valid(start)||!valid(end))return {ok:false,reason:'两个洞口必须在地图内'};
+ if(start.x!==end.x&&start.y!==end.y)return {ok:false,reason:'隧道必须沿水平或竖直网格轴穿山'};
+ const length=Math.abs(end.x-start.x)+Math.abs(end.y-start.y)+1,dx=Math.sign(end.x-start.x),dy=Math.sign(end.y-start.y);
+ if(length<3)return {ok:false,reason:'需要两个陆地洞口和至少一格山体，总长至少3格'};
+ const path=[];for(let n=0;n<length;n++){const p={x:start.x+dx*n,y:start.y+dy*n},i=p.y*w.N+p.x,mouth=n===0||n===length-1;
+  if(mouth?G.isMountain(w,p.x,p.y):!G.isMountain(w,p.x,p.y))return {ok:false,reason:mouth?'两端洞口须在陆地':'洞口间必须是连续山体，不能跨空地、弯折或中途出入口'};
+  if(w.water[i]===1||w.rock[i]||w.treeIdx[i]>=0||(!mouth&&w.road[i]))return {ok:false,reason:'隧道不能穿水、露矿或树木；洞口须先清场'};
+  if(w.bgrid[i]>=0&&w.bgrid[i]!==options.ignoreId)return {ok:false,reason:'隧道或洞口与建筑/工地重叠，不能交叉'};path.push(p);
+ }
+ return {ok:true,path,length,steps:length-1,turns:0,newTiles:length,reusedTiles:0,clearTrees:[],materials:{stone:4*length},axis:dx?'x':'y',start:{...start},end:{...end}};
+};
+
+// A walkable tunnel floor is not a door/shore on the mountain surface.
+G.surfaceAccess=(w,x,y)=>!G.isMountain(w,x,y)&&!G.tileBlocked(w,x,y);
