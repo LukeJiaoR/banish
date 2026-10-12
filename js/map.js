@@ -583,11 +583,31 @@ G.orchardLayout=function(b){
   return {columns,rows,count:columns*rows,legacy:false};
 };
 G.orchardTreeCount=b=>G.orchardLayout(b)?.count||0;
-G.buildingDefinition=b=>!b?null:b.type==='farm'?G.farmDefinition(b.farmSize):b.type==='pasture'?G.pastureDefinition(b.pastureSize):b.type==='orchard'?G.orchardDefinition(b.orchardSize):G.BDEF[b.type];
+/* The published cemetery table has unnamed axes. East-west width and these
+ * unique cell/sprite coordinates are this game's explicit map adaptation. */
+G.cemeteryDefinition=function(size){
+  const d=G.BDEF.cemetery;if(size===undefined)return d;
+  if(!Array.isArray(size)||size.length!==2||![size[0],size[1]].every(n=>Number.isInteger(n)&&n>=7&&n<=20))return null;
+  const [w,h]=size,perimeter=2*(w+h)-4;
+  return {...d,w,h,cost:{stone:perimeter},buildWork:perimeter,jobs:0};
+};
+G.cemeteryCapacity=function(b){
+  if(b?.cemeterySize===undefined)return 8;
+  const d=G.cemeteryDefinition(b.cemeterySize);return d?(d.w-4)*Math.floor((d.h-1)/2):0;
+};
+G.cemeteryGravePoint=function(b,slot){
+  if(!Number.isInteger(slot)||slot<0||slot>=G.cemeteryCapacity(b))return null;
+  if(b.cemeterySize===undefined)return {x:b.x+.85+(slot%2)*1.7,y:b.y+.5+Math.floor(slot/2)*.85};
+  const columns=b.cemeterySize[0]-4;
+  return {x:b.x+2.5+slot%columns,y:b.y+1.5+2*Math.floor(slot/columns)};
+};
+G.cemeteryGraveCell=function(b,slot){const p=G.cemeteryGravePoint(b,slot);return p?{x:Math.floor(p.x),y:Math.floor(p.y)}:null;};
+G.remnantGravePoint=b=>b?.type==='graveremnant'?G.cemeteryGravePoint(b.graveSource,b.grave.slot):null;
+G.buildingDefinition=b=>!b?null:b.type==='farm'?G.farmDefinition(b.farmSize):b.type==='pasture'?G.pastureDefinition(b.pastureSize):b.type==='orchard'?G.orchardDefinition(b.orchardSize):b.type==='cemetery'?G.cemeteryDefinition(b.cemeterySize):G.BDEF[b.type];
 G.canPlace = function (w, type, ox, oy, fieldSize) {
-  if(['farm','pasture','orchard'].includes(type)&&(!Number.isInteger(ox)||!Number.isInteger(oy)))return {ok:false,reason:(type==='farm'?'农田':type==='orchard'?'果园':'牧场')+'坐标须为整数'};
-  const def = type==='farm'?G.farmDefinition(fieldSize):type==='pasture'?G.pastureDefinition(fieldSize):type==='orchard'?G.orchardDefinition(fieldSize):G.BDEF[type];
-  if(!def||(fieldSize!==undefined&&!['farm','pasture','orchard'].includes(type)))return {ok:false,reason:type==='pasture'?'牧场每边须为7至20格的整数':(type==='orchard'?'果园':'农田')+'每边须为4至15格的整数'};
+  if(['farm','pasture','orchard','cemetery'].includes(type)&&(!Number.isInteger(ox)||!Number.isInteger(oy)))return {ok:false,reason:(type==='farm'?'农田':type==='orchard'?'果园':type==='cemetery'?'墓园':'牧场')+'坐标须为整数'};
+  const def = type==='farm'?G.farmDefinition(fieldSize):type==='pasture'?G.pastureDefinition(fieldSize):type==='orchard'?G.orchardDefinition(fieldSize):type==='cemetery'?G.cemeteryDefinition(fieldSize):G.BDEF[type];
+  if(!def||(fieldSize!==undefined&&!['farm','pasture','orchard','cemetery'].includes(type)))return {ok:false,reason:type==='cemetery'?'墓园每边须为7至20格的整数':type==='pasture'?'牧场每边须为7至20格的整数':(type==='orchard'?'果园':'农田')+'每边须为4至15格的整数'};
   if(def.unbuildable)return {ok:false,reason:def.name+'不能主动建造或重新开发'};
   const N = w.N;
   if (ox < 0 || oy < 0 || ox + def.w > N || oy + def.h > N) return { ok: false, reason: '超出地图范围' };
@@ -602,10 +622,10 @@ G.canPlace = function (w, type, ox, oy, fieldSize) {
   // 等距视觉间距：脚印不重叠还不够——新建筑的前墙脚线（南缘）若落在已有建筑的
   // 屋顶投影内，画出来会像“盖在已有建筑上”；反向（新屋顶挡住旧前墙）同理。
   // 屋顶高约 28px ≈ 0.875 格，恰好盖住紧贴北/西侧一格内的墙脚。农田是平的，不参与。
-  if (!['farm', 'pasture', 'orchard', 'mineralpit'].includes(type)) {
+  if (!['farm', 'pasture', 'orchard', 'cemetery', 'graveremnant', 'mineralpit'].includes(type)) {
     const foot = oy + def.h;
     for (const b of w.buildings) {
-      if (['farm', 'pasture', 'orchard', 'mineralpit'].includes(b.type)) continue;
+      if (['farm', 'pasture', 'orchard', 'cemetery', 'graveremnant', 'mineralpit'].includes(b.type)) continue;
       if (foot >= b.y && foot < b.y + b.h && ox < b.x + b.w && ox + def.w >= b.x)
         return { ok: false, reason: '与其他建筑贴得太近：会叠在它后面' };
       if (b.y + b.h >= oy && b.y + b.h < oy + def.h && b.x < ox + def.w && b.x + b.w >= ox)

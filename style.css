@@ -501,10 +501,10 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 @media (max-width: 600px) { .house-upgrade-details button { min-height: 44px; } }
 
 /* Farm rectangle preview shares the bounded placement panel, not a new menu. */
-#farm-plan-controls, #pasture-plan-controls, #orchard-plan-controls { background: rgba(24,18,10,.94); border:1px solid #c1b371; border-radius:8px; padding:8px 10px; font-size:12px; line-height:1.5; }
-#farm-plan-status, #pasture-plan-status, #orchard-plan-status { white-space:pre-line; margin:0 0 8px; }
-#farm-plan-controls button, #pasture-plan-controls button, #orchard-plan-controls button { min-height:44px; min-width:100px; margin:0 6px 4px 0; }
-@media (max-width:600px), (max-height:620px) { #hud:has(#farm-plan-controls:not(.hidden)) #survival-guide, #hud:has(#pasture-plan-controls:not(.hidden)) #survival-guide, #hud:has(#orchard-plan-controls:not(.hidden)) #survival-guide { display:none; } }
+#farm-plan-controls, #pasture-plan-controls, #orchard-plan-controls, #cemetery-plan-controls { background: rgba(24,18,10,.94); border:1px solid #c1b371; border-radius:8px; padding:8px 10px; font-size:12px; line-height:1.5; }
+#farm-plan-status, #pasture-plan-status, #orchard-plan-status, #cemetery-plan-status { white-space:pre-line; margin:0 0 8px; }
+#farm-plan-controls button, #pasture-plan-controls button, #orchard-plan-controls button, #cemetery-plan-controls button { min-height:44px; min-width:100px; margin:0 6px 4px 0; }
+@media (max-width:600px), (max-height:620px) { #hud:has(#farm-plan-controls:not(.hidden)) #survival-guide, #hud:has(#pasture-plan-controls:not(.hidden)) #survival-guide, #hud:has(#orchard-plan-controls:not(.hidden)) #survival-guide, #hud:has(#cemetery-plan-controls:not(.hidden)) #survival-guide { display:none; } }
 
 /* Start choices use the established warm dialog and original resource icons. */
 #new-game-settings { z-index: 11; }

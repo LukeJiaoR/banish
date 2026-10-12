@@ -228,6 +228,7 @@ G.ui = {
     this.initFarmPlanControls();
     this.initPasturePlanControls();
     this.initOrchardPlanControls();
+    this.initCemeteryPlanControls();
     this.initNewGameSettings();
 
     // 顶栏按钮
@@ -323,8 +324,8 @@ G.ui = {
     };
     const def = G.BDEF[t], action = special[t];
     const name = action ? action.name : def.name, icon = action ? action.icon : def.icon;
-    const cost = action ? action.cost : t === 'pasture' ? '7–20格 · 按面积圈地' : t === 'orchard' ? '4–15格 · 按树列开园' : this.resourceCost(def.cost, true);
-    const tip = action ? action.tip : t === 'pasture' ? '牧场：每边7–20格，选两个角或拖出矩形；预览羊、牛、鸡容量和建材用工，确认后清场施工' : t === 'orchard' ? '果园：每边4–15格，选两个角或拖矩形；按东西2格/南北3格树距预览株数、成本与农夫用工，确认后清场施工' : t === 'road' ? '道路：点选或鼠标拖出起终点预览连通路线，确认后铺设；树木需先标记由工人清除' :
+    const cost = action ? action.cost : t === 'pasture' ? '7–20格 · 按面积圈地' : t === 'orchard' ? '4–15格 · 按树列开园' : t === 'cemetery' ? '7–20格 · 按墓位规划' : this.resourceCost(def.cost, true);
+    const tip = action ? action.tip : t === 'cemetery' ? '墓园：每边7–20格，选两个角或拖出矩形；预览实际墓位、石材和工时，确认后实运施工。拆围栏不清除墓碑' : t === 'pasture' ? '牧场：每边7–20格，选两个角或拖出矩形；预览羊、牛、鸡容量和建材用工，确认后清场施工' : t === 'orchard' ? '果园：每边4–15格，选两个角或拖矩形；按东西2格/南北3格树距预览株数、成本与农夫用工，确认后清场施工' : t === 'road' ? '道路：点选或鼠标拖出起终点预览连通路线，确认后铺设；树木需先标记由工人清除' :
       `${def.name}（${this.resourceCost(def.cost, false)}${def.jobs ? ' · 岗位×' + def.jobs : ''}）— ${def.desc}`;
     const imagePath = icons[t] ? `assets/icons/${icons[t]}.png` : ['tailor', 'tradingpost', 'pasture', 'orchard', 'chapel'].includes(t) ? `assets/buildings/${t}.png` : null;
     const image = imagePath ? `<img class="icimg" src="${imagePath}" alt="" onerror="this.remove()">` : '';
@@ -365,7 +366,7 @@ G.ui = {
     if (status) {
       const t = G.tool && (G.tool.kind === 'build' ? G.tool.type : G.tool.kind==='road' ? (G.tool.surface==='bridge'?'bridge':G.tool.surface==='stone'?'stoneroad':'road') : G.tool.kind);
       const names = { fell: '砍伐', quarry: '采石采铁', demolish: '拆除', road: '铺路' };
-      status.textContent = t ? `当前：${names[t] || G.BDEF[t].name} · ${t === 'demolish' ? '点击建筑或道路拆除；已开采的有限矿点须确认永久废坑' : ['fell', 'quarry'].includes(t) ? '框选范围后确认标记' : ['road','stoneroad','bridge'].includes(t) ? '选起终点后预览并确认' : t==='farm'?'选两个角或拖出矩形，再确认开田' : t==='pasture'?'选两个角或拖出矩形，再确认圈地' : t==='orchard'?'选两个角或拖出矩形，再确认开园' : '点击地图放置，可连续建造'} · Esc / 右键取消${this.mineralBuildRisk(t) ? '\n' + this.mineralBuildRisk(t) : ''}` :
+      status.textContent = t ? `当前：${names[t] || G.BDEF[t].name} · ${t === 'demolish' ? '点击建筑或道路拆除；已开采的有限矿点须确认永久废坑' : ['fell', 'quarry'].includes(t) ? '框选范围后确认标记' : ['road','stoneroad','bridge'].includes(t) ? '选起终点后预览并确认' : t==='farm'?'选两个角或拖出矩形，再确认开田' : t==='pasture'?'选两个角或拖出矩形，再确认圈地' : t==='orchard'?'选两个角或拖出矩形，再确认开园' : t==='cemetery'?'选两个角或拖出矩形，再确认建园' : '点击地图放置，可连续建造'} · Esc / 右键取消${this.mineralBuildRisk(t) ? '\n' + this.mineralBuildRisk(t) : ''}` :
         group ? '未选择工具。点击一项开始；返回分类可切换功能。' : '选择分类，再选择建筑或操作。';
     }
   },
@@ -397,6 +398,7 @@ G.ui = {
     this.refreshFarmPlanControls();
     this.refreshPasturePlanControls();
     this.refreshOrchardPlanControls();
+    this.refreshCemeteryPlanControls();
   },
 
   initHarvestRangeControls: function () {
@@ -664,6 +666,97 @@ G.ui = {
     lines.push('鼠标拖矩形或点两个角；手机点两个角。每边4–15格，确认创建工地，不预扣/预留材料；到仓领取时扣除，送齐才施工。重选不撤销已确认工地；Esc / 右键退出。');
     const message = lines.join('\n'); if (text.textContent !== message) text.textContent = message;
     button._orchardIntent = s.ok ? { plan: s.plan, signature: s.signature, ...panel._orchardContext } : null;
+    button.disabled = !s.ok || G.hasOpenModal();
+  },
+
+  initCemeteryPlanControls: function () {
+    const panel = document.getElementById('cemetery-plan-controls');
+    const confirm = document.getElementById('cemetery-plan-confirm'), cancel = document.getElementById('cemetery-plan-cancel');
+    if (!panel || !confirm || !cancel || panel._cemeteryBound) return;
+    panel._cemeteryBound = true;
+    let activation = null, held = false, interrupted = false;
+    const valid = intent => !!intent && G.world === intent.world && G.game === intent.game && G.tool === intent.tool &&
+      G.cemeteryGestureVersion === intent.generation && G.isCemeteryPlanning() && !G.hasOpenModal() &&
+      document.getElementById('cemetery-plan-controls') === panel && !panel.classList.contains('hidden') &&
+      document.getElementById('cemetery-plan-confirm') === confirm && document.getElementById('cemetery-plan-cancel') === cancel &&
+      panel.contains(confirm) && panel.contains(cancel);
+    const capture = e => {
+      if (e.type === 'mousedown' && activation?.source === 'touchstart') return;
+      held = false; interrupted = false;
+      activation = { intent: confirm._cemeteryIntent, source: e.type, used: false };
+    };
+    for (const name of (window.PointerEvent ? ['pointerdown'] : ['mousedown', 'touchstart'])) confirm.addEventListener(name, capture);
+    confirm.addEventListener('keydown', e => {
+      if (!['Enter', ' '].includes(e.key)) return;
+      if (e.repeat || held) { e.preventDefault(); return; }
+      held = true; interrupted = false;
+      activation = { intent: confirm._cemeteryIntent, source: 'keyboard', used: false };
+    });
+    confirm.addEventListener('keyup', e => { if (['Enter', ' '].includes(e.key)) held = false; });
+    const interrupt = () => { activation = null; held = false; interrupted = true; };
+    for (const name of ['pointercancel', 'touchcancel', 'blur']) confirm.addEventListener(name, interrupt);
+    window.addEventListener('blur', interrupt);
+    confirm.addEventListener('click', e => {
+      e.preventDefault(); e.stopPropagation();
+      if (interrupted || e.detail > 1 || activation?.used) return;
+      const intent = activation ? activation.intent : confirm._cemeteryIntent;
+      if (activation) activation.used = true;
+      if (!valid(intent) || confirm.disabled) return;
+      const result = G.confirmCemeteryPlan({ plan: intent.plan, signature: intent.signature });
+      if (result.ok) this.toast(`墓园 ${result.b.w}×${result.b.h} 已规划；石材实运到场并施工完毕后才能安葬`, 'good');
+      else if (result.reason) this.toast(result.reason, 'warn');
+      this.refreshCemeteryPlanControls();
+    });
+    let cancelActivation = null, cancelHeld = false, cancelInterrupted = false;
+    const captureCancel = e => {
+      if (e.type === 'mousedown' && cancelActivation?.source === 'touchstart') return;
+      cancelHeld = false; cancelInterrupted = false;
+      cancelActivation = { context: panel._cemeteryContext, plan: G.cemeteryPlan, source: e.type, used: false };
+    };
+    for (const name of (window.PointerEvent ? ['pointerdown'] : ['mousedown', 'touchstart'])) cancel.addEventListener(name, captureCancel);
+    cancel.addEventListener('keydown', e => {
+      if (!['Enter', ' '].includes(e.key)) return;
+      if (e.repeat || cancelHeld) { e.preventDefault(); return; }
+      captureCancel(e); cancelHeld = true;
+    });
+    cancel.addEventListener('keyup', e => { if (['Enter', ' '].includes(e.key)) cancelHeld = false; });
+    const interruptCancel = () => { cancelActivation = null; cancelHeld = false; cancelInterrupted = true; };
+    for (const name of ['pointercancel', 'touchcancel', 'blur']) cancel.addEventListener(name, interruptCancel);
+    window.addEventListener('blur', interruptCancel);
+    cancel.addEventListener('click', e => {
+      e.preventDefault(); e.stopPropagation();
+      if (cancelInterrupted || e.detail > 1 || cancelActivation?.used) return;
+      const context = cancelActivation ? cancelActivation.context : panel._cemeteryContext;
+      if (cancelActivation) { cancelActivation.used = true; if (cancelActivation.plan !== G.cemeteryPlan) return; }
+      if (!valid(context)) return;
+      interrupt(); G.cancelCemeteryPlan(); this.refreshCemeteryPlanControls();
+      const button = this.el.toolbar?.querySelector('[data-tool="cemetery"]');
+      if (button?.focus) button.focus({ preventScroll: true });
+    });
+  },
+  refreshCemeteryPlanControls: function () {
+    const panel = document.getElementById('cemetery-plan-controls'); if (!panel) return;
+    const text = document.getElementById('cemetery-plan-status'), button = document.getElementById('cemetery-plan-confirm');
+    const visible = !!G.world && !!G.isCemeteryPlanning && G.isCemeteryPlanning();
+    if (!visible && panel.contains(document.activeElement)) {
+      const selected = G.tool && (G.tool.kind === 'build' ? G.tool.type : G.tool.kind === 'road' ? (G.tool.surface === 'bridge' ? 'bridge' : G.tool.surface === 'stone' ? 'stoneroad' : 'road') : G.tool.kind);
+      const target = this.el.toolbar?.querySelector(`[data-tool="${selected || 'cemetery'}"]`);
+      if (target?.focus) target.focus({ preventScroll: true });
+    }
+    panel.classList.toggle('hidden', !visible);
+    panel._cemeteryContext = visible ? { world: G.world, game: G.game, tool: G.tool, generation: G.cemeteryGestureVersion } : null;
+    if (!visible) { if (button) { button._cemeteryIntent = null; button.disabled = true; } return; }
+    if (!text || !button) return;
+    const s = G.cemeteryPlanStatus(), lines = [];
+    if (s.size) lines.push(`墓园 ${s.size[0]}×${s.size[1]} · ${s.area ?? s.size[0] * s.size[1]}格`);
+    if (Number.isFinite(s.capacity)) lines.push(`实际墓位 ${s.capacity} 个；本作横边减4列、纵边每2格一行，换向可能改变容量，位置见地图预览。`);
+    if (s.cost && Number.isFinite(s.work)) lines.push(`建材 ${this.resourceCost(s.cost, false)} · 施工 ${s.work} 工时（本作适配）；先清 ${s.trees || 0} 棵树，工人实际砍伐搬木后施工`);
+    lines.push('无常驻岗位；完工后死亡时仍检查实际可达空墓位。墓期192日是本作适配，不能拆建刷新。');
+    if (s.reason) lines.push(s.reason);
+    lines.push('石材和劳动按围长2×(横边+纵边)−4，来自Wiki链接表；无木材要求。具体墓碑位置与工时尺度为本作适配。旧4×4园保留8墓位、旧成本和原到期日。');
+    lines.push('鼠标拖矩形或点两个角；手机点两个角。每边7–20格，确认创建工地，不预扣/预留材料；到仓领取时扣除，送齐才施工。重选不撤销已确认工地；Esc / 右键退出。');
+    const message = lines.join('\n'); if (text.textContent !== message) text.textContent = message;
+    button._cemeteryIntent = s.ok ? { plan: s.plan, signature: s.signature, ...panel._cemeteryContext } : null;
     button.disabled = !s.ok || G.hasOpenModal();
   },
 
@@ -950,6 +1043,7 @@ G.ui = {
     if(this.refreshFarmPlanControls)this.refreshFarmPlanControls();
     if(this.refreshPasturePlanControls)this.refreshPasturePlanControls();
     if(this.refreshOrchardPlanControls)this.refreshOrchardPlanControls();
+    if(this.refreshCemeteryPlanControls)this.refreshCemeteryPlanControls();
     if (this.refreshHarvestRangeControls) this.refreshHarvestRangeControls(false);
     if (this.refreshHarvestControls) this.refreshHarvestControls();
     const el = this.el.placement;
@@ -1901,11 +1995,25 @@ G.ui = {
   },
   stockpileInfoMarkup: function(b) {const d=this.stockpileInfoData(b);return Object.keys(d).map(k=>'<div class="row desc" data-stockpile="'+k+'">'+this.escHtml(d[k])+'</div>').join('');},
   refreshStockpileInfo: function(b) {const d=this.stockpileInfoData(b);for(const k of Object.keys(d)){const n=this.el.info.querySelector('[data-stockpile="'+k+'"]');if(n)n.textContent=d[k];}},
+  graveRemnantInfoData: function(b) {
+    const s=G.graveRemnantSummary(b);if(!s)return null;
+    return {status:s.status,name:`墓碑：${s.name}`,identity:`原墓园 ${s.sourceId} · 墓位 ${s.slot+1}`,
+      expiry:`安葬日 ${s.deathDay} · 原到期日 ${s.expiresDay} · 剩余 ${s.daysLeft} 天`,
+      occupancy:'仅此1格仍被墓位占用，不能新建建筑或道路；仍可步行，原道路不被抹除。自然到期后释放。不可再次安葬、拆除或退款。'};
+  },
+  graveRemnantInfoMarkup: function(b) {
+    const d=this.graveRemnantInfoData(b);return d?`<section data-grave-remnant>${Object.keys(d).map(k=>`<div class="row desc" data-grave="${k}">${this.escHtml(d[k])}</div>`).join('')}</section>`:'';
+  },
+  refreshGraveRemnantInfo: function(b) {
+    const d=this.graveRemnantInfoData(b);if(!d)return;
+    for(const k of Object.keys(d)){const n=this.el.info.querySelector(`[data-grave="${k}"]`);if(n&&n.textContent!==d[k])n.textContent=d[k];}
+  },
   cemeteryInfoData: function(b) {
     const s=G.cemeterySummary(b);if(!s)return null;
     return {status:s.status,capacity:`墓位：${s.used} / ${s.capacity} · 空余 ${s.free}`,expiry:s.nextDays===null?'暂无墓位占用':`最早约 ${s.nextDays} 天后释放墓位`,
       records:s.graves.length?s.graves.map(r=>`${r.name}（余 ${r.daysLeft} 天）`).join('、'):'墓位空置，建成不会追溯减免此前的哀伤',
-      removal:s.canRemove?'空墓园可正常拆除，退还一半已付建材':'仍有未到期墓位，禁止拆除；不能拆建刷新容量'};
+      layout:`占地 ${b.w}×${b.h} · ${b.cemeterySize?'按实际槽位规划':'旧园保留8墓位与原成本'}；墓期192日为本作适配`,
+      removal:'拆围栏前先预览并确认：已有墓碑保留原到期日，所占格不可建造/铺路，仍可步行；其余土地释放。不能拆建刷新容量。'};
   },
   cemeteryInfoMarkup: function(data) {
     return `<section class="cemetery-info">${Object.keys(data).filter(k=>k!=='status').map(k=>`<div class="row desc" data-cemetery="${k}">${this.escHtml(data[k])}</div>`).join('')}</section>`;
@@ -1913,6 +2021,7 @@ G.ui = {
   refreshCemeteryInfo: function(b) {
     const data=this.cemeteryInfoData(b);if(!data||!this.el.info.querySelector)return;
     for(const k of Object.keys(data)){const node=this.el.info.querySelector(`[data-cemetery="${k}"]`);if(node&&node.textContent!==data[k])node.textContent=data[k];}
+    this.refreshCemeteryRemoval(b);
   },
   townLedgerInfoData: function () {
     // A summary is a read-only view. Never initialize/backfill a ledger from UI
@@ -2607,6 +2716,100 @@ G.ui = {
   mineralEquivalentText: function (summary) {
     return summary.source === 'stonequarry' ? `${summary.stone} 石头` : `${summary.iron} 铁或 ${summary.coal} 煤（共享储量，不能相加）`;
   },
+  cemeteryRemovalMarkup: function (b) {
+    if(b.type!=='cemetery'||b.state!=='ok')return '';
+    return `<section class="economy-form" data-cemetery-removal-panel aria-label="墓园拆围栏确认">
+      <div class="hidden" data-cemetery-removal-confirm role="group" aria-label="确认拆围栏并保留墓位">
+        <p class="desc" data-cemetery-removal-quote></p>
+        <div class="economy-actions"><button type="button" id="cemetery-removal-confirm" class="danger" disabled>确认拆围栏，保留墓位</button><button type="button" id="cemetery-removal-cancel">取消，保留墓园</button></div>
+      </div>
+      <p class="economy-message" data-cemetery-removal-message role="status" aria-live="polite"></p>
+    </section>`;
+  },
+  cemeteryRemovalControlValid: function (b, context, node, allowModal) {
+    const { world, game, el, panel, type, state } = context;
+    return G.world === world && G.game === game && this.el.info === el && !el.classList.contains('hidden') &&
+      G.sel && G.sel.kind === 'b' && G.sel.id === b.id && world.bmap[b.id] === b && b.type === type && b.state === state &&
+      el.querySelector('[data-cemetery-removal-panel]') === panel && (!node || (!node.disabled && panel.querySelector('#' + node.id) === node)) &&
+      (allowModal || !(G.hasOpenModal && G.hasOpenModal()));
+  },
+  resetCemeteryRemoval: function (panel, message, restoreFocus) {
+    const box = panel.querySelector('[data-cemetery-removal-confirm]'), confirm = panel.querySelector('#cemetery-removal-confirm');
+    const status = panel.querySelector('[data-cemetery-removal-message]'), el = this.el.info;
+    const hadFocus = box && box.contains && box.contains(document.activeElement);
+    panel._cemeteryPending = null;
+    if (box) box.classList.add('hidden');
+    if (confirm) confirm.disabled = true;
+    if (message !== undefined && status) status.textContent = message;
+    const start = el.querySelector && el.querySelector('#info-demolish');
+    if (restoreFocus && hadFocus && start && start.focus) start.focus();
+  },
+  refreshCemeteryRemoval: function (b) {
+    const el = this.el.info, panel = el.querySelector && el.querySelector('[data-cemetery-removal-panel]');
+    if (!panel || !panel._cemeteryContext) return false;
+    if (!this.cemeteryRemovalControlValid(b, panel._cemeteryContext, null, true)) { this.resetCemeteryRemoval(panel); return false; }
+    if (G.hasOpenModal && G.hasOpenModal()) this.resetCemeteryRemoval(panel, '拆除确认已取消，请关闭弹窗后重新查看。');
+    else if (panel._cemeteryPending !== null) {
+      const quote = G.cemeteryRemovalQuote(b);
+      if (!quote.ok || quote.key !== panel._cemeteryPending)
+        this.resetCemeteryRemoval(panel, '墓位、日期或退款已变化。未拆除，请重新查看最新确认。', true);
+    }
+    return true;
+  },
+  confirmCemeteryRemoval: function (b, quote) {
+    const world = G.world, game = G.game;
+    if (!b || !world || world.bmap[b.id] !== b || !quote?.ok || 
+        (G.hasOpenModal && G.hasOpenModal()) || G.cemeteryRemovalQuote(b).key !== quote.key) return false;
+    // Map-tool demolition has no selected details yet. Open the same owned panel.
+    G.sel = { kind: 'b', id: b.id };
+    this.showInfo();
+    const el = this.el.info, panel = el.querySelector && el.querySelector('[data-cemetery-removal-panel]');
+    if (G.world !== world || G.game !== game || !panel || !panel._cemeteryContext ||
+        !this.cemeteryRemovalControlValid(b, panel._cemeteryContext)) return false;
+    const current = G.cemeteryRemovalQuote(b);
+    if (!current.ok || current.key !== quote.key) return false;
+    panel._cemeteryPending = current.key;
+    const graves=current.graves||[],last=graves.length?Math.max(...graves.map(r=>r.expiresDay))-G.game.day:0;
+    panel.querySelector('[data-cemetery-removal-quote]').textContent =
+      `拆除围栏后停止新安葬；保留 ${graves.length} 座已有墓碑，占用 ${current.retainedTiles.length} 格，释放其余 ${current.releaseTiles.length} 格。${graves.length?`最晚 ${last} 天后自然释放，姓名和原到期日保留。`:''}墓碑所在格不能新建建筑或道路，仍可走过；墓碑不能再次拆除或退款。此次返还 ${this.resourceCost(current.refund,false)||'无材料'}，只退一次；在途建材仍归搬运者。` ;
+    panel.querySelector('[data-cemetery-removal-confirm]').classList.remove('hidden');
+    panel.querySelector('[data-cemetery-removal-message]').textContent = '尚未拆围栏或退款。请确认保留墓位的占地后果，或取消保留墓园。';
+    const confirm = panel.querySelector('#cemetery-removal-confirm');
+    confirm.disabled = false;
+    if (confirm.focus) confirm.focus();
+    return true;
+  },
+  initCemeteryRemoval: function (b) {
+    const el = this.el.info, panel = el.querySelector && el.querySelector('[data-cemetery-removal-panel]');
+    if (!panel) return;
+    const context = { world: G.world, game: G.game, el, panel, type: b.type, state: b.state };
+    panel._cemeteryContext = context;
+    this.resetCemeteryRemoval(panel, '');
+    const confirm = panel.querySelector('#cemetery-removal-confirm'), cancel = panel.querySelector('#cemetery-removal-cancel');
+    for (const button of [confirm, cancel]) button.addEventListener('keydown', e => {
+      if (e.repeat && ['Enter', ' '].includes(e.key)) e.preventDefault();
+    });
+    cancel.addEventListener('click', () => {
+      if (!this.cemeteryRemovalControlValid(b, context, cancel)) { this.resetCemeteryRemoval(panel); return; }
+      this.resetCemeteryRemoval(panel, '已取消确认，墓园、墓碑和建材均未改变。', true);
+    });
+    confirm.addEventListener('click', e => {
+      if ((e && e.detail > 1) || !this.cemeteryRemovalControlValid(b, context, confirm) || panel._cemeteryPending === null) {
+        this.resetCemeteryRemoval(panel); return;
+      }
+      const key = panel._cemeteryPending;
+      this.refreshCemeteryRemoval(b);
+      if (panel._cemeteryPending !== key) return;
+      this.resetCemeteryRemoval(panel);
+      const removed = G.removeBuilding(b, key);
+      if (!removed) this.resetCemeteryRemoval(panel, '墓园状态已改变，未拆除。请重新查看。', true);
+      else {
+        this.renderInfo(true);
+        const close = el.querySelector('#info-close');
+        if (!el.classList.contains('hidden') && close && close.focus) close.focus();
+      }
+    });
+  },
   mineralRemovalMarkup: function (b) {
     if (!G.finiteMineral || !G.finiteMineral(b) || b.type === 'mineralpit') return '';
     return `<section class="economy-form" data-mineral-removal-panel aria-label="有限矿点拆除确认">
@@ -3009,6 +3212,7 @@ G.ui = {
     if (sameSelection && selected.state === 'ok' && this._resourceChainInfoState === selected.state && this.refreshResourceChainInfo(selected)) return;
     if(sameSelection&&G.sel.kind==='b'&&selected.type==='stockpile'&&selected.state==='ok'&&this._infoBuildState==='ok'){this.refreshStockpileInfo(selected);return;}
     if(sameSelection&&G.sel.kind==='b'&&selected.type==='cemetery'&&selected.state==='ok'&&this._infoBuildState==='ok'){this.refreshCemeteryInfo(selected);return;}
+    if(sameSelection&&G.sel.kind==='b'&&selected.type==='graveremnant'){this.refreshGraveRemnantInfo(selected);return;}
     if (sameSelection && selected.type === 'woodcutter' && this._fuelInfoState === selected.state && this.refreshFuelInfo(selected)) return;
     if (hadFocus && !force && sameSelection && selected.type !== 'woodcutter' &&
         !(selected.type === 'farm' && selected.state === 'ok' && G.farmSummary) && (G.sel.kind === 'c' || (this._infoBuildState === selected.state && this._infoBuildType === selected.type))) {
@@ -3050,10 +3254,10 @@ G.ui = {
       const farmData = this.farmInfoData(b);
       const schoolData=this.schoolInfoData(b);
       const cemeteryData=b.type==='cemetery'&&b.state==='ok'?this.cemeteryInfoData(b):null;
-      const pit = b.type === 'mineralpit', mineral = G.mineralSummary && G.mineralSummary(b);
+      const pit = b.type === 'mineralpit', remnant=b.type==='graveremnant', mineral = G.mineralSummary && G.mineralSummary(b);
       const fireData = this.homeFireInfoData(b), ruin = !!fireData?.summary.ruin;
       const rebuildData = this.fireRebuildInfoData(b);
-      const workforceData = pit || ruin ? null : this.workforceInfoData(b);
+      const workforceData = pit || remnant || ruin ? null : this.workforceInfoData(b);
       const homeData = this.homeInfoData(b), upgradeData = this.houseUpgradeInfoData(b);
       let status;
       if (fireData) status = fireData.data.status;
@@ -3063,6 +3267,7 @@ G.ui = {
       else if (siteData) status = siteData.status;
       else if (b.type==='hunting') status=G.huntingSummary(b,{reachability:false}).reason;
       else if(cemeteryData)status=cemeteryData.status;
+      else if(remnant)status=G.graveRemnantSummary(b).status;
       else if(schoolData)status=schoolData.status;
       else if (medicalData) status = medicalData.status;
       else if (chainData) status = chainData.status;
@@ -3089,6 +3294,7 @@ G.ui = {
         workers = `<div class="row">${medicalData ? b.type === 'hospital' ? '医师' : '采药员' : tavernData ? '酿酒工（需 18 岁以上且健康）' : '工人'}：<span${b.type === 'dock' && b.state === 'ok' ? ' data-fishing-workers' : ''}${b.type === 'hunting' && b.state === 'ok' ? ' data-hunting-workers' : ''}${marketData ? ' data-market-workers' : ''}${siteData ? ' data-site-workers' : ''}${fuelData ? ' data-fuel="workers"' : ''}${medicalData ? ' data-medical="workers"' : ''}${chainData ? ' data-resource-chain-live="workers"' : ''}${tavernData ? ' data-tavern="workers"' : ''}${tailorData ? ' data-tailor="workers"' : ''}${farmData ? ' data-farm="workers"' : ''}${b.state === 'ok' && ['tradingpost', 'pasture', 'orchard'].includes(b.type) ? ' data-economy-workers' : ''}>${names || (b.state === 'site' ? '等待建筑工人' : '无')}</span></div>`;
       }
       let extra = '';
+      if(remnant)extra=this.graveRemnantInfoMarkup(b);
       if (pit) extra = `<div class="row" data-mineral-pit-source>原址：${this.escHtml(G.BDEF[mineral?.source]?.name || '矿点')} · 永久占地 3×3；没有岗位和产出。</div><div class="row desc" data-mineral-pit-reserve>拆除时丢弃的剩余矿藏：${Number(mineral?.remaining) || 0} 储量单位，永久不可恢复。</div>`;
       if (homeData) extra = `<div class="row" data-home-residents>${this.escHtml(homeData.residents)}</div>`;
       if(homeData)extra+=this.heatingInfoMarkup(b) + this.householdSupplyInfoMarkup(b);
@@ -3154,8 +3360,8 @@ G.ui = {
         <div class="row"${b.type === 'dock' && b.state === 'ok' ? ' data-fishing-status' : ''}${b.type === 'hunting' && b.state === 'ok' ? ' data-hunting-status' : ''}${siteData ? ' data-site-status' : ''}${homeData ? ' data-home-status' : ''}${fuelData ? ' data-fuel="status"' : ''}${medicalData ? ' data-medical="status"' : ''}${chainData ? ' data-resource-chain-live="status"' : ''}${hallData ? ' data-townhall="status"' : ''}${marketData ? ' data-market-supply="status"' : ''}${tavernData ? ' data-tavern="status"' : ''}${chapelData ? ' data-chapel="status"' : ''}${tailorData ? ' data-tailor="status"' : ''}${farmData ? ' data-farm="status"' : ''}${cemeteryData?' data-cemetery="status"':''}${schoolData?' data-school="status"':''}${b.state === 'ok' && ['tradingpost', 'pasture', 'orchard'].includes(b.type) ? ' data-economy-status' : ''}>${this.escHtml(status)}</div>
         ${workers}${this.workforceInfoMarkup(b, workforceData)}${siteData ? this.siteInfoMarkup(siteData) : ''}${extra}
         <div class="row desc">${def.desc}</div>
-        ${pit ? '' : `<div class="row desc" data-info-refund${fuelData ? ' data-fuel="refund"' : ''}>${ruin ? '清理烧毁废墟退还 0 材料；不能回收原屋材料。' : fireData?.summary.active ? '火灾进行中，暂不能拆除；关闭新增火灾也不会停止当前损伤。' : fuelData ? fuelData.refund : siteData ? siteData.refund : '已开工：拆除退还一半已付建材，已砍树不恢复'}</div>
-        <button id="info-demolish" class="danger"${fireData?.summary.active ? ' disabled' : ''}>${b.state === 'site' ? '取消工地' : ruin ? '清理废墟（无返料）' : '拆除'}</button>${this.mineralRemovalMarkup(b)}`}`;
+        ${pit||remnant ? '' : `<div class="row desc" data-info-refund${fuelData ? ' data-fuel="refund"' : ''}>${ruin ? '清理烧毁废墟退还 0 材料；不能回收原屋材料。' : fireData?.summary.active ? '火灾进行中，暂不能拆除；关闭新增火灾也不会停止当前损伤。' : fuelData ? fuelData.refund : siteData ? siteData.refund : '已开工：拆除退还一半已付建材，已砍树不恢复'}</div>
+        <button id="info-demolish" class="danger"${fireData?.summary.active ? ' disabled' : ''}>${b.state === 'site' ? '取消工地' : ruin ? '清理废墟（无返料）' : b.type==='cemetery'?'拆围栏…':'拆除'}</button>${this.mineralRemovalMarkup(b)}${this.cemeteryRemovalMarkup(b)}`}`;
       if (fuelData) this._fuelInfoState = b.state;
       this._economyInfoState = b.state;
       this._medicalInfoState = b.state;
@@ -3181,6 +3387,7 @@ G.ui = {
       if (medicalData) this.refreshMedicalPatients(b);
       if (chainData) this.initResourceChainInfo(b);
       this.initMineralRemoval(b);
+      this.initCemeteryRemoval(b);
       if (b.state === 'ok') this.initEconomyInfo(b);
       if (tradeDraft) {
         for (const [id, value] of Object.entries(tradeDraft)) {

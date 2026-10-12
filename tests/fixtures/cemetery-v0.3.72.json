@@ -1,0 +1,660 @@
+{
+  "provenance": {
+    "main": "581d98f675d0133226e3f401b22b7bce644fa28f",
+    "version": "0.3.72",
+    "apiSourceHash": "2b3d190994f2512e6d113e6d8715e5640db538d3593ec5ec7367940b88241e0a",
+    "scenario": "Actual .72 engine APIs on deterministic cleared test terrain; paid occupied legacy cemetery, physically delivered partly built paused cemetery, second legacy site with accepted cargo.",
+    "cemetery": 23,
+    "site": 27,
+    "cargoSite": 29,
+    "citizen": 28
+  },
+  "save": {
+    "v": 1,
+    "seed": 1,
+    "N": 128,
+    "mapVersion": 1,
+    "game": {
+      "v": "0.3.72",
+      "startConfig": {
+        "v": 1,
+        "preset": "classic",
+        "seed": 1
+      },
+      "h": 12,
+      "day": 0,
+      "season": 0,
+      "year": 1,
+      "res": {
+        "wood": 452,
+        "stone": 420,
+        "iron": 0,
+        "tools": 100,
+        "food": 500,
+        "meat": 0,
+        "eggs": 0,
+        "vegetables": 0,
+        "grain": 500,
+        "apples": 0,
+        "pears": 0,
+        "firewood": 0,
+        "leather": 0,
+        "wool": 0,
+        "clothes": 0,
+        "herbs": 0,
+        "coal": 0,
+        "steelTools": 0,
+        "ale": 0,
+        "warmCoats": 0
+      },
+      "stats": {
+        "born": 0,
+        "died": 3,
+        "deadReasons": {
+          "老逝": 3
+        }
+      },
+      "prevFood": 200,
+      "foodNet": 0,
+      "foodUrgent": false,
+      "warned": {},
+      "supplyMode": "automatic",
+      "clothingSupply": false,
+      "huntingLost": {
+        "meat": 0,
+        "leather": 0
+      },
+      "constructionVersion": 1,
+      "constructionLost": {},
+      "heating": {
+        "allowCoal": false,
+        "coalReserve": 20
+      },
+      "fishingRules": "shared",
+      "fireDisasters": {
+        "enabled": false,
+        "startedDay": null,
+        "graceUntil": 0,
+        "lastDay": -1,
+        "nextIgnitionDay": 0,
+        "serial": 0,
+        "incidentHomes": []
+      },
+      "farmPests": {
+        "enabled": false,
+        "graceUntil": 0,
+        "lastDay": -1
+      },
+      "pasturePests": {
+        "enabled": false,
+        "graceUntil": 0,
+        "lastDay": -1
+      },
+      "townLedger": {
+        "v": 1,
+        "startDay": 0,
+        "startHour": 12,
+        "current": {
+          "day": 0,
+          "fromHour": 12,
+          "partial": true,
+          "opening": {
+            "meat": 0,
+            "eggs": 0,
+            "vegetables": 0,
+            "grain": 500,
+            "apples": 0,
+            "pears": 0,
+            "firewood": 0
+          },
+          "flows": {
+            "meat": {
+              "produced": 0,
+              "received": 0,
+              "used": 0,
+              "withdrawn": 0,
+              "discarded": 0,
+              "distributedUsed": 0,
+              "distributedLost": 0
+            },
+            "eggs": {
+              "produced": 0,
+              "received": 0,
+              "used": 0,
+              "withdrawn": 0,
+              "discarded": 0,
+              "distributedUsed": 0,
+              "distributedLost": 0
+            },
+            "vegetables": {
+              "produced": 0,
+              "received": 0,
+              "used": 0,
+              "withdrawn": 0,
+              "discarded": 0,
+              "distributedUsed": 0,
+              "distributedLost": 0
+            },
+            "grain": {
+              "produced": 0,
+              "received": 0,
+              "used": 0,
+              "withdrawn": 0,
+              "discarded": 0,
+              "distributedUsed": 0,
+              "distributedLost": 0
+            },
+            "apples": {
+              "produced": 0,
+              "received": 0,
+              "used": 0,
+              "withdrawn": 0,
+              "discarded": 0,
+              "distributedUsed": 0,
+              "distributedLost": 0
+            },
+            "pears": {
+              "produced": 0,
+              "received": 0,
+              "used": 0,
+              "withdrawn": 0,
+              "discarded": 0,
+              "distributedUsed": 0,
+              "distributedLost": 0
+            },
+            "firewood": {
+              "produced": 0,
+              "received": 0,
+              "used": 0,
+              "withdrawn": 0,
+              "discarded": 0,
+              "distributedUsed": 0,
+              "distributedLost": 0
+            }
+          }
+        },
+        "days": []
+      },
+      "challenges": {
+        "v": 1,
+        "completed": {}
+      },
+      "hist": [],
+      "buildLog": [
+        {
+          "d": 0,
+          "t": "storage"
+        },
+        {
+          "d": 0,
+          "t": "storage"
+        },
+        {
+          "d": 0,
+          "t": "cemetery"
+        },
+        {
+          "d": 0,
+          "t": "cemetery"
+        },
+        {
+          "d": 0,
+          "t": "cemetery"
+        }
+      ],
+      "toolMode": "pooled",
+      "toolRemainders": {
+        "tools": 0,
+        "steelTools": 0
+      },
+      "toolWear": 0,
+      "steelToolWear": 0,
+      "healthStartDay": 0,
+      "nomads": {
+        "nextDay": 48,
+        "serial": 0,
+        "offer": null,
+        "accepted": 0,
+        "declined": 0
+      },
+      "unlocks": {
+        "wheat": true,
+        "orchard": false,
+        "apple": false,
+        "pear": false,
+        "cabbage": false,
+        "beans": false,
+        "squash": false
+      },
+      "livestock": {
+        "sheep": 0,
+        "cattle": 0,
+        "chicken": 0
+      }
+    },
+    "deer": [
+      {
+        "id": 1,
+        "x": 86,
+        "y": 48,
+        "homeX": 86,
+        "homeY": 48,
+        "returnDay": 8.5,
+        "moveDay": 1,
+        "generation": 1
+      },
+      {
+        "id": 2,
+        "x": 78,
+        "y": 49,
+        "homeX": 78,
+        "homeY": 49,
+        "returnDay": 8.5,
+        "moveDay": 1,
+        "generation": 1
+      },
+      {
+        "id": 3,
+        "x": 61,
+        "y": 79,
+        "homeX": 61,
+        "homeY": 79,
+        "returnDay": 8.5,
+        "moveDay": 1,
+        "generation": 1
+      },
+      {
+        "id": 4,
+        "x": 51,
+        "y": 74,
+        "homeX": 51,
+        "homeY": 74,
+        "returnDay": 8.5,
+        "moveDay": 1,
+        "generation": 1
+      },
+      {
+        "id": 5,
+        "x": 65,
+        "y": 72,
+        "homeX": 65,
+        "homeY": 72,
+        "returnDay": 8.5,
+        "moveDay": 1,
+        "generation": 1
+      },
+      {
+        "id": 6,
+        "x": 73,
+        "y": 84,
+        "homeX": 73,
+        "homeY": 84,
+        "returnDay": 8.5,
+        "moveDay": 1,
+        "generation": 1
+      },
+      {
+        "id": 7,
+        "x": 77,
+        "y": 53,
+        "homeX": 77,
+        "homeY": 53,
+        "returnDay": 8.5,
+        "moveDay": 1,
+        "generation": 1
+      },
+      {
+        "id": 8,
+        "x": 69,
+        "y": 40,
+        "homeX": 69,
+        "homeY": 40,
+        "returnDay": 8.5,
+        "moveDay": 1,
+        "generation": 1
+      },
+      {
+        "id": 9,
+        "x": 98,
+        "y": 70,
+        "homeX": 98,
+        "homeY": 70,
+        "returnDay": 8.5,
+        "moveDay": 1,
+        "generation": 1
+      },
+      {
+        "id": 10,
+        "x": 67,
+        "y": 53,
+        "homeX": 67,
+        "homeY": 53,
+        "returnDay": 8.5,
+        "moveDay": 1,
+        "generation": 1
+      },
+      {
+        "id": 11,
+        "x": 102,
+        "y": 61,
+        "homeX": 102,
+        "homeY": 61,
+        "returnDay": 8.5,
+        "moveDay": 1,
+        "generation": 1
+      },
+      {
+        "id": 12,
+        "x": 55,
+        "y": 69,
+        "homeX": 55,
+        "homeY": 69,
+        "returnDay": 8.5,
+        "moveDay": 1,
+        "generation": 1
+      },
+      {
+        "id": 13,
+        "x": 1,
+        "y": 121,
+        "homeX": 1,
+        "homeY": 121,
+        "returnDay": 8.5,
+        "moveDay": 1,
+        "generation": 1
+      },
+      {
+        "id": 14,
+        "x": 23,
+        "y": 37,
+        "homeX": 23,
+        "homeY": 37,
+        "returnDay": 8.5,
+        "moveDay": 1,
+        "generation": 1
+      },
+      {
+        "id": 15,
+        "x": 124,
+        "y": 76,
+        "homeX": 124,
+        "homeY": 76,
+        "returnDay": 8.5,
+        "moveDay": 1,
+        "generation": 1
+      },
+      {
+        "id": 16,
+        "x": 37,
+        "y": 85,
+        "homeX": 37,
+        "homeY": 85,
+        "returnDay": 8.5,
+        "moveDay": 1,
+        "generation": 1
+      },
+      {
+        "id": 17,
+        "x": 47,
+        "y": 66,
+        "homeX": 47,
+        "homeY": 66,
+        "returnDay": 8.5,
+        "moveDay": 1,
+        "generation": 1
+      },
+      {
+        "id": 18,
+        "x": 5,
+        "y": 85,
+        "homeX": 5,
+        "homeY": 85,
+        "returnDay": 8.5,
+        "moveDay": 1,
+        "generation": 1
+      },
+      {
+        "id": 19,
+        "x": 126,
+        "y": 69,
+        "homeX": 126,
+        "homeY": 69,
+        "returnDay": 8.5,
+        "moveDay": 1,
+        "generation": 1
+      },
+      {
+        "id": 20,
+        "x": 47,
+        "y": 51,
+        "homeX": 47,
+        "homeY": 51,
+        "returnDay": 8.5,
+        "moveDay": 1,
+        "generation": 1
+      },
+      {
+        "id": 21,
+        "x": 37,
+        "y": 63,
+        "homeX": 37,
+        "homeY": 63,
+        "returnDay": 8.5,
+        "moveDay": 1,
+        "generation": 1
+      },
+      {
+        "id": 22,
+        "x": 0,
+        "y": 87,
+        "homeX": 0,
+        "homeY": 87,
+        "returnDay": 8.5,
+        "moveDay": 1,
+        "generation": 1
+      },
+      {
+        "id": 23,
+        "x": 80,
+        "y": 115,
+        "homeX": 80,
+        "homeY": 115,
+        "returnDay": 8.5,
+        "moveDay": 1,
+        "generation": 1
+      },
+      {
+        "id": 24,
+        "x": 54,
+        "y": 88,
+        "homeX": 54,
+        "homeY": 88,
+        "returnDay": 8.5,
+        "moveDay": 1,
+        "generation": 1
+      }
+    ],
+    "roads": [],
+    "stoneRoads": [],
+    "trees": [],
+    "marked": [],
+    "markedRocks": [],
+    "rockCleared": [],
+    "buildings": [
+      {
+        "id": 22,
+        "type": "storage",
+        "x": 2,
+        "y": 2,
+        "state": "ok",
+        "progress": 1,
+        "workLeft": 0,
+        "totalWork": 110,
+        "paidCost": {},
+        "constructionStarted": false,
+        "workers": [],
+        "family": null,
+        "noWork": false,
+        "warnText": ""
+      },
+      {
+        "id": 23,
+        "type": "cemetery",
+        "x": 25,
+        "y": 10,
+        "state": "ok",
+        "progress": 1,
+        "workLeft": 0,
+        "totalWork": 80,
+        "paidCost": {
+          "wood": 16,
+          "stone": 40
+        },
+        "constructionStarted": false,
+        "construction": {
+          "required": {
+            "wood": 16,
+            "stone": 40
+          },
+          "onsite": {},
+          "consumed": true
+        },
+        "workers": [],
+        "family": null,
+        "noWork": false,
+        "warnText": "",
+        "graves": [
+          {
+            "slot": 0,
+            "name": "旧墓位0",
+            "deathDay": 0,
+            "expiresDay": 192
+          },
+          {
+            "slot": 1,
+            "name": "旧墓位1",
+            "deathDay": 0,
+            "expiresDay": 192
+          },
+          {
+            "slot": 2,
+            "name": "旧墓位2",
+            "deathDay": 0,
+            "expiresDay": 192
+          }
+        ]
+      },
+      {
+        "id": 27,
+        "type": "cemetery",
+        "x": 10,
+        "y": 10,
+        "state": "site",
+        "sitePaused": true,
+        "progress": 0.050000000000000044,
+        "workLeft": 76,
+        "totalWork": 80,
+        "paidCost": {
+          "wood": 16,
+          "stone": 40
+        },
+        "constructionStarted": true,
+        "construction": {
+          "required": {
+            "wood": 16,
+            "stone": 40
+          },
+          "onsite": {},
+          "consumed": true
+        },
+        "workers": [],
+        "family": null,
+        "noWork": false,
+        "warnText": "",
+        "graves": []
+      },
+      {
+        "id": 29,
+        "type": "cemetery",
+        "x": 17,
+        "y": 20,
+        "state": "site",
+        "progress": 0,
+        "workLeft": 80,
+        "totalWork": 80,
+        "paidCost": {
+          "wood": 16,
+          "stone": 40
+        },
+        "constructionStarted": false,
+        "construction": {
+          "required": {
+            "wood": 16,
+            "stone": 40
+          },
+          "onsite": {},
+          "consumed": false
+        },
+        "workers": [
+          28
+        ],
+        "family": null,
+        "noWork": false,
+        "warnText": "",
+        "graves": []
+      }
+    ],
+    "families": [],
+    "citizens": [
+      {
+        "id": 28,
+        "name": "许峰",
+        "sex": "m",
+        "age": 30,
+        "adult": true,
+        "x": 5,
+        "y": 5.144,
+        "familyId": null,
+        "job": 29,
+        "partnerId": null,
+        "parentIds": [],
+        "grandparentIds": [],
+        "ancestorIds": [],
+        "birthFamilyId": null,
+        "student": 0,
+        "educated": 0,
+        "school": null,
+        "studyHours": 0,
+        "studyToday": 0,
+        "studyDay": 0,
+        "toolType": null,
+        "toolHours": 0,
+        "arrivalHallId": null,
+        "hunger": 0,
+        "cold": 0,
+        "clothingLeft": 0,
+        "clothingType": null,
+        "dietVariety": 0,
+        "dietScore": 1,
+        "happiness": 3,
+        "leisureDays": 0,
+        "chapelDays": 0,
+        "chapelId": null,
+        "health": 4,
+        "sickDays": 0,
+        "immunityDays": 0,
+        "herbCooldown": 0,
+        "careHours": 0,
+        "camped": 0,
+        "carry": {
+          "type": "wood",
+          "qty": 16,
+          "constructionId": 29,
+          "staffingReturn": true
+        }
+      }
+    ],
+    "supplyCaches": [],
+    "nextUid": 30
+  }
+}

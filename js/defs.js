@@ -173,7 +173,11 @@ G.BDEF = {
     id:'cemetery',name:'墓园',icon:'🪦',w:4,h:4,
     cost:{wood:16,stone:40},buildWork:80,jobs:0,passable:true,
     wall:'#948b7a',wallD:'#6e6558',roof:'#837b6b',
-    desc:'小型4×4墓园，8个墓位，不占常驻工人。亲属去世时需有空位且从逝者所在地可达，才减轻新发生的哀伤；墓位保留4年后自然释放。有未到期墓位时不可拆除，不能拆建刷新容量。尺寸、成本与时长为本作适配。',
+    desc:'新墓园框选7–20格矩形，石材与工时按围栏周长计算，不占常驻工人。死亡时须有可达空位才减轻新哀伤；墓位保留192天。确认拆围栏后仅实际墓位留在原格，到原期限自然释放；旧4×4墓园仍保留8位及旧成本。坐标与期限为本作适配。',
+  },
+  graveremnant: {
+    id:'graveremnant',name:'留存墓位',icon:'🪦',w:1,h:1,cost:{},buildWork:0,jobs:0,passable:true,unbuildable:true,hidden:true,
+    desc:'拆除墓园围栏后保留的原墓位。沿用姓名、位置和到期日；仅占此格，可步行通过，不能拆除、建造、铺新路或重复退款。',
   },
   school: {
     id: 'school', name: '学堂', icon: '🏫', w: 3, h: 3,
