@@ -201,7 +201,7 @@ G.stepSupply=function(c,dt){
  G.finishSupplyTask(c);return true;
 };
 G.useSupplyStock=function(stock,type,qty){stock[type]=Math.max(0,(stock[type]||0)-qty);G.game.supplyUsed[type]=(G.game.supplyUsed[type]||0)+qty;G.ledgerRecord('distributedUsed',type,qty);};
-G.eatHousehold=function(c,qty,legacy=false){const mealDay=legacy?G.game.day-1:G.game.day;if(c.lastMealDay!=null&&c.lastMealDay>=mealDay)return [];const target=G.supplyFamilyTarget(G.familyOf(c),true);if(!target||(!(legacy&&G.mealTransitionActive())&&(!G.atMealTarget(c,target)||!c.mealJourney||c.mealJourney.target!==target||c.mealJourney.familyId!==c.familyId||!(c.mealJourney.remaining<=0))))return [];const stock=G.supplyStock(target);if(G.supplyFood(stock)+1e-8<qty)return [];
+G.eatHousehold=function(c,qty,legacy=false){const mealDay=legacy?G.game.day-1:G.game.day;if(c.lastMealDay!=null&&c.lastMealDay>=mealDay)return [];const target=G.supplyFamilyTarget(G.familyOf(c),true);if(!target||(!(legacy&&G.mealTransitionActive(G.game,mealDay))&&(!G.atMealTarget(c,target)||!c.mealJourney||c.mealJourney.target!==target||c.mealJourney.familyId!==c.familyId||!(c.mealJourney.remaining<=0))))return [];const stock=G.supplyStock(target);if(G.supplyFood(stock)+1e-8<qty)return [];
  const basket=G.supplyBasket(stock,{food:qty,firewood:0,coal:0,room:qty},qty),eaten=[];for(const[k,n]of Object.entries(basket)){G.useSupplyStock(stock,k,n);eaten.push(k);}c.lastMealDay=mealDay;return G.foodGroupsOf(eaten);
 };
 G.heatSuppliedHome=function(b,need){const r=G.supplyStock(b),wood=Math.min(r.firewood,need),coal=G.heatingPolicy().allowCoal?Math.min(r.coal,Math.max(0,need-wood)/G.COAL_HEAT):0;
@@ -305,7 +305,7 @@ G.enableClothingSupply=function(key,expectedGame=G.game){const q=G.clothingSuppl
 /* Reachable meals, physical mode only. The existing pausedTask slot retains
  * work; cargo never leaves its citizen during this short survival trip. */
 G.MEAL_HOURS=.25;
-G.mealTransitionActive=(g=G.game)=>g.supplyMode==='physical'&&g.mealRuleVersion===1&&g.mealTransitionStart!=null&&g.day<g.mealTransitionEnd;
+G.mealTransitionActive=(g=G.game,day=g.day)=>g.supplyMode==='physical'&&g.mealRuleVersion===1&&g.mealTransitionStart!=null&&day>=g.mealTransitionStart&&day<g.mealTransitionEnd;
 G.mealDue=c=>G.supplyEnabled()&&!c.dead&&c.lastMealDay!==G.game.day;
 G.mealTarget=c=>G.supplyFamilyTarget(G.familyOf(c),true);
 G.atMealTarget=function(c,target){

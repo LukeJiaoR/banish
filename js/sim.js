@@ -169,7 +169,7 @@ G.endDay = function () {
   const sorted = w.citizens.slice().sort((a, b) => (a.age >= G.ADULT_AGE && !a.student ? 1 : 0) - (b.age >= G.ADULT_AGE && !b.student ? 1 : 0));
   for (const c of sorted) {
     if(G.supplyEnabled&&G.supplyEnabled()){
-      const meal=G.mealTransitionActive()?G.eatHousehold(c,eat,true):[];
+      const meal=G.mealTransitionActive(g,g.day-1)?G.eatHousehold(c,eat,true):[];
       if(meal.length)G.recordHouseholdMeal(c,meal,g.day-1);
       else if(c.lastMealDay!==g.day&&c.lastMealDay!==g.day-1){c.hunger++;c.dietVariety=0;}
     }else if(g.res.food>=eat){
