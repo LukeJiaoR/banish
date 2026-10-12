@@ -76,27 +76,27 @@ test('7×7 and 20×20 sites pay exact adapted cost, clear a far-corner tree and 
     const tree={i:y*w.N+x,x,y,b:-G.YEAR_DAYS};w.treeIdx[tree.i]=0;w.trees.push(tree);G.bumpNavigation(w);
     G.game.res.wood=500;const d=G.pastureDefinition(size),result=G.addBuilding('pasture',10,10,{pastureSize:size});
     assert(result.ok,result.reason);const b=result.b,cs=workers(G,b,4);
-    assert.equal(b.totalWork,d.buildWork);assert.equal(b.workLeft,d.buildWork);assert.equal(G.game.res.wood,500-d.cost.wood);
+    assert.equal(b.totalWork,d.buildWork);assert.equal(b.workLeft,d.buildWork);assert.equal(G.game.res.wood,500);assert.deepEqual(clone(b.construction.required),{wood:d.cost.wood});assert.deepEqual(clone(b.construction.onsite),{});
     assert.equal(b.workerLimit,d.jobs);assert.equal(G.workerLimitOf(b),4);assert.equal(G.siteTrees(b).length,1);
     assert.equal(w.bgrid[(10+height-1)*w.N+10+width-1],b.id);assert.equal(b.w*b.h,width*height);
     assert(!G.stockPasture(b,1));G.finishBuilding(b);assert.equal(b.state,'site');
     for(const c of cs)G.requestTask(c);until(G,cs,()=>G.siteTrees(b).length===0);
-    assert(b.constructionStarted);assert.equal(b.state,'site');assert.equal(b.workLeft,d.buildWork);
+    assert.equal(b.constructionStarted,false);assert.equal(b.construction.consumed,false);assert.equal(b.state,'site');assert.equal(b.workLeft,d.buildWork);
     until(G,cs,()=>b.state==='ok');assert.equal(b.workLeft,0);assert.equal(b.progress,1);
     assert.equal(G.workerMaximumOf(b),d.jobs);assert(b.workers.length<=d.jobs);
-    assert(G.game.res.wood>=500-d.cost.wood);G.applySaveData(data(G));
+    assert(b.construction.consumed);assert(G.game.res.wood>=500-d.cost.wood);assert(G.game.res.wood<=500-d.cost.wood+G.TREE_LOGS);G.applySaveData(data(G));
     const loaded=G.world.bmap[b.id];assert.deepEqual(Array.from(loaded.pastureSize),size);assert.equal(loaded.totalWork,d.buildWork);
   }
 });
-test('new sites copy size input, persist payment and cancellation refunds only their own cost once',()=>{
+test('new sites copy size input, persist cost plans and refund only delivered or consumed material once',()=>{
   const G=fresh(),size=[7,7];G.game.res.wood=200;
   const b=G.addBuilding('pasture',10,10,{pastureSize:size}).b;size[0]=20;
-  assert.equal(b.w,7);assert.equal(b.pastureSize[0],7);assert.equal(G.game.res.wood,165);
+  assert.equal(b.w,7);assert.equal(b.pastureSize[0],7);assert.equal(G.game.res.wood,200);assert.deepEqual(clone(b.construction.onsite),{});
   G.applySaveData(data(G));const loaded=G.world.bmap[b.id];assert.equal(loaded.workLeft,69);assert.equal(loaded.paidCost.wood,35);
   G.removeBuilding(loaded);assert.equal(G.game.res.wood,200);G.removeBuilding(loaded);assert.equal(G.game.res.wood,200);
-  const started=G.addBuilding('pasture',10,10,{pastureSize:[20,20]}).b;started.constructionStarted=true;
-  started.workLeft-=4;started.progress=1-started.workLeft/started.totalWork;
-  G.applySaveData(data(G));G.removeBuilding(G.world.bmap[started.id]);assert.equal(G.game.res.wood,150);
+  const started=G.addBuilding('pasture',10,10,{pastureSize:[20,20]}).b,cs=workers(G,started,4);
+  for(const c of cs)G.requestTask(c);until(G,cs,()=>started.progress>0);assert(started.constructionStarted);assert(started.construction.consumed);assert.equal(G.game.res.wood,100);const left=started.workLeft;
+  G.applySaveData(data(G));assert.equal(G.world.bmap[started.id].workLeft,left);G.removeBuilding(G.world.bmap[started.id]);assert.equal(G.game.res.wood,150);assert.equal(G.game.constructionLost.wood,50);
 });
 test('all three species obey each actual area cap for stock, targets, breeding and save/load',()=>{
   for(const size of [[7,7],[20,20]])for(const type of ['cattle','sheep','chicken']){
@@ -189,11 +189,13 @@ test('legacy no-size saves keep 6×6 identity, species caps, one job, old worksi
   for(const [type,cap] of [['sheep',12],['cattle',10],['chicken',24]]){
     const G=fresh(),b=legacy(G,type);b.animals=cap;b.animalTarget=cap;b.animalGrowth=.4;
     if(type==='sheep')b.woolReady=7;if(type==='chicken'){b.pastureProducts.eggs=8;b.eggProgress=.5;}
-    const site=G.addBuilding('pasture',30,10,{free:true}).b;site.paidCost={wood:30};site.workLeft=40;site.progress=.2;site.constructionStarted=true;
+    // A no-size paid plot retains its legacy definition while using real delivery.
+    G.game.res.wood=30;const site=G.addBuilding('pasture',30,10).b,cs=workers(G,site,1);
+    G.requestTask(cs[0]);until(G,cs,()=>site.progress>0);assert(site.construction.consumed);assert.equal(G.game.res.wood,0);const left=site.workLeft;
     const save=data(G);assert.equal(save.buildings.find(x=>x.id===b.id).pastureSize,undefined);G.applySaveData(save);
     const loaded=G.world.bmap[b.id];assert.equal(loaded.w,6);assert.equal(loaded.h,6);assert.equal(G.pastureCapacity(loaded),cap);
     assert.equal(loaded.animals,cap);assert.equal(loaded.animalGrowth,.4);assert.equal(G.workerMaximumOf(loaded),1);assert.equal(G.pastureSummary(loaded).capacityRule,'legacy');
-    assert.equal(G.world.bmap[site.id].workLeft,40);assert.equal(G.world.bmap[site.id].paidCost.wood,30);
+    assert.equal(G.world.bmap[site.id].workLeft,left);assert.equal(G.world.bmap[site.id].paidCost.wood,30);assert.equal(G.world.bmap[site.id].totalWork,50);
     if(type==='sheep')assert.equal(loaded.woolReady,7);if(type==='chicken'){assert.equal(loaded.pastureProducts.eggs,8);assert.equal(loaded.eggProgress,.5);}
   }
 });

@@ -168,7 +168,7 @@ test('valid preview discloses densities, three capacities, wood, work and staffi
   assert.match(text, /10×20.*200格/); assert.match(text, /羊 12 头.*牛 10 头.*鸡 33 只/);
   assert.match(text, /木材×75.*278 工时.*本作适配/); assert.match(text, /上限 2 人/);
   assert.match(text, /牛20格\/头、羊16格\/头、鸡6格\/只.*向下取整/);
-  assert.match(text, /工人实际砍伐搬木后施工/); assert.match(text, /确认才扣建材并创建工地/);
+  assert.match(text, /工人实际砍伐搬木后施工/); assert.match(text, /确认创建工地，不预扣\/预留材料/);
   const confirm = input(f, 'pasture-plan-confirm'); confirm.focus();
   const writes = input(f, 'pasture-plan-controls').htmlWrites;
   f.G.ui.refreshPasturePlanControls();
@@ -176,13 +176,13 @@ test('valid preview discloses densities, three capacities, wood, work and staffi
   assert.equal(input(f, 'pasture-plan-controls').htmlWrites, writes);
 });
 
-test('confirmation creates exactly one sized paid construction site and reselect leaves it intact', () => {
+test('confirmation creates exactly one sized construction material plan and reselect leaves it intact', () => {
   const f = planning(); preview(f);
   const wood = f.G.game.res.wood; activate(f).click();
   assert.equal(f.G.world.buildings.length, 1); const b = f.G.world.buildings[0];
   assert.equal(b.type, 'pasture'); assert.equal(b.state, 'site');
   assert.deepEqual(Array.from(b.pastureSize), [7, 7]); assert.equal(b.animals || 0, 0);
-  assert.equal(f.G.game.res.wood, wood - 35); assert.equal(b.totalWork, 69);
+  assert.equal(f.G.game.res.wood, wood); assert.equal(b.construction.required.wood,35); assert.equal(Object.values(b.construction.onsite).reduce((a,n)=>a+n,0),0); assert.equal(b.totalWork, 69);
   input(f, 'pasture-plan-confirm').click(2); assert.equal(f.G.world.buildings.length, 1);
   preview(f, 8, 8, 15, 15); const before = snapshot(f);
   input(f, 'pasture-plan-cancel').click();

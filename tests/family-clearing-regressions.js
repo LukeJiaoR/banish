@@ -123,7 +123,7 @@ for(const type of ['farm','house']) test(type+' orders retain trees and cancel w
   G.addTree(G.world,6,6,-200);const tree=G.world.trees[0],before={...G.game.res};
   const check=G.canPlace(G.world,type,6,6),result=G.addBuilding(type,6,6);
   assert.equal(check.ok,true);assert.equal(result.ok,true);assert.equal(G.siteTrees(result.b).length,1);
-  assert.equal(G.world.trees[0],tree);assert.equal(G.game.res.wood,before.wood-(G.BDEF[type].cost.wood||0));
+  assert.equal(G.world.trees[0],tree);assert.deepEqual(G.game.res,before);assert.deepEqual(result.b.construction.required,G.BDEF[type].cost);assert.deepEqual(result.b.construction.onsite,{});assert.equal(result.b.construction.consumed,false);
   G.removeBuilding(result.b);assert.equal(G.world.trees[0],tree);assert.deepEqual(G.game.res,before);assert.equal(G.world.buildings.length,0);
 });
 test('worksite trees take normal felling time and must be hauled',()=>{
@@ -137,14 +137,14 @@ test('worksite trees take normal felling time and must be hauled',()=>{
   for(let step=0;step<2000&&G.siteTrees(b).length;step++)G.stepCitizen(c,0.1);
   assert.equal(G.siteTrees(b).length,0);assert.equal(G.game.res.wood,wood);assert.ok(c.carry);
   for(let step=0;step<2000&&c.carry;step++)G.stepCitizen(c,0.1);
-  assert.equal(G.game.res.wood,wood+G.TREE_LOGS);assert.equal(b.constructionStarted,true);
+  assert.equal(G.game.res.wood,wood+G.TREE_LOGS);assert.equal(b.constructionStarted,false);assert.equal(b.construction.consumed,false);assert.equal(b.workLeft,b.totalWork);
 });
-test('canceling a partially cleared site leaves untouched trees and refunds half',()=>{
+test('canceling a clearing-only site leaves untouched trees and never refunds uncollected plans',()=>{
   const store=house(2,2);store.type='storage';
   G.addTree(G.world,12,12,-200);G.addTree(G.world,13,12,-200);
   const b=G.addBuilding('house',12,12).b,c=citizen('m',30);c.x=11;c.y=12;c.job=b.id;b.workers=[c.id];G.requestTask(c);
-  for(let step=0;step<20&&!b.constructionStarted;step++)G.stepCitizen(c,0.1);assert.equal(b.constructionStarted,true);const wood=G.game.res.wood;
-  G.removeBuilding(b);assert.equal(G.world.trees.length,2);assert.equal(c.task,null);assert.equal(c.pausedTask,null);assert.equal(G.game.res.wood,wood+8);
+  for(let step=0;step<20&&c.state!=='work';step++)G.stepCitizen(c,0.1);assert.equal(c.state,'work');assert.equal(c.task.kind,'clearSite');G.stepCitizen(c,0.1);assert(c.task.workLeft<c.task.work);assert.equal(b.constructionStarted,false);assert.equal(b.construction.consumed,false);const wood=G.game.res.wood;
+  G.removeBuilding(b);assert.equal(G.world.trees.length,2);assert.equal(c.task,null);assert.equal(c.pausedTask,null);assert.equal(G.game.res.wood,wood);assert.deepEqual(G.game.constructionLost,{});
   for(let step=0;step<100;step++)G.stepCitizen(c,0.1);assert.equal(G.world.trees.length,2);
 });
 test('free internal buildings cannot generate refunds',()=>{

@@ -149,6 +149,7 @@ G.serializeGame = function () {
       res: g.res, stats: g.stats, prevFood: g.prevFood, foodNet: g.foodNet, foodUrgent: g.foodUrgent, warned: g.warned,
       supplyMode:g.supplyMode,clothingSupply:g.clothingSupply,supplyStartedDay:g.supplyStartedDay,supplyUsed:g.supplyUsed,supplyLost:g.supplyLost,
       huntingLost:{...g.huntingLost},
+      constructionVersion:1,constructionLost:{...g.constructionLost},
       heating:g.heating, fishingRules:g.fishingRules, fireDisasters:g.fireDisasters, farmPests:g.farmPests, pasturePests:g.pasturePests, townLedger:g.townLedger, challenges:g.challenges, hist: g.hist, buildLog: g.buildLog, toolMode:g.toolMode,toolRemainders:g.toolRemainders,toolWear: g.toolWear, steelToolWear: g.steelToolWear, healthStartDay: g.healthStartDay, nomads:g.nomads, unlocks: g.unlocks, livestock: g.livestock,
       productionGoals: g.productionGoals && { ...g.productionGoals }, productionPaused: g.productionPaused && { ...g.productionPaused },
     },
@@ -162,6 +163,7 @@ G.serializeGame = function () {
     buildings: w.buildings.map(b => ({
       id: b.id, type: b.type, x: b.x, y: b.y, state: b.state,
       upgradeFrom:b.upgradeFrom, workerLimit:b.workerLimit, sitePaused:b.sitePaused, sitePriority:b.sitePriority, progress: b.progress, workLeft: b.workLeft, totalWork: b.totalWork, paidCost: b.paidCost, constructionStarted: b.constructionStarted,
+      construction:b.construction&&{required:{...b.construction.required},onsite:{...b.construction.onsite},consumed:b.construction.consumed,...(b.construction.legacyRefundHalf?{legacyRefundHalf:true}:{})},
       workers: b.workers, family: b.family, noWork: b.noWork, warnText: b.warnText,
       bridgeAxis: b.bridgeAxis, bridgeLength: b.type === 'bridge' ? b.w + b.h - 1 : undefined,
       houseFire:b.houseFire&&{...b.houseFire},ruinFrom:b.ruinFrom,ruinIncident:b.ruinIncident,
@@ -315,6 +317,10 @@ G.prepareSaveData = function (d) {
   }
   g.h = number(gd.h, '小时', 0, G.DAY_H); if (g.h === G.DAY_H) bad('小时');
   g.day = integer(gd.day, '天数'); g.season = integer(gd.season, '季节', 0, 3); g.year = integer(gd.year, '年份', 1);
+  const currentConstruction=gd.constructionVersion!==undefined;
+  if(currentConstruction&&gd.constructionVersion!==1)bad('建材配送版本');
+  if(currentConstruction!==(gd.constructionLost!==undefined))bad('建材配送损失记录缺失');
+  g.constructionLost={};if(currentConstruction){record(gd.constructionLost,'建材损失');for(const [k,n]of Object.entries(gd.constructionLost)){if(!G.RES_KEYS.includes(k))bad('建材损失类型');g.constructionLost[k]=number(n,'建材损失数量',0);}}
   const currentDeer=d.deer!==undefined;
   if(currentDeer!==(gd.huntingLost!==undefined))bad('鹿群存档状态不完整');
   if(currentDeer){const loss=record(gd.huntingLost,'猎获损失');
@@ -667,6 +673,24 @@ G.prepareSaveData = function (d) {
         b.paidCost[key] = number(bd.paidCost[key], '已付建材数量', 0);
       }
     }
+    if(bd.construction!==undefined){
+      if(!currentConstruction||['burntruins','mineralpit'].includes(b.type))bad('建材配送建筑');
+      const raw=record(bd.construction,'建材配送状态');
+      if(Object.keys(raw).some(k=>!['required','onsite','consumed','legacyRefundHalf'].includes(k))||typeof raw.consumed!=='boolean'||raw.legacyRefundHalf!==undefined&&raw.legacyRefundHalf!==true)bad('建材配送字段');
+      const required=record(raw.required,'计划建材'),onsite=record(raw.onsite,'现场建材'),paid=b.paidCost||def.cost;
+      if(Object.keys(required).length!==Object.keys(paid).length||Object.keys(required).some(k=>!Object.hasOwn(paid,k)||required[k]!==paid[k]))bad('计划建材与建筑成本不符');
+      b.construction={required:{...required},onsite:{},consumed:raw.consumed};
+      for(const [k,n]of Object.entries(onsite)){if(!Object.hasOwn(required,k))bad('现场建材类型');b.construction.onsite[k]=number(n,'现场建材数量',0,required[k]);}
+      if(raw.legacyRefundHalf)b.construction.legacyRefundHalf=true;
+      if(raw.consumed&&Object.keys(onsite).length||b.state==='ok'&&!raw.consumed)bad('建材消耗状态');
+      if(!raw.consumed&&(b.constructionStarted||b.progress>0||b.workLeft<b.totalWork)&&!raw.legacyRefundHalf)bad('未齐料不能已有施工');
+      if(raw.legacyRefundHalf&&!raw.consumed&&Object.entries(required).some(([k,n])=>(onsite[k]||0)!==n))bad('旧工地建材必须齐备');
+      if(raw.consumed&&b.state==='site'&&!b.constructionStarted)bad('建材消耗未开工');
+    }else if(b.state==='site'){
+      if(currentConstruction)bad('工地缺少建材配送状态');
+      const required=b.paidCost||def.cost;b.construction=G.newConstruction(required,required);
+      if(b.constructionStarted||b.progress>0||b.workLeft<b.totalWork)b.construction.legacyRefundHalf=true;
+    }
     if(b.orchardSize&&(!b.paidCost||Object.keys(b.paidCost).some(k=>k!=='wood')||(Object.keys(b.paidCost).length&&b.paidCost.wood!==def.cost.wood)))bad('面积果园已付建材');
     // Only genuine 12-wood / 36-work legacy orchards may retain the dense nine slots.
     if(b.type==='orchard'&&!b.orchardSize&&b.paidCost&&(Object.keys(b.paidCost).some(k=>k!=='wood')||(Object.keys(b.paidCost).length&&b.paidCost.wood!==def.cost.wood)))bad('旧果园已付建材不符');
@@ -751,6 +775,13 @@ G.prepareSaveData = function (d) {
     if (cd.carry != null) {
       record(cd.carry, '随身资源'); if (!G.RES_KEYS.includes(cd.carry.type)) bad('随身资源类型');
       carry = { type: cd.carry.type === 'food' ? 'grain' : cd.carry.type, qty: number(cd.carry.qty, '随身资源数量', 0) };
+      if(cd.carry.constructionId!==undefined||cd.carry.constructionReturn!==undefined){
+        if(!currentConstruction||!['wood','stone','iron'].includes(carry.type)||!cd.adult||cd.student||cd.carry.staffingReturn!==true||carry.qty<=0||carry.qty>G.CONSTRUCTION_HAUL||Object.keys(cd.carry).some(k=>!['type','qty','staffingReturn','constructionId','constructionReturn'].includes(k))||cd.carry.constructionReturn!==undefined&&cd.carry.constructionReturn!==true)bad('建材货批字段');
+        carry.constructionId=id(cd.carry.constructionId,'建材工地来源');carry.staffingReturn=true;
+        if(cd.carry.constructionReturn)carry.constructionReturn=true;
+        const site=w.bmap[carry.constructionId];
+        if(!carry.constructionReturn&&(!site?.construction||site.state!=='site'||site.sitePaused||site.construction.consumed||!Object.hasOwn(site.construction.required,carry.type)||cd.job!==site.id))bad('建材货批目的地');
+      }
       if(cd.carry.huntingId!==undefined){
         if(!currentDeer||!['meat','leather'].includes(carry.type)||cd.carry.staffingReturn!==true||
           ['smithInput','coatInput','tailorId','fuelInput','firewoodId','orchardId','pastureId','brewIngredient','supplyBatch'].some(k=>cd.carry[k]!==undefined)||
@@ -836,6 +867,12 @@ G.prepareSaveData = function (d) {
     }else c.grief=null;
     w.citizens.push(c); w.cmap[c.id] = c;
   }
+  // Validate accepted cargo as a whole before abandoning unsaved tasks. A
+  // loaded batch returns physically and can never become a second site refund.
+  const incoming=new Map();
+  for(const c of w.citizens)if(G.constructionCargo(c)&&!c.carry.constructionReturn){const cargo=c.carry,key=cargo.constructionId+':'+cargo.type;incoming.set(key,(incoming.get(key)||0)+cargo.qty);}
+  for(const b of w.buildings)if(b.construction&&!b.construction.consumed)for(const [k,n]of Object.entries(b.construction.required))if((b.construction.onsite[k]||0)+(incoming.get(b.id+':'+k)||0)>n)bad('在途和现场建材超出需求');
+  for(const c of w.citizens)if(G.constructionCargo(c))c.carry.constructionReturn=true;
   const chapelCounts={};
   for(const c of w.citizens)if(c.chapelId!==null){
     const chapel=w.bmap[c.chapelId];

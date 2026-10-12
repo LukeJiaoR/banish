@@ -31,7 +31,7 @@ G.fireFootprintGap=(a,b)=>Math.max(Math.max(0,a.x-b.x-b.w,b.x-a.x-a.w),Math.max(
 G.cancelFireRescue=function(c){for(const k of ['task','pausedTask'])if(c[k]?.kind==='firefight')c[k]=null;c.path=null;c.pi=0;c.walkKind='';c.state='idle';c.wanderT=.5;};
 G.finishHouseFire=function(b,burned){if(!b?.houseFire||G.world.bmap[b.id]!==b)return false;
  const incident=b.houseFire.incident;delete b.houseFire;for(const c of G.world.citizens)if(G.fireTaskOf(c)?.b===b)G.cancelFireRescue(c);
- if(burned){if(G.burnSupplyStock)G.burnSupplyStock(b);b.ruinIncident=incident;b.ruinFrom=b.type;b.type='burntruins';b.progress=1;b.workLeft=0;b.paidCost={};b.family=null;b.workers=[];b.noWork=false;b.warnText='';delete b.workerLimit;delete b.upgradeFrom;delete b.lastHeating;delete b.unheated;G.bumpNavigation(G.world);G.ui.toast('住房已烧毁，留下可清理的废墟；可支付新建材原址重建，无旧建材退款','warn');}
+ if(burned){G.recordConstructionLoss(G.constructionEntitlement(b));delete b.construction;if(G.burnSupplyStock)G.burnSupplyStock(b);b.ruinIncident=incident;b.ruinFrom=b.type;b.type='burntruins';b.progress=1;b.workLeft=0;b.paidCost={};b.family=null;b.workers=[];b.noWork=false;b.warnText='';delete b.workerLimit;delete b.upgradeFrom;delete b.lastHeating;delete b.unheated;G.bumpNavigation(G.world);G.ui.toast('住房已烧毁，留下可清理的废墟；可支付新建材原址重建，无旧建材退款','warn');}
  else{G.assignHousing();G.ui.toast('火情已扑灭，房屋重新开放入住；按当前空床重新安置，不挤占其他家庭','good');}
  return true;};
 G.advanceHousingFires=function(dtH){for(const b of G.activeHouseFires()){
@@ -85,4 +85,4 @@ G.fireRebuildQuote=function(b){const invalid={ok:false,key:'',cost:{},origin:nul
  const reason=missing.length?'重建材料不足：'+missing.map(([k,n])=>G.RES[k].name+' '+n).join('、'):!reachable?'没有成人可到达废墟施工':'原址按原房型重新建造，完成前仍需临时住房；原烧毁材料不回收';
  return {ok:!missing.length&&reachable,key:JSON.stringify([b.id,b.ruinFrom,b.ruinIncident,cost,!missing.length,reachable,homelessFamilies,G.isWinter()]),cost,origin:b.ruinFrom,homelessFamilies,winter:G.isWinter(),reason};};
 G.rebuildBurntHome=function(b,key,expectedGame=G.game){const q=G.fireRebuildQuote(b);if(expectedGame!==G.game||!q.ok||q.key!==key)return {ok:false,reason:'重建条件或村庄已改变，请重新确认'};
- for(const [k,n]of Object.entries(q.cost))G.game.res[k]-=n;b.type=q.origin;delete b.ruinFrom;delete b.ruinIncident;b.state='site';b.paidCost={...q.cost};b.workLeft=b.totalWork=G.BDEF[b.type].buildWork;b.progress=0;b.constructionStarted=false;b.family=null;b.workers=[];b.noWork=false;b.warnText='';b.sitePaused=false;delete b.sitePriority;delete b.workerLimit;G.bumpNavigation(G.world);G.scheduleJobs();return {ok:true,b};};
+ b.construction=G.newConstruction(q.cost);b.type=q.origin;delete b.ruinFrom;delete b.ruinIncident;b.state='site';b.paidCost={...q.cost};b.workLeft=b.totalWork=G.BDEF[b.type].buildWork;b.progress=0;b.constructionStarted=false;b.family=null;b.workers=[];b.noWork=false;b.warnText='';b.sitePaused=false;delete b.sitePriority;delete b.workerLimit;G.bumpNavigation(G.world);G.scheduleJobs();return {ok:true,b};};

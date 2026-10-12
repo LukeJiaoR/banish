@@ -12,31 +12,42 @@ function test(name, fn) {
 }
 function game(seed = 11) { const G = loadGame(root); G.newGame(seed); return G; }
 function advance(G, hours) { for (let n = 0; n < hours * 4 && !G.game.over; n++) G.advanceSim(.25); }
+// Seed 11's distant storage adds real delivery legs. The four-house wall now
+// finishes on day 16; keep a bounded 18-day check and stop at real completion.
+function finishWall(G,sites) {
+  for(let n=0;n<18*24*4&&!G.game.over&&sites.some(b=>b.state!=='ok');n++)G.advanceSim(.25);
+  complete(sites);
+}
 function wall(G) {
   const before = {...G.game.res};
   const sites = [33, 35, 37, 39].map(x => {
     const result = G.addBuilding('house', x, 29);
     assert.equal(result.ok, true, result.reason); return result.b;
   });
-  assert.equal(before.wood - G.game.res.wood, 64);
-  assert.equal(before.stone - G.game.res.stone, 32);
+  assert.deepEqual({...G.game.res}, before, 'placement is a plan, not a withdrawal');
+  assert.equal(sites.reduce((n,b)=>n+b.construction.required.wood,0),64);
+  assert.equal(sites.reduce((n,b)=>n+b.construction.required.stone,0),32);
+  for(const b of sites) { assert.deepEqual({...b.construction.onsite},{}); assert.equal(b.construction.consumed,false); }
   return sites;
 }
 function complete(sites) {
   for (const b of sites) {
     assert.equal(b.state, 'ok', `${b.type}@${b.x},${b.y}: ${b.workLeft} hours left`);
     assert.equal(b.progress, 1); assert.ok(b.workLeft <= 0);
+    assert.equal(b.construction.consumed,true);assert.deepEqual({...b.construction.onsite},{});
   }
 }
 
 test('native seed 11: four paid houses finish via their reachable north edges', () => {
   const G = game(), sites = wall(G), w = G.world;
   const c = w.cmap[sites[0].workers[0]];
-  const nearest = G.workSpot(w, sites[0], c.x, c.y);
+  // The old test confused the geometric edge with workSpot's reachable selector.
+  const nearest = {x:33,y:31}, chosen = G.workSpot(w, sites[0], c.x, c.y);
   assert.equal(G.findPath(w, Math.round(c.x), Math.round(c.y), nearest.x, nearest.y), null,
     'the geometrically closest edge is cut off by natural water and paid sites');
   assert.ok(G.findPath(w, Math.round(c.x), Math.round(c.y), 33, 28), 'north edge is reachable');
-  advance(G, 12 * 24); complete(sites);
+  assert.equal(chosen.y,28);assert.ok(G.findPath(w,Math.round(c.x),Math.round(c.y),chosen.x,chosen.y));
+  finishWall(G,sites);
   assert.equal(G.game.stats.died, 0);
 });
 
@@ -46,18 +57,19 @@ test('native seed 11: a saved construction queue resumes building without extra 
   // state or give resources when restoring the construction queue.
   const save = JSON.parse(JSON.stringify(G.serializeGame()));
   G.applySaveData(save);
-  assert.equal(G.game.res.wood, 16); assert.equal(G.game.res.stone, 16);
-  advance(G, 12 * 24); complete(sites.map(b => G.world.bmap[b.id]));
+  assert.equal(G.game.res.wood, 80); assert.equal(G.game.res.stone, 48);
+  for(const b of sites)assert.deepEqual({...G.world.bmap[b.id].construction.onsite},{});
+  finishWall(G,sites.map(b => G.world.bmap[b.id]));
   assert.equal(G.game.stats.died, 0);
 });
 
-test('native seed 11: canceling a paid wall site refunds and keeps remaining sites valid', () => {
+test('native seed 11: canceling an uncollected wall plan refunds nothing and keeps remaining sites valid', () => {
   const G = game(), sites = wall(G), removed = sites.splice(1, 1)[0];
   const before = {...G.game.res}; G.removeBuilding(removed);
-  assert.equal(G.game.res.wood, before.wood + 16);
-  assert.equal(G.game.res.stone, before.stone + 8);
+  assert.equal(G.game.res.wood, before.wood);
+  assert.equal(G.game.res.stone, before.stone);
   assert.equal(G.world.bmap[removed.id], undefined);
-  advance(G, 12 * 24); complete(sites);
+  finishWall(G,sites);
   for (const c of G.world.citizens) {
     assert.notEqual(c.job, removed.id);
     assert.notEqual(c.task && c.task.b, removed);
@@ -87,7 +99,7 @@ test('native seed 1: clearing trees, hauling, overnight pauses, and construction
   assert.ok(sawClear && sawHaul && sawBuild && sawPause);
   // Every cleared tree still produces and physically delivers the ordinary yield.
   advance(G, 24);
-  assert.equal(G.game.res.wood, deposited + trees * G.TREE_LOGS);
+  assert.equal(G.game.res.wood, deposited + trees * G.TREE_LOGS - b.paidCost.wood);
 });
 
 function geometry() {
@@ -96,6 +108,9 @@ function geometry() {
     road:new Uint8Array(N*N), bgrid:new Int32Array(N*N).fill(-1), treeIdx:new Int32Array(N*N).fill(-1),
     trees:[], rockCleared:[], marked:new Set(), markedRocks:new Set(), buildings:[], bmap:{}, citizens:[], cmap:{}, families:[], start:{x:5,y:10} };
   G.game = G.newGameState();
+  // Geometry fixture supplies a genuine, reachable material source. Sites use
+  // the paid API and workers withdraw/deliver their full cost normally.
+  assert(G.addBuilding('storage',2,2,{instant:true,free:true}).ok);
   const c = G.spawnCitizen({x:5,y:10,age:30,sex:'m'});
   const b = G.addBuilding('house',12,12).b;
   return {G, c, b};
@@ -106,11 +121,14 @@ test('geometry fixture: completely blocked perimeter does not build from a fallb
   for (let y=11;y<=14;y++) for (let x=11;x<=14;x++)
     if (x===11 || x===14 || y===11 || y===14) w.water[y*w.N+x]=1;
   G.requestTask(c);
-  assert.equal(c.task, null); assert.equal(c.state, 'idle');
+  const before={...G.game.res};
   advance(G, 48); assert.equal(b.workLeft, b.totalWork); assert.equal(b.progress, 0);
+  for(const k of Object.keys(b.paidCost))assert.equal(G.game.res[k],before[k]);assert.equal(b.construction.consumed,false);
   // Reopen a real perimeter entry. There is no stale reachability cache.
   w.water[11*w.N+12]=0; G.paintRoad(12,11,12,11); G.requestTask(c);
+  for(let i=0;i<2000&&c.task?.kind!=='build';i++)G.advanceSim(.1);
   assert.equal(c.task.kind, 'build'); assert.equal(c.task.tx,12); assert.equal(c.task.ty,11);
+  assert(G.constructionReady(b));
   advance(G, 8*24); complete([b]);
 });
 
@@ -118,11 +136,13 @@ test('geometry fixture: unreachable near perimeter yields to a farther reachable
   const {G,c,b} = geometry(), w=G.world;
   c.x=10;c.y=10;
   for (const [x,y] of [[10,11],[11,10],[12,11],[11,12]]) w.water[y*w.N+x]=1;
-  const near = G.workSpot(w,b,c.x,c.y);
-  assert.equal(near.x,11); assert.equal(near.y,11);
+  const near={x:11,y:11},chosen=G.workSpot(w,b,c.x,c.y);
   assert.equal(G.findPath(w,10,10,near.x,near.y),null);
-  G.requestTask(c); assert.equal(c.task.kind,'build');
-  assert.ok(G.findPath(w,10,10,c.task.tx,c.task.ty));
+  assert.notDeepEqual({...chosen},near);assert.ok(G.findPath(w,10,10,chosen.x,chosen.y));
+  G.requestTask(c);assert.equal(c.task.kind,'constructionMaterial');
+  for(let i=0;i<2000&&c.task?.kind!=='build';i++)G.advanceSim(.1);
+  assert.equal(c.task.kind,'build');assert(G.constructionReady(b));
+  assert.ok(G.findPath(w,Math.round(c.x),Math.round(c.y),c.task.tx,c.task.ty));
   advance(G, 8*24); complete([b]);
 });
 
@@ -144,11 +164,11 @@ test('native seed 11: completed construction updates the ordinary selected build
   global.window=global;global.G=G;
   global.document={getElementById(){return {addEventListener(){}};}};
   require(path.join(root,'js/ui.js'));
-  const info={innerHTML:'',querySelectorAll(){return [];}};
+  const info={innerHTML:'',querySelector(){return null;},querySelectorAll(){return [];}};
   G.ui.el.info=info;G.ui.toast=()=>{};G.ui.refreshHUD=()=>{};
   G.sel={kind:'b',id:b.id};G.ui.renderInfo();
-  assert.match(info.innerHTML,/建造中 0%/);assert.match(info.innerHTML,/取消工地/);
-  advance(G,12*24);complete(sites);G.ui.renderInfo();
+  assert.match(info.innerHTML,/等待工人从可达仓库取料并送抵工地/);assert.match(info.innerHTML,/需要 16 · 到场 0 · 在途 0 · 已投入 0 · 待领 16/);assert.match(info.innerHTML,/取消工地/);
+  finishWall(G,sites);G.ui.renderInfo();
   assert.doesNotMatch(info.innerHTML,/建造中|取消工地/);
   assert.match(info.innerHTML,/有人居住|空置/);assert.match(info.innerHTML,/>拆除<\/button>/);
 });

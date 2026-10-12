@@ -207,6 +207,8 @@ G.ui = { toast() {}, refreshHUD() {} };
   const w = G.world;
   const site = addB(w, 'house', 2, 2, 2, 2);
   site.state = 'site'; site.workLeft = 50; site.totalWork = 90;
+  // Existing manual fixture represents an already-paid legacy worksite.
+  site.construction = G.newConstruction(G.BDEF.house.cost, G.BDEF.house.cost); site.construction.legacyRefundHalf = true;
   w.rock[8 * w.N + 8] = 1;
   w.markedRocks.add(8 * w.N + 8); // 1 格待清岩石 → wantLabor = 1
   const c1 = G.spawnCitizen({ x: 5, y: 5, sex: 'm', age: 30 });

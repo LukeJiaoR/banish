@@ -89,6 +89,8 @@ function fixture() {
       w: def.w, h: def.h, state: 'ok', workers: [], family: null, noWork: false, warnText: '',
       progress: 1, totalWork: def.buildWork, workLeft: 0 }, options);
     if (type === 'farm') { b.farm = []; for (let y = b.y; y < b.y + b.h; y++) for (let x = b.x; x < b.x + b.w; x++) b.farm.push({ x, y, sown: false, harvested: false }); b.sownAll = false; b.growth = 0; b.harvestDone = false; }
+    // Existing direct fixtures model an already-paid, stocked legacy worksite.
+    if (b.state === 'site') { const cost=b.paidCost||def.cost;b.construction=G.newConstruction(cost,cost);if(b.constructionStarted||b.progress>0||b.workLeft<b.totalWork)b.construction.legacyRefundHalf=true; }
     G.ensureEconomyBuilding(b);
     G.world.buildings.push(b); G.world.bmap[b.id] = b;
     for (let y = b.y; y < b.y + b.h; y++) for (let x = b.x; x < b.x + b.w; x++) G.world.bgrid[y * N + x] = b.id;
@@ -359,7 +361,8 @@ test('site completion replaces focused pause with safe close and makes its old c
     const f = setup('woodcutter', { state: 'site', progress: .5, workLeft: 10, totalWork: 20, constructionStarted: true });
     if (wasPaused) input(f, 'construction-pause').click();
     const old = input(f, wasPaused ? 'construction-resume' : 'construction-pause'); old.focus();
-    f.b.workLeft = 0; f.G.finishBuilding(f.b);
+    if(wasPaused)f.G.setConstructionPaused(f.b,false);
+    const c=worker(f);until(f,c,()=>f.b.state==='ok');
     assert.equal(f.b.state, 'ok');
     if (update === 'timer') f.G.ui.renderInfo(); else old.click();
     assert.equal(f.doc.activeElement, input(f, 'info-close'), update);

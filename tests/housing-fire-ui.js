@@ -115,6 +115,8 @@ const pending = (f, kind = 'fire-rules') => !f.info.querySelector(`[data-${kind}
 const state = f => JSON.stringify(f.G.serializeGame());
 const begin = (f, kind) => control(f, 'start', kind).click();
 const confirm = (f, kind) => control(f, 'confirm', kind).click();
+function workUntil(f,condition){f.G.game.h=12;if(f.c.job!==f.home.id){f.G.releaseWorker(f.c);f.G.assignWorker(f.home,f.c);}if(!f.c.task&&!f.c.carry)f.G.requestTask(f.c);for(let i=0;i<10000&&!condition();i++)f.G.stepCitizen(f.c,.1);assert(condition(),'actual rebuilt home delivery/build must progress');}
+
 function setup() {
   const f = fixture(), G = f.G;
   f.building('storage'); f.hall = f.building('townhall'); f.home = f.building('house'); f.c = f.resident(f.home);
@@ -337,15 +339,15 @@ test('ruin review quotes full original wooden or stone home costs and winter hou
   }
 });
 
-test('one explicit rebuild pays full cost once, creates the real site, and detaches old callbacks', () => {
+test('one explicit rebuild creates the real unpaid material plan once, and detaches old callbacks', () => {
   for (const type of ['house', 'stonehouse']) {
     const f = ruins(type), before = { ...f.G.game.res }, cost = { ...f.G.BDEF[type].cost }, stale = control(f, 'confirm', 'fire-rebuild');
     begin(f, 'fire-rebuild'); confirm(f, 'fire-rebuild');
     assert.equal(f.home.type, type); assert.equal(f.home.state, 'site'); assert.equal(f.G.world.bmap[f.home.id], f.home);
     assert.equal(f.home.progress, 0); assert.equal(f.home.totalWork, f.G.BDEF[type].buildWork);
     assert.deepEqual({ ...f.home.paidCost }, cost); assert.equal(f.G.familyOf(f.c).houseId, null);
-    for (const [key, n] of Object.entries(cost)) assert.equal(f.G.game.res[key], before[key] - n);
-    assert.equal(control(f, 'start', 'fire-rebuild'), null); assert.match(f.info.querySelector('[data-site-status]').textContent, /建造中 0%/);
+    for (const [key, n] of Object.entries(cost)) {assert.equal(f.G.game.res[key], before[key]);assert.equal(f.home.construction.required[key],n);assert.equal(f.home.construction.onsite[key]||0,0);}
+    assert.equal(control(f, 'start', 'fire-rebuild'), null); assert.match(f.info.querySelector('[data-site-status]').textContent, /取料/);
     assert.equal(f.doc.activeElement, f.info.querySelector('#info-close'));
     const after = state(f); stale.click(); stale.click(); assert.equal(state(f), after);
   }
@@ -452,11 +454,11 @@ test('rebuild site pause, progress and cancellation keep existing construction r
   begin(f, 'fire-rebuild'); confirm(f, 'fire-rebuild');
   f.info.querySelector('#construction-pause').click(); assert(f.home.sitePaused);
   f.info.querySelector('#construction-resume').click(); assert(!f.home.sitePaused);
-  const refund = f.info.querySelector('[data-info-refund]'); assert.match(refund.textContent, /未开工.*退还全部/);
-  assert.doesNotMatch(refund.textContent, /旧屋回收|退还 0/); assert.equal(f.info.querySelectorAll('[data-info-refund]').length, 1);
-  f.home.progress = .5; f.home.workLeft = f.home.totalWork / 2; f.home.constructionStarted = true;
-  f.info.querySelector('#info-close').focus(); f.G.ui.renderInfo(); assert.match(refund.textContent, /退还一半/);
-  assert.match(f.info.querySelector('[data-site-status]').textContent, /50%/);
+  const refund = f.info.querySelector('[data-info-refund]'); assert.match(refund.textContent, /当前可立即返还：0 材料/);
+  assert.doesNotMatch(refund.textContent, /旧屋回收/); assert.equal(f.info.querySelectorAll('[data-info-refund]').length, 1);
+  workUntil(f,()=>f.home.progress>=.5);
+  f.info.querySelector('#info-close').focus(); f.G.ui.renderInfo(); assert.match(refund.textContent, /建材按一半回收/);
+  assert.match(f.info.querySelector('[data-site-status]').textContent, /建造中 [5-9][0-9]%/);
   f.info.querySelector('#info-demolish').click(); assert.equal(f.G.world.bmap[f.home.id], undefined);
   for (const [key, n] of Object.entries(cost)) assert.equal(f.G.game.res[key], before[key] - n / 2);
 });
@@ -464,7 +466,7 @@ test('rebuild site pause, progress and cancellation keep existing construction r
 test('finishing a rebuilt home returns housing details and makes prior cancel/pause callbacks inert', () => {
   const f = ruins('stonehouse'); begin(f, 'fire-rebuild'); confirm(f, 'fire-rebuild');
   const cancel = f.info.querySelector('#info-demolish'), pause = f.info.querySelector('#construction-pause'); pause.focus();
-  f.G.finishBuilding(f.home); f.G.ui.renderInfo();
+  workUntil(f,()=>f.home.state==='ok'); f.G.ui.renderInfo();
   assert.equal(f.home.state, 'ok'); assert.equal(f.home.type, 'stonehouse'); assert(f.info.querySelector('[data-home-residents]'));
   assert.equal(f.info.querySelector('[data-home-fire-panel]'), null); assert.equal(f.info.querySelector('#construction-pause'), null);
   assert.equal(f.doc.activeElement, f.info.querySelector('#info-close'));
