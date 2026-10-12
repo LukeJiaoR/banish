@@ -89,6 +89,8 @@ function fixture() {
       w: def.w, h: def.h, state: 'ok', workers: [], family: null, noWork: false, warnText: '',
       progress: 1, totalWork: def.buildWork, workLeft: 0 }, options);
     if (type === 'farm') { b.farm = []; for (let y = b.y; y < b.y + b.h; y++) for (let x = b.x; x < b.x + b.w; x++) b.farm.push({ x, y, sown: false, harvested: false }); b.sownAll = false; b.growth = 0; b.harvestDone = false; }
+    // Existing direct fixtures model an already-paid, stocked legacy worksite.
+    if (b.state === 'site') { const cost=b.paidCost||def.cost;b.construction=G.newConstruction(cost,cost);if(b.constructionStarted||b.progress>0||b.workLeft<b.totalWork)b.construction.legacyRefundHalf=true; }
     G.ensureEconomyBuilding(b);
     G.world.buildings.push(b); G.world.bmap[b.id] = b;
     for (let y = b.y; y < b.y + b.h; y++) for (let x = b.x; x < b.x + b.w; x++) G.world.bgrid[y * N + x] = b.id;
@@ -126,6 +128,8 @@ function setup(options = {}) {
 const state = f => JSON.stringify(f.G.serializeGame());
 const begin = f => control(f, 'start').click();
 const confirm = f => control(f, 'confirm').click();
+function workUntil(f,condition){if(f.c.job!==f.b.id){f.G.releaseWorker(f.c);f.G.assignWorker(f.b,f.c);}if(!f.c.task&&!f.c.carry)f.G.requestTask(f.c);for(let i=0;i<10000&&!condition();i++)f.G.stepCitizen(f.c,.1);assert(condition(),'actual delivery and construction must progress');}
+
 
 test('only a completed wooden house has the upgrade action', () => {
   for (const [type, status] of [['house', 'ok'], ['house', 'site'], ['stonehouse', 'ok'], ['stonehouse', 'site'], ['boarding', 'ok'], ['storage', 'ok']]) {
@@ -167,12 +171,12 @@ test('one explicit confirmation converts the real entity once and safely focuses
   assert.equal(f.b.type, 'stonehouse'); assert.equal(f.b.state, 'site');
   assert.equal(f.b.upgradeFrom, 'house'); assert.equal(f.b.totalWork, 120);
   assert.equal(f.b.family, null); assert.notEqual(f.G.familyOf(f.c).houseId, f.b.id);
-  assert.equal(f.G.game.res.wood, before.wood - 16);
-  assert.equal(f.G.game.res.stone, before.stone - 36);
-  assert.equal(f.G.game.res.iron, before.iron - 10);
+  assert.equal(f.G.game.res.wood, before.wood);assert.equal(f.b.construction.required.wood,24);assert.equal(f.b.construction.onsite.wood,8);
+  assert.equal(f.G.game.res.stone, before.stone);assert.equal(f.b.construction.onsite.stone,4);
+  assert.equal(f.G.game.res.iron, before.iron);assert.equal(f.b.construction.required.iron,10);
   assert.equal(control(f, 'start'), null);
   assert.equal(f.doc.activeElement, f.info.querySelector('#info-close'));
-  assert.match(f.info.querySelector('[data-site-status]').textContent, /木屋升级石屋.*建造中 0%/);
+  assert.match(f.info.querySelector('[data-site-status]').textContent, /木屋升级石屋.*取料/);
   const after = state(f); stale.click(); stale.click(); assert.equal(state(f), after);
 });
 
@@ -311,11 +315,11 @@ test('converted-site pause/resume, progress and cancellation retain one accurate
   const pause = f.info.querySelector('#construction-pause'); assert(pause); pause.click(); assert(f.b.sitePaused);
   f.info.querySelector('#construction-resume').click(); assert(!f.b.sitePaused);
   const refund = f.info.querySelector('[data-info-refund]');
-  assert.match(refund.textContent, /取消退还全部石屋已付建材.*包含旧屋回收材料.*不会还原木屋/);
+  assert.match(refund.textContent, /当前可立即返还：木材×8、石头×4.*不会还原木屋/);
   assert.equal(f.info.querySelectorAll('[data-info-refund]').length, 1);
-  f.b.progress = .5; f.b.workLeft = 60; f.b.constructionStarted = true;
+  workUntil(f,()=>f.b.progress>=.5);
   f.info.querySelector('#info-close').focus(); f.G.ui.renderInfo();
-  assert.match(refund.textContent, /取消退还一半/); assert.match(f.info.querySelector('[data-site-status]').textContent, /50%/);
+  assert.match(refund.textContent, /建材按一半回收/); assert.match(f.info.querySelector('[data-site-status]').textContent, /建造中 [5-9][0-9]%/);
   f.info.querySelector('#info-demolish').click(); assert.equal(f.G.world.bmap[f.b.id], undefined);
   assert.equal(f.G.game.res.wood, before.wood - 16 + 12);
   assert.equal(f.G.game.res.stone, before.stone - 36 + 20);
@@ -325,7 +329,7 @@ test('converted-site pause/resume, progress and cancellation retain one accurate
 test('completion removes upgrade-site controls, refreshes housing and makes all old destructive callbacks inert', () => {
   const f = setup(), oldHouseDemolish = f.info.querySelector('#info-demolish'); begin(f); confirm(f);
   const oldCancel = f.info.querySelector('#info-demolish'), oldPause = f.info.querySelector('#construction-pause'); oldPause.focus();
-  f.G.finishBuilding(f.b); f.G.ui.renderInfo();
+  workUntil(f,()=>f.b.state==='ok'); f.G.ui.renderInfo();
   assert.equal(f.b.type, 'stonehouse'); assert.equal(f.b.state, 'ok');
   assert.equal(control(f, 'start'), null); assert.equal(f.info.querySelector('#construction-pause'), null);
   assert.equal(f.doc.activeElement, f.info.querySelector('#info-close'));

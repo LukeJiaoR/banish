@@ -523,3 +523,6 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 #new-game-review { border:1px solid #b58c53; border-radius:8px; padding:10px 12px; margin-top:12px; background:rgba(110,62,28,.2); }
 #new-game-confirm { background:#76532e; }
 @media(max-width:480px) { .start-presets { grid-template-columns:1fr; } .start-settings-dialog { padding:16px; } .start-seed-row button { flex:1; } }
+
+/* Construction delivery keeps material facts readable in the existing panel. */
+.site-materials { white-space: pre-line; }

@@ -805,7 +805,9 @@ G.drawCitizen = function (ctx, c, time, homes) {
   const walking = c.state === 'walk' || c.state === 'haul';
   const rescue=G.fireTaskOf&&G.fireTaskOf(c);
   const shopping=G.supplyTaskOf&&G.supplyTaskOf(c);
-  const working = c.state === 'work'&&!rescue&&!shopping;
+  // Loading/unloading uses the existing empty/holding pose, not a hammer swing.
+  const materialTransfer = c.task?.kind === 'constructionMaterial';
+  const working = c.state === 'work'&&!rescue&&!shopping&&!materialTransfer;
   const bob = walking ? Math.abs(Math.sin(c.animT)) * 1.2 : (working ? Math.abs(Math.sin(c.animT)) * 0.6 : 0);
   const target = G.citizenWorkTarget(c);
   const facing = G.citizenFacing(c, target), flip = facing < 0;

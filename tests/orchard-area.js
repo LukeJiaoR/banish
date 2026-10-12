@@ -64,9 +64,9 @@ test('two and three farmers physically clear, construct, plant, care four years,
     const G=fresh(),w=G.world,[width,height]=size,tree={x:10+width-1,y:10+height-1,b:-48};tree.i=tree.y*w.N+tree.x;w.trees.push(tree);w.treeIdx[tree.i]=0;G.bumpNavigation(w);
     G.addBuilding('storage',30,2,{instant:true,free:true});
     const b=plot(G,size,false),count=G.orchardTreeCount(b),cs=workers(G,b,n);
-    assert.equal(G.siteTrees(b).length,1);assert.equal(G.game.res.wood,500-width-height);assert.equal(b.totalWork,width*height);G.finishBuilding(b);assert.equal(b.state,'site');
+    assert.equal(G.siteTrees(b).length,1);assert.equal(G.game.res.wood,500);assert.deepEqual(clone(b.construction.required),{wood:width+height});assert.deepEqual(clone(b.construction.onsite),{});assert.equal(b.totalWork,width*height);G.finishBuilding(b);assert.equal(b.state,'site');
     until(G,cs,()=>G.siteTrees(b).length===0);assert.equal(b.workLeft,width*height);
-    until(G,cs,()=>b.state==='ok');assert.equal(b.workLeft,0);assert.equal(b.progress,1);assert.equal(G.workerMaximumOf(b),n);
+    until(G,cs,()=>b.state==='ok');assert.equal(b.workLeft,0);assert.equal(b.progress,1);assert.equal(G.workerMaximumOf(b),n);assert.equal(b.construction.consumed,true);assert.equal(G.game.res.wood,500-width-height+G.TREE_LOGS);
     assert(G.setOrchardType(b,'apple'));
     until(G,cs,()=>b.orchardTrees.every(t=>t.planted));assert.equal(b.orchardYield,0);
     // The first tasks accepted at completion keep the old seed choice. Future slots use apples.
@@ -112,8 +112,9 @@ test('picked fruit remains conserved through full-store partial hauling, zero st
 test('area cost, construction progress and cancellation refund survive saves without gifting wood',()=>{
   const G=fresh(),size=[15,15],b=plot(G,size,false);size[0]=4;assert.equal(b.w,15);assert.equal(b.orchardSize[0],15);assert.equal(b.paidCost.wood,30);
   G.applySaveData(saved(G));const loaded=G.world.bmap[b.id];G.removeBuilding(loaded);assert.equal(G.game.res.wood,500);G.removeBuilding(loaded);assert.equal(G.game.res.wood,500);
-  const started=plot(G,[15,15],false);started.constructionStarted=true;started.workLeft-=7;started.progress=1-started.workLeft/started.totalWork;
-  G.applySaveData(saved(G));G.removeBuilding(G.world.bmap[started.id]);assert.equal(G.game.res.wood,485);
+  const started=plot(G,[15,15],false),cs=workers(G,started,3);
+  until(G,cs,()=>started.progress>0);assert(started.constructionStarted);assert(started.construction.consumed);assert.equal(G.game.res.wood,470);const left=started.workLeft;
+  G.applySaveData(saved(G));assert.equal(G.world.bmap[started.id].workLeft,left);G.removeBuilding(G.world.bmap[started.id]);assert.equal(G.game.res.wood,485);assert.equal(G.game.constructionLost.wood,15);
 });
 test('malformed area records reject atomically, including shape-stripped dense-legacy forgeries',()=>{
   const G=fresh(),b=plot(G),base=saved(G),world=G.world,game=G.game;

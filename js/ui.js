@@ -50,6 +50,8 @@ G.ui = {
       if (G.citizenIndoorHome && G.citizenIndoorHome(c)) return '屋内休息';
       return G.homeOf(c) ? '户外休息（未入屋）' : '露宿（无住房）';
     }
+    const construction = G.constructionCarryState && G.constructionCarryState(c);
+    if (construction) return construction;
     if (c.state === 'work') {
       if(c.task?.kind==='hunt')return '狩猎鹿 #'+c.task.deerId+'（完成后才获得肉皮）';
       if(c.task?.kind==='toolFetch')return '在通用仓领取个人工具（完成领取才扣库存）';
@@ -137,7 +139,7 @@ G.ui = {
     let status;
     if (b.state === 'site') {
       const trees = G.siteTrees ? G.siteTrees(b).length : 0;
-      status = trees ? `清理工地：还需砍 ${trees} 棵树（工人搬运入仓）` : `建造中 ${Math.floor(b.progress * 100)}%`;
+      status = this.siteInfoData(b).status;
     } else if (G.productionGoalOf('firewood') !== null && G.fuelLimited(b)) status = G.buildingGoalStatus(b);
     else if (G.fuelLimited(b)) status = '本屋暂停新批次：柴火库存已达本屋目标';
     else if (!G.jobCanProduce(b)) status = '本屋暂无新批次：缺原木';
@@ -154,8 +156,7 @@ G.ui = {
       status,
       workers: b.workers.map(id => G.world.cmap[id]).filter(Boolean).map(c => c.name).join('、') ||
         (b.state === 'site' ? '等待建筑工人' : '无'),
-      refund: b.state === 'site' && !b.constructionStarted && b.progress === 0 && b.workLeft >= b.totalWork
-        ? '未开工：取消退还全部已付建材，保留树木' : '已开工：拆除退还一半已付建材，已砍树不恢复',
+      refund: b.state === 'site' ? this.siteInfoData(b).refund : '已开工：拆除退还一半已付建材，已砍树不恢复',
     };
   },
 
@@ -569,7 +570,7 @@ G.ui = {
     if (Number.isFinite(s.workers)) lines.push(`本场牧人上限 ${s.workers} 人：面积不足200格为1人，200格及以上为2人；上限不保证配足`);
     if (s.reason) lines.push(s.reason);
     lines.push('原版密度：牛20格/头、羊16格/头、鸡6格/只，容量向下取整。新场建成后再购买并放入同种牲畜。');
-    lines.push('鼠标拖矩形或点两个角；手机点两个角。每边7–20格，确认才扣建材并创建工地。重选不撤销已确认工地；Esc / 右键退出。');
+    lines.push('鼠标拖矩形或点两个角；手机点两个角。每边7–20格，确认创建工地，不预扣/预留材料；到仓领取时扣除，送齐才施工。重选不撤销已确认工地；Esc / 右键退出。');
     const message = lines.join('\n'); if (text.textContent !== message) text.textContent = message;
     button._pastureIntent = s.ok ? { plan: s.plan, signature: s.signature, ...panel._pastureContext } : null;
     button.disabled = !s.ok || G.hasOpenModal();
@@ -660,7 +661,7 @@ G.ui = {
     if (Number.isFinite(s.workers)) lines.push(`本园农夫上限 ${s.workers} 人：每72格增加一岗，最多3人（本作适配）；可调低，上限不保证配足，不直接增加每株产量。`);
     if (s.reason) lines.push(s.reason);
     lines.push('买对应种子后逐株种植，4年有效养护成熟；每株秋收最多20果，实际采收送仓。旧6×6果园保留9株和2岗位，不按此新树距改排。');
-    lines.push('鼠标拖矩形或点两个角；手机点两个角。每边4–15格，确认才扣建材并创建工地。重选不撤销已确认工地；Esc / 右键退出。');
+    lines.push('鼠标拖矩形或点两个角；手机点两个角。每边4–15格，确认创建工地，不预扣/预留材料；到仓领取时扣除，送齐才施工。重选不撤销已确认工地；Esc / 右键退出。');
     const message = lines.join('\n'); if (text.textContent !== message) text.textContent = message;
     button._orchardIntent = s.ok ? { plan: s.plan, signature: s.signature, ...panel._orchardContext } : null;
     button.disabled = !s.ok || G.hasOpenModal();
@@ -716,7 +717,7 @@ G.ui = {
       const r = plan.result;
       const stone=plan.surface==='stone', bridge=plan.surface==='bridge';
       const changed=stone?status.materials.stone:r.newTiles;
-      message = bridge ? `木桥 ${r.path.length} 格 · 直线跨水\n桥头 (${plan.start.x},${plan.start.y}) → (${plan.end.x},${plan.end.y})\n材料：木材 ${status.materials.wood} / 石头 ${status.materials.stone} · 建造 ${r.path.length*3} 工时\n工人从岸边施工，完工前不可通行` :
+      message = bridge ? `木桥 ${r.path.length} 格 · 直线跨水\n桥头 (${plan.start.x},${plan.start.y}) → (${plan.end.x},${plan.end.y})\n材料：木材 ${status.materials.wood} / 石头 ${status.materials.stone} · 建造 ${r.path.length*3} 工时\n确认只建工地；材料从仓实运到岸边，送齐才施工，完工前不可通行` :
         `路线 ${r.path.length} 格 · ${stone?'新铺/升级':'新铺'} ${changed} · 复用 ${r.path.length-changed} · 转弯 ${r.turns} 次\n${stone?'石路每格1石，合计 '+status.materials.stone+' 石':'土路材料消耗：0'} · 尚需清树 ${status.trees.length} 棵`;
       const missing=Object.entries(status.materials).filter(([k,q])=>G.game.res[k]<q).map(([k,q])=>`${G.RES[k].name}差${Math.ceil(q-G.game.res[k])}`);
       if(missing.length)message+='\n材料不足：'+missing.join(' · ');
@@ -1084,7 +1085,7 @@ G.ui = {
             if ((priority?!!b.sitePriority:G.workforceSummary(b).paused) === desired) { this.refreshWorkforceInfo(b); return; }
             if ((priority?G.setConstructionPriority:G.setConstructionPaused)(b,desired)) {
               const message = panel.querySelector('[data-workforce-message]');
-              if (message) message.textContent = priority?(desired?'已设为优先施工。当前工作段和携货先结清，不会凭空增加工人。':'已恢复普通顺序；不会取消已完成工段或扣取新建材。'):desired ? '工地已暂停。已完成工段和已付建材保留；携货者仍需送仓。' : '工地已恢复，等待建筑工人；不会再次扣除已付建材。';
+              if (message) message.textContent = priority?(desired?'已设为优先施工。当前工作段和携货先结清，不会凭空增加工人。':'已恢复普通顺序；不会取消已完成工段或扣取新建材。'):desired ? '工地已暂停。已完成工段和到场建材保留；已领在途货仍需实运退仓。' : '工地已恢复，等待领料、送达和施工；已到场建材不重复领取。';
             }
             this.renderInfo();
           });
@@ -1106,13 +1107,32 @@ G.ui = {
   siteInfoData: function (b) {
     const w = G.world, trees = G.siteTrees ? G.siteTrees(b).length : 0;
     const upgrade = b.type === 'stonehouse' && b.upgradeFrom === 'house';
+    const summary = G.constructionSummary && G.constructionSummary(b);
     const untouched = !b.constructionStarted && b.progress === 0 && b.workLeft >= b.totalWork;
+    const materialText = summary ? summary.materials.map(m => `${G.RES[m.type].name}：需要 ${m.required} · 到场 ${m.onsite} · 在途 ${m.incoming} · 已投入 ${m.incorporated} · 待领 ${m.missing}`).join('\n') || '无需建材，清场后仍须实际施工。' : '旧工地建材已付；载入后保留原进度。';
+    const refundText = summary ? `当前可立即返还：${Object.entries(summary.refund).filter(([, n]) => n > 0).map(([k,n]) => `${G.RES[k].name}×${n}`).join('、') || '0 材料'}。${summary.legacyRefundHalf ? '旧档按历史已开工保留一半回收。' : summary.consumed ? '已投入施工的建材按一半回收。' : '未投入施工的到场建材全额回收。'}本作回收简化为直接返公共库存；在途货另行实运退仓，不计入此数。尚未领出的计划不退款。`
+      : untouched ? '未开工：取消退还全部已付建材，保留树木' : '已开工：拆除退还一半已付建材，已砍树不恢复';
     return {
-      status: (b.sitePriority?'优先施工 · ':'') + (upgrade ? '木屋升级石屋 · ' : '') + (trees ? `清理工地：还需砍 ${trees} 棵树（工人搬运入仓）` : `建造中 ${Math.floor(b.progress * 100)}%`),
+      status: (b.sitePriority ? '优先施工 · ' : '') + (upgrade ? '木屋升级石屋 · ' : '') + (summary ? summary.status + (summary.phase === 'clearing' ? `（还需 ${summary.clearing} 棵树）` : '') : trees ? `清理工地：还需砍 ${trees} 棵树（工人搬运入仓）` : `建造中 ${Math.floor(b.progress * 100)}%`),
       workers: b.workers.map(id => w.cmap[id]).filter(Boolean).map(c => c.name).join('、') || '等待建筑工人',
-      refund: upgrade ? `${untouched ? '未开工：取消退还全部' : '已开工：取消退还一半'}石屋已付建材（包含旧屋回收材料）。原木屋已拆除，取消升级不会还原木屋。`
-        : untouched ? '未开工：取消退还全部已付建材，保留树木' : '已开工：拆除退还一半已付建材，已砍树不恢复'
+      materials: materialText,
+      delivery: '新工地不预扣或预留公共库存：工人到仓/堆料场领料时扣除，实背到场，备齐才施工。缺料或断路会等待；暂停/转岗后的已领材料需送回仓，满仓保留。',
+      losses: '本档已记录不可回收建材：' + (Object.entries(G.game.constructionLost || {}).filter(([,n])=>n>0).map(([k,n])=>`${G.RES[k].name} ${Number(n.toFixed(2))}`).join('、') || '0') + '（搬运死亡、拆除未回收和住房烧毁等；旧档不追溯）。',
+      refund: refundText + (upgrade ? '原木屋已拆除，取消升级不会还原木屋。' : '已砍树不恢复。')
     };
+  },
+  siteInfoMarkup: function (data) {
+    return `<section class="economy-form" data-site-material-panel><h3>建材实运</h3><p class="row site-materials" data-site-materials>${this.escHtml(data.materials)}</p><p class="row desc" data-site-delivery>${this.escHtml(data.delivery)}</p><p class="row desc" data-site-losses>${this.escHtml(data.losses)}</p></section>`;
+  },
+  refreshSiteInfo: function (b) {
+    const el = this.el.info;
+    if (b.state !== 'site' || !el.querySelector?.('[data-site-material-panel]')) return false;
+    const data = this.siteInfoData(b);
+    for (const [key, selector] of [['status','[data-site-status]'],['workers','[data-site-workers]'],['materials','[data-site-materials]'],['delivery','[data-site-delivery]'],['losses','[data-site-losses]'],['refund','[data-info-refund]']]) {
+      const node = el.querySelector(selector);
+      if (node && node.textContent !== data[key]) node.textContent = data[key];
+    }
+    return true;
   },
   homeInfoData: function (b) {
     if (!['house', 'stonehouse','boarding'].includes(b.type) || b.state !== 'ok') return null;
@@ -1609,13 +1629,13 @@ G.ui = {
     const s = G.houseFireSummary && G.houseFireSummary(b);
     if (!s || !s.ruin || !G.fireRebuildQuote) return null;
     const quote = G.fireRebuildQuote(b), name = G.BDEF[quote.origin || s.origin]?.name || '原住宅';
-    return { quote, title: '原址重建住宅', start: '查看重建确认', confirm: '确认扣料并重建',
-      confirmation: `确认后按下方完整新建价扣料，原址开始重建${name}；施工完工前不能入住，实际需要可达建筑工人施工，不立即恢复住房。`,
+    return { quote, title: '原址重建住宅', start: '查看重建确认', confirm: '确认创建重建工地',
+      confirmation: `确认后原址创建${name}工地；新建材不预扣或预留，工人到仓领取并实运备齐后施工。完工前不能入住，不立即恢复住房。`,
       data: {
         origin: `原住宅：${name}。烧毁材料已损失，无旧料回收或抵扣；清理废墟退还 0 材料。`,
         cost: `完整新建材料：${this.resourceCost(quote.cost || {}, false)}。`,
         housing: `全镇无房家庭 ${Number(quote.homelessFamilies) || 0} 户。${quote.winter ? '⚠ 当前正值寒冬。' : ''}施工期间仍需可达空屋或宿舍、食物和柴火；冬季可能受冻，重建不预留床位。`,
-        reason: quote.ok ? '材料与施工条件满足，可以确认开始；仍须实际施工。' : `暂不能重建：${quote.reason || '请检查材料和可达建筑工人。'}`,
+        reason: quote.ok ? '当前材料与施工条件满足，可以确认创建工地；仍须领料、运到场和实际施工。' : `暂不能重建：${quote.reason || '请检查材料和可达建筑工人。'}`,
       } };
   },
   fireActionMarkup: function (kind, facts) {
@@ -1753,13 +1773,13 @@ G.ui = {
     const materials = values => ['wood', 'stone', 'iron'].map(key => `${G.RES[key].name} ${Number(values && values[key]) || 0}`).join(' · ');
     return { quote, data: {
       cost: `石屋完整建材：${materials(quote.cost)}`,
-      salvage: `旧屋回收抵扣：${materials(quote.salvage)}（按原屋实际投入）`,
-      due: `现在从库存补付：${materials(quote.due)}`,
+      salvage: `旧屋回收留在工地：${materials(quote.salvage)}（按原屋实际投入）`,
+      due: `仍需从库存实运：${materials(quote.due)}（到仓领料才扣，不预留）`,
       displaced: `开始后搬出：${quote.families} 户 / ${quote.people} 人；施工期间不能住在这里。`,
       housing: `全镇其余空屋 ${quote.freeHomes} 户 · 宿舍空位 ${quote.boardingSlots} 户。仅为全镇统计，未核实对住户是否可达，也不会预留床位。`,
       cold: `${quote.winter ? '⚠ 当前正值寒冬。' : '冬季风险：'}搬出后若无可达住处和柴火，住户可能受冻；即使全镇有空位也不能保证入住。`,
       fuel: `本作取暖：有人入住时，每屋每年约 ${quote.oldFuel} → ${quote.newFuel} 柴火（冬季集中消耗，省一半）。`,
-      reason: quote.ok ? '建材和可达建筑工人满足开始条件，实际完工仍需施工。' : `暂不能升级：${quote.reason || '请检查建材和可用建筑工人。'}`,
+      reason: quote.ok ? '当前库存和可达建筑工人满足开始条件，补料运到场后才能施工；其他工地可能先领取库存。' : `暂不能升级：${quote.reason || '请检查建材和可用建筑工人。'}`,
     } };
   },
   houseUpgradeInfoMarkup: function (facts) {
@@ -1770,7 +1790,7 @@ G.ui = {
       <p class="house-upgrade-warning">确认开始后立即拆除原木屋，住户搬出，原屋永久消失。取消升级工地也不会还原木屋。</p>
       <button type="button" id="house-upgrade-start" aria-expanded="false">查看升级确认</button>
       <div class="house-upgrade-confirm hidden" data-house-upgrade-confirm>
-        <p>已了解上方最新建材、搬迁和受冻风险？确认后立即补付建材并拆除木屋，原址改建石屋。</p>
+        <p>已了解上方最新建材、搬迁和受冻风险？确认后立即拆除木屋并留下回收材料；补料从仓实运到场后，原址施工石屋。</p>
         <div class="economy-actions"><button type="button" id="house-upgrade-confirm" class="danger">确认拆木屋并升级</button><button type="button" id="house-upgrade-cancel">取消，保留木屋</button></div>
       </div>
       <p class="economy-message" data-house-upgrade-message role="status" aria-live="polite"></p>
@@ -2969,6 +2989,7 @@ G.ui = {
     if (merchantChanged) force = true;
     // Workforce facts must update before every specialized panel's early return.
     if (sameSelection && G.sel.kind === 'b' && this._infoBuildState === selected.state) this.refreshWorkforceInfo(selected);
+    if (!force && sameSelection && G.sel.kind === 'b' && this._infoBuildState === 'site' && selected.state === 'site' && this._infoBuildType === selected.type && this.refreshSiteInfo(selected)) return;
     if (!force && sameSelection && selected.type === 'market' && this._infoBuildState === selected.state && this.refreshMarketSupplyInfo(selected)) return;
     if (!force && sameSelection && G.sel.kind === 'b' && this._infoBuildState === selected.state && this._infoBuildType === selected.type && this.refreshHomeInfo(selected)) return;
     // Update only fuel text, never replace this panel's focused buttons. A new
@@ -3130,7 +3151,7 @@ G.ui = {
       el.innerHTML = `
         <div class="info-head"><span>${def.icon} ${def.name}</span><button id="info-close">✕</button></div>
         <div class="row"${b.type === 'dock' && b.state === 'ok' ? ' data-fishing-status' : ''}${b.type === 'hunting' && b.state === 'ok' ? ' data-hunting-status' : ''}${siteData ? ' data-site-status' : ''}${homeData ? ' data-home-status' : ''}${fuelData ? ' data-fuel="status"' : ''}${medicalData ? ' data-medical="status"' : ''}${chainData ? ' data-resource-chain-live="status"' : ''}${hallData ? ' data-townhall="status"' : ''}${marketData ? ' data-market-supply="status"' : ''}${tavernData ? ' data-tavern="status"' : ''}${chapelData ? ' data-chapel="status"' : ''}${tailorData ? ' data-tailor="status"' : ''}${farmData ? ' data-farm="status"' : ''}${cemeteryData?' data-cemetery="status"':''}${schoolData?' data-school="status"':''}${b.state === 'ok' && ['tradingpost', 'pasture', 'orchard'].includes(b.type) ? ' data-economy-status' : ''}>${this.escHtml(status)}</div>
-        ${workers}${this.workforceInfoMarkup(b, workforceData)}${extra}
+        ${workers}${this.workforceInfoMarkup(b, workforceData)}${siteData ? this.siteInfoMarkup(siteData) : ''}${extra}
         <div class="row desc">${def.desc}</div>
         ${pit ? '' : `<div class="row desc" data-info-refund${fuelData ? ' data-fuel="refund"' : ''}>${ruin ? '清理烧毁废墟退还 0 材料；不能回收原屋材料。' : fireData?.summary.active ? '火灾进行中，暂不能拆除；关闭新增火灾也不会停止当前损伤。' : fuelData ? fuelData.refund : siteData ? siteData.refund : '已开工：拆除退还一半已付建材，已砍树不恢复'}</div>
         <button id="info-demolish" class="danger"${fireData?.summary.active ? ' disabled' : ''}>${b.state === 'site' ? '取消工地' : ruin ? '清理废墟（无返料）' : '拆除'}</button>${this.mineralRemovalMarkup(b)}`}`;
@@ -3180,7 +3201,7 @@ G.ui = {
         <div class="info-head"><span>🧑 ${this.escHtml(c.name)}</span><button id="info-close">✕</button></div>
         <div class="row" data-citizen-role>${c.sex === 'm' ? '男' : '女'} · ${Math.floor(c.age)} 岁 · ${c.student ? '学生' : c.adult ? '成人' : '儿童'}</div>
         <div class="row">职业：<span data-citizen-job>${jobName}</span> · <span data-citizen-status>${this.escHtml(status)}</span></div>
-        ${c.carry ? `<div class="row">随身：${this.cargoText(c.carry)}（${c.carry.smithInput?'铁匠原料已出库、尚未消耗':'未入库'}）</div>` : ''}
+        ${c.carry ? `<div class="row">随身：${this.cargoText(c.carry)}（${Number.isInteger(c.carry.constructionId)?'建材已出库、尚未投入施工':c.carry.smithInput?'铁匠原料已出库、尚未消耗':'未入库'}）</div>` : ''}
         <div class="row">家庭：${fam ? (fam.houseId != null ? '有房' : '无房') : '单身'}</div>
         <div data-citizen-household-supply>${supplyHome ? this.householdSupplyInfoMarkup(supplyHome) : ''}</div>
         ${this.studentInfoMarkup(c)}
@@ -4347,6 +4368,7 @@ G.placementInfo = function (type, x, y) {
   result.bounds = [Math.max(0,x-result.radius), Math.max(0,y-result.radius), Math.min(w.N,x+result.radius+1), Math.min(w.N,y+result.radius+1)];
   const lines = [`${def.name} · ${!check.ok ? '不能建：' + check.reason : !affordable ? '材料不足' : '可建造'}`];
   lines.push('材料（现有/需要）：' + (Object.keys(def.cost).map(k => `${G.RES[k].name} ${Math.floor(G.game.res[k])}/${def.cost[k]}`).join(' · ') || '无需建材，仍需施工'));
+  if (Object.keys(def.cost).length) lines.push('确认只创建工地，不预扣/预留库存；工人沿路到仓领料，实运送齐后才施工。');
   if (p.radius) {
     const trees = G.treesInRadius(w, x, y, p.radius, false).filter(t => !(t.x >= x && t.x < x + def.w && t.y >= y && t.y < y + def.h));
     result.trees = trees.length; result.mature = trees.filter(t => G.treeStage(t) >= 2).length;

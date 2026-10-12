@@ -3,7 +3,7 @@
 ## 核查口径
 
 - 核查日期：2026-10-12。已交付基线为 [`main@6cfbe2d7f91d4a41fe3cc06caa3b6954d1fefdea`](https://github.com/LukeJiaoR/banish/tree/6cfbe2d7f91d4a41fe3cc06caa3b6954d1fefdea)，版本 **0.3.64**；[鸡牧场 PR #66](https://github.com/LukeJiaoR/banish/pull/66) 已在此基线上。
-- 本文记录 **0.3.65** 牧场疫病/整群搬空增量（[Issue #67](https://github.com/LukeJiaoR/banish/issues/67)，[PR #68](https://github.com/LukeJiaoR/banish/pull/68)已合并），以及 **0.3.66** 两果树/果品酿酒增量（[Issue #69](https://github.com/LukeJiaoR/banish/issues/69)，[PR #70](https://github.com/LukeJiaoR/banish/pull/70)已合并），以及 **0.3.67** 面积牧场增量（[Issue #71](https://github.com/LukeJiaoR/banish/issues/71)，[PR #72](https://github.com/LukeJiaoR/banish/pull/72)已合并），以及 **0.3.68** 地图种子/无种子困难开局增量（[Issue #73](https://github.com/LukeJiaoR/banish/issues/73)，[PR #74](https://github.com/LukeJiaoR/banish/pull/74)已合并），以及 **0.3.69** 可变果园增量（[Issue #75](https://github.com/LukeJiaoR/banish/issues/75)、[PR #76](https://github.com/LukeJiaoR/banish/pull/76)已合并），以及 **0.3.70** 鹿群狩猎增量（[Issue #77](https://github.com/LukeJiaoR/banish/issues/77)）。增量源码用同提交相对链接；本文若位于未合并分支，最新增量仅是候选，交付仍以普通PR合并main为准。
+- 本文记录 **0.3.65** 牧场疫病/整群搬空增量（[Issue #67](https://github.com/LukeJiaoR/banish/issues/67)，[PR #68](https://github.com/LukeJiaoR/banish/pull/68)已合并），以及 **0.3.66** 两果树/果品酿酒增量（[Issue #69](https://github.com/LukeJiaoR/banish/issues/69)，[PR #70](https://github.com/LukeJiaoR/banish/pull/70)已合并），以及 **0.3.67** 面积牧场增量（[Issue #71](https://github.com/LukeJiaoR/banish/issues/71)，[PR #72](https://github.com/LukeJiaoR/banish/pull/72)已合并），以及 **0.3.68** 地图种子/无种子困难开局增量（[Issue #73](https://github.com/LukeJiaoR/banish/issues/73)，[PR #74](https://github.com/LukeJiaoR/banish/pull/74)已合并），以及 **0.3.69** 可变果园增量（[Issue #75](https://github.com/LukeJiaoR/banish/issues/75)、[PR #76](https://github.com/LukeJiaoR/banish/pull/76)已合并），以及 **0.3.70** 鹿群狩猎增量（[Issue #77](https://github.com/LukeJiaoR/banish/issues/77)、[PR #78](https://github.com/LukeJiaoR/banish/pull/78)已合并），以及 **0.3.71** 建材实运增量（[Issue #79](https://github.com/LukeJiaoR/banish/issues/79)）。增量源码用同提交相对链接；本文若位于未合并分支，最新增量仅是候选，交付仍以普通PR合并main为准。
 - 共列 40 项核心系统，按玩家能够做出的经营选择核查，不计算没有统一分母的“整体完成百分比”。本文件是范围审计，不是全功能、全平台或真实浏览器试玩通过证明。
 - 查验了实际定义、模拟、菜单、序列化及加载逻辑；先核完整 Git 树，再以固定 SHA 读取本地缺少的相关设计文档。README、旧片文档中的“下一步”不能单独证明现在缺失。例如旧医疗文档称游民传染未做，但当前 `advanceNomads` / `decideNomads` 已接上疾病；旧市政厅文档称市场配送未做，当前 `supply.js` 已实现。
 - 以下源码链接固定到上述基线，定位以函数或字段名为准。与原版比较的依据使用用户指定的 [Banished Wiki](https://banished-wiki.com/)；Wiki 里有旧版、预发布及互相不一致的描述，疑点单列，不把本作数值冒称为原版数值。
@@ -27,7 +27,7 @@
 | A2 宿舍与无房家庭安置 | 有适配简化 | [定义][defs] `boarding`；[模拟][sim] `boardingFamilies`、`assignHousing`，容纳 5 户，空独栋优先，无房多人户与单人户可入住；有独栋后迁出。 | 临时收容闭环已存在。每屋 75 柴/年、4×3 占地是本作设定；Wiki 宿舍页面的燃料说法与现有数值不同，不写成完全对齐。无需以“缺宿舍”另开功能。[Boarding House](https://banished-wiki.com/wiki/Boarding_House) |
 | A3 成家、生育、成长与老死 | 有适配简化 | [模拟][sim] `normalizeFamilyRelations`、`areCloseKin`、`joinFamilies`、`formFamilies`、`tryBirths`、`killCitizen`；空房约束新家庭，保存亲属/配偶；日界 `age += 1 / G.YEAR_DAYS`，70 岁后有老死概率。[存档][main]保存年龄与亲属关系。 | 人口不是只增不减。18 岁成家、在读学生不配对、亲属排除和每历年长 1 岁是适配；Wiki 的年龄时间换算与此不同，且其页面内部算例不一致。缺口是人口节奏对齐与展示，不是从零加家庭/寿命。未经独立玩法决策不直接把旧村年龄加速。[Housing](https://banished-wiki.com/wiki/Housing)、[Citizens](https://banished-wiki.com/wiki/Citizens) |
 | A4 吃饭、营养、饥饿与御寒 | 有适配简化 | [核心][core] `FOOD_KEYS`、`foodGroup`、`foodBasket`；[模拟][sim] 日界吃饭、`consumeFood`、`coldStep`、`heatHome`、`advanceHealth`；[配送][supply] `eatHousehold`。食物、服装、房屋和燃料各有真实作用，饥饿/寒冷可致死。 | 明确保持肉/蛋白、蔬菜、主食 **三营养组**；鸡蛋是独立货品、与肉共享蛋白组，旧通用树仍产蔬菜；0.3.66苹果/梨为独立物品，营养仍归蔬菜组。原版有更多具体食物及水果/坚果类别。本矩阵不授权新增第四营养组；应与果树品种和酒原料扩展分开决策。[Food](https://banished-wiki.com/wiki/Food)、[Citizens](https://banished-wiki.com/wiki/Citizens#Health) |
-| A5 用工、散工、清场和施工优先级 | 有适配简化 | [模拟][sim] `scheduleJobs`、`setWorkerLimit`、`setConstructionPaused`、`setConstructionPriority`、`siteTrees`、`addBuilding`；[地图][map] 标记采伐/采矿；[界面][ui] 用工及工地操作。工人清场、搬货后施工，暂停/撤岗保护既有货批。 | 已有真实工人与生产机会成本；本作以建筑用工上限、自动调度为主，不等同原版按职业总数分配。建材付款仍主要为开工时公共扣款，没有逐件运建材到工地。不为“补职业面板”重写现有调度。[Citizens / Professions](https://banished-wiki.com/wiki/Citizens#Professions) |
+| A5 用工、散工、清场、施工优先级与建材实运 | 有适配简化（0.3.71 增量） | [本片模拟](../js/sim.js) `scheduleJobs`、`setConstructionPaused`、`setConstructionPriority`、`constructionSummary` 与建材领取/交付；[存档](../js/main.js) 已付旧工地迁移；[界面](../js/ui.js) 实时材料清单。工人清场、到仓领料、实运到场，齐料才施工，见 [#79](https://github.com/LukeJiaoR/banish/issues/79)、[规则](construction-delivery.md)。 | 已补入场建材运输；本作仍合并建筑工人的清场/运输/施工职责、采用用工上限与自动调度。公共仓共享、初始须够价、取消立即返到场/已投入材料均明确为适配；不重复另造职业或库存平台。[Builder](https://banished-wiki.com/wiki/Builder)、[Laborers](https://banished-wiki.com/wiki/Laborers) |
 
 ## 二、食物生产（10 项）
 
@@ -91,7 +91,7 @@
 
 ## 下一步优先的非灾难玩法
 
-以下是按新增经营选择、现有系统复用和美术可见性排序的建议，**不是已开始实现或已交付的承诺**。后续开发先建对应 Issue，写清最小范围、旧档策略、美术及完成条件，再关联任务分支与 PR；不替已经合并的片段补造“事前跟踪票”。当前 #69 完成后再选下一片，不为填满表格重写已交付系统。
+以下是按新增经营选择、现有系统复用和美术可见性排序的建议，**不是已开始实现或已交付的承诺**。后续开发先建对应 Issue，写清最小范围、旧档策略、美术及完成条件，再关联任务分支与 PR；不替已经合并的片段补造“事前跟踪票”。每一片以实际合并状态为准，不为填满表格重写已交付系统。
 
 ### 已完成的最小切片：两果树与果品酿酒
 
@@ -119,7 +119,11 @@
 
 **真实玩法缺口仍保留：**其余作物/果树目录、逐仓实物库存、山地隧道、地图/气候选择。不可把它们一口气扩成框架；气候需要真实霜期/冷伤/取暖差异与旧档保全，隧道先需真实山体。新预设标签没有这些规则就没有玩家价值。
 
-优先候选可缩为**坚果果园（栗子/核桃）**：两类种子交易、现有逐株种养/换种、独立坚果采运与消费/贸易，不扩气候或果树平台。[Chestnut](https://banished-wiki.com/wiki/Chestnut) 与 [Walnut](https://banished-wiki.com/wiki/Walnut) 均确认果园种植、种子2500与果品贸易价1；现源码 `ORCHARD_TYPES` 只有旧树/苹果/梨，确实尚无坚果物品。营养组及产量须在对应Issue明确适配，不能把既有肉或苹果换名成坚果。这里只记录范围候选，尚未建票/开发。
+当前优先片改为**建材实际配送**，范围见 [#79](https://github.com/LukeJiaoR/banish/issues/79) 与 [建材实运](construction-delivery.md)：原 0.3.70 仅在放置时全额扣库存，没有工人取料到场；本片补真实运入并守住旧已付工地合同，仍不扩成逐仓库存。
+
+坚果目录暂缓：玩家现有三营养组是“肉、蔬菜、主食”，不能为了植物蛋白悄悄把“肉”改为泛蛋白组。栗子/核桃虽有原版物品依据，但分类尚未约定；新增两种品名的收益低于缺失的建材运输链。
+
+建材配送之后的候选按玩家经营影响排序：工业邻近住房的幸福影响、剩余作物与有真实区别的收成时序，再到剩余果品目录。幸福惩罚若会改变旧村需先写清保护与预览；作物气候差异不能靠标签假装已实现。上述仍是候选，不是已建票或已开工。
 
 下一片先查现有Issue和具体试玩证据，再选一个最小完整玩法。不得把本段候选当成已经启动或已经交付，也不因一个PR结束就宣称整个原版复刻完成。
 
