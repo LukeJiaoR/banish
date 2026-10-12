@@ -481,6 +481,19 @@ G.drawFarmPlan=function(ctx){
   ctx.restore();
 };
 
+// New pasture previews share the established tile/outline drawing vocabulary.
+G.drawPasturePlan=function(ctx){
+  if(!G.isPasturePlanning||!G.isPasturePlanning())return;
+  const p=G.pastureDrag||G.pasturePlan;if(!p||p.world!==G.world)return;
+  const bounds=G.farmBounds(p.end?p:{...p,end:p.start});if(!bounds)return;
+  const {x,y,w,h}=bounds,size=[w,h],def=G.pastureDefinition(size),check=def?G.canPlace(G.world,'pasture',x,y,size):{ok:false};
+  const ok=check.ok&&Object.entries(def.cost).every(([k,v])=>G.game.res[k]>=v);
+  ctx.save();ctx.fillStyle=ok?'rgba(120,230,140,.28)':'rgba(230,90,80,.25)';ctx.strokeStyle=ok?'#c4e89b':'#e78f80';ctx.lineWidth=1/G.cam.z;
+  if(def)for(let yy=y;yy<y+h;yy++)for(let xx=x;xx<x+w;xx++){G.diamondPath(ctx,...G.T2S(xx,yy));ctx.fill();ctx.stroke();}
+  else{ctx.beginPath();[[x,y],[x+w,y],[x+w,y+h],[x,y+h]].forEach(([xx,yy],i)=>{const [sx,sy]=G.T2S(xx,yy);if(i)ctx.lineTo(sx,sy);else ctx.moveTo(sx,sy);});ctx.closePath();ctx.fill();ctx.stroke();}
+  ctx.restore();
+};
+
 G.drawFarmGround = function (ctx, b, bounds) {
   const pal = G.PAL[G.game.season];
   const soilTex = pal.snow ? 'farm_soil_snow' : 'farm_soil';
@@ -562,6 +575,26 @@ G.drawEconomyFieldGround = function (ctx, b, bounds) {
   }
 };
 
+// Keep legacy pen composition intact; area-sized pens distribute actual animals
+// over their true footprint without stretching any original sprite.
+G.pastureAnimalSpots=function(b){
+  const count=Math.max(0,Math.floor(b.animals||0));
+  if(!b.pastureSize){
+    const spots=[[3.2,1.2],[4.7,1.6],[2.8,2.7],[4.5,3.1],[1.2,3.2],[1.5,4.7],[3.1,4.8],[4.8,4.8],[2.2,3.9],[3.8,4],[4,2],[.9,4.2]];
+    if(G.pastureTypeOf(b)==='chicken')spots.push(...spots.map(([x,y])=>[Math.min(5.5,x+.35),Math.min(5.5,y+.35)]));
+    return spots.slice(0,count);
+  }
+  if(!count)return [];
+  const cols=Math.ceil(Math.sqrt((count+10)*b.w/b.h)),rows=Math.ceil((count+10)/cols),spots=[];
+  for(let row=0;row<rows;row++)for(let col=0;col<cols;col++){
+    const x=.8+(b.w-1.6)*(col+.5)/cols+Math.sin(col*2.1+row*3.7)*.13,
+      y=.8+(b.h-1.6)*(row+.5)/rows+Math.cos(row*2.3+col*3.1)*.13;
+    if(x<3.4&&y<3.4)continue; // Keep feet out of the original shelter footprint.
+    spots.push([x,y]);
+  }
+  return Array.from({length:Math.min(count,spots.length)},(_,i)=>spots[Math.floor((i+.5)*spots.length/count)]);
+};
+
 G.addEconomyFieldParts = function (items, b, bounds) {
   const add = part => {
     if (bounds && (part.x < bounds.tx0 - 2 || part.x > bounds.tx1 + 2 || part.y < bounds.ty0 - 2 || part.y > bounds.ty1 + 2)) return;
@@ -585,10 +618,7 @@ G.addEconomyFieldParts = function (items, b, bounds) {
       add({ kind: 'fruitTree', x: b.x + x, y: b.y + y, ti:Math.floor(y/2)*3+Math.floor(x/2) });
   } else {
     add({ kind: 'sheepShelter', x: b.x + 2.1, y: b.y + 2.1 });
-    const spots = [[3.2, 1.2], [4.7, 1.6], [2.8, 2.7], [4.5, 3.1], [1.2, 3.2], [1.5, 4.7],
-      [3.1, 4.8], [4.8, 4.8], [2.2, 3.9], [3.8, 4], [4, 2], [0.9, 4.2]];
-    if(G.pastureTypeOf(b)==='chicken')spots.push(...spots.map(([x,y])=>[Math.min(5.5,x+.35),Math.min(5.5,y+.35)]));
-    const count = Math.min(spots.length, Math.max(0, Math.floor(b.animals || 0)));
+    const spots=G.pastureAnimalSpots(b),count=spots.length;
     for (let i = 0; i < count; i++) add({ kind: G.pastureTypeOf(b), x: b.x + spots[i][0], y: b.y + spots[i][1], n: i });
   }
 };
@@ -903,7 +933,7 @@ G.frame = function (dtReal) {
 
   // 建造幽灵：贴着地面画、在建筑之前——后面的建筑/树会正确把它挡住，
   // 不会出现“绿色预览浮在已有建筑上”的误导
-  if (G.tool && G.tool.kind === 'build' && G.hover.tx >= 0 && !(G.isFarmPlanning&&G.isFarmPlanning())) {
+  if (G.tool && G.tool.kind === 'build' && G.hover.tx >= 0 && !(G.isFarmPlanning&&G.isFarmPlanning()) && !(G.isPasturePlanning&&G.isPasturePlanning())) {
     const def = G.BDEF[G.tool.type];
     const ox = G.hover.tx - ((def.w - 1) >> 1), oy = G.hover.ty - ((def.h - 1) >> 1);
     const chk = G.canPlace(w, G.tool.type, ox, oy);
@@ -932,6 +962,7 @@ G.frame = function (dtReal) {
   }
 
   G.drawFarmPlan(ctx);
+  G.drawPasturePlan(ctx);
 
   // 矿石与道路工具悬停（同样贴地）
   if (G.tool && G.tool.kind === 'quarry' && G.hover.tx >= 0 && G.hover.ty >= 0 && G.hover.tx < w.N && G.hover.ty < w.N) {

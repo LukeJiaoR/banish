@@ -552,17 +552,26 @@ G.workSpot = function (w, b, fx, fy, reachable = false) {
 };
 
 /* ---------- 放置判定 ---------- */
-// Only farm plots opt into variable dimensions; old/default definitions stay fixed.
+// Explicit sizes opt fields into area rules; missing sizes retain legacy plots.
 G.farmDefinition=function(size){
   const d=G.BDEF.farm;if(size===undefined)return d;
   if(!Array.isArray(size)||size.length!==2||!size.every(n=>Number.isInteger(n)&&n>=4&&n<=15))return null;
   return {...d,w:size[0],h:size[1],buildWork:d.buildWork*size[0]*size[1]/64};
 };
 G.initialFarmWorkers=size=>Math.min(4,Math.max(1,Math.ceil(size[0]*size[1]/56)));
-G.canPlace = function (w, type, ox, oy, farmSize) {
-  if(type==='farm'&&(!Number.isInteger(ox)||!Number.isInteger(oy)))return {ok:false,reason:'农田坐标须为整数'};
-  const def = type==='farm'?G.farmDefinition(farmSize):G.BDEF[type];
-  if(!def||(farmSize!==undefined&&type!=='farm'))return {ok:false,reason:'农田每边须为4至15格的整数'};
+G.pastureDefinition=function(size){
+  const d=G.BDEF.pasture;if(size===undefined)return d;
+  if(!Array.isArray(size)||size.length!==2||![size[0],size[1]].every(n=>Number.isInteger(n)&&n>=7&&n<=20))return null;
+  const [w,h]=size;
+  // Fence cost and building effort are explicit small-map adaptations.
+  return {...d,w,h,cost:{wood:Math.ceil(d.cost.wood*(w+h)/12)},buildWork:Math.ceil(d.buildWork*w*h/36),jobs:w*h>=200?2:1};
+};
+G.initialPastureWorkers=size=>G.pastureDefinition(size)?.jobs||0;
+G.buildingDefinition=b=>!b?null:b.type==='farm'?G.farmDefinition(b.farmSize):b.type==='pasture'?G.pastureDefinition(b.pastureSize):G.BDEF[b.type];
+G.canPlace = function (w, type, ox, oy, fieldSize) {
+  if(['farm','pasture'].includes(type)&&(!Number.isInteger(ox)||!Number.isInteger(oy)))return {ok:false,reason:(type==='farm'?'农田':'牧场')+'坐标须为整数'};
+  const def = type==='farm'?G.farmDefinition(fieldSize):type==='pasture'?G.pastureDefinition(fieldSize):G.BDEF[type];
+  if(!def||(fieldSize!==undefined&&!['farm','pasture'].includes(type)))return {ok:false,reason:type==='pasture'?'牧场每边须为7至20格的整数':'农田每边须为4至15格的整数'};
   if(def.unbuildable)return {ok:false,reason:def.name+'不能主动建造或重新开发'};
   const N = w.N;
   if (ox < 0 || oy < 0 || ox + def.w > N || oy + def.h > N) return { ok: false, reason: '超出地图范围' };

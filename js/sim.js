@@ -1956,7 +1956,7 @@ G.pickSchool = function(counts,c){return G.schoolCandidate(c,counts)?.b||null;};
  * 人手最多的非粮食岗 → 粮食富余岗（人数 > 按人口测算的需求） */
 G.pickMarkDonor = function (w, harvestSeason, foodJobs, needFood) {
   const isFoodRole=b=>foodJobs.includes(b.type)||(b.type==='farm'&&G.farmHarvestReady(b));
-  const staffed = w.buildings.filter(b => b.state === 'ok' && G.BDEF[b.type].jobs > 0 && b.workers.length > 0);
+  const staffed = w.buildings.filter(b => b.state === 'ok' && G.workerMaximumOf(b) > 0 && b.workers.length > 0);
   const adultsOf = (b) => b.workers.map(id => w.cmap[id]).filter(c => c && !c.dead && c.adult && !G.goalCommitment(c) && !G.mineralDeliveryBlocked(c));
   for (const b of staffed) {
     const xs = adultsOf(b);
@@ -2111,7 +2111,7 @@ G.scheduleJobs = function () {
         const busyAll = w.citizens.filter(ci => {
           if (ci.dead || !ci.adult || ci.job == null || G.goalCommitment(ci)) return false;
           const jb = w.bmap[ci.job];
-          return jb && jb.state === 'ok' && G.BDEF[jb.type].jobs > 0 && jb.type !== 'school'
+          return jb && jb.state === 'ok' && G.workerMaximumOf(jb) > 0 && jb.type !== 'school'
             && !(jb.type === 'farm' && !jb.sownAll && (G.game.season === 0 || G.game.season === 1) && jb.workers.length <= 1); // 教师不抽调
         });
         let pool = busyAll.filter(ci => !isFoodRole(w.bmap[ci.job]));
@@ -2131,7 +2131,7 @@ G.scheduleJobs = function () {
   // 第二优先：普通工作岗位（不侵占标记散工预留；柴火到上限的伐木屋不拉人）
   for (const b of w.buildings) {
     if (b.state !== 'ok') continue;
-    const def = G.BDEF[b.type];
+    const def = G.buildingDefinition(b);
     if (!def.jobs || !G.jobCanProduce(b)) continue;
     if (b.type !== 'herbalist' && G.productionLimited(b)) continue; // 柴火/工具达到上限的岗位不拉人，空闲者留给「砍伐」标记
     let guard = 0;
@@ -2150,7 +2150,7 @@ G.scheduleJobs = function () {
   const FOOD_SET = ['gatherer', 'dock', 'hunting', 'farm'];
   const foodWorkerCount = () => w.buildings.filter(x => x.state === 'ok' && isFoodRole(x)).reduce((n, x) => n + x.workers.length, 0);
   const targets = w.buildings
-    .filter(b => b.state === 'ok' && G.BDEF[b.type].jobs > 0 && b.workers.length < G.workerLimitOf(b) && !b.noWork && G.jobCanProduce(b))
+    .filter(b => b.state === 'ok' && G.workerMaximumOf(b) > 0 && b.workers.length < G.workerLimitOf(b) && !b.noWork && G.jobCanProduce(b))
     .sort((a, b2) => (a.type === 'woodcutter' ? -1 : b2.type === 'woodcutter' ? 1 : 0));
   for (const b of targets) {
     const eligibleForTarget = c => c && !G.goalCommitment(c) && (b.type !== 'hospital' || !G.isSick(c)) && (b.type!=='chapel'||(!G.isSick(c)&&c.hunger<=0)) && (b.type!=='tavern'||(c.age>=18&&!G.isSick(c)));
@@ -2170,7 +2170,7 @@ G.scheduleJobs = function () {
     // 供体 2：有闲置工人的岗位（工人正闲着就是临时富余；粮食岗至少留 1 人。
     // 旧实现要求「全员闲置」——那种时刻几乎不会同时出现，抽调链一断，
     // 关键岗位（伐木屋）会永久 0 工人，柴火归零冻死人）
-    const lazy = w.buildings.find(x => x !== b && x.state === 'ok' && G.BDEF[x.type].jobs > 0 && x.workers.length > 0
+    const lazy = w.buildings.find(x => x !== b && x.state === 'ok' && G.workerMaximumOf(x) > 0 && x.workers.length > 0
       && x.type !== 'school' // 教师不外借，保证学堂开学
       && (!FOOD_SET.includes(x.type) || (x.workers.length > 1 && (isFoodRole(b) || foodWorkerCount() > needFood)))
       && x.workers.some(id => { const c = w.cmap[id]; return eligibleForTarget(c) && c.state === 'idle' && !c.task; }));
@@ -2217,16 +2217,16 @@ G.siteTrees = function (b) {
 };
 G.addBuilding = function (type, x, y, opt) {
   opt = opt || {};
-  const def=type==='farm'?G.farmDefinition(opt.farmSize):G.BDEF[type];
+  const def=type==='farm'?G.farmDefinition(opt.farmSize):type==='pasture'?G.pastureDefinition(opt.pastureSize):G.BDEF[type];
   if(def?.unbuildable)return {ok:false,reason:def.name+'不能主动建造或重新开发'};
-  if(!def||(opt.farmSize!==undefined&&type!=='farm'))return {ok:false,reason:'农田每边须为4至15格的整数'};
+  if(!def||(opt.farmSize!==undefined&&type!=='farm')||(opt.pastureSize!==undefined&&type!=='pasture'))return {ok:false,reason:type==='pasture'?'牧场每边须为7至20格的整数':'农田每边须为4至15格的整数'};
   const w = G.world;
   if (!opt.free) {
     for (const k in def.cost) {
       if (G.game.res[k] < def.cost[k]) return { ok: false, reason: `${G.RES[k].name}不足（需要 ${def.cost[k]}）` };
     }
   }
-  const chk = G.canPlace(w, type, x, y, opt.farmSize);
+  const chk = G.canPlace(w, type, x, y, type==='pasture'?opt.pastureSize:opt.farmSize);
   if (!chk.ok) return chk;
   if (opt.instant && G.siteTrees({ x, y, w: def.w, h: def.h }).length) return { ok: false, reason: '立即放置需要已清场的地面' };
   if (!opt.free) for (const k in def.cost) G.game.res[k] -= def.cost[k];
@@ -2242,6 +2242,7 @@ G.addBuilding = function (type, x, y, opt) {
     workers: [], family: null, noWork: false, warnText: '',
     paidCost: opt.free ? {} : Object.assign({}, def.cost), constructionStarted: false,
   };
+  if(type==='pasture'&&opt.pastureSize!==undefined){b.pastureSize=[...opt.pastureSize];b.workerLimit=G.initialPastureWorkers(b.pastureSize);}
   if (type === 'farm') {
     if(opt.farmSize!==undefined){b.farmSize=[...opt.farmSize];b.workerLimit=G.initialFarmWorkers(b.farmSize);}
     b.cropType='wheat';b.cropChoice='wheat';
@@ -2344,7 +2345,8 @@ G.finishBuilding = function (b) {
   b.progress = 1;
   G.bumpNavigation(G.world);
   // 建造工人多于正式岗位时，释放多余人员
-  const def = G.BDEF[b.type];
+  const def = G.buildingDefinition(b);
+  if(b.pastureSize)b.workLeft=0;
   while (b.workers.length > def.jobs) {
     const id = b.workers.pop();
     const c = G.world.cmap[id];
@@ -2390,7 +2392,7 @@ G.removeBuilding = function (b, confirmationKey) {
     if(c.chapelId===b.id)c.chapelId=null;
   }
   // 尚未开工的规划全额撤销；已经劳动/建成的建筑拆除返还一半。
-  const def = G.BDEF[b.type];
+  const def = G.buildingDefinition(b);
   const paid = b.paidCost || def.cost; // 旧档没有付款快照，沿用历史建材成本。
   const untouched = b.state === 'site' && !b.constructionStarted && b.progress === 0 && b.workLeft >= b.totalWork;
   const refund = [];
@@ -2543,7 +2545,7 @@ G.tradeQuote=function(b,good,qty,payment){
 };
 G.ensureEconomyBuilding = function(b) {
   if(b.type==='tradingpost'){b.tradeInventory=b.tradeInventory||{};b.tradeTargets=b.tradeTargets||{};if(!Number.isFinite(b.nextMerchantDay))b.nextMerchantDay=G.game.day+G.SEASON_DAYS;if(!Number.isInteger(b.merchantVisits))b.merchantVisits=b.merchant?1:0;b.merchantOrders=b.merchantOrders||{};b.autoTrade=b.autoTrade||G.defaultAutoTrade();}
-  if(b.type==='pasture'){b.animalType=G.pastureTypeOf(b);b.animals=b.animals||0;b.animalGrowth=b.animalGrowth||0;b.woolReady=b.woolReady||0;b.pastureProducts=b.pastureProducts||{meat:0,leather:0};if(b.animalType==='chicken'){if(!Number.isFinite(b.pastureProducts.eggs))b.pastureProducts.eggs=0;if(!Number.isFinite(b.eggProgress))b.eggProgress=0;if(!Number.isInteger(b.eggDay))b.eggDay=G.game.day;}if(!Number.isFinite(b.animalTarget))b.animalTarget=8;}
+  if(b.type==='pasture'){b.animalType=G.pastureTypeOf(b);b.animals=b.animals||0;b.animalGrowth=b.animalGrowth||0;b.woolReady=b.woolReady||0;b.pastureProducts=b.pastureProducts||{meat:0,leather:0};if(b.animalType==='chicken'){if(!Number.isFinite(b.pastureProducts.eggs))b.pastureProducts.eggs=0;if(!Number.isFinite(b.eggProgress))b.eggProgress=0;if(!Number.isInteger(b.eggDay))b.eggDay=G.game.day;}if(!Number.isFinite(b.animalTarget))b.animalTarget=Math.min(8,G.pastureCapacity(b));}
   if(b.type==='orchard')G.ensureOrchard(b);
 };
 G.withdrawResource = function(type,qty){
@@ -2603,11 +2605,19 @@ G.executeTrade = function(b,good,qty,payment,expectedMerchant){
   else b.tradeInventory[good]=(b.tradeInventory[good]||0)+qty;
   G.game.schedT=0;return {ok:true,paid:q.cost};
 };
-// Fixed 6x6 pens and yields are small-map adaptations, not original tile density.
+// Legacy caps and product yields are small-map adaptations. Explicit sizes use tile density.
 G.LIVESTOCK={sheep:{name:'羊',cap:12,meat:24,leather:0},cattle:{name:'牛',cap:10,meat:36,leather:4},chicken:{name:'鸡',cap:24,meat:6,leather:0}};
 G.CHICKEN={eggsPerDay:.5,eggCap:96,haul:20,growthYears:1};
 G.isLivestockType=type=>typeof type==='string'&&Object.hasOwn(G.LIVESTOCK,type);
 G.pastureTypeOf=b=>G.isLivestockType(b?.animalType)?b.animalType:'sheep';
+G.PASTURE_DENSITY={sheep:16,cattle:20,chicken:6};
+G.pastureCapacity=function(b,type=G.pastureTypeOf(b)){
+  if(!b||b.type!=='pasture'||!G.isLivestockType(type))return 0;
+  if(b.pastureSize===undefined)return G.LIVESTOCK[type].cap;
+  const d=G.pastureDefinition(b.pastureSize);return d?Math.floor(d.w*d.h/G.PASTURE_DENSITY[type]):0;
+};
+// Quotes include shape identity, not only rounded capacity, to reject stale previews.
+G.pastureGeometryKey=b=>[b.x,b.y,b.w,b.h,b.pastureSize||null,G.pastureCapacity(b)];
 G.pastureHasProducts=b=>Object.values(b.pastureProducts||{}).some(q=>q>0);
 G.pastureSwitchReason=function(b){
   if(b.animals>0)return '已有牲畜，禁止混养或转换物种';
@@ -2619,12 +2629,12 @@ G.setPastureType=function(b,type){
   if(!b||G.world.bmap[b.id]!==b||b.type!=='pasture'||b.state!=='ok'||!G.isLivestockType(type))return false;
   G.ensureEconomyBuilding(b);if(type===G.pastureTypeOf(b))return true;
   if(G.pastureSwitchReason(b))return false;
-  b.animalType=type;b.animalGrowth=0;b.woolReady=0;delete b.pastureInfestation;delete b.eggProgress;delete b.eggDay;delete b.pastureProducts.eggs;b.animalTarget=Math.min(b.animalTarget||8,G.LIVESTOCK[type].cap);G.game.schedT=0;return true;
+  b.animalType=type;b.animalGrowth=0;b.woolReady=0;delete b.pastureInfestation;delete b.eggProgress;delete b.eggDay;delete b.pastureProducts.eggs;b.animalTarget=Math.min(b.animalTarget||8,G.pastureCapacity(b,type));G.game.schedT=0;return true;
 };
 G.stockPasture = function(b,qty,type=G.pastureTypeOf(b)){
   if(!b||G.world.bmap[b.id]!==b||b.type!=='pasture'||b.state!=='ok'||!Number.isInteger(qty)||qty<=0||!G.isLivestockType(type)||type!==G.pastureTypeOf(b))return false;
   if(b.pastureInfestation)return false;
-  G.ensureEconomyBuilding(b);if(qty>(G.game.livestock[type]||0)||b.animals+qty>G.LIVESTOCK[type].cap)return false;
+  G.ensureEconomyBuilding(b);if(qty>(G.game.livestock[type]||0)||b.animals+qty>G.pastureCapacity(b,type))return false;
   G.game.livestock[type]-=qty;b.animals+=qty;G.game.schedT=0;return true;
 };
 /* Herd counts use the existing direct-placement abstraction, not a new animal
@@ -2638,10 +2648,10 @@ G.pastureSplitFacts=function(source,target){
   if(G.pastureTypeOf(target)!==type)return {ok:false,reason:'目标物种不同，请先在空场设置为同种牲畜'};
   if(target.animals>0)return {ok:false,reason:'分群目标必须是空牧场'};
   const pending=G.pastureSwitchReason(target);if(pending)return {ok:false,reason:'目标仍有旧产物或任务：'+pending};
-  if(qty>G.LIVESTOCK[type].cap||count-qty<2)return {ok:false,reason:'目标容量不足或源场种畜不足'};
+  if(qty>G.pastureCapacity(target,type)||count-qty<2)return {ok:false,reason:'目标容量不足或源场种畜不足'};
   const fromGrowth=source.animalGrowth||0,toGrowth=target.animalGrowth||0,sourceTarget=source.animalTarget||8,targetTarget=target.animalTarget||8;
   return {ok:true,type,qty,left:count-qty,sourceCount:count,fromGrowth,toGrowth,sourceTarget,targetTarget,
-    key:[source.id,target.id,type,count,fromGrowth,toGrowth,sourceTarget,targetTarget,G.game.day,w.navigationRevision||0].join(':')};
+    key:JSON.stringify([source.id,target.id,type,count,fromGrowth,toGrowth,sourceTarget,targetTarget,G.game.day,w.navigationRevision||0,G.pastureGeometryKey(source),G.pastureGeometryKey(target)])};
 };
 G.pastureSplitQuote=function(source,target){
   const q=G.pastureSplitFacts(source,target);if(!q.ok)return q;
@@ -2673,11 +2683,11 @@ G.pastureEmptyFacts=function(source,target){
   if(target.animals>0)return {ok:false,reason:'整群搬空目标必须是空牧场'};
   if(target.pastureInfestation)return {ok:false,reason:'目标牧场仍有疫情，不能接收牲畜'};
   const pending=G.pastureSwitchReason(target);if(pending)return {ok:false,reason:'目标仍有旧产物或任务：'+pending};
-  if(count>G.LIVESTOCK[type].cap)return {ok:false,reason:'目标容量不足，不能整群搬入'};
+  if(count>G.pastureCapacity(target,type))return {ok:false,reason:'目标容量不足，不能整群搬入'};
   const fromGrowth=source.animalGrowth||0,toGrowth=target.animalGrowth||0,sourceTarget=source.animalTarget||8,targetTarget=target.animalTarget||8;
   return {ok:true,type,qty:count,left:0,sourceCount:count,fromGrowth,toGrowth,sourceTarget,targetTarget,
     key:JSON.stringify([source.id,target.id,type,count,fromGrowth,toGrowth,sourceTarget,targetTarget,G.game.day,w.navigationRevision||0,
-      G.game.pasturePests,source.pastureInfestation||null,target.pastureInfestation||null])};
+      G.game.pasturePests,source.pastureInfestation||null,target.pastureInfestation||null,G.pastureGeometryKey(source),G.pastureGeometryKey(target)])};
 };
 G.pastureEmptyQuote=function(source,target){
   const q=G.pastureEmptyFacts(source,target);if(!q.ok)return q;
@@ -2738,7 +2748,7 @@ G.advancePasturePests=function(){
     G.ui.toast(`⚠ ${G.LIVESTOCK[G.pastureTypeOf(b)].name}牧场染疫：2天后每天病死1${G.pastureTypeOf(b)==='chicken'?'只':'头'}，病死不产物。可整群搬到同种空场保种。`,'warn');break;
   }
 };
-G.setPastureTarget = function(b,qty){if(!b||G.world.bmap[b.id]!==b||b.type!=='pasture'||b.state!=='ok'||!Number.isInteger(qty)||qty<2||qty>G.LIVESTOCK[G.pastureTypeOf(b)].cap)return false;b.animalTarget=qty;return true;};
+G.setPastureTarget = function(b,qty){if(!b||G.world.bmap[b.id]!==b||b.type!=='pasture'||b.state!=='ok'||!Number.isInteger(qty)||qty<2||qty>G.pastureCapacity(b))return false;b.animalTarget=qty;return true;};
 G.pastureTaskCurrent=(c,t)=>!!(t?.economy==='pasture'&&t.b?.type==='pasture'&&G.world.bmap[t.b.id]===t.b&&t.b.state==='ok'&&c.job===t.b.id&&(!t.pastureType||t.pastureType===G.pastureTypeOf(t.b)));
 G.atPastureWork=(c,t)=>G.pastureTaskCurrent(c,t)&&G.atMedicalDoor(c,t.b)&&G.d2(c.x,c.y,t.tx,t.ty)<.04&&!G.tileBlocked(G.world,t.tx,t.ty);
 G.pastureSlaughterReason=function(b){
@@ -2749,7 +2759,9 @@ G.pastureSlaughterReason=function(b){
 };
 G.pastureSummary=function(b){
   const type=G.pastureTypeOf(b),d=G.LIVESTOCK[type],pending=b.pastureProducts||{};
-  return {type,name:d.name,cap:d.cap,animals:b.animals||0,target:b.animalTarget||8,bank:G.game.livestock[type]||0,
+  return {type,name:d.name,cap:G.pastureCapacity(b),animals:b.animals||0,target:b.animalTarget||Math.min(8,G.pastureCapacity(b)),bank:G.game.livestock[type]||0,
+    dimensions:[b.w,b.h],area:b.w*b.h,capacityRule:b.pastureSize?'area':'legacy',tilesPerAnimal:b.pastureSize?G.PASTURE_DENSITY[type]:null,
+    workers:b.workers.length,workerLimit:G.workerLimitOf(b),workerMaximum:G.workerMaximumOf(b),
     growth:b.animalGrowth||0,wool:b.woolReady||0,meat:pending.meat||0,leather:pending.leather||0,eggs:pending.eggs||0,eggProgress:b.eggProgress||0,switchReason:G.pastureSwitchReason(b),
     status:!b.animals?'空牧场：购买同种牲畜后放入':type==='chicken'?(G.workerLimitOf(b)<=0||!b.workers.length?'等待牧人照料':G.goalPaused('eggs')?'鸡蛋目标已达，暂停新产蛋；已产鸡蛋继续送仓':pending.eggs>=G.CHICKEN.eggCap?'待取鸡蛋已达96枚，暂停新产蛋':pending.eggs>0?'场内鸡蛋等待牧人实背送仓':b.animals<2?'单鸡可产蛋；至少2只同种鸡才能繁殖':G.pastureSlaughterReason(b)||'照料产蛋中；超保留量才屠宰'):b.animals<2?'至少2头同种牲畜才能繁殖':!b.workers.length?'等待牧人照料':G.pastureSlaughterReason(b)||'牧人照料中；超保留量才屠宰',
     rule:type==='chicken'?'照料后每只每天0.5鸡蛋，场内最多96枚待取；牧人每趟最多20枚实背送仓。超保留量屠宰每只6肉，不产羊毛皮革；数量和产速为本作适配':type==='cattle'?'牛不产羊毛；每次超额屠宰产36肉＋4皮革，逐批送仓后才可使用':'羊剪毛与超额屠宰产24肉；不会产皮革'};
@@ -2773,7 +2785,7 @@ G.advanceTownEconomy = function(){
       if(!b.merchant&&g.day>=b.nextMerchantDay)G.arriveMerchant(b);
     }
     if(b.type==='pasture'&&b.animals>0&&b.tendedDay>=g.day-2){
-      if(b.animals>=2)b.animalGrowth+=b.animals/(G.YEAR_DAYS*(G.pastureTypeOf(b)==='chicken'?G.CHICKEN.growthYears:2));while(b.animalGrowth>=1&&b.animals<G.LIVESTOCK[G.pastureTypeOf(b)].cap){b.animals++;b.animalGrowth--;}
+      if(b.animals>=2)b.animalGrowth+=b.animals/(G.YEAR_DAYS*(G.pastureTypeOf(b)==='chicken'?G.CHICKEN.growthYears:2));while(b.animalGrowth>=1&&b.animals<G.pastureCapacity(b)){b.animals++;b.animalGrowth--;}
       b.animalGrowth=Math.min(1,b.animalGrowth);if(G.pastureTypeOf(b)==='sheep')b.woolReady=Math.min(48,b.woolReady+b.animals/G.SEASON_DAYS);
     }
     if(b.type==='pasture'&&G.pastureTypeOf(b)==='chicken')G.advanceChickenEggs(b);
@@ -3725,9 +3737,10 @@ G.schoolSummary=function(b){
 
 
 /* Player ceilings supplement the existing automatic scheduler, never reserve people. */
+G.workerMaximumOf=b=>G.buildingDefinition(b)?.jobs||0;
 G.workerLimitOf=function(b){
   if(!b)return 0;if(b.state==='site')return b.sitePaused?0:4;
-  const max=G.BDEF[b.type]?.jobs||0;return Number.isInteger(b.workerLimit)?G.clamp(b.workerLimit,0,max):max;
+  const max=G.workerMaximumOf(b);return Number.isInteger(b.workerLimit)?G.clamp(b.workerLimit,0,max):max;
 };
 G.markStaffingCargo=c=>{if(c.carry)c.carry.staffingReturn=true;};
 G.detachStaffingRole=function(c){
@@ -3766,7 +3779,7 @@ G.syncStoppedServices=function(b){
   }
 };
 G.setWorkerLimit=function(b,limit){
-  const max=b&&G.BDEF[b.type]?.jobs||0;
+  const max=G.workerMaximumOf(b);
   if(!b||G.world.bmap[b.id]!==b||b.state!=='ok'||!max||!Number.isInteger(limit)||limit<0||limit>max)return false;
   b.workerLimit=limit;G.enforceWorkerLimit(b);G.syncStoppedServices(b);G.game.schedT=0;return true;
 };
@@ -3829,7 +3842,7 @@ G.workforceSummary=function(b){
   const global={adults:adults.length,students:G.world.citizens.filter(c=>!c.dead&&c.student).length,
     assigned:adults.filter(c=>c.job!=null).length,finishing:adults.filter(finishing).length,
     available:adults.filter(c=>c.job==null&&!c.carry&&!G.goalCommitment(c)).length,hauling:adults.filter(c=>c.job==null&&c.carry).length};
-  const maximum=b.state==='site'?4:G.BDEF[b.type]?.jobs||0,limit=G.workerLimitOf(b),draining=workers.filter(finishing),paused=b.state==='site'&&!!b.sitePaused;
+  const maximum=b.state==='site'?4:G.workerMaximumOf(b),limit=G.workerLimitOf(b),draining=workers.filter(finishing),paused=b.state==='site'&&!!b.sitePaused;
   const wait=draining.map(c=>G.cargoWaitReason(c)).find(Boolean);
   const reason=paused?'施工已暂停，已完成工段与已付建材保留':draining.length?(wait||'本批工作/送仓结清后释放，不再接新批次'):limit===0?'已停用：不再分配工人':b.state==='ok'&&!G.jobCanProduce(b)?G.workforceBlockReason(b):workers.length<limit?(global.available?'等待自动调度或可达工作路线':'可用成人不足，已有岗位、送仓或个人服务占用劳力'):'当前人数已达上限';
   const rule=b.state==='site'?(b.sitePriority?'优先施工：':'普通施工：')+'优先级不保证配足人数，仍保留粮食救急与采运散工。其他工地完成当前小工段并送清货后才转入可达优先工地；暂停优先于排位。暂停保留已完成工段，恢复不重复扣建材。':

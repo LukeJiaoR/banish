@@ -222,6 +222,7 @@ G.ui = {
     this.initProductionGoals();
     this.initRoadControls();
     this.initFarmPlanControls();
+    this.initPasturePlanControls();
 
     // 顶栏按钮
     document.getElementById('btn-save').addEventListener('click', () => { G.saveGame(); });
@@ -316,8 +317,8 @@ G.ui = {
     };
     const def = G.BDEF[t], action = special[t];
     const name = action ? action.name : def.name, icon = action ? action.icon : def.icon;
-    const cost = action ? action.cost : this.resourceCost(def.cost, true);
-    const tip = action ? action.tip : t === 'road' ? '道路：点选或鼠标拖出起终点预览连通路线，确认后铺设；树木需先标记由工人清除' :
+    const cost = action ? action.cost : t === 'pasture' ? '7–20格 · 按面积圈地' : this.resourceCost(def.cost, true);
+    const tip = action ? action.tip : t === 'pasture' ? '牧场：每边7–20格，选两个角或拖出矩形；预览羊、牛、鸡容量和建材用工，确认后清场施工' : t === 'road' ? '道路：点选或鼠标拖出起终点预览连通路线，确认后铺设；树木需先标记由工人清除' :
       `${def.name}（${this.resourceCost(def.cost, false)}${def.jobs ? ' · 岗位×' + def.jobs : ''}）— ${def.desc}`;
     const imagePath = icons[t] ? `assets/icons/${icons[t]}.png` : ['tailor', 'tradingpost', 'pasture', 'orchard', 'chapel'].includes(t) ? `assets/buildings/${t}.png` : null;
     const image = imagePath ? `<img class="icimg" src="${imagePath}" alt="" onerror="this.remove()">` : '';
@@ -358,7 +359,7 @@ G.ui = {
     if (status) {
       const t = G.tool && (G.tool.kind === 'build' ? G.tool.type : G.tool.kind==='road' ? (G.tool.surface==='bridge'?'bridge':G.tool.surface==='stone'?'stoneroad':'road') : G.tool.kind);
       const names = { fell: '砍伐', quarry: '采石采铁', demolish: '拆除', road: '铺路' };
-      status.textContent = t ? `当前：${names[t] || G.BDEF[t].name} · ${t === 'demolish' ? '点击建筑或道路拆除；已开采的有限矿点须确认永久废坑' : ['fell', 'quarry'].includes(t) ? '框选范围后确认标记' : ['road','stoneroad','bridge'].includes(t) ? '选起终点后预览并确认' : t==='farm'?'选两个角或拖出矩形，再确认开田' : '点击地图放置，可连续建造'} · Esc / 右键取消${this.mineralBuildRisk(t) ? '\n' + this.mineralBuildRisk(t) : ''}` :
+      status.textContent = t ? `当前：${names[t] || G.BDEF[t].name} · ${t === 'demolish' ? '点击建筑或道路拆除；已开采的有限矿点须确认永久废坑' : ['fell', 'quarry'].includes(t) ? '框选范围后确认标记' : ['road','stoneroad','bridge'].includes(t) ? '选起终点后预览并确认' : t==='farm'?'选两个角或拖出矩形，再确认开田' : t==='pasture'?'选两个角或拖出矩形，再确认圈地' : '点击地图放置，可连续建造'} · Esc / 右键取消${this.mineralBuildRisk(t) ? '\n' + this.mineralBuildRisk(t) : ''}` :
         group ? '未选择工具。点击一项开始；返回分类可切换功能。' : '选择分类，再选择建筑或操作。';
     }
   },
@@ -388,6 +389,7 @@ G.ui = {
     this.refreshHarvestRangeControls();
     this.refreshRoadControls();
     this.refreshFarmPlanControls();
+    this.refreshPasturePlanControls();
   },
 
   initHarvestRangeControls: function () {
@@ -472,6 +474,99 @@ G.ui = {
     message+='\n鼠标拖矩形或点两个角；手机点两个角。每边4–15格，确认才创建工地。重选不撤销已确认工地。';
     if(text.textContent!==message)text.textContent=message;
     button._farmIntent=s.ok?{plan:s.plan,signature:s.signature}:null;button.disabled=!s.ok||G.hasOpenModal();
+  },
+
+  initPasturePlanControls: function () {
+    const panel = document.getElementById('pasture-plan-controls');
+    const confirm = document.getElementById('pasture-plan-confirm'), cancel = document.getElementById('pasture-plan-cancel');
+    if (!panel || !confirm || !cancel || panel._pastureBound) return;
+    panel._pastureBound = true;
+    let activation = null, held = false, interrupted = false;
+    const valid = intent => !!intent && G.world === intent.world && G.game === intent.game && G.tool === intent.tool &&
+      G.pastureGestureVersion === intent.generation && G.isPasturePlanning() && !G.hasOpenModal() &&
+      document.getElementById('pasture-plan-controls') === panel && !panel.classList.contains('hidden') &&
+      document.getElementById('pasture-plan-confirm') === confirm && document.getElementById('pasture-plan-cancel') === cancel &&
+      panel.contains(confirm) && panel.contains(cancel);
+    const capture = e => {
+      if (e.type === 'mousedown' && activation?.source === 'touchstart') return;
+      held = false; interrupted = false;
+      activation = { intent: confirm._pastureIntent, source: e.type, used: false };
+    };
+    for (const name of (window.PointerEvent ? ['pointerdown'] : ['mousedown', 'touchstart'])) confirm.addEventListener(name, capture);
+    confirm.addEventListener('keydown', e => {
+      if (!['Enter', ' '].includes(e.key)) return;
+      if (e.repeat || held) { e.preventDefault(); return; }
+      held = true; interrupted = false;
+      activation = { intent: confirm._pastureIntent, source: 'keyboard', used: false };
+    });
+    confirm.addEventListener('keyup', e => { if (['Enter', ' '].includes(e.key)) held = false; });
+    const interrupt = () => { activation = null; held = false; interrupted = true; };
+    for (const name of ['pointercancel', 'touchcancel', 'blur']) confirm.addEventListener(name, interrupt);
+    window.addEventListener('blur', interrupt);
+    confirm.addEventListener('click', e => {
+      e.preventDefault(); e.stopPropagation();
+      if (interrupted || e.detail > 1 || activation?.used) return;
+      const intent = activation ? activation.intent : confirm._pastureIntent;
+      if (activation) activation.used = true;
+      if (!valid(intent) || confirm.disabled) return;
+      const result = G.confirmPasturePlan({ plan: intent.plan, signature: intent.signature });
+      if (result.ok) this.toast(`牧场 ${result.b.w}×${result.b.h} 已规划；工人清场施工后才能放入牲畜`, 'good');
+      else if (result.reason) this.toast(result.reason, 'warn');
+      this.refreshPasturePlanControls();
+    });
+    let cancelActivation = null, cancelHeld = false, cancelInterrupted = false;
+    const captureCancel = e => {
+      if (e.type === 'mousedown' && cancelActivation?.source === 'touchstart') return;
+      cancelHeld = false; cancelInterrupted = false;
+      cancelActivation = { context: panel._pastureContext, plan: G.pasturePlan, source: e.type, used: false };
+    };
+    for (const name of (window.PointerEvent ? ['pointerdown'] : ['mousedown', 'touchstart'])) cancel.addEventListener(name, captureCancel);
+    cancel.addEventListener('keydown', e => {
+      if (!['Enter', ' '].includes(e.key)) return;
+      if (e.repeat || cancelHeld) { e.preventDefault(); return; }
+      captureCancel(e); cancelHeld = true;
+    });
+    cancel.addEventListener('keyup', e => { if (['Enter', ' '].includes(e.key)) cancelHeld = false; });
+    const interruptCancel = () => { cancelActivation = null; cancelHeld = false; cancelInterrupted = true; };
+    for (const name of ['pointercancel', 'touchcancel', 'blur']) cancel.addEventListener(name, interruptCancel);
+    window.addEventListener('blur', interruptCancel);
+    cancel.addEventListener('click', e => {
+      e.preventDefault(); e.stopPropagation();
+      if (cancelInterrupted || e.detail > 1 || cancelActivation?.used) return;
+      const context = cancelActivation ? cancelActivation.context : panel._pastureContext;
+      if (cancelActivation) { cancelActivation.used = true; if (cancelActivation.plan !== G.pasturePlan) return; }
+      if (!valid(context)) return;
+      interrupt(); G.cancelPasturePlan(); this.refreshPasturePlanControls();
+      const button = this.el.toolbar?.querySelector('[data-tool="pasture"]');
+      if (button?.focus) button.focus({ preventScroll: true });
+    });
+  },
+  refreshPasturePlanControls: function () {
+    const panel = document.getElementById('pasture-plan-controls'); if (!panel) return;
+    const text = document.getElementById('pasture-plan-status'), button = document.getElementById('pasture-plan-confirm');
+    const visible = !!G.world && !!G.isPasturePlanning && G.isPasturePlanning();
+    if (!visible && panel.contains(document.activeElement)) {
+      const selected = G.tool && (G.tool.kind === 'build' ? G.tool.type : G.tool.kind === 'road' ? (G.tool.surface === 'bridge' ? 'bridge' : G.tool.surface === 'stone' ? 'stoneroad' : 'road') : G.tool.kind);
+      const target = this.el.toolbar?.querySelector(`[data-tool="${selected || 'pasture'}"]`);
+      if (target?.focus) target.focus({ preventScroll: true });
+    }
+    panel.classList.toggle('hidden', !visible);
+    panel._pastureContext = visible ? { world: G.world, game: G.game, tool: G.tool, generation: G.pastureGestureVersion } : null;
+    if (!visible) { if (button) { button._pastureIntent = null; button.disabled = true; } return; }
+    if (!text || !button) return;
+    const s = G.pasturePlanStatus(), capacities = s.capacities;
+    const lines = [];
+    if (s.size) lines.push(`牧场 ${s.size[0]}×${s.size[1]} · ${s.area ?? s.size[0] * s.size[1]}格`);
+    if (capacities) lines.push(`可容纳羊 ${capacities.sheep} 头 / 牛 ${capacities.cattle} 头 / 鸡 ${capacities.chicken} 只（选择一种，不能混养）`);
+    if (capacities?.cattle === 2) lines.push('本场最多2头牛，只适合保种或转场；保留量最低2头，无法靠繁殖产生超额屠宰的肉和皮革。');
+    if (s.cost && Number.isFinite(s.work)) lines.push(`建材 ${this.resourceCost(s.cost, false)} · 施工 ${s.work} 工时（本作适配）；先清 ${s.trees || 0} 棵树，工人实际砍伐搬木后施工`);
+    if (Number.isFinite(s.workers)) lines.push(`本场牧人上限 ${s.workers} 人：面积不足200格为1人，200格及以上为2人；上限不保证配足`);
+    if (s.reason) lines.push(s.reason);
+    lines.push('原版密度：牛20格/头、羊16格/头、鸡6格/只，容量向下取整。新场建成后再购买并放入同种牲畜。');
+    lines.push('鼠标拖矩形或点两个角；手机点两个角。每边7–20格，确认才扣建材并创建工地。重选不撤销已确认工地；Esc / 右键退出。');
+    const message = lines.join('\n'); if (text.textContent !== message) text.textContent = message;
+    button._pastureIntent = s.ok ? { plan: s.plan, signature: s.signature, ...panel._pastureContext } : null;
+    button.disabled = !s.ok || G.hasOpenModal();
   },
 
   initRoadControls: function () {
@@ -754,6 +849,7 @@ G.ui = {
   refreshPlacement: function (type, x, y) {
     if (this.refreshRoadControls) this.refreshRoadControls();
     if(this.refreshFarmPlanControls)this.refreshFarmPlanControls();
+    if(this.refreshPasturePlanControls)this.refreshPasturePlanControls();
     if (this.refreshHarvestRangeControls) this.refreshHarvestRangeControls(false);
     if (this.refreshHarvestControls) this.refreshHarvestControls();
     const el = this.el.placement;
@@ -801,9 +897,10 @@ G.ui = {
   workforceInfoData: function (b) {
     if (!G.workforceSummary) return null;
     const s = G.workforceSummary(b), g = s.global;
+    if (G.workerMaximumOf && b.state !== 'site') s.maximum = G.workerMaximumOf(b);
     const data = {
       current: s.supported ? `当前占岗 ${s.current} 人 · 其中收尾 ${s.draining} 人` : '本建筑无需安排工人',
-      limit: s.supported ? `已应用上限 ${s.limit} 人 · 原最大 ${s.maximum} 人` : '',
+      limit: s.supported ? `已应用上限 ${s.limit} 人 · ${b.type === 'pasture' && b.pastureSize ? '本场最大' : '原最大'} ${s.maximum} 人` : '',
       reason: s.supported ? s.reason || '等待下一次派工检查。' : '可在下方查看全镇人力。',
       rule: !s.supported ? '全镇概览只读，各建筑的岗位在各自详情中调整。' : s.rule || (b.state === 'site' ? '暂停保留已完成工段和已付建材，取消未完成的小工段；恢复不重复扣建材。' : '上限不保证配足人数。设为 0 后停止接新工作，已接有限批次结清才释放；服务岗位立即停服务。'),
       population: `成人 ${g.adults} 人 · 学生 ${g.students} 人`,
@@ -2796,7 +2893,7 @@ G.ui = {
     if (G.sel.kind === 'b') {
       const b = w.bmap[G.sel.id];
       if (!b) { this.hideInfo(); return; }
-      const def = G.BDEF[b.type];
+      const def = G.buildingDefinition ? G.buildingDefinition(b) : G.BDEF[b.type];
       const fuelData = b.type === 'woodcutter' ? this.fuelInfoData(b) : null;
       const siteData = b.state === 'site' ? this.siteInfoData(b) : null;
       const medicalData = this.medicalInfoData(b);
@@ -3063,13 +3160,14 @@ G.ui = {
       </section>`;
     }
     if (b.type === 'pasture' && G.stockPasture && G.setPastureTarget) return `<section class="economy-details" data-economy="pasture">
+      <p class="row" data-economy-live="pasture-area"></p><p class="desc" data-economy-live="pasture-capacity-rule"></p><p class="desc" data-economy-live="pasture-cattle-warning"></p>
       <p class="row" data-economy-live="animals"></p><p class="row" data-economy-live="pasture-production"></p><p class="row" data-economy-live="pasture-stock"></p><p class="desc" data-economy-live="pasture-logistics"></p>
       ${this.pasturePestsMarkup()}
       <form id="pasture-type-form" class="economy-form"><h3>空场选择物种</h3><label for="pasture-type">羊、牛或鸡（不能混养）</label><select id="pasture-type"><option value="sheep"${G.pastureTypeOf(b)==='sheep'?' selected':''}>羊：肉、羊毛</option><option value="cattle"${G.pastureTypeOf(b)==='cattle'?' selected':''}>牛：肉、皮革</option><option value="chicken"${G.pastureTypeOf(b)==='chicken'?' selected':''}>鸡：鸡蛋、肉</option></select><button type="submit" id="pasture-type-apply">应用物种</button><p data-economy-live="pasture-switch"></p></form>
       <form id="pasture-stock-form" class="economy-form"><h3>放入已购同种牲畜</h3><p data-economy-live="sheep-bank"></p>
-        <label for="pasture-stock-quantity">放入数量</label><input id="pasture-stock-quantity" type="number" min="1" max="${G.LIVESTOCK[G.pastureTypeOf(b)].cap}" step="1" value="2" inputmode="numeric"><button type="submit" id="pasture-stock">放入牧场</button></form>
-      <form id="pasture-target-form" class="economy-form"><h3>繁殖与保留数量</h3><label for="pasture-target-quantity" data-economy-live="pasture-target-range"></label><input id="pasture-target-quantity" type="number" min="2" max="${G.LIVESTOCK[G.pastureTypeOf(b)].cap}" step="1" value="${Number(b.animalTarget) || 8}" inputmode="numeric"><button type="submit">应用保留数量</button>
-        <p class="desc" data-economy-live="pasture-rule"></p><p class="desc">至少2只/头同种牲畜且牧人实际照料才繁殖。保留数只控制超额屠宰。鸡场沿用本作6×6小地图适配，容量24只，默认保留8只；鸡蛋独立库存，与肉类同属一个营养组。产物逐批实背送仓后才可使用，库存满则保留；牧场内待送产物未搬空不能拆场。</p></form>
+        <label for="pasture-stock-quantity">放入数量</label><input id="pasture-stock-quantity" type="number" min="1" max="${G.pastureCapacity(b, G.pastureTypeOf(b))}" step="1" value="2" inputmode="numeric"><button type="submit" id="pasture-stock">放入牧场</button></form>
+      <form id="pasture-target-form" class="economy-form"><h3>繁殖与保留数量</h3><label for="pasture-target-quantity" data-economy-live="pasture-target-range"></label><input id="pasture-target-quantity" type="number" min="2" max="${G.pastureCapacity(b, G.pastureTypeOf(b))}" step="1" value="${Number(b.animalTarget) || 8}" inputmode="numeric"><button type="submit">应用保留数量</button>
+        <p class="desc" data-economy-live="pasture-rule"></p><p class="desc">至少2只/头同种牲畜且牧人实际照料才繁殖。保留数只控制超额屠宰。新圈牧场按面积计算容量，旧6×6场保留旧版容量适配；鸡蛋独立库存，与肉类同属一个营养组。产物逐批实背送仓后才可使用，库存满则保留；牧场内待送产物未搬空不能拆场。</p></form>
       <section data-pasture-split><h3>分群扩场</h3>
         <label for="pasture-split-target">同种空牧场（确认时检查通路）</label><select id="pasture-split-target"></select>
         <p class="desc" data-pasture-split-status></p>
@@ -3570,6 +3668,10 @@ G.ui = {
       this.refreshAutoTradeInfo(b);
     } else if (b.type === 'pasture') {
       const d=G.pastureSummary(b),bank=G.game.livestock,unit=d.type==='chicken'?'只':'头';
+      const dimensions = d.dimensions || [b.w, b.h], area = d.area ?? b.w * b.h;
+      set('[data-economy-live="pasture-area"]', `牧场 ${dimensions[0]}×${dimensions[1]} · ${area}格 · 本场牧人上限 ${G.workerMaximumOf(b)} 人（上限不保证配足）`);
+      set('[data-economy-live="pasture-capacity-rule"]', d.capacityRule === 'area' ? `原版面积密度：牛20格/头、羊16格/头、鸡6格/只，容量向下取整。本场最多羊 ${G.pastureCapacity(b, 'sheep')} 头 / 牛 ${G.pastureCapacity(b, 'cattle')} 头 / 鸡 ${G.pastureCapacity(b, 'chicken')} 只，不能混养。` : '旧版6×6小地图容量适配：羊12头 / 牛10头 / 鸡24只，旧场默认保留8只/头；保留旧场容量、建材与用工，不按新面积规则缩减。');
+      set('[data-economy-live="pasture-cattle-warning"]', d.capacityRule === 'area' && d.type === 'cattle' && d.cap === 2 ? '本场最多2头牛，只适合保种或转场；保留量最低2头，无法靠繁殖产生超额屠宰的肉和皮革。' : '');
       set('[data-economy-live="animals"]', `${d.name}群 ${d.animals}/${d.cap} ${unit} · 当前保留 ${d.target} ${unit}`);
       const products=d.type==='chicken'?`场内待取鸡蛋 ${Math.floor(d.eggs||0)} / ${G.CHICKEN.eggCap} · 未成蛋进度 ${Math.floor((d.eggProgress||0)*100)}% · 已屠宰待送：肉 ${d.meat}`:d.type==='sheep'?`待剪羊毛 ${Math.floor(d.wool)}`:`已屠宰待送：肉 ${d.meat} · 皮革 ${d.leather}`;
       set('[data-economy-live="pasture-production"]', `繁殖进度 ${Math.floor(d.growth*100)}% · ${products}`);
