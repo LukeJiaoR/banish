@@ -286,7 +286,7 @@ G.mountainStartReport = function (w, preset) {
 G.addTree = function (w, x, y, born) {
   if (x < 0 || y < 0 || x >= w.N || y >= w.N) return;
   const i = y * w.N + x;
-  if (G.isMountain(w, x, y) || w.water[i] || w.rock[i] || w.treeIdx[i] >= 0 || w.bgrid[i] >= 0) return;
+  if (G.isMountain(w, x, y) || w.water[i] || w.rock[i] || w.treeIdx[i] >= 0 || w.bgrid[i] >= 0 || G.roadWorkAt(w,x,y)) return;
   w.trees.push({ i, x, y, b: born !== undefined ? born : G.game ? G.game.day : 0 });
   w.treeIdx[i] = w.trees.length - 1;
 };
@@ -689,6 +689,7 @@ G.nearestPlantSpot = function (w, cx, cy, r, claimed, reachable) {
 /* 建筑（或工地）旁最省预计时间的真实可达入口。
  * reachable 参数保留兼容旧调用；默认也不返回水面隔离的死口。 */
 G.workSpot = function (w, b, fx, fy, reachable = false) {
+  if(b.type==='roadwork')return G.routeSpot(G.findPathToAny(w,fx,fy,[{x:b.x,y:b.y}]));
   if(b.type==='tunnel'){const p=G.tunnelEndpoints(b).start;return G.routeSpot(G.findPathToAny(w,fx,fy,[p]));}
   const spots = [];
   for (let j = b.y - 1; j <= b.y + b.h; j++)
@@ -754,7 +755,7 @@ G.cemeteryGravePoint=function(b,slot){
 };
 G.cemeteryGraveCell=function(b,slot){const p=G.cemeteryGravePoint(b,slot);return p?{x:Math.floor(p.x),y:Math.floor(p.y)}:null;};
 G.remnantGravePoint=b=>b?.type==='graveremnant'?G.cemeteryGravePoint(b.graveSource,b.grave.slot):null;
-G.buildingDefinition=b=>!b?null:b.type==='tunnel'?G.tunnelDefinition(b.tunnelAxis,b.w+b.h-1):b.type==='farm'?G.farmDefinition(b.farmSize):b.type==='pasture'?G.pastureDefinition(b.pastureSize):b.type==='orchard'?G.orchardDefinition(b.orchardSize):b.type==='cemetery'?G.cemeteryDefinition(b.cemeterySize):G.BDEF[b.type];
+G.buildingDefinition=b=>!b?null:b.type==='roadwork'?G.roadWorkDefinition(b):b.type==='tunnel'?G.tunnelDefinition(b.tunnelAxis,b.w+b.h-1):b.type==='farm'?G.farmDefinition(b.farmSize):b.type==='pasture'?G.pastureDefinition(b.pastureSize):b.type==='orchard'?G.orchardDefinition(b.orchardSize):b.type==='cemetery'?G.cemeteryDefinition(b.cemeterySize):G.BDEF[b.type];
 G.canPlace = function (w, type, ox, oy, fieldSize) {
   if(['farm','pasture','orchard','cemetery'].includes(type)&&(!Number.isInteger(ox)||!Number.isInteger(oy)))return {ok:false,reason:(type==='farm'?'农田':type==='orchard'?'果园':type==='cemetery'?'墓园':'牧场')+'坐标须为整数'};
   const def = type==='farm'?G.farmDefinition(fieldSize):type==='pasture'?G.pastureDefinition(fieldSize):type==='orchard'?G.orchardDefinition(fieldSize):type==='cemetery'?G.cemeteryDefinition(fieldSize):G.BDEF[type];
@@ -768,6 +769,7 @@ G.canPlace = function (w, type, ox, oy, fieldSize) {
       const t = j * N + i;
       if (G.isMountain(w, i, j)) return { ok: false, reason: '不能建在山体上；请沿山谷选址' };
       if (w.water[t] === 1) return { ok: false, reason: '不能建在水上' };
+      if(G.roadWorkAt(w,i,j))return {ok:false,reason:'此格属于未结束铺路工程，请先完成或取消剩余工程'};
       if (w.rock[t]) return { ok: false, reason: '地面有岩石，需先用采石采铁工具标记清除' };
       if (w.bgrid[t] >= 0) return { ok: false, reason: '与其他建筑重叠' };
     }
@@ -777,7 +779,7 @@ G.canPlace = function (w, type, ox, oy, fieldSize) {
   if (!['farm', 'pasture', 'orchard', 'cemetery', 'graveremnant', 'mineralpit', 'tunnel'].includes(type)) {
     const foot = oy + def.h;
     for (const b of w.buildings) {
-      if (['farm', 'pasture', 'orchard', 'cemetery', 'graveremnant', 'mineralpit', 'tunnel'].includes(b.type)) continue;
+      if (['farm', 'pasture', 'orchard', 'cemetery', 'graveremnant', 'mineralpit', 'tunnel','roadwork'].includes(b.type)) continue;
       if (foot >= b.y && foot < b.y + b.h && ox < b.x + b.w && ox + def.w >= b.x)
         return { ok: false, reason: '与其他建筑贴得太近：会叠在它后面' };
       if (b.y + b.h >= oy && b.y + b.h < oy + def.h && b.x < ox + def.w && b.x + b.w >= ox)
@@ -914,6 +916,7 @@ G.planBridge = function(w,start,end,options={}) {
     if(G.isMountain(w,p.x,p.y))return {ok:false,reason:'木桥不能穿过山体或以山体作桥头'};
     if(bank?w.water[i]===1:w.water[i]!==1)return {ok:false,reason:bank?'桥头必须落在陆地；请在对岸选择端点':'两岸之间必须连续水面，不能穿陆地或转弯'};
     if(w.rock[i]||w.treeIdx[i]>=0)return {ok:false,reason:'桥头需先清除树木或矿石，再重新预览'};
+    if(G.roadWorkAt(w,p.x,p.y))return {ok:false,reason:'桥线与未结束铺路工程冲突'};
     if(w.bgrid[i]>=0&&w.bgrid[i]!==options.ignoreId)return {ok:false,reason:'桥线被已有建筑或桥工地占用'};
     path.push(p);
   }
@@ -974,6 +977,7 @@ G.planTunnel=function(w,start,end,options={}){
  const path=[];for(let n=0;n<length;n++){const p={x:start.x+dx*n,y:start.y+dy*n},i=p.y*w.N+p.x,mouth=n===0||n===length-1;
   if(mouth?G.isMountain(w,p.x,p.y):!G.isMountain(w,p.x,p.y))return {ok:false,reason:mouth?'两端洞口须在陆地':'洞口间必须是连续山体，不能跨空地、弯折或中途出入口'};
   if(w.water[i]===1||w.rock[i]||w.treeIdx[i]>=0||(!mouth&&w.road[i]))return {ok:false,reason:'隧道不能穿水、露矿或树木；洞口须先清场'};
+  if(G.roadWorkAt(w,p.x,p.y))return {ok:false,reason:'隧道与未结束铺路工程冲突'};
   if(w.bgrid[i]>=0&&w.bgrid[i]!==options.ignoreId)return {ok:false,reason:'隧道或洞口与建筑/工地重叠，不能交叉'};path.push(p);
  }
  return {ok:true,path,length,steps:length-1,turns:0,newTiles:length,reusedTiles:0,clearTrees:[],materials:{stone:4*length},axis:dx?'x':'y',start:{...start},end:{...end}};
@@ -981,3 +985,18 @@ G.planTunnel=function(w,start,end,options={}){
 
 // A walkable tunnel floor is not a door/shore on the mountain surface.
 G.surfaceAccess=(w,x,y)=>!G.isMountain(w,x,y)&&!G.tileBlocked(w,x,y);
+
+/* A route owns one nonblocking work order. This index is derived, never inventory. */
+G.roadWorkAt=function(w,x,y){if(x<0||y<0||x>=w.N||y>=w.N)return null;if(!w.roadWorkIndex)G.reindexRoadWorks(w);return w.bmap?.[w.roadWorkIndex[y*w.N+x]]||null;};
+G.reindexRoadWorks=function(w){w.roadWorkIndex=new Int32Array(w.N*w.N).fill(-1);for(const b of w.buildings||[])if(b.type==='roadwork')for(const c of b.roadWork.cells)if(!c.done||c.x===b.x&&c.y===b.y)w.roadWorkIndex[c.y*w.N+c.x]=b.id;};
+G.roadWorkDefinition=b=>({...G.BDEF.roadwork,cost:b.roadWork.surface==='stone'?{stone:b.roadWork.cells.length}:{},buildWork:b.roadWork.cells.length*G.ROAD_WORK_H});
+G.roadWorkPlanQuote=function(w,path,surface){
+ if(!['dirt','stone'].includes(surface)||!Array.isArray(path)||!path.length||path.length>w.N*w.N)return {ok:false,reason:'铺路计划无效'};
+ const target=surface==='stone'?2:1,cells=[],seen=new Set();let reused=0,alreadyQueued=0;
+ for(const p of path){if(!p||!Number.isInteger(p.x)||!Number.isInteger(p.y)||p.x<0||p.y<0||p.x>=w.N||p.y>=w.N)return {ok:false,reason:'路线超出地图'};const i=p.y*w.N+p.x;if(seen.has(i))return {ok:false,reason:'路线重复经过同一格'};seen.add(i);
+  if(G.isMountain(w,p.x,p.y)||w.water[i]===1||w.rock[i]||w.bgrid[i]>=0)return {ok:false,reason:'路线已被地形或建筑占用，请重新规划'};
+  if(w.road[i]>=target){reused++;continue;}const owner=G.roadWorkAt(w,p.x,p.y);if(owner){if(owner.roadWork.surface!==surface)return {ok:false,reason:'该格已有另一种铺路工程，请先完成或取消它'};alreadyQueued++;continue;}
+  cells.push({x:p.x,y:p.y,base:w.road[i],target,workLeft:G.ROAD_WORK_H,used:false,done:false});
+ }
+ return {ok:true,cells,queued:cells.length,reused,alreadyQueued,materials:{wood:0,stone:surface==='stone'?cells.length:0},work:cells.length*G.ROAD_WORK_H};
+};

@@ -176,6 +176,7 @@ G.serializeGame = function () {
       construction:b.construction&&{required:{...b.construction.required},onsite:{...b.construction.onsite},consumed:b.construction.consumed,...(b.construction.legacyRefundHalf?{legacyRefundHalf:true}:{})},
       workers: b.workers, family: b.family, noWork: b.noWork, warnText: b.warnText,
       bridgeAxis: b.bridgeAxis, bridgeLength: b.type === 'bridge' ? b.w + b.h - 1 : undefined,
+      ...(b.type==='roadwork'?{roadWork:{surface:b.roadWork.surface,cells:b.roadWork.cells.map(p=>({...p}))}}:{}),
       ...(b.type==='tunnel'?{tunnelAxis:b.tunnelAxis,tunnelLength:b.w+b.h-1,tunnelStart:b.tunnelStart}:{}),
       houseFire:b.houseFire&&{...b.houseFire},ruinFrom:b.ruinFrom,ruinIncident:b.ruinIncident,
       mineralUnits:b.mineralUnits, pitSource:b.pitSource, mineMode: b.mineMode, legacyMine: b.legacyMine, mineTick: b.mineTick, toolRecipe: b.toolRecipe, reserveDays:b.reserveDays, brewRecipe:b.brewRecipe, coatRecipe:b.coatRecipe, coatMaterial:b.coatMaterial,
@@ -541,6 +542,15 @@ G.prepareSaveData = function (d) {
       const length = integer(bd.bridgeLength,'木桥长度',3,24);
       def = {...def,w:bd.bridgeAxis==='x'?length:1,h:bd.bridgeAxis==='y'?length:1,buildWork:length*3};
     }
+    let roadWork=null;
+    if(bd.type==='roadwork'){
+      const raw=record(bd.roadWork,'铺路工程');if(Object.keys(raw).some(k=>!['surface','cells'].includes(k))||!['dirt','stone'].includes(raw.surface))bad('铺路表面');
+      const rows=array(raw.cells,'铺路分格');if(!rows.length||rows.length>w.N*w.N)bad('铺路范围');const seen=new Set();
+      roadWork={surface:raw.surface,cells:rows.map(row=>{record(row,'铺路格');if(Object.keys(row).length!==7||Object.keys(row).some(k=>!['x','y','base','target','workLeft','used','done'].includes(k))||typeof row.used!=='boolean'||typeof row.done!=='boolean')bad('铺路格字段');
+        const p={x:integer(row.x,'路格x',0,w.N-1),y:integer(row.y,'路格y',0,w.N-1),base:integer(row.base,'旧路面',0,raw.surface==='stone'?1:0),target:raw.surface==='stone'?2:1,workLeft:number(row.workLeft,'路格余工',0,G.ROAD_WORK_H),used:row.used,done:row.done},i=p.y*w.N+p.x;
+        if(seen.has(i)||row.target!==p.target||p.done!==(p.workLeft===0)||raw.surface==='dirt'&&p.used||raw.surface==='stone'&&!p.used&&p.workLeft<G.ROAD_WORK_H)bad('铺路格进度或材料');seen.add(i);return p;})};
+      def=G.roadWorkDefinition({roadWork});
+    }else if(bd.roadWork!==undefined)bad('非道路工程字段');
     if(bd.type==='tunnel'){
       if(!authoritative)bad('隧道需要权威山地存档');
       const length=integer(bd.tunnelLength,'隧道总长',3,w.N);def=G.tunnelDefinition(bd.tunnelAxis,length);if(!def)bad('隧道方向');
@@ -561,6 +571,9 @@ G.prepareSaveData = function (d) {
       fuelLimit: bd.type === 'woodcutter' ? G.fuelLimitOf(bd) : undefined,
       reserveDays:bd.type==='tavern'?(bd.reserveDays===undefined?12:integer(bd.reserveDays,'酿酒储粮天数',8,48)):undefined,
     };
+    if(roadWork){b.roadWork=roadWork;const left=roadWork.cells.reduce((n,p)=>n+p.workLeft,0);
+      if(b.state!=='site'||b.workers.length>2||b.family!==null||bd.totalWork!==def.buildWork||bd.workLeft===undefined||bd.progress===undefined||left<=0||Math.abs(b.workLeft-left)>1e-8||Math.abs(b.progress-(1-left/b.totalWork))>1e-8||b.x!==roadWork.cells[0].x||b.y!==roadWork.cells[0].y)bad('铺路工程状态');
+    }
     if(bd.type==='cemetery'&&bd.cemeterySize===undefined&&b.totalWork!==def.buildWork)bad('旧墓园总工时不符');
     if(bd.cemeterySize!==undefined){
       b.cemeterySize=[...bd.cemeterySize];
@@ -757,7 +770,7 @@ G.prepareSaveData = function (d) {
       for(const [k,n]of Object.entries(onsite)){if(!Object.hasOwn(required,k))bad('现场建材类型');b.construction.onsite[k]=number(n,'现场建材数量',0,required[k]);}
       if(raw.legacyRefundHalf)b.construction.legacyRefundHalf=true;
       if(raw.consumed&&Object.keys(onsite).length||b.state==='ok'&&!raw.consumed)bad('建材消耗状态');
-      if(!raw.consumed&&(b.constructionStarted||b.progress>0||b.workLeft<b.totalWork)&&!raw.legacyRefundHalf)bad('未齐料不能已有施工');
+      if(b.type!=='roadwork'&&!raw.consumed&&(b.constructionStarted||b.progress>0||b.workLeft<b.totalWork)&&!raw.legacyRefundHalf)bad('未齐料不能已有施工');
       if(raw.legacyRefundHalf&&!raw.consumed&&Object.entries(required).some(([k,n])=>(onsite[k]||0)!==n))bad('旧工地建材必须齐备');
       if(raw.consumed&&b.state==='site'&&!b.constructionStarted)bad('建材消耗未开工');
     }else if(b.state==='site'){
@@ -765,6 +778,7 @@ G.prepareSaveData = function (d) {
       const required=b.paidCost||def.cost;b.construction=G.newConstruction(required,required);
       if(b.constructionStarted||b.progress>0||b.workLeft<b.totalWork)b.construction.legacyRefundHalf=true;
     }
+    if(b.type==='roadwork'&&(!b.paidCost||JSON.stringify(b.paidCost)!==JSON.stringify(def.cost)||!b.construction||b.construction.consumed||b.construction.legacyRefundHalf||b.constructionStarted!==(b.progress>0||b.roadWork.cells.some(p=>p.used))))bad('铺路实料合同');
     if(b.type==='tunnel'&&(!b.paidCost||Object.keys(b.paidCost).length!==1||b.paidCost.stone!==def.cost.stone||!b.construction||b.construction.legacyRefundHalf))bad('隧道实运建材合同');
     if(b.type==='cemetery'&&((b.cemeterySize&&!b.paidCost)||b.paidCost&&(Object.keys(b.paidCost).some(k=>!Object.hasOwn(def.cost,k))||Object.keys(b.paidCost).length&&Object.keys(def.cost).some(k=>b.paidCost[k]!==def.cost[k]))))bad('墓园已付建材不符');
     if(b.orchardSize&&(!b.paidCost||Object.keys(b.paidCost).some(k=>k!=='wood')||(Object.keys(b.paidCost).length&&b.paidCost.wood!==def.cost.wood)))bad('面积果园已付建材');
@@ -810,7 +824,7 @@ G.prepareSaveData = function (d) {
         if(b.state!=='ok'||!b.sownAll||!b.farm.every(f=>f.sown)||b.earlyHarvestYield!==Math.floor(G.farmBaseYield(b)*b.growth+1e-9))bad('抢收农田状态');
       }
     }
-    for (let yy = y; yy < y + b.h; yy++) for (let xx = x; xx < x + b.w; xx++) {
+    if(b.type!=='roadwork')for (let yy = y; yy < y + b.h; yy++) for (let xx = x; xx < x + b.w; xx++) {
       const i = yy * w.N + xx; if (w.bgrid[i] >= 0) bad('建筑重叠');
       if(authoritative&&((b.type!=='tunnel'&&w.mountain[i])||w.rock[i]||b.type!=='bridge'&&w.water[i]===1||b.state==='ok'&&w.treeIdx[i]>=0))bad('建筑与权威地形冲突');
       if((b.cemeterySize||b.type==='graveremnant')&&(w.water[i]===1||w.rock[i]||(b.state==='ok'&&w.treeIdx[i]>=0)))bad('墓园占地未清理或在水上');
@@ -823,6 +837,14 @@ G.prepareSaveData = function (d) {
       b.supplyStock=supplyStock(bd.supplyStock,'建筑配送库存',b.type==='market'?G.SUPPLY.marketCap:G.SUPPLY.homeCap);
     }
     w.buildings.push(b); w.bmap[b.id] = b;
+  }
+  // Road orders reserve construction ownership, never a walk-blocking tile.
+  w.roadWorkIndex=new Int32Array(w.N*w.N).fill(-1);
+  for(const b of w.buildings)if(b.type==='roadwork')for(const p of b.roadWork.cells){const i=p.y*w.N+p.x,staging=p.x===b.x&&p.y===b.y;
+    // Completed non-staging cells are history, not remaining ownership: a player
+    // may later upgrade, build over or remove them without replaying completion.
+    if(p.done&&!staging)continue;
+    if(G.isMountain(w,p.x,p.y)||w.water[i]===1||w.rock[i]||w.treeIdx[i]>=0||w.bgrid[i]>=0||w.roadWorkIndex[i]>=0||w.road[i]!== (p.done?p.target:p.base))bad('铺路工程占格或路面冲突');w.roadWorkIndex[i]=b.id;
   }
   if(currentDeer){
     const rows=array(d.deer,'鹿群');if(rows.length!==G.HUNTING.population)bad('鹿群槽位数量');
@@ -860,11 +882,13 @@ G.prepareSaveData = function (d) {
     if (cd.carry != null) {
       record(cd.carry, '随身资源'); if (!G.RES_KEYS.includes(cd.carry.type)) bad('随身资源类型');
       carry = { type: cd.carry.type === 'food' ? 'grain' : cd.carry.type, qty: number(cd.carry.qty, '随身资源数量', 0) };
-      if(cd.carry.constructionId!==undefined||cd.carry.constructionReturn!==undefined){
-        if(!currentConstruction||!['wood','stone','iron'].includes(carry.type)||!cd.adult||cd.student||cd.carry.staffingReturn!==true||carry.qty<=0||carry.qty>G.CONSTRUCTION_HAUL||Object.keys(cd.carry).some(k=>!['type','qty','staffingReturn','constructionId','constructionReturn'].includes(k))||cd.carry.constructionReturn!==undefined&&cd.carry.constructionReturn!==true)bad('建材货批字段');
+      if(cd.carry.constructionId!==undefined||cd.carry.constructionReturn!==undefined||cd.carry.roadPaving!==undefined){
+        if(!currentConstruction||!['wood','stone','iron'].includes(carry.type)||!cd.adult||cd.student||cd.carry.staffingReturn!==true||carry.qty<=0||carry.qty>G.CONSTRUCTION_HAUL||Object.keys(cd.carry).some(k=>!['type','qty','staffingReturn','constructionId','constructionReturn','roadPaving'].includes(k))||cd.carry.constructionReturn!==undefined&&cd.carry.constructionReturn!==true)bad('建材货批字段');
         carry.constructionId=id(cd.carry.constructionId,'建材工地来源');carry.staffingReturn=true;
         if(cd.carry.constructionReturn)carry.constructionReturn=true;
+        if(cd.carry.roadPaving!==undefined){if(cd.carry.roadPaving!==true||carry.type!=='stone'||carry.qty!==1)bad('铺路携石');carry.roadPaving=true;}
         const site=w.bmap[carry.constructionId];
+        if(carry.roadPaving&&!carry.constructionReturn&&site?.type!=='roadwork')bad('铺路携石归属');
         if(!carry.constructionReturn&&(!site?.construction||site.state!=='site'||site.sitePaused||site.construction.consumed||!Object.hasOwn(site.construction.required,carry.type)||cd.job!==site.id))bad('建材货批目的地');
       }
       if(cd.carry.huntingId!==undefined){
@@ -956,7 +980,7 @@ G.prepareSaveData = function (d) {
   // loaded batch returns physically and can never become a second site refund.
   const incoming=new Map();
   for(const c of w.citizens)if(G.constructionCargo(c)&&!c.carry.constructionReturn){const cargo=c.carry,key=cargo.constructionId+':'+cargo.type;incoming.set(key,(incoming.get(key)||0)+cargo.qty);}
-  for(const b of w.buildings)if(b.construction&&!b.construction.consumed)for(const [k,n]of Object.entries(b.construction.required))if((b.construction.onsite[k]||0)+(incoming.get(b.id+':'+k)||0)>n)bad('在途和现场建材超出需求');
+  for(const b of w.buildings)if(b.construction&&!b.construction.consumed)for(const [k,n]of Object.entries(b.construction.required))if((b.construction.onsite[k]||0)+(incoming.get(b.id+':'+k)||0)+G.constructionUsed(b,k)>n)bad('在途和现场建材超出需求');
   for(const c of w.citizens)if(G.constructionCargo(c))c.carry.constructionReturn=true;
   const chapelCounts={};
   for(const c of w.citizens)if(c.chapelId!==null){
@@ -1184,23 +1208,7 @@ G.tryPlace = function (tx, ty) {
   G.ui.refreshHUD();
 };
 
-G.paintRoad = function (x0, y0, x1, y1) {
-  const w = G.world;
-  const dx = Math.abs(x1 - x0), dy = Math.abs(y1 - y0);
-  const sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
-  let err = dx - dy, x = x0, y = y0;
-  while (true) {
-    if (G.canPlaceRoad(w, x, y)) {
-      if (w.treeIdx[y * w.N + x] >= 0) G.removeTree(w, x, y);
-      G.setRoad(w, x, y, true);
-      G.markGroundDirty(x, y);
-    }
-    if (x === x1 && y === y1) break;
-    const e2 = 2 * err;
-    if (e2 > -dy) { err -= dy; x += sx; }
-    if (e2 < dx) { err += dx; y += sy; }
-  }
-};
+G.paintRoad = function(x0,y0,x1,y1){const q=G.planRoad(G.world,{x:x0,y:y0},{x:x1,y:y1});return q.ok?G.addRoadWork(q.path,'dirt'):q;};
 
 /* Farm placement is a transient rectangle, not an immediate stamp. */
 G.farmPlan=null;G.farmDrag=null;G.farmGestureVersion=0;
@@ -1365,8 +1373,8 @@ G.roadPlanStatus = function () {
     if (w.treeIdx[i] >= 0) { trees.push(p); if (!w.marked.has(i)) added.push(p); }
   }
   if (w.marked.size + added.length > 300) return { ok: false, reason: '清树标记将超过300处，请等待现有任务完成或取消多余标记' };
-  const materials={wood:0,stone:plan.surface==='stone'?plan.result.path.filter(p=>w.road[p.y*w.N+p.x]!==2).length:0};
-  return { ok: true, trees, added, plan, materials };
+  const quote=G.roadWorkPlanQuote(w,plan.result.path,plan.surface||'dirt');if(!quote.ok)return quote;
+  return {...quote,trees,added,plan};
 };
 G.confirmRoadPlan = function (intent) {
   if (!G.tool || G.tool.kind !== 'road' || G.hasOpenModal()) return { ok: false };
@@ -1384,15 +1392,8 @@ G.confirmRoadPlan = function (intent) {
     plan.message = '已确认清树任务；工人清树后，再点击确认铺路；木材仍须搬运入仓。退出规划不会撤销已确认标记。';
     return { ok: true, clearing: true, marked: status.added.length };
   }
-  if(G.game.res.stone<status.materials.stone)return {ok:false,reason:`石头不足：需${status.materials.stone}，现有${Math.floor(G.game.res.stone)}`};
-  G.game.res.stone-=status.materials.stone;
-  let placed = 0;
-  for (const p of plan.result.path) {
-    const i = p.y * w.N + p.x;
-    if (plan.surface==='stone'?w.road[i]!==2:!w.road[i]) { G.setRoad(w, p.x, p.y, plan.surface==='stone'?2:true); G.markGroundDirty(p.x, p.y); placed++; }
-  }
-  G.cancelRoadPlan();
-  G.ui.refreshHUD();return { ok: true, placed, surface:plan.surface||'dirt' };
+  const result=G.addRoadWork(plan.result.path,plan.surface||'dirt');if(!result.ok)return result;
+  G.cancelRoadPlan();G.ui.refreshHUD();if(result.b){G.sel={kind:'b',id:result.b.id};G.ui.showInfo?.(G.sel);}return {...result,surface:plan.surface||'dirt'};
 };
 
 /* Range previews are transient and hold original tree identities, never jobs or
@@ -1773,6 +1774,7 @@ G.selectAt = function (tx, ty, p) {
     G.ui.showInfo(G.sel);
     return;
   }
+  const roadwork=G.roadWorkAt(w,tx,ty);if(roadwork){G.sel={kind:'b',id:roadwork.id};G.ui.showInfo(G.sel);return;}
   const mountain=G.isMountain(w,tx,ty);
   // bgrid 指向已不存在的建筑（异常残留）时按空地处理
   // 找附近的市民（屏幕距离）

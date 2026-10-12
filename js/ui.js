@@ -52,6 +52,8 @@ G.ui = {
     }
     const construction = G.constructionCarryState && G.constructionCarryState(c);
     if (construction) return construction;
+    if (c.task?.kind === 'roadPave' && c.walkKind !== 'home')
+      return c.task.phase === 'load' ? '从现场领取铺路石材' : c.state === 'work' ? '正在铺路（该格完工后才提速）' : c.state === 'walk' ? '前往待铺路格' : '等待到格铺路';
     if (c.state === 'work') {
       if(c.task?.kind==='hunt')return '狩猎鹿 #'+c.task.deerId+'（完成后才获得肉皮）';
       if(c.task?.kind==='toolFetch')return '在通用仓领取个人工具（完成领取才扣库存）';
@@ -329,8 +331,8 @@ G.ui = {
     };
     const def = G.BDEF[t], action = special[t];
     const name = action ? action.name : def.name, icon = action ? action.icon : def.icon;
-    const cost = action ? action.cost : t === 'tunnel' ? '每格4石 · 3工时' : t === 'pasture' ? '7–20格 · 按面积圈地' : t === 'orchard' ? '4–15格 · 按树列开园' : t === 'cemetery' ? '7–20格 · 按墓位规划' : this.resourceCost(def.cost, true);
-    const tip = action ? action.tip : t === 'tunnel' ? '隧道：选两个已清场陆地洞口，沿一个网格轴穿过连续山体；每格4石、3游戏施工小时（含两端）。只在首选洞口实运材料并施工，完工后按土路速度通行' : t === 'cemetery' ? '墓园：每边7–20格，选两个角或拖出矩形；预览实际墓位、石材和工时，确认后实运施工。拆围栏不清除墓碑' : t === 'pasture' ? '牧场：每边7–20格，选两个角或拖出矩形；预览羊、牛、鸡容量和建材用工，确认后清场施工' : t === 'orchard' ? '果园：每边4–15格，选两个角或拖矩形；按东西2格/南北3格树距预览株数、成本与农夫用工，确认后清场施工' : t === 'road' ? '道路：点选或鼠标拖出起终点预览连通路线，确认后铺设；树木需先标记由工人清除' :
+    const cost = action ? action.cost : t === 'road' ? '免材料 · 每格1工时' : t === 'stoneroad' ? '每格1石 · 1工时' : t === 'tunnel' ? '每格4石 · 3工时' : t === 'pasture' ? '7–20格 · 按面积圈地' : t === 'orchard' ? '4–15格 · 按树列开园' : t === 'cemetery' ? '7–20格 · 按墓位规划' : this.resourceCost(def.cost, true);
+    const tip = action ? action.tip : t === 'tunnel' ? '隧道：选两个已清场陆地洞口，沿一个网格轴穿过连续山体；每格4石、3游戏施工小时（含两端）。只在首选洞口实运材料并施工，完工后按土路速度通行' : t === 'cemetery' ? '墓园：每边7–20格，选两个角或拖出矩形；预览实际墓位、石材和工时，确认后实运施工。拆围栏不清除墓碑' : t === 'pasture' ? '牧场：每边7–20格，选两个角或拖出矩形；预览羊、牛、鸡容量和建材用工，确认后清场施工' : t === 'orchard' ? '果园：每边4–15格，选两个角或拖矩形；按东西2格/南北3格树距预览株数、成本与农夫用工，确认后清场施工' : ['road', 'stoneroad'].includes(t) ? `${t === 'stoneroad' ? '石路每个新铺/升级格需1石' : '土路无需材料'}：点选或拖出起终点预览连通路线，清树后再确认施工；每格1基础游戏施工小时为本作适配。确认排队，逐格实运施工后才提速；原道路仍可走` :
       `${def.name}（${this.resourceCost(def.cost, false)}${def.jobs ? ' · 岗位×' + def.jobs : ''}）— ${def.desc}`;
     const imagePath = icons[t] ? `assets/icons/${icons[t]}.png` : ['tailor', 'tradingpost', 'pasture', 'orchard', 'chapel'].includes(t) ? `assets/buildings/${t}.png` : null;
     const image = imagePath ? `<img class="icimg" src="${imagePath}" alt="" onerror="this.remove()">` : '';
@@ -797,7 +799,7 @@ G.ui = {
       if (result.reason) this.toast(result.reason, 'warn');
       else if (result.tunnel && result.ok) this.toast('隧道工地已确认；材料只送首选洞口并在此施工，完工前山内不可通行', 'good');
       else if (result.bridge && result.ok) this.toast('木桥工地已确认；工人完工前不可通行', 'good');
-      else if (result.placed != null) this.toast(`已铺设 ${result.placed} 格${result.surface==='stone'?'石路':'土路'}`, 'good');
+      else if (result.queued != null) this.toast(result.queued > 0 ? `已排队 ${result.queued} 格${result.surface==='stone'?'石路':'土路'}施工；逐格完工后才提速，原道路仍可走` : '路线已铺好或已安排施工，无需重复排队', 'good');
       this.refreshRoadControls();
     });
     cancel.addEventListener('click', e => {
@@ -819,18 +821,19 @@ G.ui = {
     if (status.ok) {
       const r = plan.result;
       const stone=plan.surface==='stone', bridge=plan.surface==='bridge', tunnel=plan.surface==='tunnel';
-      const changed=stone?status.materials.stone:r.newTiles;
+      const changed=status.queued ?? (stone?status.materials.stone:r.newTiles);
+      const reused=status.reused ?? r.path?.length-changed, alreadyQueued=status.alreadyQueued || 0;
       message = tunnel ? `隧道 ${r.length} 格（含两端） · ${r.axis==='x'?'东西':'南北'}直线穿山\n首选洞口 (${r.start.x},${r.start.y}) → 远端洞口 (${r.end.x},${r.end.y})\n材料：石头 ${status.materials.stone} · 建造 ${r.length*3} 游戏施工小时\n确认只建工地，不预扣或预留材料；材料只实运至首选洞口，并在此施工。原洞口道路仍可走，山内完工前不可通行\n完工后沿隧道轴按土路速度实际步行和搬运；无常驻岗位` : bridge ? `木桥 ${r.path.length} 格 · 直线跨水\n桥头 (${plan.start.x},${plan.start.y}) → (${plan.end.x},${plan.end.y})\n材料：木材 ${status.materials.wood} / 石头 ${status.materials.stone} · 建造 ${r.path.length*3} 工时\n确认只建工地；材料从仓实运到岸边，送齐才施工，完工前不可通行` :
-        `路线 ${r.path.length} 格 · ${stone?'新铺/升级':'新铺'} ${changed} · 复用 ${r.path.length-changed} · 转弯 ${r.turns} 次\n${stone?'石路每格1石，合计 '+status.materials.stone+' 石':'土路材料消耗：0'} · 尚需清树 ${status.trees.length} 棵`;
+        `路线 ${r.path.length} 格 · 待排施工 ${changed} · 复用已成路 ${reused} · 已排队 ${alreadyQueued} · 转弯 ${r.turns} 次\n${stone?'石路每个新铺/升级格1石，合计 '+status.materials.stone+' 石':'土路材料消耗：0'} · 尚需清树 ${status.trees.length} 棵\n新增建造 ${status.work ?? changed} 基础游戏施工小时（每格1小时，为本作适配）\n确认只排队，不预扣或预留材料；原道路仍可走，每格实际完工后才提速。${stone?'石材先实运到临时堆料点，再由铺路工背至施工格。':''}`;
       const missing=Object.entries(status.materials).filter(([k,q])=>G.game.res[k]<q).map(([k,q])=>`${G.RES[k].name}差${Math.ceil(q-G.game.res[k])}`);
-      if(missing.length)message+='\n材料不足：'+missing.join(' · ');
+      if(missing.length)message+='\n材料不足：'+missing.join(' · ')+(bridge||tunnel?'':'；仍可排队，等待可用石材');
       if (plan.message) message += '\n' + plan.message;
     }
-    message += G.tool.surface==='tunnel'?'\n点选/拖选两个洞口，终点吸附较长方向轴；两端清场陆地、中间连续山体，总长3–'+Math.min(G.world.N,128)+'格。二值山体、单端施工和游戏工时为本作适配。Esc/右键退出。':G.tool.surface==='bridge'?'\n点选/拖选两岸，终点吸附较长方向轴；需连续水面和清场桥头。Esc/右键退出。':'\n点选起终点，或鼠标拖出起终点、松开预览；再确认铺路。水面、建筑和矿石需绕行。Esc/右键退出。';
+    message += G.tool.surface==='tunnel'?'\n点选/拖选两个洞口，终点吸附较长方向轴；两端清场陆地、中间连续山体，总长3–'+Math.min(G.world.N,128)+'格。二值山体、单端施工和游戏工时为本作适配。Esc/右键退出。':G.tool.surface==='bridge'?'\n点选/拖选两岸，终点吸附较长方向轴；需连续水面和清场桥头。Esc/右键退出。':'\n点选起终点，或鼠标拖出起终点、松开预览；树木先标记清除，再确认施工。水面、建筑和矿石需绕行。点选施工标记可暂停、优先或取消剩余铺路。Esc/右键退出。';
     if (text.textContent !== message) text.textContent = message;
     const waiting = status.ok && status.trees.length && !status.added.length;
     button._roadIntent = status.ok ? { plan, mode: status.tunnel?'tunnel':status.bridge?'bridge':status.trees.length ? 'clear' : 'pave', trees: status.trees.map(p => p.y * G.world.N + p.x).join(',') } : null;
-    button.textContent = status.ok && status.trees.length ? (waiting ? '等待工人清树' : '确认标记清树') : status.tunnel||G.tool.surface==='tunnel'?'确认建隧道':status.bridge?'确认建桥':'确认铺路';
+    button.textContent = status.ok && status.trees.length ? (waiting ? '等待工人清树' : '确认标记清树') : status.tunnel||G.tool.surface==='tunnel'?'确认建隧道':status.bridge?'确认建桥':'确认排队施工';
     button.disabled = !status.ok || !!waiting || G.hasOpenModal();
   },
 
@@ -1211,6 +1214,7 @@ G.ui = {
     return true;
   },
   siteInfoData: function (b) {
+    if (b.type === 'roadwork' && G.roadWorkSummary) return this.roadWorkInfoData(b);
     const w = G.world, trees = G.siteTrees ? G.siteTrees(b).length : 0;
     const upgrade = b.type === 'stonehouse' && b.upgradeFrom === 'house';
     const summary = G.constructionSummary && G.constructionSummary(b);
@@ -1227,14 +1231,28 @@ G.ui = {
       refund: refundText + (upgrade ? '原木屋已拆除，取消升级不会还原木屋。' : '已砍树不恢复。')
     };
   },
+  roadWorkInfoData: function (b) {
+    const s = G.roadWorkSummary(b), number = n => this.supplyNumber(n || 0);
+    const refund = Object.entries(s.refund || {}).filter(([, n]) => n > 0).map(([type, n]) => `${G.RES[type].name}×${number(n)}`).join('、') || '0 材料';
+    const material = (s.materials || []).map(m => `${G.RES[m.type].name}：需要 ${number(m.required)} · 堆料点未用 ${number(m.onsite)} · 携带合计 ${number(m.incoming)} · 已投入 ${number(m.incorporated)} · 待领 ${number(m.missing)}`).join('\n');
+    return {
+      status: `${b.sitePriority ? '优先施工 · ' : ''}${s.surface === 'stone' ? '石路' : '土路'}施工 · 已完成 ${s.completed}/${s.total} 格 · 待完工 ${s.pending} 格 · ${s.status}`,
+      workers: b.workers.map(id => G.world.cmap[id]).filter(c => c && !c.dead).map(c => c.name).join('、') || '等待建筑工人',
+      materials: material || '土路无需建材；每格仍须由工人实际施工。',
+      progress: `剩余 ${number(s.workLeft)} / 总计 ${number(s.totalWork)} 基础游戏施工小时。每格1基础小时为本作适配，实际速度受工具和居民状态影响。`,
+      delivery: `工程首格是临时堆料点 (${b.x},${b.y})，该格完工后仍保留至工程结束，可点选管理；其他完工格释放。确认不预扣或预留公共库存；到仓领取时才出库。${s.surface === 'stone' ? `仓库→堆料点携带 ${number(s.fetchCarried)} 石，堆料点→施工格携带 ${number(s.pavingCarried)} 石（两项合计为上方携带数，不重复计入到场或已投入）。石材送到施工格才投入。` : ''}施工标记不封路，已有路面和速度保持，每格完工后才按新路面提速。`,
+      losses: '暂停保留已完工路面、已做工时和未用到场石材；已领随身材料仍须实际退仓，满仓保留。恢复后继续剩余铺路，不重复扣料。',
+      refund: `取消剩余铺路：当前可立即返还 ${refund}，只含堆料点未用建材，直接返公共库存。携带中的材料另行实运退仓，不计入此数；尚未领出的计划不退款，已投入石材不返还。已完工路面和原有道路保留，已砍树不恢复。`,
+    };
+  },
   siteInfoMarkup: function (data) {
-    return `<section class="economy-form" data-site-material-panel><h3>建材实运</h3><p class="row site-materials" data-site-materials>${this.escHtml(data.materials)}</p><p class="row desc" data-site-delivery>${this.escHtml(data.delivery)}</p><p class="row desc" data-site-losses>${this.escHtml(data.losses)}</p></section>`;
+    return `<section class="economy-form" data-site-material-panel><h3>建材实运</h3>${data.progress ? `<p class="row" data-road-work-progress>${this.escHtml(data.progress)}</p>` : ''}<p class="row site-materials" data-site-materials>${this.escHtml(data.materials)}</p><p class="row desc" data-site-delivery>${this.escHtml(data.delivery)}</p><p class="row desc" data-site-losses>${this.escHtml(data.losses)}</p></section>`;
   },
   refreshSiteInfo: function (b) {
     const el = this.el.info;
     if (b.state !== 'site' || !el.querySelector?.('[data-site-material-panel]')) return false;
     const data = this.siteInfoData(b);
-    for (const [key, selector] of [['status','[data-site-status]'],['workers','[data-site-workers]'],['materials','[data-site-materials]'],['delivery','[data-site-delivery]'],['losses','[data-site-losses]'],['refund','[data-info-refund]']]) {
+    for (const [key, selector] of [['status','[data-site-status]'],['workers','[data-site-workers]'],['materials','[data-site-materials]'],['delivery','[data-site-delivery]'],['losses','[data-site-losses]'],['refund','[data-info-refund]'],['progress','[data-road-work-progress]']]) {
       const node = el.querySelector(selector);
       if (node && node.textContent !== data[key]) node.textContent = data[key];
     }
@@ -3540,7 +3558,7 @@ G.ui = {
         ${this.buildingActivityMarkup(b)}${workers}${this.workforceInfoMarkup(b, workforceData)}${siteData ? this.siteInfoMarkup(siteData) : ''}${extra}
         <div class="row desc">${def.desc}</div>
         ${pit||remnant ? '' : `<div class="row desc" data-info-refund${fuelData ? ' data-fuel="refund"' : ''}>${ruin ? '清理烧毁废墟退还 0 材料；不能回收原屋材料。' : fireData?.summary.active ? '火灾进行中，暂不能拆除；关闭新增火灾也不会停止当前损伤。' : fuelData ? fuelData.refund : siteData ? siteData.refund : '已开工：拆除退还一半已付建材，已砍树不恢复'}</div>
-        <button id="info-demolish" class="danger"${fireData?.summary.active ? ' disabled' : ''}>${b.state === 'site' ? '取消工地' : ruin ? '清理废墟（无返料）' : b.type==='cemetery'?'拆围栏…':b.type==='tunnel'?'拆除隧道…':'拆除'}</button>${this.mineralRemovalMarkup(b)}${this.cemeteryRemovalMarkup(b)}${this.tunnelRemovalMarkup(b)}`}`;
+        <button id="info-demolish" class="danger"${fireData?.summary.active ? ' disabled' : ''}>${b.type === 'roadwork' ? '取消剩余铺路' : b.state === 'site' ? '取消工地' : ruin ? '清理废墟（无返料）' : b.type==='cemetery'?'拆围栏…':b.type==='tunnel'?'拆除隧道…':'拆除'}</button>${this.mineralRemovalMarkup(b)}${this.cemeteryRemovalMarkup(b)}${this.tunnelRemovalMarkup(b)}`}`;
       if (fuelData) this._fuelInfoState = b.state;
       this._economyInfoState = b.state;
       this._medicalInfoState = b.state;
@@ -3633,7 +3651,23 @@ G.ui = {
     if (focusSelector && el.querySelector) { const next = el.querySelector(focusSelector); if (next) next.focus(); }
     const dem = document.getElementById('info-demolish');
     const renderedState = selected.state, renderedType = selected.type, renderedGame = G.game;
-    if (dem) dem.addEventListener('click', () => {
+    let roadCancelInterrupted = false;
+    if (dem && renderedType === 'roadwork') {
+      const capture = () => { roadCancelInterrupted = false; };
+      for (const name of (window.PointerEvent ? ['pointerdown'] : ['mousedown', 'touchstart'])) dem.addEventListener(name, capture);
+      dem.addEventListener('keydown', e => {
+        if (!['Enter', ' '].includes(e.key)) return;
+        if (e.repeat) { e.preventDefault(); roadCancelInterrupted = true; } else capture();
+      });
+      dem._roadCancelInterrupt = () => { roadCancelInterrupted = true; };
+      for (const name of ['pointercancel', 'touchcancel', 'blur']) dem.addEventListener(name, dem._roadCancelInterrupt);
+      if (!this._roadCancelBlurBound) {
+        this._roadCancelBlurBound = true;
+        window.addEventListener('blur', () => this.el.info?.querySelector?.('#info-demolish')?._roadCancelInterrupt?.());
+      }
+    }
+    if (dem) dem.addEventListener('click', e => {
+      if (renderedType === 'roadwork' && (roadCancelInterrupted || e?.detail > 1)) return;
       // A stale cancel-site button must never remove a newly completed building.
       if (!G.sel || G.sel.kind !== 'b' || G.world !== w || G.game !== renderedGame || this.el.info !== el ||
           w.bmap[G.sel.id] !== selected || selected.state !== renderedState || selected.type !== renderedType ||
