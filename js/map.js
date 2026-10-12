@@ -567,11 +567,26 @@ G.pastureDefinition=function(size){
   return {...d,w,h,cost:{wood:Math.ceil(d.cost.wood*(w+h)/12)},buildWork:Math.ceil(d.buildWork*w*h/36),jobs:w*h>=200?2:1};
 };
 G.initialPastureWorkers=size=>G.pastureDefinition(size)?.jobs||0;
-G.buildingDefinition=b=>!b?null:b.type==='farm'?G.farmDefinition(b.farmSize):b.type==='pasture'?G.pastureDefinition(b.pastureSize):G.BDEF[b.type];
+G.orchardDefinition=function(size){
+  const d=G.BDEF.orchard;if(size===undefined)return d;
+  if(!Array.isArray(size)||size.length!==2||![size[0],size[1]].every(n=>Number.isInteger(n)&&n>=4&&n<=15))return null;
+  const [w,h]=size;
+  // Source geometry is 2 tiles east-west / 3 north-south. Costs and jobs are adaptations.
+  return {...d,w,h,cost:{wood:w+h},buildWork:w*h,jobs:Math.min(3,Math.ceil(w*h/72))};
+};
+G.initialOrchardWorkers=size=>G.orchardDefinition(size)?.jobs||0;
+G.orchardLayout=function(b){
+  if(b?.orchardSize===undefined)return {columns:3,rows:3,count:9,legacy:true};
+  const d=G.orchardDefinition(b.orchardSize);if(!d)return null;
+  const columns=Math.ceil(d.w/2),rows=Math.ceil(d.h/3);
+  return {columns,rows,count:columns*rows,legacy:false};
+};
+G.orchardTreeCount=b=>G.orchardLayout(b)?.count||0;
+G.buildingDefinition=b=>!b?null:b.type==='farm'?G.farmDefinition(b.farmSize):b.type==='pasture'?G.pastureDefinition(b.pastureSize):b.type==='orchard'?G.orchardDefinition(b.orchardSize):G.BDEF[b.type];
 G.canPlace = function (w, type, ox, oy, fieldSize) {
-  if(['farm','pasture'].includes(type)&&(!Number.isInteger(ox)||!Number.isInteger(oy)))return {ok:false,reason:(type==='farm'?'农田':'牧场')+'坐标须为整数'};
-  const def = type==='farm'?G.farmDefinition(fieldSize):type==='pasture'?G.pastureDefinition(fieldSize):G.BDEF[type];
-  if(!def||(fieldSize!==undefined&&!['farm','pasture'].includes(type)))return {ok:false,reason:type==='pasture'?'牧场每边须为7至20格的整数':'农田每边须为4至15格的整数'};
+  if(['farm','pasture','orchard'].includes(type)&&(!Number.isInteger(ox)||!Number.isInteger(oy)))return {ok:false,reason:(type==='farm'?'农田':type==='orchard'?'果园':'牧场')+'坐标须为整数'};
+  const def = type==='farm'?G.farmDefinition(fieldSize):type==='pasture'?G.pastureDefinition(fieldSize):type==='orchard'?G.orchardDefinition(fieldSize):G.BDEF[type];
+  if(!def||(fieldSize!==undefined&&!['farm','pasture','orchard'].includes(type)))return {ok:false,reason:type==='pasture'?'牧场每边须为7至20格的整数':(type==='orchard'?'果园':'农田')+'每边须为4至15格的整数'};
   if(def.unbuildable)return {ok:false,reason:def.name+'不能主动建造或重新开发'};
   const N = w.N;
   if (ox < 0 || oy < 0 || ox + def.w > N || oy + def.h > N) return { ok: false, reason: '超出地图范围' };

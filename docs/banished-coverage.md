@@ -3,7 +3,7 @@
 ## 核查口径
 
 - 核查日期：2026-10-12。已交付基线为 [`main@6cfbe2d7f91d4a41fe3cc06caa3b6954d1fefdea`](https://github.com/LukeJiaoR/banish/tree/6cfbe2d7f91d4a41fe3cc06caa3b6954d1fefdea)，版本 **0.3.64**；[鸡牧场 PR #66](https://github.com/LukeJiaoR/banish/pull/66) 已在此基线上。
-- 本文记录 **0.3.65** 牧场疫病/整群搬空增量（[Issue #67](https://github.com/LukeJiaoR/banish/issues/67)，[PR #68](https://github.com/LukeJiaoR/banish/pull/68)已合并），以及 **0.3.66** 两果树/果品酿酒增量（[Issue #69](https://github.com/LukeJiaoR/banish/issues/69)，[PR #70](https://github.com/LukeJiaoR/banish/pull/70)已合并），以及 **0.3.67** 面积牧场增量（[Issue #71](https://github.com/LukeJiaoR/banish/issues/71)，[PR #72](https://github.com/LukeJiaoR/banish/pull/72)已合并），以及 **0.3.68** 地图种子/无种子困难开局增量（[Issue #73](https://github.com/LukeJiaoR/banish/issues/73)）。增量源码用同提交相对链接；本文若位于未合并分支，最新增量仅是候选，交付仍以普通PR合并main为准。
+- 本文记录 **0.3.65** 牧场疫病/整群搬空增量（[Issue #67](https://github.com/LukeJiaoR/banish/issues/67)，[PR #68](https://github.com/LukeJiaoR/banish/pull/68)已合并），以及 **0.3.66** 两果树/果品酿酒增量（[Issue #69](https://github.com/LukeJiaoR/banish/issues/69)，[PR #70](https://github.com/LukeJiaoR/banish/pull/70)已合并），以及 **0.3.67** 面积牧场增量（[Issue #71](https://github.com/LukeJiaoR/banish/issues/71)，[PR #72](https://github.com/LukeJiaoR/banish/pull/72)已合并），以及 **0.3.68** 地图种子/无种子困难开局增量（[Issue #73](https://github.com/LukeJiaoR/banish/issues/73)，[PR #74](https://github.com/LukeJiaoR/banish/pull/74)已合并），以及 **0.3.69** 可变果园增量（[Issue #75](https://github.com/LukeJiaoR/banish/issues/75)）。增量源码用同提交相对链接；本文若位于未合并分支，最新增量仅是候选，交付仍以普通PR合并main为准。
 - 共列 40 项核心系统，按玩家能够做出的经营选择核查，不计算没有统一分母的“整体完成百分比”。本文件是范围审计，不是全功能、全平台或真实浏览器试玩通过证明。
 - 查验了实际定义、模拟、菜单、序列化及加载逻辑；先核完整 Git 树，再以固定 SHA 读取本地缺少的相关设计文档。README、旧片文档中的“下一步”不能单独证明现在缺失。例如旧医疗文档称游民传染未做，但当前 `advanceNomads` / `decideNomads` 已接上疾病；旧市政厅文档称市场配送未做，当前 `supply.js` 已实现。
 - 以下源码链接固定到上述基线，定位以函数或字段名为准。与原版比较的依据使用用户指定的 [Banished Wiki](https://banished-wiki.com/)；Wiki 里有旧版、预发布及互相不一致的描述，疑点单列，不把本作数值冒称为原版数值。
@@ -38,8 +38,8 @@
 | F3 渔业选址、共享水域与桥占水 | 有适配简化 | [模拟][sim] `fishingWaterSummary`、`fishingPlacementSummary`、`enableSharedFishing`；新村共享规则扣除桥占水，有工人的重叠渔场分摊水域；鱼产为肉类并送仓。 | 两人岗位、范围和产量为适配，旧村可保留经典规则。已做水域竞争，不再立“渔场重叠”重复票；并未实现有限鱼群，但不把旧概述页的“灭绝”文字自动升级成下一轮必做。[Fishing Dock](https://banished-wiki.com/wiki/Fishing_Dock) |
 | F4 自由农田、季节劳动与抢收 | 已交付 | [地图][map] `farmDefinition` / `initialFarmWorkers`；[模拟][sim] 逐格播种/收割、`earlyHarvestQuote` / `beginEarlyHarvest`；[主程序][main] 农田框选与 `farmSize` 保存；[界面][ui] 预览确认。新田每边 4–15 格。 | 面积、用工、播种承诺、秋收/早熟收获、冬季未收损失都已有决策；14/格等产量、播种窗口和成熟日数为适配，不是原版精确气温模型。[Crop Field](https://banished-wiki.com/wiki/Crop_Field)、[Farming](https://banished-wiki.com/wiki/Farming) |
 | F5 作物种子、换种及生长期差异 | 有适配简化 | [模拟][sim] `CROPS` 为小麦、卷心菜、早熟豆类；`cropUnlocked`、`setFarmCrop`、`cropChoiceOf`、`seedUnlockKey`；交易永久解锁，开种后变更留给下一季，豆类夏季成熟。 | 原版还有玉米、辣椒、马铃薯、南瓜、笋瓜等；当前未覆盖完整八作物，也无逐作物耐寒阈值。**已有三作物而非只有小麦**；12 日/10 每格的豆类是本作适配。[Farming](https://banished-wiki.com/wiki/Farming)、[Seeds](https://banished-wiki.com/wiki/Seeds) |
-| F6 果园逐树生长、采果和补种 | 已交付 | [模拟][sim] `newOrchardTrees`、`makeOrchardTask`、`completeOrchardTask`、`advanceOrchard`、`setOrchardReplant`；[存档][main] `orchardTrees`。农夫逐株种植/养护/采果，老树死亡、空位补种，货物仍需送仓。 | 已有多年投资和更新空窗。固定 9 株、4 年有效养护、12–20 年错峰寿命、每株 20 果为适配；不要再次开发“老树死亡/补种”。[Orchard](https://banished-wiki.com/wiki/Orchard)、[已交付说明][orchard-doc] |
-| F7 果树品种与可变果园面积 | 有适配简化（0.3.66 增量） | [本片模拟](../js/sim.js) `ORCHARD_TYPES`、`setOrchardType`、逐树 `type`；[规则](fruit-brewing.md)，[Issue #69](https://github.com/LukeJiaoR/banish/issues/69)。苹果/梨种子各自永久解锁，实际种植/采果/搬运；修改未来品种不改已种树或在途货，旧通用树仍产蔬菜。 | 两种果品独立，营养仍归既有蔬菜组；原版其余果/坚果品种及可变15×15以内果园仍缺。固定6×6/9株与现有树龄节奏保留；不能把两种品种切片称为完整八果树或面积规划。[Orchard](https://banished-wiki.com/wiki/Orchard) |
+| F6 果园逐树生长、采果和补种 | 已交付 | [模拟][sim] `newOrchardTrees`、`makeOrchardTask`、`completeOrchardTask`、`advanceOrchard`、`setOrchardReplant`；[存档][main] `orchardTrees`。农夫逐株种植/养护/采果，老树死亡、空位补种，货物仍需送仓。 | 已有多年投资和更新空窗。旧场9株保留，新场树位见F7；4年有效养护、12–20年错峰寿命、每株20果为适配；不要再次开发“老树死亡/补种”。[Orchard](https://banished-wiki.com/wiki/Orchard)、[已交付说明][orchard-doc] |
+| F7 果树品种与可变果园面积 | 有适配简化（0.3.66 / 0.3.69 增量） | [模拟](../js/sim.js) `ORCHARD_TYPES` / `orchardLayout` / `orchardPoint`、[地图](../js/map.js) `orchardDefinition` 和[主程序](../js/main.js) 矩形规划与 `orchardSize` 保存；[两果品](fruit-brewing.md)、[可变果园](orchard-area.md)，[Issue #75](https://github.com/LukeJiaoR/banish/issues/75)。苹果梨独立买种/实采/实运；新场4–15边长、东西2格/南北3格树列、实际用工与产物守恒。 | 原版其余果/坚果品种仍缺，营养保留三组。新场按Wiki正文树距，披露尾部矛盾表；成本/岗位为适配。旧6×6/9株/2岗独立保全，寿命12–20年不随树数延长；可变面积不再列缺失。[Orchard](https://banished-wiki.com/wiki/Orchard) |
 | F8 羊、牛、鸡及牧产品 | 已交付 | [模拟][sim] `LIVESTOCK`、`setPastureType`、`stockPasture`、`advanceChickenEggs`、`completeEconomyWork`；[核心][core] 独立鸡蛋；[界面][ui] 选种、放入、保留量与生产；[鸡牧场说明](chickens.md)。 | 三物种已覆盖，禁止混养，照料繁殖、羊毛、肉、皮、鸡蛋及真实运出可玩。肉品合并、固定容量和繁殖/蛋产量是适配；鸡已经合并，不再作为下一片。[Pasture](https://banished-wiki.com/wiki/Pasture) |
 | F9 按面积规划牧场与容量 | 有适配简化（0.3.67 增量） | [本片地图](../js/map.js) `pastureDefinition`；[模拟](../js/sim.js) `pastureCapacity`；[规划/存档](../js/main.js) `pastureSize`；[规则](pasture-area.md)，[Issue #71](https://github.com/LukeJiaoR/banish/issues/71)。新场两角/拖拽确认7–20格，实际清场建造，容量/材料/岗位预览，放畜、繁殖、分群和搬空统一按目标场容量。 | 新场牛20/羊16/鸡6格；费用/工时为适配。旧6×6场保留羊12/牛10/鸡24与原库存合同。原围栏/棚屋/动物素材复用，畜群按实际区域分布；不含已有场扩缩或逐头转场寻路。[Pasture](https://banished-wiki.com/wiki/Pasture) |
 | F10 同种分群扩场 | 已交付 | [模拟][sim] `pastureSplitFacts`、`pastureSplitQuote`、`splitPasture`；不少于 10 头可向可达同种空场分一半，检查容量/残留任务，分配繁殖进度；沿原头数保存。[分群说明][split-doc] | 这是基线功能。牲畜仍按群体直接划拨，没有逐头赶畜行走；别把“分群”与本片“整群搬空”混为一项，后者见 D5。[Farming](https://banished-wiki.com/wiki/Farming#Pasture) |
@@ -105,13 +105,17 @@
 
 0.3.68按 [#73](https://github.com/LukeJiaoR/banish/issues/73) 补真实新局设置、种子0、现行/困难预设与小麦买种闭环；旧村设置未记录就如实显示，未最终确认不清理自动档。见[本片说明](start-settings.md)。不再把整个玩家种子入口排为缺失，简单预建村和原版全部难度仍是剩余范围。
 
-### 1. 地形与气候选择（D2分阶段）
+### 已交付的下一片：可变果园树列（F7面积部分）
 
-**下一片候选：**先核原版温和/严寒气候对霜期、作物、取暖的实际影响，再落一个可解释的气候选择闭环，设置同时出现在新局预览、温度/风险提示和存档中。只对主动选择的新村生效，旧村保持既有时钟与霜期。新游戏面板已具备安全预览/最终确认，不需重建新平台。
+0.3.69按 [#75](https://github.com/LukeJiaoR/banish/issues/75) 补果园矩形、可复算树列、实际用工与旧9株合同保护。见[本片说明](orchard-area.md)。苹果梨可变面积已经覆盖，不再反复排同一功能；并不表示原版其余果/坚果品种已完成。
 
-**依赖与边界：**当前地形没有独立山体不可建区；山谷/山地和隧道应一起拆解，不能只改标签。地图大小会影响生成、可达性和存档裸索引，需另票。下一片先查重建Issue、核原版再定范围；不得把此候选文字当成已经做好的功能。
+### 后续取舍：真实试玩问题优先，剩余玩法按明确闭环拆票
 
-**验收方向：**所选气候实际改变受影响规则与季节提示；同种子同配置仍能重建初始世界，旧档无数值漂移，新存档保留选择。美术复用现有季节图，必要差异跟实际状态走，不增无效下拉框或宣传图。具体气候数值尚待专页核实，本片不预设原版参数。
+**已核可见问题：**人物劳作仍按任务固定挥工具或抱筐单帧，仅做上下轻动；这是已有反馈所述机械感的真实来源。后续若补帧，应沿原提示词锁同一角色、现17像素显示高、脚点和原透视，区分工具动作/采收动作；不重绘整套人物，也不把未复现的布局朝向问题先当bug修。
+
+**真实玩法缺口仍保留：**移动鹿群/按狩猎小屋冷却、其余作物/果树目录、逐仓实物库存、山地隧道、地图/气候选择。不可把它们一口气扩成框架；气候需要真实霜期/冷伤/取暖差异与旧档保全，隧道先需真实山体。新预设标签没有这些规则就没有玩家价值。
+
+下一片先查现有Issue和具体试玩证据，再选一个最小完整玩法。不得把本段候选当成已经启动或已经交付，也不因一个PR结束就宣称整个原版复刻完成。
 
 ## 暂不优先的边界与资料可信度
 

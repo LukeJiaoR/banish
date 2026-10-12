@@ -2227,16 +2227,16 @@ G.siteTrees = function (b) {
 };
 G.addBuilding = function (type, x, y, opt) {
   opt = opt || {};
-  const def=type==='farm'?G.farmDefinition(opt.farmSize):type==='pasture'?G.pastureDefinition(opt.pastureSize):G.BDEF[type];
+  const def=type==='farm'?G.farmDefinition(opt.farmSize):type==='pasture'?G.pastureDefinition(opt.pastureSize):type==='orchard'?G.orchardDefinition(opt.orchardSize):G.BDEF[type];
   if(def?.unbuildable)return {ok:false,reason:def.name+'不能主动建造或重新开发'};
-  if(!def||(opt.farmSize!==undefined&&type!=='farm')||(opt.pastureSize!==undefined&&type!=='pasture'))return {ok:false,reason:type==='pasture'?'牧场每边须为7至20格的整数':'农田每边须为4至15格的整数'};
+  if(!def||(opt.farmSize!==undefined&&type!=='farm')||(opt.pastureSize!==undefined&&type!=='pasture')||(opt.orchardSize!==undefined&&type!=='orchard'))return {ok:false,reason:type==='pasture'?'牧场每边须为7至20格的整数':(type==='orchard'?'果园':'农田')+'每边须为4至15格的整数'};
   const w = G.world;
   if (!opt.free) {
     for (const k in def.cost) {
       if (G.game.res[k] < def.cost[k]) return { ok: false, reason: `${G.RES[k].name}不足（需要 ${def.cost[k]}）` };
     }
   }
-  const chk = G.canPlace(w, type, x, y, type==='pasture'?opt.pastureSize:opt.farmSize);
+  const chk = G.canPlace(w, type, x, y, type==='pasture'?opt.pastureSize:type==='orchard'?opt.orchardSize:opt.farmSize);
   if (!chk.ok) return chk;
   if (opt.instant && G.siteTrees({ x, y, w: def.w, h: def.h }).length) return { ok: false, reason: '立即放置需要已清场的地面' };
   if (!opt.free) for (const k in def.cost) G.game.res[k] -= def.cost[k];
@@ -2252,6 +2252,7 @@ G.addBuilding = function (type, x, y, opt) {
     workers: [], family: null, noWork: false, warnText: '',
     paidCost: opt.free ? {} : Object.assign({}, def.cost), constructionStarted: false,
   };
+  if(type==='orchard'&&opt.orchardSize!==undefined){b.orchardSize=[...opt.orchardSize];b.workerLimit=G.initialOrchardWorkers(b.orchardSize);}
   if(type==='pasture'&&opt.pastureSize!==undefined){b.pastureSize=[...opt.pastureSize];b.workerLimit=G.initialPastureWorkers(b.pastureSize);}
   if (type === 'farm') {
     if(opt.farmSize!==undefined){b.farmSize=[...opt.farmSize];b.workerLimit=G.initialFarmWorkers(b.farmSize);}
@@ -2269,7 +2270,7 @@ G.addBuilding = function (type, x, y, opt) {
   if(type==='cemetery')b.graves=[];
   if(type==='tavern'){b.reserveDays=12;b.brewRecipe='grain';}
   if(type==='tailor'){b.coatRecipe='basic';b.coatMaterial='auto';}
-  if(type==='orchard'){b.orchardType='legacy';b.orchardTrees=G.newOrchardTrees();b.orchardDay=G.game.day;b.orchardReplant=true;G.syncOrchardTotals(b);}
+  if(type==='orchard'){b.orchardType='legacy';b.orchardTrees=G.newOrchardTrees(b);b.orchardDay=G.game.day;b.orchardReplant=true;G.syncOrchardTotals(b);}
   if (type === 'woodcutter') b.fuelLimit = G.PROD.woodcutter.fuelLimit; // 燃料上限（原版 Fuel Limit）
   if (G.game && G.game.buildLog) { // 建造/拆除记录（反馈分析用；负号前缀 = 拆除）
     G.game.buildLog.push({ d: G.game.day, t: type });
@@ -2356,7 +2357,7 @@ G.finishBuilding = function (b) {
   G.bumpNavigation(G.world);
   // 建造工人多于正式岗位时，释放多余人员
   const def = G.buildingDefinition(b);
-  if(b.pastureSize)b.workLeft=0;
+  if(b.pastureSize||b.orchardSize)b.workLeft=0;
   while (b.workers.length > def.jobs) {
     const id = b.workers.pop();
     const c = G.world.cmap[id];
@@ -2837,13 +2838,13 @@ G.setOrchardType=function(b,type){
   // unclaimed planting slot reads this selection; no fruit is ever relabelled.
   b.orchardType=type;b.noWork=false;b.warnText='';G.game.schedT=0;return true;
 };
-G.orchardLifetime=i=>(12+i)*G.YEAR_DAYS;
+G.orchardLifetime=i=>(12+i%9)*G.YEAR_DAYS;
 G.newOrchardTree=(cycle=0)=>({type:'legacy',planted:false,age:0,fruit:0,season:0,tendedDay:-1,cycle});
-G.newOrchardTrees=()=>Array.from({length:G.ORCHARD.count},()=>G.newOrchardTree());
+G.newOrchardTrees=b=>Array.from({length:G.orchardTreeCount(b)},()=>G.newOrchardTree());
 G.ensureOrchard=function(b){
   if(!b.orchardTrees){
     let fruit=b.orchardYield||0;const age=Math.min(G.ORCHARD.matureDays,b.orchardAge||0);
-    b.orchardTrees=Array.from({length:G.ORCHARD.count},()=>{const n=Math.min(G.ORCHARD.fruit,fruit);fruit-=n;return {type:'legacy',planted:true,age,fruit:n,season:b.orchardSeason||0,tendedDay:b.tendedDay??-1,cycle:0};});
+    b.orchardTrees=Array.from({length:G.orchardTreeCount(b)},()=>{const n=Math.min(G.ORCHARD.fruit,fruit);fruit-=n;return {type:'legacy',planted:true,age,fruit:n,season:b.orchardSeason||0,tendedDay:b.tendedDay??-1,cycle:0};});
     b.orchardDay=G.game.day; // Unknown old partial day is not replayed.
   }
   if(b.orchardReplant===undefined)b.orchardReplant=true;
@@ -2852,10 +2853,15 @@ G.ensureOrchard=function(b){
   G.syncOrchardTotals(b);
 };
 G.syncOrchardTotals=function(b){
-  b.orchardAge=Math.floor(b.orchardTrees.reduce((n,t)=>n+Math.min(t.age,G.ORCHARD.matureDays),0)/G.ORCHARD.count);
+  b.orchardAge=Math.floor(b.orchardTrees.reduce((n,t)=>n+Math.min(t.age,G.ORCHARD.matureDays),0)/G.orchardTreeCount(b));
   b.orchardYield=b.orchardTrees.reduce((n,t)=>n+t.fruit,0);
 };
-G.orchardPoint=(b,i)=>({x:b.x+1+(i%3)*2,y:b.y+1+Math.floor(i/3)*2});
+// Tile coordinates are integer work targets. Rendering uses these same tiles;
+// no fractional centering may move work off the navigation grid or beyond the plot.
+G.orchardPoint=function(b,i){
+  const layout=G.orchardLayout(b),offset=layout.legacy?1:0;
+  return {x:b.x+offset+(i%layout.columns)*2,y:b.y+offset+Math.floor(i/layout.columns)*(layout.legacy?2:3)};
+};
 G.orchardAction=function(b,t){
   if(!t.planted)return b.orchardReplant!==false&&G.orchardUnlocked(G.orchardTypeOf(b))?'plant':'';
   if(!G.orchardUnlocked(G.orchardTreeType(t)))return '';
@@ -2912,7 +2918,7 @@ G.orchardSummary=function(b){
   const fruit=trees.reduce((n,t)=>n+t.fruit,0),remaining=trees.map((t,i)=>t.planted?G.orchardLifetime(i)-t.age:Infinity),soon=remaining.filter(n=>n<=G.YEAR_DAYS).length;
   const fruitByType={vegetables:0,apples:0,pears:0};for(const t of trees)fruitByType[G.orchardOutput(t)]+=t.fruit;
   const selected=G.orchardTypeOf(b),plantable=G.orchardUnlocked(selected),hasUnlockedTree=trees.some(t=>t.planted&&G.orchardUnlocked(G.orchardTreeType(t)));
-  return {empty,young,mature,fruit,fruitByType,selected,soon,nextDeath:Math.min(...remaining),status:!plantable&&!hasUnlockedTree?'需从贸易站购买对应果树种子并选择补种品种':fruit&&G.game.season===2?(trees.some(t=>t.fruit>0&&!G.goalPaused(G.orchardOutput(t)))?'秋季逐树采果':'果实等待：对应果品或食物目标已达'):empty&&b.orchardReplant?(plantable?'空位待补种':'所选补种品种尚未解锁'):young?'幼树逐株养护，4年有效照料成熟':empty===9?'空园，补种已暂停':'成熟果树等待秋季'};
+  return {...G.orchardLayout(b),dimensions:[b.w,b.h],area:b.w*b.h,empty,young,mature,fruit,fruitByType,selected,soon,nextDeath:Math.min(...remaining),status:!plantable&&!hasUnlockedTree?'需从贸易站购买对应果树种子并选择补种品种':fruit&&G.game.season===2?(trees.some(t=>t.fruit>0&&!G.goalPaused(G.orchardOutput(t)))?'秋季逐树采果':'果实等待：对应果品或食物目标已达'):empty&&b.orchardReplant?(plantable?'空位待补种':'所选补种品种尚未解锁'):young?'幼树逐株养护，4年有效照料成熟':empty===G.orchardTreeCount(b)?'空园，补种已暂停':'成熟果树等待秋季'};
 };
 
 /* Health is separate from happiness. Rates/capacity are small-town adaptations;
