@@ -3,7 +3,7 @@
 ## 核查口径
 
 - 核查日期：2026-10-12。已交付基线为 [`main@6cfbe2d7f91d4a41fe3cc06caa3b6954d1fefdea`](https://github.com/LukeJiaoR/banish/tree/6cfbe2d7f91d4a41fe3cc06caa3b6954d1fefdea)，版本 **0.3.64**；[鸡牧场 PR #66](https://github.com/LukeJiaoR/banish/pull/66) 已在此基线上。
-- 本文记录 **0.3.65** 牧场疫病/整群搬空增量（[Issue #67](https://github.com/LukeJiaoR/banish/issues/67)，[PR #68](https://github.com/LukeJiaoR/banish/pull/68)已合并），以及 **0.3.66** 两果树/果品酿酒增量（[Issue #69](https://github.com/LukeJiaoR/banish/issues/69)）。增量源码用同提交相对链接；本文若位于未合并分支，最新增量仅是候选，交付仍以普通PR合并main为准。
+- 本文记录 **0.3.65** 牧场疫病/整群搬空增量（[Issue #67](https://github.com/LukeJiaoR/banish/issues/67)，[PR #68](https://github.com/LukeJiaoR/banish/pull/68)已合并），以及 **0.3.66** 两果树/果品酿酒增量（[Issue #69](https://github.com/LukeJiaoR/banish/issues/69)，[PR #70](https://github.com/LukeJiaoR/banish/pull/70)已合并），以及 **0.3.67** 面积牧场增量（[Issue #71](https://github.com/LukeJiaoR/banish/issues/71)）。增量源码用同提交相对链接；本文若位于未合并分支，最新增量仅是候选，交付仍以普通PR合并main为准。
 - 共列 40 项核心系统，按玩家能够做出的经营选择核查，不计算没有统一分母的“整体完成百分比”。本文件是范围审计，不是全功能、全平台或真实浏览器试玩通过证明。
 - 查验了实际定义、模拟、菜单、序列化及加载逻辑；先核完整 Git 树，再以固定 SHA 读取本地缺少的相关设计文档。README、旧片文档中的“下一步”不能单独证明现在缺失。例如旧医疗文档称游民传染未做，但当前 `advanceNomads` / `decideNomads` 已接上疾病；旧市政厅文档称市场配送未做，当前 `supply.js` 已实现。
 - 以下源码链接固定到上述基线，定位以函数或字段名为准。与原版比较的依据使用用户指定的 [Banished Wiki](https://banished-wiki.com/)；Wiki 里有旧版、预发布及互相不一致的描述，疑点单列，不把本作数值冒称为原版数值。
@@ -41,7 +41,7 @@
 | F6 果园逐树生长、采果和补种 | 已交付 | [模拟][sim] `newOrchardTrees`、`makeOrchardTask`、`completeOrchardTask`、`advanceOrchard`、`setOrchardReplant`；[存档][main] `orchardTrees`。农夫逐株种植/养护/采果，老树死亡、空位补种，货物仍需送仓。 | 已有多年投资和更新空窗。固定 9 株、4 年有效养护、12–20 年错峰寿命、每株 20 果为适配；不要再次开发“老树死亡/补种”。[Orchard](https://banished-wiki.com/wiki/Orchard)、[已交付说明][orchard-doc] |
 | F7 果树品种与可变果园面积 | 有适配简化（0.3.66 增量） | [本片模拟](../js/sim.js) `ORCHARD_TYPES`、`setOrchardType`、逐树 `type`；[规则](fruit-brewing.md)，[Issue #69](https://github.com/LukeJiaoR/banish/issues/69)。苹果/梨种子各自永久解锁，实际种植/采果/搬运；修改未来品种不改已种树或在途货，旧通用树仍产蔬菜。 | 两种果品独立，营养仍归既有蔬菜组；原版其余果/坚果品种及可变15×15以内果园仍缺。固定6×6/9株与现有树龄节奏保留；不能把两种品种切片称为完整八果树或面积规划。[Orchard](https://banished-wiki.com/wiki/Orchard) |
 | F8 羊、牛、鸡及牧产品 | 已交付 | [模拟][sim] `LIVESTOCK`、`setPastureType`、`stockPasture`、`advanceChickenEggs`、`completeEconomyWork`；[核心][core] 独立鸡蛋；[界面][ui] 选种、放入、保留量与生产；[鸡牧场说明](chickens.md)。 | 三物种已覆盖，禁止混养，照料繁殖、羊毛、肉、皮、鸡蛋及真实运出可玩。肉品合并、固定容量和繁殖/蛋产量是适配；鸡已经合并，不再作为下一片。[Pasture](https://banished-wiki.com/wiki/Pasture) |
-| F9 按面积规划牧场与容量 | 真实缺失 | [定义][defs] `pasture` 固定 6×6；[模拟][sim] 容量来自 `LIVESTOCK` 常数羊 12 / 牛 10 / 鸡 24；[地图][map] 仅 `farmDefinition` 支持变尺寸；[存档][main] 无 `pastureSize`。 | 缺土地面积、畜种密度、最大保留量和牧人需求的取舍。原版每牛 20 格、每羊 16 格、每鸡 6 格；不能把现有 6×6 / 24 鸡宣称原版面积规则，也不能直接把旧场套新密度挤死牲畜。[Pasture](https://banished-wiki.com/wiki/Pasture) |
+| F9 按面积规划牧场与容量 | 有适配简化（0.3.67 增量） | [本片地图](../js/map.js) `pastureDefinition`；[模拟](../js/sim.js) `pastureCapacity`；[规划/存档](../js/main.js) `pastureSize`；[规则](pasture-area.md)，[Issue #71](https://github.com/LukeJiaoR/banish/issues/71)。新场两角/拖拽确认7–20格，实际清场建造，容量/材料/岗位预览，放畜、繁殖、分群和搬空统一按目标场容量。 | 新场牛20/羊16/鸡6格；费用/工时为适配。旧6×6场保留羊12/牛10/鸡24与原库存合同。原围栏/棚屋/动物素材复用，畜群按实际区域分布；不含已有场扩缩或逐头转场寻路。[Pasture](https://banished-wiki.com/wiki/Pasture) |
 | F10 同种分群扩场 | 已交付 | [模拟][sim] `pastureSplitFacts`、`pastureSplitQuote`、`splitPasture`；不少于 10 头可向可达同种空场分一半，检查容量/残留任务，分配繁殖进度；沿原头数保存。[分群说明][split-doc] | 这是基线功能。牲畜仍按群体直接划拨，没有逐头赶畜行走；别把“分群”与本片“整群搬空”混为一项，后者见 D5。[Farming](https://banished-wiki.com/wiki/Farming#Pasture) |
 
 ## 三、材料、衣物、工具与加工（6 项）
@@ -87,7 +87,7 @@
 | D3 住房火灾、水井与真实扑救 | 有适配简化 | [火灾][fire] `setFireDisasters`、`igniteHouse`、`assignFireRescuers`、`fireWaterSpot`、`completeFirefighting`、`finishHouseFire`；[存档][main] `houseFire` / `ruinFrom`。有烟警、迁出、提水、蔓延、烧毁与付费重建。 | 默认关闭；只覆盖独栋住房，至多有限邻屋、无直接火灾死亡，非原版全城建筑火灾。水井供扑救，不制造可交易“水”。已足以产生预备住房/消防路线选择，不优先扩更多火灾条款。[Well](https://banished-wiki.com/wiki/Well)、[Disasters](https://banished-wiki.com/wiki/Disasters) |
 | D4 农田虫害、抢收与轮作 | 有适配简化 | [模拟][sim] `setFarmPests`、`advanceFarmPests`、`farmPestSummary`、`beginEarlyHarvest`；[存档][main] `farmPests`、`pestInfestation`、`lastPestCrop`。选择启用后，未收作物会损失，换作物影响复发。 | 核心应对已做，概率/宽限/损失批次为适配；不能从“已有农田虫害”推断果园也感染。Wiki 明确支持抢收和改种，但同页已澄清土壤退化未实现，不应开发伪原版“强制肥力耗尽”。[Farming / Infestation](https://banished-wiki.com/wiki/Farming#Infestation) |
 | D5 牧场疫病与整群搬空 | 有适配简化（0.3.65 增量） | [Issue #67](https://github.com/LukeJiaoR/banish/issues/67)；[本片模拟](../js/sim.js) `advancePasturePests` / `emptyPasture`、[规则](pasture-pests.md)。从0.3.64的繁殖/产物/分群扩展为明确确认的可选疫病和独立整群搬空，最后1–2头也可保种；旧村默认关闭。 | 12日宽限、2日预警、每天1死、全镇最多1场为适配，搬空清疫；原场已产物/携货与繁殖进度守恒。动物仍按群体直接安置，不是逐头赶畜；不接人类诊所或无依据邻场传播。交付条件见顶部合并口径。[Pasture](https://banished-wiki.com/wiki/Pasture) |
-| D6 其他原版灾难范围 | 真实缺失 | [模拟][sim] 果园生命周期没有虫害；[火灾][fire] 仅住房；[定义][defs]、[地图][map]、[存档][main] 无龙卷风实体/路径及工作事故机制。 | 果园虫害、龙卷风、工作事故等未覆盖。列明事实即可；在地图设置、牧场面积、果园面积/剩余品种仍有空缺时，暂不把连续加灾难作为默认路线。[Farming / Orchards](https://banished-wiki.com/wiki/Farming#Orchards)、[Disasters](https://banished-wiki.com/wiki/Disasters)、[Hunting Cabin / Risk](https://banished-wiki.com/wiki/Hunting_Cabin#Risk) |
+| D6 其他原版灾难范围 | 真实缺失 | [模拟][sim] 果园生命周期没有虫害；[火灾][fire] 仅住房；[定义][defs]、[地图][map]、[存档][main] 无龙卷风实体/路径及工作事故机制。 | 果园虫害、龙卷风、工作事故等未覆盖。列明事实即可；在地图设置、果园面积/剩余品种仍有空缺时，暂不把连续加灾难作为默认路线。[Farming / Orchards](https://banished-wiki.com/wiki/Farming#Orchards)、[Disasters](https://banished-wiki.com/wiki/Disasters)、[Hunting Cabin / Risk](https://banished-wiki.com/wiki/Hunting_Cabin#Risk) |
 
 ## 下一步优先的非灾难玩法
 
@@ -97,17 +97,11 @@
 
 0.3.66按 [#69](https://github.com/LukeJiaoR/banish/issues/69) 补苹果/梨与真实果品配方，三营养组、旧树旧蔬菜合同保留；详见 [本片说明](fruit-brewing.md)。不再把这两个品种和原料选择重复排为新任务。其余六种果/坚果目录、第四营养组和面积扩展仍需独立范围决策。
 
-### 1. 按面积规划牧场（F9）
+### 已交付的下一片：面积牧场（F9）
 
-**最小可玩范围：**沿现有农田两角规划交互，新增牧场矩形尺寸；预览同时显示各物种容量、建造成本和建议牧人数量。新场按面积决定容量，保留量受该场实际容量约束；羊/牛/鸡现有生产、分群、以及 #67 合并后的整群搬空都复用同一容量查询。无需先做逐头动物寻路或新的繁殖系统。
+0.3.67按 [#71](https://github.com/LukeJiaoR/banish/issues/71) 补新场矩形规划、密度容量、成本/用工和转场约束，旧场容量保全；见 [本片说明](pasture-area.md)。原围栏源码本已按宽高画段和入口，因此复用而非新造美术；新增真实区域畜群分布，不再把面积牧场重复排为新任务。
 
-**规则边界：**可按 Wiki 的每牛 20 / 每羊 16 / 每鸡 6 格为新场密度依据；尺寸范围、成本和岗位阶梯在 Issue 中明确，若采用小地图缩放则直接标适配。旧 6×6 牧场保留其原容量/种畜/产品，不因读档套新公式降到几只；新旧场都把容量规则显示清楚。整群搬空需要目标装得下整群，分群仍只检查分出的数量。
-
-**最小美术：**可拼接的原创围栏、转角与入口，动物活动位置与实际新尺寸一致，保留鸡舍/蛋篮和疫病状态可读性。
-
-**主要阻碍与完成证据：**现在大量上限直接用 `LIVESTOCK[type].cap`，树位式畜群绘制和保存也假定固定场地；要集中成每场容量/范围，避免只放大外框。选两种面积、至少两物种实际建造并验证容量差、正常繁殖/出货、向不足/足够容量场分群及搬空、旧场加载不损畜即可，不扩大为通用区域规划重构。
-
-### 2. 可重玩的开局设置（D1，D2 分阶段）
+### 1. 可重玩的开局设置（D1，D2 分阶段）
 
 **最小可玩范围：**先交付新游戏设置面板，玩家能输入/查看/复用地图种子，选择明确说明资源、家庭、初始种子/牲畜差别的开局预设；保留当前适配中等作为默认和旧档行为。预览不删除当前村，最终确认后才开新村，设置随存档保存并可查看。固定同种子＋同配置可重建初始世界，不宣称中途存档是确定性回放。
 
