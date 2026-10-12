@@ -3166,6 +3166,18 @@ G.ui = {
     const status = el.querySelector('[data-citizen-status]');
     if (status) status.textContent = this.citizenStatus(c);
   },
+  buildingActivityMarkup: function (b) {
+    const activity = typeof G.buildingActivity === 'function' ? G.buildingActivity(b) : null;
+    return activity ? `<div class="row" data-building-activity>${this.escHtml(activity.label)} · ${this.escHtml(activity.detail)}</div>` : '';
+  },
+  refreshBuildingActivity: function (b) {
+    const row = this.el.info.querySelector?.('[data-building-activity]');
+    if (!row) return;
+    const activity = typeof G.buildingActivity === 'function' ? G.buildingActivity(b) : null;
+    const text = activity ? `${activity.label} · ${activity.detail}` : '';
+    if (row.textContent !== text) row.textContent = text;
+    row.classList.toggle('hidden', !activity);
+  },
   renderInfo: function (force) {
     if (!G.sel) return;
     const w = G.world, el = this.el.info;
@@ -3198,6 +3210,8 @@ G.ui = {
     if (merchantChanged) force = true;
     // Workforce facts must update before every specialized panel's early return.
     if (sameSelection && G.sel.kind === 'b' && this._infoBuildState === selected.state) this.refreshWorkforceInfo(selected);
+    // The shared read-only activity facts must also bypass every early return.
+    if (sameSelection && G.sel.kind === 'b') this.refreshBuildingActivity(selected);
     if (!force && sameSelection && G.sel.kind === 'b' && this._infoBuildState === 'site' && selected.state === 'site' && this._infoBuildType === selected.type && this.refreshSiteInfo(selected)) return;
     if (!force && sameSelection && selected.type === 'market' && this._infoBuildState === selected.state && this.refreshMarketSupplyInfo(selected)) return;
     if (!force && sameSelection && G.sel.kind === 'b' && this._infoBuildState === selected.state && this._infoBuildType === selected.type && this.refreshHomeInfo(selected)) return;
@@ -3363,7 +3377,7 @@ G.ui = {
       el.innerHTML = `
         <div class="info-head"><span>${def.icon} ${def.name}</span><button id="info-close">✕</button></div>
         <div class="row"${b.type === 'dock' && b.state === 'ok' ? ' data-fishing-status' : ''}${b.type === 'hunting' && b.state === 'ok' ? ' data-hunting-status' : ''}${siteData ? ' data-site-status' : ''}${homeData ? ' data-home-status' : ''}${fuelData ? ' data-fuel="status"' : ''}${medicalData ? ' data-medical="status"' : ''}${chainData ? ' data-resource-chain-live="status"' : ''}${hallData ? ' data-townhall="status"' : ''}${marketData ? ' data-market-supply="status"' : ''}${tavernData ? ' data-tavern="status"' : ''}${chapelData ? ' data-chapel="status"' : ''}${tailorData ? ' data-tailor="status"' : ''}${farmData ? ' data-farm="status"' : ''}${cemeteryData?' data-cemetery="status"':''}${schoolData?' data-school="status"':''}${b.state === 'ok' && ['tradingpost', 'pasture', 'orchard'].includes(b.type) ? ' data-economy-status' : ''}>${this.escHtml(status)}</div>
-        ${workers}${this.workforceInfoMarkup(b, workforceData)}${siteData ? this.siteInfoMarkup(siteData) : ''}${extra}
+        ${this.buildingActivityMarkup(b)}${workers}${this.workforceInfoMarkup(b, workforceData)}${siteData ? this.siteInfoMarkup(siteData) : ''}${extra}
         <div class="row desc">${def.desc}</div>
         ${pit||remnant ? '' : `<div class="row desc" data-info-refund${fuelData ? ' data-fuel="refund"' : ''}>${ruin ? '清理烧毁废墟退还 0 材料；不能回收原屋材料。' : fireData?.summary.active ? '火灾进行中，暂不能拆除；关闭新增火灾也不会停止当前损伤。' : fuelData ? fuelData.refund : siteData ? siteData.refund : '已开工：拆除退还一半已付建材，已砍树不恢复'}</div>
         <button id="info-demolish" class="danger"${fireData?.summary.active ? ' disabled' : ''}>${b.state === 'site' ? '取消工地' : ruin ? '清理废墟（无返料）' : b.type==='cemetery'?'拆围栏…':'拆除'}</button>${this.mineralRemovalMarkup(b)}${this.cemeteryRemovalMarkup(b)}`}`;

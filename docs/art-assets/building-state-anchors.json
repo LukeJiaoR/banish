@@ -1,0 +1,793 @@
+{
+  "version": 1,
+  "coordinate_convention": "u=x/source_width; v=y/source_height; origin=image top-left including transparent pixels. World x=footX+(u-0.5)*drawWidth; world y=footY+(v-1)*drawHeight.",
+  "precision_note": "Anchors are manually selected feature centers from actual viewed PNG pixels, normalized exactly from the listed source-pixel points; not segmentation masks. Renderer-level visual QA is still required.",
+  "assets": [
+    {
+      "name": "house",
+      "source_path": "assets/buildings/house.png",
+      "source_sha256": "41caf239c8d525b519397695f596e2536cb91526c53e9d201a2b56c0534583a6",
+      "source_size": [
+        280,
+        285
+      ],
+      "draw_size_at_zoom_1": [
+        148.48,
+        151.131
+      ],
+      "anchors": {
+        "chimney_mouth": {
+          "source_px": [
+            169,
+            59
+          ],
+          "uv": [
+            0.603571,
+            0.207018
+          ],
+          "world_offset_from_foot": [
+            15.378,
+            -119.845
+          ]
+        },
+        "front_window": {
+          "source_px": [
+            132,
+            203
+          ],
+          "uv": [
+            0.471429,
+            0.712281
+          ],
+          "world_offset_from_foot": [
+            -4.242,
+            -43.483
+          ]
+        },
+        "side_front_window": {
+          "source_px": [
+            184,
+            202
+          ],
+          "uv": [
+            0.657143,
+            0.708772
+          ],
+          "world_offset_from_foot": [
+            23.333,
+            -44.014
+          ]
+        },
+        "side_back_window": {
+          "source_px": [
+            214,
+            189
+          ],
+          "uv": [
+            0.764286,
+            0.663158
+          ],
+          "world_offset_from_foot": [
+            39.241,
+            -50.907
+          ]
+        },
+        "loft_window": {
+          "source_px": [
+            203,
+            155
+          ],
+          "uv": [
+            0.725,
+            0.54386
+          ],
+          "world_offset_from_foot": [
+            33.408,
+            -68.937
+          ]
+        },
+        "door_glass": {
+          "source_px": [
+            64,
+            178
+          ],
+          "uv": [
+            0.228571,
+            0.624561
+          ],
+          "world_offset_from_foot": [
+            -40.302,
+            -56.741
+          ]
+        }
+      },
+      "baked_content_risks": [
+        "Baked gray smoke from main stone chimney, reaching the image top.",
+        "Windows are mostly cool blue and weakly lit; no large bright yellow window glow.",
+        "Secondary small brown roof vent at (207,96) is not the stone chimney."
+      ]
+    },
+    {
+      "name": "stonehouse",
+      "source_path": "assets/buildings/stonehouse.png",
+      "source_sha256": "e80fa00e92526e9a60464f86282718462c2a6bdb3c6467d3579f59c57fb50438",
+      "source_size": [
+        633,
+        514
+      ],
+      "draw_size_at_zoom_1": [
+        143.36,
+        116.409
+      ],
+      "anchors": {
+        "chimney_mouth": {
+          "source_px": [
+            343,
+            65
+          ],
+          "uv": [
+            0.541864,
+            0.126459
+          ],
+          "world_offset_from_foot": [
+            6.002,
+            -101.688
+          ]
+        },
+        "left_window": {
+          "source_px": [
+            163,
+            320
+          ],
+          "uv": [
+            0.257504,
+            0.622568
+          ],
+          "world_offset_from_foot": [
+            -34.764,
+            -43.937
+          ]
+        },
+        "entry_side_window": {
+          "source_px": [
+            269,
+            345
+          ],
+          "uv": [
+            0.424961,
+            0.671206
+          ],
+          "world_offset_from_foot": [
+            -10.758,
+            -38.275
+          ]
+        },
+        "right_window": {
+          "source_px": [
+            535,
+            304
+          ],
+          "uv": [
+            0.845182,
+            0.59144
+          ],
+          "world_offset_from_foot": [
+            49.485,
+            -47.56
+          ]
+        },
+        "upper_right_window": {
+          "source_px": [
+            470,
+            232
+          ],
+          "uv": [
+            0.742496,
+            0.451362
+          ],
+          "world_offset_from_foot": [
+            34.764,
+            -63.867
+          ]
+        },
+        "left_door_lantern": {
+          "source_px": [
+            443,
+            350
+          ],
+          "uv": [
+            0.699842,
+            0.680934
+          ],
+          "world_offset_from_foot": [
+            28.649,
+            -37.142
+          ]
+        },
+        "right_door_lantern": {
+          "source_px": [
+            477,
+            339
+          ],
+          "uv": [
+            0.753555,
+            0.659533
+          ],
+          "world_offset_from_foot": [
+            36.35,
+            -39.633
+          ]
+        }
+      },
+      "baked_content_risks": [
+        "Baked beige/gray chimney smoke reaches the image top.",
+        "All four visible windows have strong yellow baked lighting.",
+        "Two warm door lanterns and local light spill are baked in."
+      ]
+    },
+    {
+      "name": "boarding",
+      "source_path": "assets/buildings/boarding.png",
+      "source_sha256": "0b9e54560fb50c7daf17d187b8bf5ed5183ed258294dd630d27ed26b82c98b26",
+      "source_size": [
+        774,
+        464
+      ],
+      "draw_size_at_zoom_1": [
+        232.96,
+        139.656
+      ],
+      "anchors": {
+        "chimney_mouth": {
+          "source_px": [
+            225,
+            55
+          ],
+          "uv": [
+            0.290698,
+            0.118534
+          ],
+          "world_offset_from_foot": [
+            -48.759,
+            -123.102
+          ]
+        },
+        "left_wall_window": {
+          "source_px": [
+            104,
+            273
+          ],
+          "uv": [
+            0.134367,
+            0.588362
+          ],
+          "world_offset_from_foot": [
+            -85.178,
+            -57.488
+          ]
+        },
+        "front_left_window": {
+          "source_px": [
+            205,
+            318
+          ],
+          "uv": [
+            0.264858,
+            0.685345
+          ],
+          "world_offset_from_foot": [
+            -54.779,
+            -43.943
+          ]
+        },
+        "dormer_1": {
+          "source_px": [
+            304,
+            221
+          ],
+          "uv": [
+            0.392765,
+            0.476293
+          ],
+          "world_offset_from_foot": [
+            -24.981,
+            -73.139
+          ]
+        },
+        "dormer_2": {
+          "source_px": [
+            353,
+            194
+          ],
+          "uv": [
+            0.456072,
+            0.418103
+          ],
+          "world_offset_from_foot": [
+            -10.233,
+            -81.265
+          ]
+        },
+        "dormer_3": {
+          "source_px": [
+            435,
+            164
+          ],
+          "uv": [
+            0.562016,
+            0.353448
+          ],
+          "world_offset_from_foot": [
+            14.447,
+            -90.295
+          ]
+        },
+        "dormer_4": {
+          "source_px": [
+            520,
+            120
+          ],
+          "uv": [
+            0.671835,
+            0.258621
+          ],
+          "world_offset_from_foot": [
+            40.031,
+            -103.538
+          ]
+        },
+        "door_lantern_1": {
+          "source_px": [
+            286,
+            336
+          ],
+          "uv": [
+            0.369509,
+            0.724138
+          ],
+          "world_offset_from_foot": [
+            -30.399,
+            -38.526
+          ]
+        },
+        "door_lantern_2": {
+          "source_px": [
+            355,
+            304
+          ],
+          "uv": [
+            0.458656,
+            0.655172
+          ],
+          "world_offset_from_foot": [
+            -9.631,
+            -48.157
+          ]
+        },
+        "door_lantern_3": {
+          "source_px": [
+            437,
+            271
+          ],
+          "uv": [
+            0.564599,
+            0.584052
+          ],
+          "world_offset_from_foot": [
+            15.049,
+            -58.09
+          ]
+        },
+        "door_lantern_4": {
+          "source_px": [
+            530,
+            234
+          ],
+          "uv": [
+            0.684755,
+            0.50431
+          ],
+          "world_offset_from_foot": [
+            43.04,
+            -69.226
+          ]
+        },
+        "door_lantern_5": {
+          "source_px": [
+            623,
+            200
+          ],
+          "uv": [
+            0.80491,
+            0.431034
+          ],
+          "world_offset_from_foot": [
+            71.032,
+            -79.459
+          ]
+        }
+      },
+      "baked_content_risks": [
+        "No baked smoke is visible.",
+        "Six visible windows/dormers are strongly yellow-lit.",
+        "Five entry lanterns and broad warm light spill are baked in."
+      ]
+    },
+    {
+      "name": "blacksmith",
+      "source_path": "assets/buildings/blacksmith.png",
+      "source_sha256": "53e3bb1b5107b91d947ac678cf21cac43e83b308b1516efb5b86ca405d33b3fe",
+      "source_size": [
+        512,
+        469
+      ],
+      "draw_size_at_zoom_1": [
+        203.52,
+        186.428
+      ],
+      "anchors": {
+        "chimney_mouth": {
+          "source_px": [
+            366,
+            22
+          ],
+          "uv": [
+            0.714844,
+            0.046908
+          ],
+          "world_offset_from_foot": [
+            43.725,
+            -177.683
+          ]
+        },
+        "forge_core": {
+          "source_px": [
+            146,
+            306
+          ],
+          "uv": [
+            0.285156,
+            0.652452
+          ],
+          "world_offset_from_foot": [
+            -43.725,
+            -64.793
+          ]
+        },
+        "anvil_strike": {
+          "source_px": [
+            182,
+            342
+          ],
+          "uv": [
+            0.355469,
+            0.729211
+          ],
+          "world_offset_from_foot": [
+            -29.415,
+            -50.483
+          ]
+        },
+        "right_window": {
+          "source_px": [
+            373,
+            317
+          ],
+          "uv": [
+            0.728516,
+            0.675906
+          ],
+          "world_offset_from_foot": [
+            46.508,
+            -60.42
+          ]
+        }
+      },
+      "baked_content_risks": [
+        "No baked chimney smoke is visible.",
+        "Bright orange/yellow forge flame/coals and surrounding brick glow are baked in.",
+        "Right window has strong warm lighting.",
+        "The anvil is visible outside; no swinging hammer occupies the strike point."
+      ]
+    },
+    {
+      "name": "woodcutter",
+      "source_path": "assets/buildings/woodcutter.png",
+      "source_sha256": "c4d0386ec13f6a68f06e98a454df9cd87c4329b2285bc09e0aa62ced941f6851",
+      "source_size": [
+        285,
+        225
+      ],
+      "draw_size_at_zoom_1": [
+        143.36,
+        113.179
+      ],
+      "anchors": {
+        "stump_strike": {
+          "source_px": [
+            90,
+            180
+          ],
+          "uv": [
+            0.315789,
+            0.8
+          ],
+          "world_offset_from_foot": [
+            -26.408,
+            -22.636
+          ]
+        },
+        "existing_axe": {
+          "source_px": [
+            91,
+            170
+          ],
+          "uv": [
+            0.319298,
+            0.755556
+          ],
+          "world_offset_from_foot": [
+            -25.905,
+            -27.666
+          ]
+        },
+        "front_left_window": {
+          "source_px": [
+            118,
+            119
+          ],
+          "uv": [
+            0.414035,
+            0.528889
+          ],
+          "world_offset_from_foot": [
+            -12.324,
+            -53.32
+          ]
+        },
+        "front_middle_window": {
+          "source_px": [
+            142,
+            133
+          ],
+          "uv": [
+            0.498246,
+            0.591111
+          ],
+          "world_offset_from_foot": [
+            -0.252,
+            -46.278
+          ]
+        },
+        "right_window": {
+          "source_px": [
+            198,
+            125
+          ],
+          "uv": [
+            0.694737,
+            0.555556
+          ],
+          "world_offset_from_foot": [
+            27.917,
+            -50.302
+          ]
+        }
+      },
+      "baked_content_risks": [
+        "No smoke, flame, or emissive yellow window glow is visible.",
+        "A static axe is already embedded in the chopping stump; a second axe would look duplicated.",
+        "The tall right-hand pole and rigging are not a chimney."
+      ]
+    },
+    {
+      "name": "tailor",
+      "source_path": "assets/buildings/tailor.png",
+      "source_sha256": "88bef9564ddce884656579a27b41d639dade4e0f1e961e7b010b4ed01481e6dc",
+      "source_size": [
+        512,
+        540
+      ],
+      "draw_size_at_zoom_1": [
+        199.68,
+        210.6
+      ],
+      "anchors": {
+        "chimney_mouth": {
+          "source_px": [
+            362,
+            16
+          ],
+          "uv": [
+            0.707031,
+            0.02963
+          ],
+          "world_offset_from_foot": [
+            41.34,
+            -204.36
+          ]
+        },
+        "arched_window": {
+          "source_px": [
+            167,
+            209
+          ],
+          "uv": [
+            0.326172,
+            0.387037
+          ],
+          "world_offset_from_foot": [
+            -34.71,
+            -129.09
+          ]
+        },
+        "dormer_window": {
+          "source_px": [
+            356,
+            195
+          ],
+          "uv": [
+            0.695312,
+            0.361111
+          ],
+          "world_offset_from_foot": [
+            39.0,
+            -134.55
+          ]
+        },
+        "storefront_workbench": {
+          "source_px": [
+            342,
+            389
+          ],
+          "uv": [
+            0.667969,
+            0.72037
+          ],
+          "world_offset_from_foot": [
+            33.54,
+            -58.89
+          ]
+        },
+        "storefront_cloth": {
+          "source_px": [
+            385,
+            395
+          ],
+          "uv": [
+            0.751953,
+            0.731481
+          ],
+          "world_offset_from_foot": [
+            50.31,
+            -56.55
+          ]
+        },
+        "entry_lantern": {
+          "source_px": [
+            94,
+            328
+          ],
+          "uv": [
+            0.183594,
+            0.607407
+          ],
+          "world_offset_from_foot": [
+            -63.18,
+            -82.68
+          ]
+        }
+      },
+      "baked_content_risks": [
+        "No baked chimney smoke is visible.",
+        "Upper windows, storefront interior, and door lantern have strong baked warm lighting.",
+        "A tiny sewing-machine/workbench detail is visible behind the storefront; no large exposed outdoor loom exists.",
+        "Mannequin and exterior cloth bolts are static decorative props."
+      ]
+    },
+    {
+      "name": "tavern",
+      "source_path": "assets/buildings/tavern.png",
+      "source_sha256": "ea7deed22c8e92a685e834e21faeb5050e43187427a4eaa8e417e4d61af80b02",
+      "source_size": [
+        448,
+        320
+      ],
+      "draw_size_at_zoom_1": [
+        224.0,
+        160.0
+      ],
+      "anchors": {
+        "front_cask_lid": {
+          "source_px": [
+            369,
+            216
+          ],
+          "uv": [
+            0.823661,
+            0.675
+          ],
+          "world_offset_from_foot": [
+            72.5,
+            -52.0
+          ]
+        },
+        "back_cask_lid": {
+          "source_px": [
+            388,
+            199
+          ],
+          "uv": [
+            0.866071,
+            0.621875
+          ],
+          "world_offset_from_foot": [
+            82.0,
+            -60.5
+          ]
+        },
+        "left_window": {
+          "source_px": [
+            78,
+            196
+          ],
+          "uv": [
+            0.174107,
+            0.6125
+          ],
+          "world_offset_from_foot": [
+            -73.0,
+            -62.0
+          ]
+        },
+        "right_window": {
+          "source_px": [
+            297,
+            234
+          ],
+          "uv": [
+            0.662946,
+            0.73125
+          ],
+          "world_offset_from_foot": [
+            36.5,
+            -43.0
+          ]
+        },
+        "mug_sign": {
+          "source_px": [
+            159,
+            234
+          ],
+          "uv": [
+            0.354911,
+            0.73125
+          ],
+          "world_offset_from_foot": [
+            -32.5,
+            -43.0
+          ]
+        },
+        "entry": {
+          "source_px": [
+            127,
+            240
+          ],
+          "uv": [
+            0.283482,
+            0.75
+          ],
+          "world_offset_from_foot": [
+            -48.5,
+            -40.0
+          ]
+        }
+      },
+      "baked_content_risks": [
+        "No chimney, smoke, flame, open brewing vat, or visible liquid exists.",
+        "Two windows are moderately yellow-lit.",
+        "Both exterior barrels are closed: do not add an open-vat foam effect or pouring stream."
+      ]
+    }
+  ]
+}
