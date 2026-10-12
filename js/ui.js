@@ -25,6 +25,7 @@ G.ui = {
     const b = c.job != null ? G.world.bmap[c.job] : null;
     const fire = G.fireRescueState && G.fireRescueState(c);
     if (fire) return fire;
+    if(c.mealJourney&&G.householdMealStatus)return G.householdMealStatus(c);
     const supply = G.supplyCitizenStatus && G.supplyCitizenStatus(c);
     if (supply) return supply;
     if (G.isArriving ? G.isArriving(c) : c.arrivalHallId != null) return '迁入途中：先步行到市政厅报到';
@@ -908,6 +909,8 @@ G.ui = {
   refreshHUD: function () {
     if (!G.world) return;
     const g = G.game, physical = G.supplyEnabled && G.supplyEnabled(), supplies = physical ? G.supplyInventory() : null;
+    const mealNotice=document.getElementById('meal-transition-notice');
+    if(mealNotice){const notice=G.mealTransitionNotice?.()||'';mealNotice.textContent=notice;mealNotice.hidden=!notice;}
     this.refreshGuide();
     this.refreshProductionGoals();
     this.refreshNewGameSettings();
@@ -1284,6 +1287,7 @@ G.ui = {
       incoming: `实际在途：${this.supplyStockText(s.incoming)}`,
       buyers: `正在采购/送回：${s.buyers.length ? s.buyers.map(c => c.name).join('、') : '无人'}；本户健康成人候选 ${candidates.length} 人（先收尾当前任务，不代表已出发）。${!candidates.length && s.people ? '无健康成人采购者，需空闲散工协助；学生和病人不采购。' : ''}`,
       reason: s.reason,
+      meals: physical ? '必须实际到达当前家庭住处或营地，完成短用餐后才实扣口粮；每人每天最多一份。'+(G.mealTransitionNotice?.()||'') : '自动供给保持原每日结算。',
     };
   },
   householdSupplyInfoMarkup: function (b) {
@@ -1292,6 +1296,7 @@ G.ui = {
     return `<section class="economy-form" data-household-supply-panel><h3>${b.type === 'supplycamp' ? '家庭临时补给' : '家庭生活物资'}</h3>${Object.keys(data).map(k => `<p class="row" data-household-supply="${k}">${this.escHtml(data[k])}</p>`).join('')}</section>`;
   },
   refreshCitizenSupplyInfo: function (c) {
+    const meal=this.el.info.querySelector?.('[data-citizen-meal]');if(meal)meal.textContent=G.householdMealStatus?.(c)||'';
     const holder = this.el.info.querySelector?.('[data-citizen-household-supply]');
     if (!holder || !G.supplyFamilyTarget) return;
     const target = G.supplyFamilyTarget(G.familyOf(c), false);
@@ -1366,7 +1371,7 @@ G.ui = {
     const quote = G.supplyModeQuote(), enabled = G.supplyEnabled();
     return { quote, enabled, data: {
       mode: enabled ? '本存档已启用全村真实配送，不能切回自动供给。' : '当前全村自动供给；真实配送为一次性、不可逆的整村规则切换。',
-      rule: quote.rule || '已分配的物资不会重复领取；以后由货商与家庭采购者实际搬运。',
+      rule: quote.rule || '已分配的物资不会重复领取；以后由货商与家庭采购者实际搬运。居民须实际到家或营地完成用餐，每天最多一份。'+(G.mealTransitionNotice?.()||''),
       cost: enabled ? '一次性启动分配已结束，不再扣取或赠送启动物资。' : `确认后从公共库存实际扣除：${this.supplyStockText(quote.cost, true)}。这些物资逐项移入下列住处，不是赠送。`,
       coverage: enabled ? '库存位置、在途与消耗请看实物分布和家庭详情。' : `本次实际启动口粮 ${this.supplyNumber(quote.foodDays)} 天（最多 2 天）；距两日口粮还缺 ${this.supplyNumber(quote.foodShortfall)}，冷季取暖还缺 ${this.supplyNumber(quote.fuelShortfall)} 柴火当量。${quote.foodDays < 2 - 1e-8 ? '库存不足，不能保证两日供给。' : ''}`,
       clothing: G.clothingSupplyEnabled?.() ? '衣物配送已启用：穿坏只从住处现货换衣；先暖衣后普通衣，保留已穿耐久。' : '衣物仍沿用远程公共领取。启用家庭配送后，可在这里另行确认把衣物加入真实配送。',
@@ -3609,7 +3614,7 @@ G.ui = {
         <div class="row">职业：<span data-citizen-job>${jobName}</span> · <span data-citizen-status>${this.escHtml(status)}</span></div>
         ${c.carry ? `<div class="row">随身：${this.cargoText(c.carry)}（${Number.isInteger(c.carry.constructionId)?'建材已出库、尚未投入施工':c.carry.smithInput?'铁匠原料已出库、尚未消耗':'未入库'}）</div>` : ''}
         <div class="row">家庭：${fam ? (fam.houseId != null ? '有房' : '无房') : '单身'}</div>
-        <div data-citizen-household-supply>${supplyHome ? this.householdSupplyInfoMarkup(supplyHome) : ''}</div>
+        <p class="row" data-citizen-meal>${this.escHtml(G.householdMealStatus?.(c)||'')}</p><div data-citizen-household-supply>${supplyHome ? this.householdSupplyInfoMarkup(supplyHome) : ''}</div>
         ${this.studentInfoMarkup(c)}
         <div class="row">饥饿 ${'▕'.repeat(Math.min(4, c.hunger)) || '无'} · 受冻 ${c.cold > 1 ? '是' : '无'}</div>
         ${this.citizenClothingMarkup(c)}

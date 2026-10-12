@@ -168,11 +168,14 @@ G.endDay = function () {
   G.reconcileFood(g);
   const sorted = w.citizens.slice().sort((a, b) => (a.age >= G.ADULT_AGE && !a.student ? 1 : 0) - (b.age >= G.ADULT_AGE && !b.student ? 1 : 0));
   for (const c of sorted) {
-    const homeMeal=G.supplyEnabled&&G.supplyEnabled()?G.eatHousehold(c,eat):null;
-    if (homeMeal?homeMeal.length>0:g.res.food >= eat) {
-      const meal = homeMeal||G.consumeFood(eat); c.hunger = 0; c.dietVariety = meal.length;
-      c.dietScore = (c.dietScore ?? 1) * 0.9 + meal.length * 0.1;
-    } else { c.hunger++; c.dietVariety = 0; }
+    if(G.supplyEnabled&&G.supplyEnabled()){
+      const meal=G.mealTransitionActive(g,g.day-1)?G.eatHousehold(c,eat,true):[];
+      if(meal.length)G.recordHouseholdMeal(c,meal,g.day-1);
+      else if(c.lastMealDay!==g.day&&c.lastMealDay!==g.day-1){c.hunger++;c.dietVariety=0;}
+    }else if(g.res.food>=eat){
+      const meal=G.consumeFood(eat);c.hunger=0;c.dietVariety=meal.length;
+      c.dietScore=(c.dietScore??1)*.9+meal.length*.1;
+    }else{c.hunger++;c.dietVariety=0;}
     G.wearClothing(c);
     c.leisureDays=Math.max(0,G.leisureDaysOf(c)-1);
     c.chapelDays=Math.max(0,G.chapelDaysOf(c)-1);if(!c.chapelDays)c.chapelId=null;
@@ -1020,6 +1023,7 @@ G.buildingGoalStatus = function (b) {
 // Only configured automatic jobs gain completion protection. Never change the
 // unset baseline, teachers, manual tasks, or construction scheduling here.
 G.goalCommitment = function (c) {
+  if(c.mealJourney)return true;
   if(G.toolFetchTask(c))return true;
   if(G.fireTaskOf&&G.fireTaskOf(c))return true;
   if(G.supplyTaskOf&&G.supplyTaskOf(c))return true;
@@ -1236,6 +1240,7 @@ G.coldStep = function (c, dtH) {
  * tiles. Failed detours retain the task/cargo and retry every two hours. */
 G.pathStepBlocked = (w,c,t)=>!G.tunnelSegmentAllowed(w,c.x,c.y,t.x,t.y);
 G.detourCitizen = function (c, dtH) {
+  if(c.mealJourney){G.planMealJourney(c);return;}
   if(c.task?.kind==='roadPave'){G.resumeRoadWork(c,c.task);return;}
   if(c.task?.kind==='toolFetch'){G.planToolFetch(c,c.task);return;}
   if(c.task?.kind==='constructionMaterial'){const t=c.task,spot=G.constructionLegSpot(c,t);if(spot){t.tx=spot.x;t.ty=spot.y;G.sendTo(c,t.tx,t.ty,spot.route);}else if(G.constructionCargo(c))G.returnConstructionCargo(c);else G.dropBlockedTask(c,t);return;}
@@ -1283,9 +1288,28 @@ G.detourCitizen = function (c, dtH) {
   if (!path.length) G.arrive(c);
 };
 
+G.walkCitizenPath=function(c,dtH){
+      if (!c.path || c.pi >= c.path.length) { G.arrive(c); return; }
+      let mv = G.moveSpeed(c) * dtH;
+      while (mv > 0) {
+        if (!c.path || c.pi >= c.path.length) break;
+        const t = c.path[c.pi];
+        if (G.pathStepBlocked(G.world, c, t)) { G.detourCitizen(c, dtH); return; }
+        c.pathRetryH = 0;
+        const dx = t.x - c.x, dy = t.y - c.y;
+        const d = Math.hypot(dx, dy);
+        if (d <= mv) { c.x = t.x; c.y = t.y; mv -= d; c.pi++; }
+        else { c.x += (dx / d) * mv; c.y += (dy / d) * mv; mv = 0; }
+      }
+      c.animT += dtH * 8;
+      if (c.pi >= c.path.length) G.arrive(c);
+      return;
+};
+
 /* 市民每帧步进 */
 G.stepCitizen = function (c, dtH) {
   if (c.dead) return;
+  if(G.stepHouseholdMeal&&G.stepHouseholdMeal(c,dtH))return;
   if(G.constructionCargo(c)&&!c.carry.constructionReturn){const b=G.world.bmap[c.carry.constructionId];if(!b||b.state!=='site'||b.sitePaused||c.job!==b.id||b.construction?.consumed)G.returnConstructionCargo(c);}
   c.toolRetryH=Math.max(0,(c.toolRetryH||0)-dtH);
   if(c.student)G.restrictStudentWork(c);
@@ -1322,21 +1346,7 @@ G.stepCitizen = function (c, dtH) {
       return;
     case 'walk':
     case 'haul': {
-      if (!c.path || c.pi >= c.path.length) { G.arrive(c); return; }
-      let mv = G.moveSpeed(c) * dtH;
-      while (mv > 0) {
-        if (!c.path || c.pi >= c.path.length) break;
-        const t = c.path[c.pi];
-        if (G.pathStepBlocked(G.world, c, t)) { G.detourCitizen(c, dtH); return; }
-        c.pathRetryH = 0;
-        const dx = t.x - c.x, dy = t.y - c.y;
-        const d = Math.hypot(dx, dy);
-        if (d <= mv) { c.x = t.x; c.y = t.y; mv -= d; c.pi++; }
-        else { c.x += (dx / d) * mv; c.y += (dy / d) * mv; mv = 0; }
-      }
-      c.animT += dtH * 8;
-      if (c.pi >= c.path.length) G.arrive(c);
-      return;
+      G.walkCitizenPath(c,dtH);return;
     }
     case 'work': {
       if(c.task?.kind==='roadPave'){G.stepRoadWork(c,dtH);return;}
@@ -1392,6 +1402,7 @@ G.stepCitizen = function (c, dtH) {
 
 G.arrive = function (c) {
   c.path = null;
+  if(c.mealJourney){c.state='meal';return;}
   if (c.state === 'haul') {
     // Connectivity may change during this trip. Check once at delivery, not per tick.
     G.protectConstructionPriorityCargo(c);
@@ -1456,6 +1467,7 @@ G.cancelResourceMarks = function (kind) {
 };
 
 G.requestTask = function (c) {
+  if(c.mealJourney||G.tryMealJourney&&G.tryMealJourney(c,true))return;
   if(G.toolFetchTask(c)){G.planToolFetch(c,G.toolFetchTask(c));return;}
   if(G.supplyTaskOf&&G.supplyTaskOf(c)){G.planSupplyLeg(c,G.supplyTaskOf(c));return;}
   if(G.fireTaskOf&&G.fireTaskOf(c)){G.planFireLeg(c,G.fireTaskOf(c));return;}
@@ -2061,7 +2073,7 @@ G.releaseWorker = function (c) {
 };
 
 G.assignWorker = function (b, c) {
-  if(!c||c.dead||!c.adult||c.student||c.job!=null||c.carry?.staffingReturn===true||G.toolFetchTask(c)||(G.fireTaskOf&&G.fireTaskOf(c))||(G.supplyTaskOf&&G.supplyTaskOf(c))||G.isArriving(c)||G.world.bmap[b.id]!==b||b.workers.length>=G.workerLimitOf(b))return;
+  if(!c||c.dead||c.mealJourney||!c.adult||c.student||c.job!=null||c.carry?.staffingReturn===true||G.toolFetchTask(c)||(G.fireTaskOf&&G.fireTaskOf(c))||(G.supplyTaskOf&&G.supplyTaskOf(c))||G.isArriving(c)||G.world.bmap[b.id]!==b||b.workers.length>=G.workerLimitOf(b))return;
   if(b.type==='tavern'&&b.state==='ok'&&(c.age<18||G.isSick(c)))return;
   if(b.type==='chapel'&&b.state==='ok'&&(G.isSick(c)||c.hunger>0))return;
   if (b.type === 'hospital' && b.state === 'ok' && G.isSick(c)) return;
@@ -2156,7 +2168,7 @@ G.scheduleJobs = function () {
   // A held mineral batch is not a free pair of hands. Free only an empty job
   // slot; staffing handoffs retain their slot, even if the ceiling was restored.
   // releaseWorker preserves other bounded cargo and retries that delivery.
-  for (const c of w.citizens) if (!c.dead && c.job != null && c.staffingRelease!==c.job && c.carry?.staffingReturn!==true && !c.task && !c.pausedTask && G.mineralDeliveryBlocked(c)) G.releaseWorker(c);
+  for (const c of w.citizens) if (!c.dead && c.job != null && c.staffingRelease!==c.job && c.carry?.staffingReturn!==true && !c.mealJourney && !c.task && !c.pausedTask && G.mineralDeliveryBlocked(c)) G.releaseWorker(c);
   for (const b of w.buildings) {
     // 在重新探测岗位前先释放确实没活的闲人；旧逻辑每2h清旗，导致每日释放永远看不到它。
     if (b.noWork || (G.hasProductionGoal(b) && G.productionLimited(b))) for (const id of b.workers.slice()) {
@@ -3956,6 +3968,7 @@ G.makeTeachingTask=function(b,c){
   return G.withTaskRoute({kind:'teach',b,tx:spot.x,ty:spot.y,work:1e9,workLeft:1e9},spot.route);
 };
 G.startStudy=function(c){
+  if(c.mealJourney||G.tryMealJourney&&G.tryMealJourney(c,true))return true;
   if(!c.student||c.dead||G.isArriving(c)||G.isRestTime()||G.isSick(c)||c.hunger>=1)return false;
   G.restrictStudentWork(c);if(c.carry){G.startHaul(c);return false;}
   const assigned=G.assignSchool(c);if(!assigned){c.state='idle';c.wanderT=4;return false;}

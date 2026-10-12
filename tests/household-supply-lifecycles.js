@@ -111,7 +111,7 @@ test('automatic is the new-game default and does not create private stores', () 
 test('public to market to home moves mixed goods only after real pickup and arrival', () => {
   const G = fresh(), market = build(G, 'market', 20, 10), vendorHome = build(G, 'house', 28, 10), buyerHome = build(G, 'house', 28, 17);
   const vendor = family(G, vendorHome).c, buyer = family(G, buyerHome).c;
-  G.enablePhysicalSupplyPrototype(); G.game.day = 24; G.game.season = 2; G.setHeatingPolicy(true, 20);
+  G.game.day = 24; G.enablePhysicalSupplyPrototype(); G.game.season = 2; G.setHeatingPolicy(true, 20);
   seedStore(G, vendorHome, { grain: 20, vegetables: 20, meat: 20, firewood: 10 });
   const initial = inventory(G), publicBefore = { ...G.game.res };
   G.assignWorker(market, vendor); assert.equal(vendor.task?.kind, 'supply'); assert(vendor.task.vendor);
@@ -135,7 +135,9 @@ test('daily food and heat consume only home stock and preserve the public coal r
   G.enablePhysicalSupplyPrototype(); G.setHeatingPolicy(true, 20);
   seedStore(G, h, { grain: 3, vegetables: 3, meat: 3, firewood: 1, coal: 2 });
   const initial = inventory(G), before = { ...G.game.res }; G.game.day = 35; G.game.season = 2; G.game.h = 23.9;
-  G.game.townLedger = G.newTownLedger(G.game); G.advanceSim(.2); conserved(G, initial, 'daily meals and heat');
+  G.game.townLedger = G.newTownLedger(G.game); c.lastMealDay=null;
+  runUntil(G,()=>c.lastMealDay===G.game.day,{citizen:c,initial,label:'actual household meal'});
+  G.advanceSim(.2); conserved(G, initial, 'daily meals and heat');
   assert.equal(c.hunger, 0); assert.equal(c.dietVariety, 3); near(G.supplyFood(G.game.supplyUsed), G.LIFE.eatPerDay);
   near(G.game.supplyUsed.firewood, 1); near(G.game.supplyUsed.coal, .75); assert(!h.unheated);
   for (const k of G.SUPPLY.types) near(G.game.res[k], before[k], 'private use leaves public stock unchanged');
@@ -239,7 +241,7 @@ test('unquenched fire loses exactly stored goods after real elapsed time and pre
 
 test('five-type vendor cargo retains all items through destination loss and physical return', () => {
   const G = fresh(), market = build(G, 'market', 20, 10), h = build(G, 'house', 27, 10), { c } = family(G, h);
-  G.enablePhysicalSupplyPrototype(); G.game.day = 24; G.game.season = 2; G.setHeatingPolicy(true, 20);
+  G.game.day = 24; G.enablePhysicalSupplyPrototype(); G.game.season = 2; G.setHeatingPolicy(true, 20);
   seedStore(G, h, { grain: 30, vegetables: 30, meat: 30, firewood: 10 });
   const initial = inventory(G), before = { ...G.game.res }; G.assignWorker(market, c);
   runUntil(G, () => !!G.supplyCargo(c), { citizen: c, initial, label: 'five-type vendor pickup' });

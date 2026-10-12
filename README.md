@@ -1,8 +1,10 @@
 # 归园 · 放逐小镇（Banished 复刻原型）
 
+0.3.79 真实配送居民须实际到家或营地完成短用餐才扣粮；儿童、学生和携货者保留各自身份与货批，每人每日最多一份。旧 physical 村首次载入暂停并获得固定 8 游戏日迁移过渡，到期后不再隔空进食；自动供给不变。见 [到家进食与旧档规则](docs/reachable-meals-design.md) 与 [#96](https://github.com/LukeJiaoR/banish/issues/96)。
+
 0.3.78 道路实运铺设：沿原规划建立非阻路工程，石材实际运至首格再携到路格；逐格劳动完成才加速，旧路持续可走，部分取消/死亡/存档守恒。见 [规则](docs/road-work.md) 与 [#94](https://github.com/LukeJiaoR/banish/issues/94)。
 
-当前版本：**0.3.78**。
+当前版本：**0.3.79**。
 
 0.3.77 增加单端实运施工隧道：选择两端清场陆地，中间连续山体；首选洞口收石施工，完工后只沿轴按土路速度穿山。保留山体与洞口旧路，洞内人货和唯一通路阻止拆除，沿用实货与旧档保护。洞口使用现色板的轻量原生绘制，无新素材生成，详见 [隧道与穿山物流](docs/tunnels.md)、[任务 #92](https://github.com/LukeJiaoR/banish/issues/92)。
 
@@ -353,6 +355,7 @@ node tests/opening.js
 node tests/hauling.js
 node tests/ui_economy.js
 node tests/save-input-regressions.js
+node tests/reachable-meals.js
 node tests/family-clearing-regressions.js
 node tests/building-completion.js
 node tests/boarding-regressions.js
