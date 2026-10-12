@@ -168,7 +168,13 @@ G.sprDraw = function (ctx, name, cx, by, opts) {
     ctx.drawImage(im, -dw / 2, -dh, dw, dh);
     ctx.restore();
   } else {
-    ctx.drawImage(im, cx - dw / 2, by - dh, dw, dh);
+    const air=opts?.omitSmokeAir&&G.BUILD_SMOKE_AIR?.[name];
+    if(air&&im.width===air.source[0]&&im.height===air.source[1]){
+      // Runtime visibility only: preserve source pixels and the chimney/roof.
+      // The omitted rectangle ends above the first masonry pixel.
+      const [x,y,w,h]=air.rect;ctx.save();ctx.beginPath();ctx.rect(cx-dw/2,by-dh,dw,dh);ctx.rect(cx-dw/2+x*dw/im.width,by-dh+y*dh/im.height,w*dw/im.width,h*dh/im.height);ctx.clip('evenodd');
+      ctx.drawImage(im,cx-dw/2,by-dh,dw,dh);ctx.restore();
+    }else ctx.drawImage(im, cx - dw / 2, by - dh, dw, dh);
   }
   return [dw, dh];
 };
@@ -225,8 +231,126 @@ G.BUILD_SPR_W = {
   school: 1.06, blacksmith: 1.06, hunting: 1.08, site_2x2: 1.0, site_3x3: 1.0,
   market:7/6, well: 1.25, burntruins: 1.25, tailor: 1.04, tavern: 7 / 6, tradingpost: 0.875, herbalist: 1.25, hospital: 7 / 6, stonequarry: 7 / 6, mineralpit: 7 / 6, townhall: 7 / 6, chapel: 1.08,
 };
-/* 精灵内烟囱的横向位置（相对精灵宽度，负=偏左），用于挂炊烟粒子 */
-G.BUILD_CHIMNEY_X = { house: -0.30, stonehouse: 0.02, boarding: -0.32 };
+
+/* Building cues are presentation-only. Stock, tasks, family ownership and save
+ * data remain owned by simulation. Shared 250ms snapshots serve visible objects;
+ * detail-panel callers obtain current facts without mutating the simulation. */
+G.BUILD_ACTIVITY_TYPES=['house','stonehouse','boarding','blacksmith','woodcutter','tailor','tavern'];
+// Verified source-space air rectangles exclude all chimney masonry. A few
+// pre-existing pixels inside the chimney throat are deliberately retained.
+G.BUILD_SMOKE_AIR={house:{source:[280,285],rect:[155,0,80,49]},stonehouse:{source:[633,514],rect:[315,0,100,54]}};
+G.BUILD_EFFECT_ANCHORS={
+ house:{chimney:[.603571,.207018],window:[.471429,.712281]},
+ stonehouse:{chimney:[.541864,.126459],window:[.424961,.671206]},
+ boarding:{chimney:[.290698,.118534],window:[.456072,.418103]},
+ blacksmith:{work:[.355469,.729167]},woodcutter:{work:[.315789,.8]},
+ tailor:{work:[.668,.72038]},tavern:{work:[.823661,.675]}
+};
+G.buildingActivityContext=function(){
+ const w=G.world,homes=new Map();
+ for(const f of w.families||[])if(f.houseId!=null){if(!homes.has(f.houseId))homes.set(f.houseId,[]);homes.get(f.houseId).push(f);}
+ return {world:w,homes,population:(w.citizens||[]).reduce((n,c)=>n+!c.dead,0)};
+};
+G.buildingProcessingWorker=function(b,c,context){
+ const t=c?.task,w=G.world,k=({blacksmith:'smith',woodcutter:'fuel',tailor:'tailor',tavern:'brew'})[b.type];
+ if(!k||!c||c.dead||c.job!==b.id||w.cmap[c.id]!==c||c.state!=='work'||!t||t.kind!==k||t.b!==b||t.phase!=='process'||t.completed||!(t.workLeft>0)||G.d2(c.x,c.y,t.tx,t.ty)>.04||G.tileBlocked(w,Math.round(c.x),Math.round(c.y))||!G.atMedicalDoor(c,b))return false;
+ const cargo=c.carry;
+ if(k==='smith')return G.smithTaskCurrent(c,t)&&G.smithCargoMatches(c,t);
+ if(k==='fuel')return G.fuelTaskCurrent(c,t)&&cargo===t.inputCargo&&cargo?.fuelInput===true&&cargo.staffingReturn===true&&cargo.type==='wood'&&cargo.qty===t.consume?.qty&&!cargo.extra;
+ if(k==='tailor'){
+  const contents=cargo?{[cargo.type]:cargo.qty,...(cargo.extra||{})}:{};
+  return G.tailorTaskCurrent(c,t)&&cargo===t.inputCargo&&cargo?.coatInput===b.id&&cargo.staffingReturn===true&&Array.isArray(t.consume)&&Object.keys(contents).length===t.consume.length&&t.consume.every(x=>contents[x.type]===x.qty);
+ }
+ const recipe=G.brewRecipeSnapshot(t),population=context?.population??w.citizens.filter(x=>!x.dead).length;
+ return !G.isSick(c)&&cargo?.brewIngredient===true&&cargo.type===recipe.inputType&&cargo.qty===recipe.inputQty&&G.game.res.food>=population*G.LIFE.eatPerDay*G.tavernReserveDays(b);
+};
+G.buildingActivity=function(b,context){
+ const w=G.world;if(!b||w.bmap[b.id]!==b||b.state!=='ok'||b.houseFire||!G.BUILD_ACTIVITY_TYPES.includes(b.type))return null;
+ context=context?.world===w?context:G.buildingActivityContext();
+ const paused=!!G.game.paused;
+ if(['house','stonehouse','boarding'].includes(b.type)){
+  const residents=(context.homes.get(b.id)||[]).filter(f=>f.houseId===b.id).flatMap(f=>(f.members||[]).map(id=>w.cmap[id]).filter(c=>c&&!c.dead&&c.familyId===f.id));
+  const atHome=residents.filter(c=>G.citizenIndoorHome(c,new Map([[c.familyId,b]]))===b).length;
+  const last=b.lastHeating,heating=G.isWinter()&&residents.length>0&&!b.unheated&&last?.day===G.game.day&&(last.wood+(last.coal||0)*G.COAL_HEAT)>0;
+  const state=!residents.length?'vacant':atHome?'home':'away';
+  return {kind:'home',state,occupied:residents.length,atHome,heating,active:false,paused,
+   label:!residents.length?'空置：没有住户':`已入住 ${residents.length} 人 · 此刻在家 ${atHome} 人`,
+   detail:(!residents.length?'无新增炊烟；原画窗色不代表入住。':atHome?'夜间仅在家时增加窗内暖光。':'住户在外，入住不代表此刻在家。')+(heating?' 本日已有实际取暖燃料消耗。':G.isWinter()?' 尚无本日有效取暖燃料记录，不新增炊烟。':' 非冬季不新增取暖炊烟。')+(paused?' 游戏已暂停，动态冻结。':'')+' 标记：空门框=空置，人形=住户在外，小屋=此刻在家。'};
+ }
+ const workers=(b.workers||[]).map(id=>w.cmap[id]).filter(c=>c&&!c.dead&&c.job===b.id),processing=workers.find(c=>G.buildingProcessingWorker(b,c,context));
+ let state,label,detail;
+ if(processing){const limited=G.productionLimited(b)||(b.type==='tavern'&&(G.goalPaused('ale')||G.game.res.ale>=Math.min(G.productionGoalOf('ale')??30,G.storageCap())));state='working';label=paused?'全局暂停：已接加工批次保留':'正在现场加工';detail=`${processing.name||'工人'}已携实料到工作点；动效只代表本批加工。`+(G.workerLimitOf(b)<=0?' 用工上限为0，本批完成后停接。':limited?' 生产目标或备货上限已达，本批完成后停接。':'');}
+ else if(paused){state='paused';label='全局暂停';detail='动效冻结；不会因此消耗材料或完成批次。';}
+ else if(workers.some(c=>c.task?.b===b&&c.task.phase==='fetch')){state='fetching';label='取料途中或正在领料';detail='工人尚未回到加工点，不播放生产动效。';}
+ else if(workers.some(c=>c.task?.b===b&&c.task.phase==='process'&&c.state!=='work')){state='returning';label='实料返工坊途中';detail='材料仍由工人持有，到场实际加工后才播放动效。';}
+ else if(workers.some(c=>c.carry&&(c.state==='haul'||!c.task))){state='hauling';label='搬运产物或退还材料';detail='接受的货物继续实际搬运，工坊此刻不播放生产动效。';}
+ else if(G.workerLimitOf(b)<=0){state='paused';label='暂停新批次：用工上限为0';detail='已接任务和实货仍按现有合同处理。';}
+ else if(!workers.length){state='unstaffed';label='无人值岗';detail='分配到可用工人并真正开工后才播放生产动效。';}
+ else if(G.productionLimited(b)){state='paused';label='暂停新批次：达到生产目标';detail='达到目标不会丢弃已接受的批次或货物。';}
+ else if(b.type==='tavern'&&workers.some(c=>c.state==='work'&&c.task?.kind==='host'&&c.task.b===b&&G.atMedicalDoor(c,b))){state='hosting';label='酒馆接待中，未酿造';detail='接待住民与酿酒是不同实际任务。';}
+ else if(b.type==='tavern'&&workers.every(c=>G.isSick(c))){state='blocked';label='酿酒工生病，暂停酿造';detail='已取原料按既有规则退回，等待健康酿酒工。';}
+ else if((b.type==='woodcutter'&&G.game.res.wood<G.PROD.woodcutter.logsIn)||(b.type==='blacksmith'&&G.blacksmithRecipe(b).some(x=>G.game.res[x.type]<x.qty))){state='blocked';label='缺少加工原料';detail='等待所选配方需要的真实库存；取到料并回到工坊后才播放动效。';}
+ else if(b.type==='tailor'&&!G.tailorProductionStatus(b).ok){state='blocked';label=G.tailorProductionStatus(b).reason;detail='等待真实衣料或仓容条件，不播放加工动效。';}
+ else if(b.type==='tavern'&&!G.tavernBrewStatus(b).ok){state='blocked';label=G.tavernBrewStatus(b).reason;detail='当前未酿造；接待与加工分别显示。';}
+ else if(b.noWork||b.warnText){state='blocked';label='等待条件：'+(b.warnText||'当前无法开工');detail='未发生现场加工，静态炉色/窗色不代表正在生产。';}
+ else{state='idle';label='空闲：尚未开始现场加工';detail='已分配工人可能在休息、应急或等待任务；静态炉色/窗色不代表生产。';}
+ detail+=' 标记：▶加工，Ⅱ暂停，!条件受阻，—无人，○取料/搬运/空闲。';
+ return {kind:'workshop',state,label,detail,active:!!processing,workerId:processing?.id,paused};
+};
+G.prepareBuildingActivities=function(buildings,now){
+ const bucket=Math.floor(now*4),w=G.world;
+ let frame=G._buildingActivityFrame;
+ if(!frame||frame.world!==w||frame.bucket!==bucket||frame.paused!==!!G.game.paused||(!frame.context&&buildings.length)){frame={world:w,bucket,paused:!!G.game.paused,context:buildings.length?G.buildingActivityContext():null,entries:new Map()};G._buildingActivityFrame=frame;}
+ for(const b of buildings)if(!frame.entries.has(b.id))frame.entries.set(b.id,G.buildingActivity(b,frame.context));
+ return frame;
+};
+G.buildingAnchor=function(b,spr,footX,footY,name){const uv=G.BUILD_EFFECT_ANCHORS[b.type]?.[name];return uv?[footX+(uv[0]-.5)*spr[0],footY+(uv[1]-1)*spr[1]]:null;};
+G.buildingReducedMotion=function(){if(!G._buildingMotionQuery&&typeof matchMedia==='function')G._buildingMotionQuery=matchMedia('(prefers-reduced-motion: reduce)');return !!G._buildingMotionQuery?.matches;};
+G.buildingEffectTime=0;
+// Consistent ~11px footpoint badge remains legible without movement or color.
+G.drawBuildingStateMarker=function(ctx,s,x,y,active){
+ ctx.save();ctx.globalAlpha=.96;ctx.fillStyle='#3e4538';ctx.strokeStyle='#c2b494';ctx.lineWidth=.85;
+ ctx.beginPath();ctx.arc(x,y,5.6,0,Math.PI*2);ctx.fill();ctx.stroke();
+ ctx.fillStyle=s.kind==='home'?(s.atHome?'#f0cc82':'#b9cf9a'):'#ecd190';ctx.strokeStyle=ctx.fillStyle;ctx.lineWidth=1.1;
+ if(s.kind==='home'){
+  if(!s.occupied)ctx.strokeRect(x-2,y-3,4,6);
+  else if(s.atHome){ctx.beginPath();ctx.moveTo(x-3,y-1);ctx.lineTo(x,y-3.6);ctx.lineTo(x+3,y-1);ctx.closePath();ctx.fill();ctx.fillRect(x-2,y-1,4,4);}
+  else{ctx.beginPath();ctx.arc(x,y-2,1.2,0,Math.PI*2);ctx.fill();ctx.fillRect(x-1.5,y,3,3);}
+ }else if(G.game.paused||s.state==='paused'){ctx.fillRect(x-2.5,y-3,1.7,6);ctx.fillRect(x+.8,y-3,1.7,6);}
+ else if(active){ctx.beginPath();ctx.moveTo(x-1.8,y-3.3);ctx.lineTo(x+3.1,y);ctx.lineTo(x-1.8,y+3.3);ctx.closePath();ctx.fill();}
+ else if(s.state==='blocked'){ctx.fillRect(x-.7,y-3,1.4,3.6);ctx.fillRect(x-.7,y+2,1.4,1.4);}
+ else if(s.state==='unstaffed'){ctx.fillRect(x-3,y-.6,6,1.2);}
+ else{ctx.beginPath();ctx.arc(x,y,2.8,0,Math.PI*2);ctx.stroke();}
+ ctx.restore();
+};
+G.renderBuildingActivity=function(b){
+ const frame=G._buildingActivityFrame;let s=frame?.world===G.world?frame.entries.get(b.id):G.buildingActivity(b);if(!s)return;
+ // Recheck live household references without another whole-world scan.
+ if(s.kind==='home'){s=G.buildingActivity(b,frame?.context);if(!s)return;if(frame)frame.entries.set(b.id,s);}
+ return s;
+};
+G.drawBuildingActivity=function(ctx,b,spr,footX,footY){
+ const frame=G._buildingActivityFrame,s=G.renderBuildingActivity(b);if(!s)return;
+ const reduced=G.buildingReducedMotion(),time=reduced?0:G.buildingEffectTime,phase=(time+b.id*.37)%1;
+ ctx.save();
+ if(s.kind==='home'){
+  const chimney=G.buildingAnchor(b,spr,footX,footY,'chimney');if(chimney)b._chimney=chimney;
+  const win=G.buildingAnchor(b,spr,footX,footY,'window');
+  if(s.atHome&&G.nightAlpha()>.15&&win){ctx.fillStyle=`rgba(255,202,105,${reduced?.52:.49+Math.sin(time*1.4+b.id)*.04})`;for(const dx of [-1.65,1.65])for(const dy of [-1.9,1.9])ctx.fillRect(win[0]+dx-.65,win[1]+dy-.9,1.3,1.8);}
+  G.drawBuildingStateMarker(ctx,s,footX+7,footY+5,false);
+ }else{
+  const anchor=G.buildingAnchor(b,spr,footX,footY,'work');
+  const active=s.active&&G.buildingProcessingWorker(b,G.world.cmap[s.workerId],frame?.context);
+  if(active&&anchor){
+   ctx.fillStyle=b.type==='woodcutter'?'#c8a576':b.type==='tailor'?'#e1d1b4':'#e5be7a';
+   if(reduced){ctx.beginPath();ctx.arc(anchor[0],anchor[1],1.3,0,Math.PI*2);ctx.fill();}
+   else if(b.type==='blacksmith'||b.type==='woodcutter')for(let i=0;i<3;i++){const t=(phase+i*.23)%1;if(t>.58)continue;ctx.globalAlpha=1-t/.58;ctx.fillRect(anchor[0]+(i-1)*t*10,anchor[1]-Math.sin(t/.58*Math.PI)*5,1.4,1.4);}
+   else{ctx.globalAlpha=.35+.45*Math.sin(phase*Math.PI);ctx.fillRect(anchor[0]-1.5+phase*3,anchor[1],1.5,.8);}
+  }
+  G.drawBuildingStateMarker(ctx,s,footX+7,footY+5,active);
+ }
+ ctx.restore();
+};
 
 /* ---------- 地面缓存（半分辨率整图；道路/岩石改动只局部重绘脏瓦片） ---------- */
 G.markGroundDirty = function (x, y) {
@@ -479,11 +603,9 @@ G.drawBuilding = function (ctx, b, time) {
   const sprW = (b.w + b.h) * 32 * (G.BUILD_SPR_W[b.type] || 1.08);
   // 贸易站按原图50%显示；补偿底角下方3px透明余量，让石基脚点贴合占地底角。
   const sprFootY = B[1] + ((b.type === 'tradingpost'||b.type==='market') ? 1.5 : b.type === 'mineralpit' ? 2 : b.type==='burntruins'?2.5:b.type==='well'?1:b.type==='chapel'?6:0);
-  const spr = G.sprDraw(ctx, b.type, B[0], sprFootY, { w: sprW });
+  const spr = G.sprDraw(ctx, b.type, B[0], sprFootY, { w: sprW, omitSmokeAir:true });
   if (spr) {
-    if (def.chimney) { // 挂烟囱粒子锚点（精灵内烟囱横向位置见 BUILD_CHIMNEY_X）
-      b._chimney = [B[0] + spr[0] * (G.BUILD_CHIMNEY_X[b.type] || -0.30), B[1] - spr[1] * 0.58];
-    }
+    G.drawBuildingActivity(ctx,b,spr,B[0],sprFootY);
     if(b.houseFire)G.drawHouseFire(ctx,b,time,spr);
     return;
   }
@@ -514,10 +636,11 @@ G.drawBuilding = function (ctx, b, time) {
   // 门（左墙中部）
   const mx = (L[0] + B[0]) / 2, my = (L[1] + B[1]) / 2 - H;
   quadFill(ctx, mx - 3, my + 6, mx + 1, my + 8, mx + 1, my + 13, mx - 3, my + 11, '#3a2a1a');
+  const fallbackActivity=G.renderBuildingActivity(b);
   // 窗（住宅冬夜透光）
   if (def.isHome) {
     const wx = (B[0] + R[0]) / 2, wy = (B[1] + R[1]) / 2 - H;
-    ctx.fillStyle = (G.isWinter() || G.nightAlpha() > 0.15) ? '#ffd98a' : '#2e2013';
+    ctx.fillStyle = fallbackActivity?.atHome && G.nightAlpha() > 0.15 ? '#ffd98a' : '#2e2013';
     ctx.fillRect(wx - 2.5, wy + 3, 5, 4);
   }
   // 屋顶（整体上移，微外扩）
@@ -549,6 +672,7 @@ G.drawBuilding = function (ctx, b, time) {
     ctx.fillRect(cx - 2.5, cy - 7, 5, 9);
     b._chimney = [cx, cy - 7];
   }
+  if(fallbackActivity)G.drawBuildingStateMarker(ctx,fallbackActivity,B[0]+7,B[1]+5,fallbackActivity.active&&G.buildingProcessingWorker(b,G.world.cmap[fallbackActivity.workerId],G._buildingActivityFrame?.context));
   if(b.houseFire)G.drawHouseFire(ctx,b,time);
 };
 
@@ -999,22 +1123,21 @@ G.drawNeedBadge = function (ctx, x, y, kind) {
 
 /* ---------- 粒子 ---------- */
 G.updateParticles = function (dt) {
-  // 炊烟
-  if (G.isWinter() && !G.game.paused) {
-    for (const b of G.world.buildings) {
-      const def = G.BDEF[b.type];
-      const lived = b.type === 'boarding' ? G.boardingFamilies(G.world, b).length > 0 : b.family != null;
-      if (def.chimney && b.state === 'ok' && lived && b._chimney && Math.random() < 0.06) {
-        G.smoke.push({ x: b._chimney[0], y: b._chimney[1], age: 0, max: 2.5 + Math.random() * 2 });
-      }
-    }
+  // Only visible completed homes can emit; never scan the whole building list.
+  if(G._buildingParticleWorld!==G.world){G.smoke=[];G._buildingParticleWorld=G.world;G._buildingSmokeNext=new Map();}
+  const reduced=G.buildingReducedMotion(),frame=G._buildingActivityFrame;
+  if(reduced)G.smoke=[];
+  if(!reduced&&!G.game.paused&&G.isWinter())for(const b of G._visibleActivityBuildings||[]){
+    const s=frame?.entries.get(b.id);if(G.world.bmap[b.id]!==b||s?.kind!=='home'||!s.heating||!b._chimney)continue;
+    if(G.buildingEffectTime<(G._buildingSmokeNext.get(b.id)||0))continue;
+    G._buildingSmokeNext.set(b.id,G.buildingEffectTime+.85+(b.id%5)*.05);
+    if(G.smoke.length<96)G.smoke.push({home:b.id,x:b._chimney[0],y:b._chimney[1],age:0,max:2.6});
   }
-  for (let i = G.smoke.length - 1; i >= 0; i--) {
-    const p = G.smoke[i];
-    p.age += dt;
-    p.y -= dt * 9;
-    p.x += Math.sin(p.age * 3) * dt * 3;
-    if (p.age > p.max) G.smoke.splice(i, 1);
+  for(let i=G.smoke.length-1;i>=0;i--){
+    const p=G.smoke[i],b=G.world.bmap[p.home];
+    if(!b||b.state!=='ok'||b.houseFire){G.smoke.splice(i,1);continue;}
+    if(!G.game.paused){p.age+=dt;p.y-=dt*5;p.x+=Math.sin(p.age*2+p.home)*dt;}
+    if(p.age>p.max)G.smoke.splice(i,1);
   }
   // 雪
   if (G.isWinter()) {
@@ -1047,7 +1170,7 @@ G.drawFoodForestBounds = function (ctx) {
 /* ---------- 主绘制 ---------- */
 G.frame = function (dtReal) {
   const cv = G.cv, ctx = G.ctx;
-  G.updateParticles(dtReal);
+  if(!G.game.paused)G.buildingEffectTime+=dtReal;
   if (G.needGround || G.groundDirty.size || G._groundWorld !== G.world || G._groundScale !== G.groundScale) G.buildGround();
 
   ctx.setTransform(G.dpr, 0, 0, G.dpr, 0, 0);
@@ -1207,6 +1330,8 @@ G.frame = function (dtReal) {
   G.addDeerDrawItems(items,w,{tx0,ty0,tx1,ty1});
   items.sort((a, b) => a.d - b.d);
   const now = performance.now() / 1000;
+  G._visibleActivityBuildings=items.filter(it=>it.k===1&&it.b.state==='ok'&&!it.b.houseFire&&G.BUILD_ACTIVITY_TYPES.includes(it.b.type)).map(it=>it.b);
+  G.prepareBuildingActivities(G._visibleActivityBuildings,now);
   for (const it of items) {
     if (it.k === 0) {
       G.drawTree(ctx, it.t);
@@ -1280,6 +1405,8 @@ G.frame = function (dtReal) {
     }
   }
 
+  // Same-frame visible anchors and facts are ready before particle emission.
+  G.updateParticles(dtReal);
   // 炊烟（世界层）
   for (const p of G.smoke) {
     const a = Math.max(0, 1 - p.age / p.max);
