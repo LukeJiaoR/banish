@@ -123,8 +123,8 @@ test('tavern appears in industry with dedicated art and real recipe, food protec
   assert.match(live(f, 'afterBatch').textContent, /870/);
   assert.match(live(f, 'service').textContent, /可接待.*步行/);
   assert.match(live(f, 'visitors').textContent, /0 \/ 4.*18 岁以上 2 人/);
-  assert.match(f.info.textContent, /工人从仓库取主食.*再把麦酒送仓/);
-  assert.match(f.info.textContent, /蔬菜不作果酒.*不能充饥/);
+  assert.match(f.info.textContent, /工人从仓库领取整批主食、苹果或梨.*再把麦酒送仓/);
+  assert.match(f.info.textContent, /通用蔬菜与旧果园的蔬菜不能酿酒.*不能充饥/);
   assert.match(f.info.textContent, /2 小时.*1 麦酒.*6 天/);
   assert.match(f.info.textContent, /18 岁以上且健康/);
   assert.match(f.info.innerHTML, /酿酒工&lt;甲&gt;/);
@@ -210,7 +210,7 @@ test('real citizen happiness reports dietary basis, six-day memory and bounded p
   assert.match(f.info.textContent, /幸福：5.0 \/ 5.*当前目标 5.0/);
   assert.match(f.info.textContent, /休闲记忆：约余 6.0 天.*幸福目标 \+1/);
   assert.match(f.info.textContent, /劳动效率：\+5.0%.*无负惩罚/);
-  assert.match(f.info.textContent, /三类饮食（肉类、蔬菜、主食）是幸福基础.*4.0/);
+  assert.match(f.info.textContent, /三组营养（肉类含鸡蛋、蔬菜含苹果和梨、主食）是幸福基础.*4.0/);
   assert.match(f.info.textContent, /日终向目标最多变化 0.1/);
   const close = f.doc.getElementById('info-close'), writes = f.info.htmlWrites; close.focus();
   c.happiness = 1; c.leisureDays = 0; c.dietScore = 0; f.G.ui.renderInfo();
@@ -232,13 +232,13 @@ test('citizen statuses distinguish actual fetching, ingredient transport, brewin
   v.state = 'walk'; v.walkKind = 'home'; assert.equal(f.G.ui.citizenStatus(v), '回家途中');
 });
 
-test('ale HUD and production goal register independently of all three foods and describe lossless full-cargo delivery', () => {
+test('ale HUD and production goal register independently of all six food items and describe lossless full-cargo delivery', () => {
   const f = tavern(), { G } = f;
   assert(G.RES_KEYS.includes('ale')); assert(!G.FOOD_KEYS.includes('ale'));
   assert.match(G.ui.resourceIcon('ale'), /assets\/icons\/res_ale\.png/);
   G.game.res.ale = G.storageCap(); f.visitor.carry = { type: 'ale', qty: 2 }; G.ui.refreshHUD();
   const title = f.doc.getElementById('res-ale').title;
-  assert.match(title, /麦酒不计入三类食物.*18 岁以上.*1 麦酒/); assert.match(title, /仓满保留麦酒/);
+  assert.match(title, /麦酒不计入食物，不可充饥.*18 岁以上.*1 麦酒/); assert.match(title, /仓满保留麦酒/);
   for (const id of ['production-goals', 'production-goal-rows', 'btn-production-goals', 'production-goals-close', 'production-goals-message']) f.mount(id);
   G.ui.initProductionGoals(); G.setProductionGoal('ale', G.storageCap() + 10); G.ui.refreshProductionGoals();
   assert(f.doc.getElementById('goal-input-ale'));

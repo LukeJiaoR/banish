@@ -55,7 +55,7 @@ G.ui = {
       if(c.task?.kind==='tailor')return c.task.phase==='fetch'?'在库领取整批衣料':`制作${G.RES[c.task.yield.type].name}（使用随身衣料）`;
       if(c.task?.kind==='fuel')return c.task.phase==='fetch'?'在库领取原木（整批出库）':'劈柴中（使用随身已取原木）';
       if(c.task?.kind==='smith')return c.task.phase==='fetch'?'在库取铁匠原料（整批出库）':`锻造${G.RES[c.task.yield.type].name}（使用随身已取原料）`;
-      if (c.task && c.task.kind === 'brew') return c.task.phase === 'fetch' ? '取主食酿酒' : '加工麦酒';
+      if (c.task && c.task.kind === 'brew') return c.task.phase === 'fetch' ? `取${this.brewInputName(c.task)}酿酒` : '加工麦酒';
       if (c.task && c.task.kind === 'host') return '酒馆在岗接待';
       if (c.task && c.task.kind === 'cleric') return G.chapelStaff && G.chapelStaff(c.task.b) ? '牧师在岗主持礼拜' : '牧师服务暂停：需健康且实际到岗';
       if (c.task && c.task.kind === 'clinic') return b && b.type === 'herbalist' ? '采药屋值守' : '诊所值守';
@@ -68,7 +68,7 @@ G.ui = {
       if(c.carry?.coatInput)return c.state==='haul'?'退回未使用衣料':c.walkKind==='home'?'带衣料回家休息':'携衣料返回裁缝铺';
       if(c.carry?.fuelInput)return c.state==='haul'?'退回未使用的原木':c.walkKind==='home'?'带原木回家休息':'携原木返回伐木屋';
       if(c.carry?.smithInput)return c.state==='haul'?'退回铁匠原料（已出库，未消耗）':c.walkKind==='home'?'带铁匠原料回家休息':c.task?.kind==='smith'?'携铁、木或煤返回铁匠铺':'铁匠原料待退仓';
-      if (c.carry) return c.carry.brewIngredient ? `搬运酿酒主食（${c.state === 'haul' ? '退回仓库' : '送往酒馆'}）` : `搬运${G.RES[c.carry.type].name}（${c.state === 'haul' ? '送仓' : '途中'}）`;
+      if (c.carry) return c.carry.brewIngredient ? `搬运酿酒${G.RES[c.carry.type].name}（${c.state === 'haul' ? '退回仓库' : '送往酒馆'}）` : `搬运${G.RES[c.carry.type].name}（${c.state === 'haul' ? '送仓' : '途中'}）`;
       if (c.walkKind === 'home') return '回家途中';
       if (c.walkKind === 'wander') return '闲逛';
       if(c.task?.kind==='toolFetch')return '步行去通用仓领工具（尚未扣库存）';
@@ -77,7 +77,7 @@ G.ui = {
       if(c.task?.kind==='orchard')return ({plant:'前往空树位种植',tend:'前往幼树照料',harvest:'前往成熟果树采果'})[c.task.phase]+'（第'+(c.task.ti+1)+'株）';
       if(c.task?.kind==='fuel')return '前往堆料场或仓库取原木（尚未扣料）';
       if(c.task?.kind==='smith')return '前往堆料场或仓库取铁匠原料（尚未扣料）';
-      if (c.task && c.task.kind === 'brew') return c.task.phase === 'fetch' ? '前往仓库取酿酒主食' : '前往酒馆加工麦酒';
+      if (c.task && c.task.kind === 'brew') return c.task.phase === 'fetch' ? `前往仓库取酿酒${this.brewInputName(c.task)}` : '前往酒馆加工麦酒';
       if (c.task && c.task.kind === 'cleric') return '牧师步行前往礼拜堂（尚未提供服务）';
       if (c.task && c.task.kind === 'trade') return c.task.phase === 'fetch' ? '前往仓库备货' : '运送贸易物资';
       return '前往工作点';
@@ -92,7 +92,7 @@ G.ui = {
     if (b.type === 'tavern' && G.tavernSummary) return G.tavernSummary(b).reason || '等待酒馆酿造或接待任务';
     if (b.type === 'chapel' && G.chapelSummary) return G.chapelSummary(b).status || '等待礼拜堂服务安排';
     if (b.type === 'pasture' && !(b.animals > 0)) return '等待放入同种牲畜';
-    if (b.type === 'orchard' && !(G.game.unlocks && G.game.unlocks.orchard)) return '等待贸易购入果树种子';
+    if (b.type === 'orchard' && G.orchardSummary) return G.orchardSummary(b).status;
     if (['mine', 'stonequarry'].includes(b.type) && G.mineralSummary) {
       const mineral = G.mineralSummary(b);
       if (mineral.finite && mineral.reason) return mineral.reason;
@@ -260,7 +260,7 @@ G.ui = {
     const available = t => !['burntruins', 'mineralpit'].includes(t) && (special.includes(t) || !!G.BDEF[t]);
     this.toolGroups = [
       { id: 'homes', name: '住房', icon: '🏠', hint: '安家与过冬', tools: ['house', 'stonehouse', 'boarding'] },
-      { id: 'food', name: '食物生产', icon: '🌾', hint: '肉类 · 蔬菜 · 主食', tools: ['gatherer', 'hunting', 'dock', 'farm', 'orchard', 'pasture'] },
+      { id: 'food', name: '食物生产', icon: '🌾', hint: '肉蛋 · 蔬果 · 主食', tools: ['gatherer', 'hunting', 'dock', 'farm', 'orchard', 'pasture'] },
       { id: 'industry', name: '资源与加工', icon: '⚒️', hint: '木石铁煤 · 工具 · 衣物 · 酿造', tools: ['forester', 'woodcutter', 'stonequarry', 'mine', 'blacksmith', 'tailor', 'tavern'] },
       { id: 'services', name: '城镇服务', icon: '🏘️', hint: '储运 · 市场 · 水源 · 教育 · 医疗 · 礼拜 · 迁入 · 安葬', tools: ['storage', 'stockpile', 'market', 'well', 'school', 'herbalist', 'hospital', 'chapel', 'tradingpost', 'townhall', 'cemetery'] },
       { id: 'land', name: '道路与采运', icon: '🛣️', hint: '修路 · 采集 · 拆除', tools: ['road', 'stoneroad', 'bridge', 'fell', 'quarry', 'demolish'] },
@@ -648,6 +648,7 @@ G.ui = {
           el.title += ` · ${unprotected} 人衣物已耗尽；${k === 'warmCoats' ? '暖衣需 2 皮革 + 2 羊毛，户外受冻降低 70%（较普通衣物再减半）' : '普通衣物需 2 皮革或 2 羊毛，户外受冻降低 40%'}；每件 ${G.YEAR_DAYS} 天，日终穿坏才优先领暖衣，再领普通衣物；不替代住房与柴火` + (G.clothingSupplyEnabled?.() ? '；只从家中/临时补给点现货换衣，公共成衣需先实际配送' : '；沿用远程公共领取');
         }
         if (k === 'eggs') el.title += ' · 鸡蛋独立库存；与肉类同属肉类营养组，不增加第4组；鸡肉仍计入肉类库存';
+        if (['apples', 'pears'].includes(k)) el.title += ' · 独立库存与生产目标；营养归蔬菜组，仍为三组；可直接食用，或用实际果品酿酒；旧通用果树不产此果品';
         if (k === 'herbs') el.title += ' · 采药屋在成熟林中采集，送仓后用于草药保健；诊所治疗不消耗草药';
         if (k === 'ale') el.title += ' · 麦酒不计入食物，不可充饥；仅供 18 岁以上居民到酒馆休闲，每次消耗 1 麦酒';
         if (k === 'ale' && hauling.carry[k] && g.res[k] >= cap) el.title += ' · 仓满保留麦酒，腾出空间后继续送仓';
@@ -683,7 +684,7 @@ G.ui = {
     if (!G.healthSummary) return '';
     const h = G.healthSummary();
     const average = Number.isFinite(h.average) ? h.average.toFixed(1) : '—';
-    return `<span class="town-health${h.sick ? ' warn-txt' : ''}" title="全镇平均健康；三组营养（肉类含鸡蛋、蔬菜、主食）搭配有助健康。草药库存 ${Math.floor(h.herbs || 0)}">健康 ${average}/5 · 患病 ${h.sick} · 治疗 ${h.treated}</span>`;
+    return `<span class="town-health${h.sick ? ' warn-txt' : ''}" title="全镇平均健康；三组营养（肉类含鸡蛋、蔬菜含苹果和梨、主食）搭配有助健康。草药库存 ${Math.floor(h.herbs || 0)}">健康 ${average}/5 · 患病 ${h.sick} · 治疗 ${h.treated}</span>`;
   },
 
   refreshGuide: function () {
@@ -708,10 +709,10 @@ G.ui = {
     const stage = !food ? '① 先保持续食物：在近仓森林建采集小屋；不要先连盖五屋耗尽木石。'
       : !fuel ? '② 近仓建伐木屋备柴；在食物林外标记砍伐和矿石，保留散工。'
       : homeless ? `③ 入冬前安家：还有 ${homeless} 家无房；逐步补住房和取暖柴。`
-      : '④ 补齐肉类（含鸡蛋）、蔬菜、主食三组营养与衣物，再扩教育、医疗和贸易，为下一代留空房。';
+      : '④ 补齐肉类（含鸡蛋）、蔬菜（含苹果和梨）、主食三组营养与衣物，再扩教育、医疗和贸易，为下一代留空房。';
     const foodKinds = (G.FOOD_KEYS || []).filter(type => supplies[type] > 0);
     const foodGroups = G.foodGroupsOf(foodKinds);
-    const variety = G.FOOD_KEYS ? ` · 营养组 ${foodGroups.length}/3（肉类含鸡蛋）` : '';
+    const variety = G.FOOD_KEYS ? ` · 营养组 ${foodGroups.length}/3（肉类含鸡蛋，蔬菜含苹果和梨）` : '';
     const progress = harvest.total ? `\n采运标记：待领 ${harvest.queued} · 执行 ${harvest.active} · 夜间保留 ${harvest.paused}${harvest.reason ? '；' + harvest.reason : ''}` : '';
     el.textContent = (G.autosaveBlocked ? '⚠ 原自动档已保护：临时局不自动保存，请打开存档管理备份/手动保存。\n' : '') + `${physical ? '全村粮食合计' : '粮食'}约 ${days.toFixed(1)} 天（不计新产出${physical ? '，含在途与待回收，逐户现货才可食用' : ''}）${variety} · ${G.isWinter() ? '寒冬中' : '距入冬 ' + untilWinter + ' 天'} · ${g.paused ? '已暂停' : '运行中'}\n${stage}${risks.length ? '\n⚠ ' + risks.join(' ') : ''}${progress}`;
   },
@@ -1744,7 +1745,7 @@ G.ui = {
         ${today(['food', 'firewood'])}
       </section>
       <details data-townledger-food><summary>展开食物物品明细</summary>
-        <p class="townledger-note">近期、前期和差额使用上方相同日期；食物合计为肉类、鸡蛋、蔬菜、主食之和；鸡蛋与肉类在营养上合为一组，仍为三组营养。</p>
+        <p class="townledger-note">近期、前期和差额使用上方相同日期；食物合计为肉类、鸡蛋、蔬菜、主食、苹果、梨六种物品之和；鸡蛋与肉类同组，苹果和梨归蔬菜组，仍为三组营养。</p>
         ${G.FOOD_KEYS.map(history).join('')}${today(G.FOOD_KEYS)}
       </details>
       <details data-townledger-help><summary>这些数字怎样记账？</summary>
@@ -1760,7 +1761,7 @@ G.ui = {
     const f=G.townChallengeFacts(),done=G.game.challenges?.completed||{};
     const status=key=>done[key]!==undefined?`已确认：第 ${done[key]} 天`:(f[key].ready?'当前已满足，待下次日界确认':'进行中');
     return {challengeSettlement:`安居村庄 · ${status('settlement')}：已入村 ${f.settlement.population}/30 人；有完工住房 ${f.settlement.homed}/${f.settlement.population} 人，还缺 ${f.settlement.population-f.settlement.homed} 人住处。`,
-      challengeFood:!f.food.available?'一季多元生产：缺少流水统计，暂不能确认；不把未知产出当作零。':`一季多元生产 · ${status('food')}：最近完整记录 ${f.food.days}/12 日${f.food.days?`（第 ${f.food.fromDay}–${f.food.toDay} 天）`:''}；实际产出食物 ${f.food.produced.toFixed(1)} / 居民食用 ${f.food.used.toFixed(1)}；有实际产出的营养组 ${f.food.groups}/3（肉类含鸡蛋）。${!f.food.contiguous?'需紧接今天的连续12个完整日。':''}`,
+      challengeFood:!f.food.available?'一季多元生产：缺少流水统计，暂不能确认；不把未知产出当作零。':`一季多元生产 · ${status('food')}：最近完整记录 ${f.food.days}/12 日${f.food.days?`（第 ${f.food.fromDay}–${f.food.toDay} 天）`:''}；实际产出食物 ${f.food.produced.toFixed(1)} / 居民食用 ${f.food.used.toFixed(1)}；有实际产出的营养组 ${f.food.groups}/3（肉类含鸡蛋，蔬菜含苹果和梨）。${!f.food.contiguous?'需紧接今天的连续12个完整日。':''}`,
       challengeEducation:`教育传承 · ${status('education')}：受教育成人 ${f.education.educated}/3 人；已有课时且所属学堂完工的学生 ${f.education.students}/1 人。`};
   },
   townHallInfoData: function (b) {
@@ -1812,7 +1813,7 @@ G.ui = {
       <p class="economy-message" data-townhall-message role="status" aria-live="polite"></p>
       <details class="townhall-ledger" data-town-challenges><summary>发展挑战（本作适配）</summary>
         ${['challengeSettlement','challengeFood','challengeEducation'].map(key=>`<p class="row" data-townhall="${key}">${this.escHtml(data[key])}</p>`).join('')}
-        <p class="desc">30名已入村居民都有完工住房；或连续12完整日肉/蔬菜/主食各有实际产出、合计不少于实际食用且有人食用；或3名受教成人与1名已有课时学生。三项独立，无资源奖励或效率加成，不是原版成就的精确条件。</p>
+        <p class="desc">30名已入村居民都有完工住房；或连续12完整日肉类（含鸡蛋）/蔬菜（含苹果和梨）/主食三组各有实际产出、合计不少于实际食用且有人食用；或3名受教成人与1名已有课时学生。三项独立，无资源奖励或效率加成，不是原版成就的精确条件。</p>
         <p class="desc">日界首次观察满足后永久记录本次确认日；旧档不追溯历史完成日。产出可仍在搬运，贸易运回不算自产，统计不保证库存足够、均衡饮食或下一季继续自给。</p>
       </details>
       ${this.townLedgerInfoMarkup(data)}
@@ -1876,9 +1877,32 @@ G.ui = {
       });
     }
   },
+  brewInputName: function (task) {
+    // An accepted task owns its recipe. Never relabel it from the next-batch selector.
+    const key = typeof task?.recipe === 'string' ? task.recipe : task?.recipe?.key;
+    const type = task?.inputType || task?.recipe?.inputType || G.BREW_RECIPES?.[key]?.inputType || 'grain';
+    return G.RES[type]?.name || '原料';
+  },
+  tavernBatchText: function (b, summary) {
+    const rows = (summary.batches || []).map(batch => {
+      const c = G.world.cmap[batch.citizenId], cargo = c?.carry;
+      const input = G.RES[batch.inputType]?.name || '原料';
+      if (batch.phase === 'deliver') return `${batch.name}：已酿麦酒 ${this.supplyNumber(cargo?.qty ?? batch.outputQty)}，${c && G.cargoWaitReason(c) || '送仓途中'}，尚不可使用`;
+      if (cargo?.brewIngredient) return `${batch.name}：${G.RES[cargo.type].name} ${this.supplyNumber(cargo.qty)} 已出库，${c.state === 'haul' || batch.phase === 'return' ? '中断后退回仓库' : c.pausedTask?.kind === 'brew' ? '夜间暂停，次日续做' : c.state === 'work' ? '正在酿造' : '携料送往酒馆'}${batch.phase === 'return' ? '；尚未消耗' : `；本批仍产 ${batch.outputQty} 麦酒，不再重复扣料`}`;
+      return `${batch.name}：已接${input}批次，需 ${batch.inputQty} ${input} → ${batch.outputQty} 麦酒；前往仓库取料，尚未出库`;
+    });
+    const known = new Set((summary.batches || []).map(batch => batch.citizenId));
+    for (const c of G.world.citizens) {
+      if (c.dead || known.has(c.id) || !c.carry || !(c.carry.tavernId === b.id || c.job === b.id)) continue;
+      if (c.carry.brewIngredient) rows.push(`${c.name}：未酿${G.RES[c.carry.type].name} ${this.supplyNumber(c.carry.qty)}，中断后退回仓库`);
+      else if (c.carry.type === 'ale') rows.push(`${c.name}：已酿麦酒 ${this.supplyNumber(c.carry.qty)}，${G.cargoWaitReason(c) || '送仓途中'}，尚不可使用`);
+    }
+    return rows.join('；') || '暂无已接取料或携料批次';
+  },
   tavernInfoData: function (b) {
     if (b.type !== 'tavern' || b.state !== 'ok' || !G.tavernSummary) return null;
-    const s = G.tavernSummary(b), g = G.game;
+    const s = G.tavernSummary(b), g = G.game, recipe = G.BREW_RECIPES[G.tavernRecipeOf(b)];
+    const input = G.RES[recipe.inputType].name;
     const names = b.workers.map(id => G.world.cmap[id]).filter(Boolean).map(c => c.name).join('、');
     const service = !s.onDuty ? '服务暂停：需健康酿酒工实际到岗' : s.ale < 1 ? '服务等待：需麦酒入库'
       : s.visitors >= s.capacity ? '休闲名额已满（含在途预约）' : '可接待：居民仍需步行到馆';
@@ -1887,18 +1911,20 @@ G.ui = {
       workers: names || '无',
       service,
       visitors: `休闲名额：${s.visitors} / ${s.capacity}（含在途预约） · 全镇 18 岁以上 ${s.eligibleAdults} 人`,
-      recipe: `每批：${s.batchGrain} 主食 → ${s.batchAle} 麦酒（受教育 4）；基础劳动 ${s.workHours} 小时`,
-      stock: `全镇库存：主食 ${Math.floor(g.res.grain || 0)} · 总食物 ${Math.floor(g.res.food || 0)} · 麦酒 ${Math.floor(s.ale || 0)}`,
+      recipe: `已应用下一批：${recipe.inputQty} ${input} → ${recipe.outputQty} 麦酒（受教育 ${recipe.educatedOutputQty}）；基础劳动 ${s.workHours} 小时`,
+      stock: `公共库存：${['grain', 'apples', 'pears'].map(type => `${G.RES[type].name} ${Math.floor(g.res[type] || 0)}`).join(' · ')} · 总食物 ${Math.floor(g.res.food || 0)} · 麦酒 ${Math.floor(s.ale || 0)}（已配送与携料另计）`,
+      batches: `当前批次：${this.tavernBatchText(b, s)}`,
       reserve: `储粮保护：全村 ${s.reserveDays} 天食物（至少 ${Math.ceil(s.reserveFood)}）`,
-      afterBatch: `取出本批 ${s.batchGrain} 主食后，总食物约 ${Math.floor(s.foodAfterBatch)}；仍须达到储粮保护线。`,
+      afterBatch: `取出下一批 ${recipe.inputQty} ${input}后，公共总食物约 ${Math.floor(s.foodAfterBatch)}；仍须达到储粮保护线。`,
       goals: G.buildingGoalStatus(b) || '全镇麦酒目标：未设置，默认备30；可在资源目标面板调整',
     };
-    return { summary: s, data };
+    return { summary: s, selectedRecipe: G.tavernRecipeOf(b), data };
   },
   tavernInfoMarkup: function (facts) {
     const data = facts.data;
     return `<section class="tavern-details" data-tavern-panel>
-      ${['service', 'visitors', 'recipe', 'stock'].map(key => `<p class="row" data-tavern="${key}">${this.escHtml(data[key])}</p>`).join('')}
+      ${['service', 'visitors', 'recipe', 'stock', 'batches'].map(key => `<p class="row" data-tavern="${key}">${this.escHtml(data[key])}</p>`).join('')}
+      <form id="tavern-recipe-form" class="economy-form"><label for="tavern-recipe">选择下一批原料</label><select id="tavern-recipe">${Object.entries(G.BREW_RECIPES).map(([key, recipe]) => `<option value="${key}"${key === facts.selectedRecipe ? ' selected' : ''}>${this.escHtml(G.RES[recipe.inputType].name)}：${recipe.inputQty} → ${recipe.outputQty} 麦酒</option>`).join('')}</select><div class="economy-actions"><button type="submit" id="tavern-recipe-apply">应用下一批配方</button><button type="button" id="tavern-recipe-cancel">取消未应用选择</button></div><p class="desc">改选只用于下一批新任务；已接取料、携料或暂停批次沿用原配方。买来的苹果、梨也可使用，无需先解锁种树。</p></form>
       <div class="tavern-reserve" role="group" aria-labelledby="tavern-reserve-label">
         <p id="tavern-reserve-label" data-tavern="reserve">${this.escHtml(data.reserve)}</p>
         <div class="tavern-actions"><button type="button" id="tavern-reserve-less" data-tavern-step="-4" aria-label="降低储粮保护 4 天" aria-describedby="tavern-reserve-note">−4 天</button>
@@ -1908,10 +1934,10 @@ G.ui = {
       <p class="row" data-tavern="afterBatch">${this.escHtml(data.afterBatch)}</p>
       <p class="row" data-tavern="goals">${this.escHtml(data.goals)}</p>
       <p class="economy-message" data-tavern-message role="status" aria-live="polite"></p>
-      <p class="desc">工人从仓库取主食，送到酒馆加工，再把麦酒送仓。取粮、开酿与完成前均检查储粮；不足时优先退回未酿原粮，中断和存档不会吞掉原粮。</p>
-      <p class="desc">仅酿主食麦酒；蔬菜不作果酒。麦酒不计入食物，也不能充饥；肉类与鸡蛋同组，加上蔬菜、主食仍为三组营养。</p>
+      <p class="desc">工人从仓库领取整批主食、苹果或梨，送到酒馆加工，再把麦酒送仓。取料、开酿与完成前均检查储粮；不足时退回未酿原料，中断和存档不会吞掉原料。</p>
+      <p class="desc">仅实际苹果、梨可作果品原料；通用蔬菜与旧果园的蔬菜不能酿酒。果品每30酿10麦酒；主食每30酿3（受教育4），6小时工时与共享麦酒库存为本作适配。麦酒不计入食物，也不能充饥。六种食物物品仍为三组营养：肉类含鸡蛋，蔬菜含苹果和梨，另有主食。</p>
       <p class="desc">仅接待 18 岁以上居民，最多 4 人（含在途预约）。到馆累计服务 2 小时后，每人消耗 1 麦酒，留下 6 天休闲记忆。需健康酿酒工实际在岗；失去服务会等待或取消，夜间照常回家。</p>
-      <p class="desc">三组营养（肉类含鸡蛋、蔬菜、主食）是幸福基础；休闲可把幸福补到 5。完成休闲即时 +0.4 幸福（上限 5），日终再向目标平滑变化。劳动效率仅获 0～+5% 正向加成，不因低幸福受到负惩罚。</p>
+      <p class="desc">三组营养（肉类含鸡蛋、蔬菜含苹果和梨、主食）是幸福基础；休闲可把幸福补到 5。完成休闲即时 +0.4 幸福（上限 5），日终再向目标平滑变化。劳动效率仅获 0～+5% 正向加成，不因低幸福受到负惩罚。</p>
     </section>`;
   },
   refreshTavernInfo: function (b) {
@@ -1934,6 +1960,28 @@ G.ui = {
     const el = this.el.info, w = G.world, g = G.game;
     const panel = el.querySelector && el.querySelector('[data-tavern-panel]');
     if (!panel || !G.setTavernReserve) return;
+    const valid = node => G.world === w && G.game === g && this.el.info === el && !el.classList.contains('hidden') &&
+      G.sel?.kind === 'b' && G.sel.id === b.id && w.bmap[b.id] === b && b.type === 'tavern' && b.state === 'ok' &&
+      el.querySelector('[data-tavern-panel]') === panel && el.querySelector('#' + node.id) === node && !node.disabled && !G.hasOpenModal?.();
+    const form = panel.querySelector('#tavern-recipe-form'), select = panel.querySelector('#tavern-recipe');
+    const cancel = panel.querySelector('#tavern-recipe-cancel'), apply = panel.querySelector('#tavern-recipe-apply');
+    for (const node of [form, select, cancel, apply, ...panel.querySelectorAll('[data-tavern-step]')]) node.addEventListener('keydown', e => {
+      if (e.repeat && ['Enter', ' '].includes(e.key)) e.preventDefault();
+    });
+    form.addEventListener('submit', e => {
+      e.preventDefault();
+      if (e.repeat || !valid(form) || !valid(select) || !valid(apply) || panel.querySelector('#tavern-recipe-form') !== form || panel.querySelector('#tavern-recipe') !== select || panel.querySelector('#tavern-recipe-apply') !== apply) return;
+      const type = select.value, message = panel.querySelector('[data-tavern-message]');
+      if (type === G.tavernRecipeOf(b)) { message.textContent = '下一批配方已是此选择；当前批次继续。'; return; }
+      const accepted = G.setTavernRecipe(b, type);
+      message.textContent = accepted ? `下一批已选${G.RES[G.BREW_RECIPES[type].inputType].name}；已接取料与携料批次保留原配方。` : '配方未更改，请选择主食、苹果或梨。';
+      this.refreshTavernInfo(b);
+    });
+    cancel.addEventListener('click', e => {
+      if (e.detail > 1 || !valid(cancel) || !valid(select) || panel.querySelector('#tavern-recipe-cancel') !== cancel || panel.querySelector('#tavern-recipe') !== select) return;
+      select.value = G.tavernRecipeOf(b); select.focus();
+      panel.querySelector('[data-tavern-message]').textContent = '已取消未应用的配方选择。';
+    });
     for (const button of panel.querySelectorAll('[data-tavern-step]')) button.addEventListener('click', () => {
       // Detached controls never act on a new world, new panel, or same-ID replacement.
       if (G.world !== w || G.game !== g || this.el.info !== el || el.classList.contains('hidden') || !G.sel ||
@@ -2094,7 +2142,7 @@ G.ui = {
       <p class="economy-message" data-farm-message role="status" aria-live="polite"></p>
       <p class="desc">全田播完才开始成长；小麦和卷心菜成长 ${G.CROPS.wheat.growDays} 天、秋季全熟后收获；早熟豆类成长 ${G.CROPS.beans.growDays} 天，夏、秋全熟即可正常收获。早熟的代价是基础每格 ${G.CROPS.beans.perTile} 蔬菜，低于小麦和卷心菜的 ${G.CROPS.wheat.perTile}。播种、走路、收割和送仓仍需时间，大田或农夫不足会推迟入库，不保证夏初就有粮。每年只种收一季，收完不能在夏季再次播种。</p>
       <p class="desc">也可确认提前抢收，按当时成熟度锁定较低产量并停止继续成长，本季不能复种。等待能提高成熟产量；若开启虫害，等候和收割期间仍可能损失未收格。冬季未收作物损失；农夫仍须收割并实际搬运入仓。</p>
-      <p class="desc">营养仍分肉类（含鸡蛋）、蔬菜、主食三组。小麦产主食，卷心菜产蔬菜，早熟豆类也计入蔬菜；多种作物不额外增加饮食类别，也不产肉。</p>
+      <p class="desc">营养仍分肉类（含鸡蛋）、蔬菜（含苹果和梨）、主食三组。小麦产主食，卷心菜产蔬菜，早熟豆类也计入蔬菜；多种作物不额外增加饮食类别，也不产肉。</p>
     </section>`;
   },
   refreshFarmInfo: function (b) {
@@ -2653,7 +2701,7 @@ G.ui = {
       memory: days > 0 ? `休闲记忆：约余 ${days.toFixed(1)} 天${s ? ` · 幸福目标 +${s.leisureBonus}` : ''}` : '休闲记忆：暂无（酒馆仅接待 18 岁以上居民）',
       chapel: chapelDays > 0 ? `礼拜记忆：约余 ${chapelDays.toFixed(1)} 天 · 幸福目标 +${chapelBonus}` : '礼拜记忆：暂无（完成礼拜堂实际服务后获得）',
       work: `幸福带来的劳动效率：+${(bonus * 100).toFixed(1)}%（仅 0～+5%，无负惩罚）`,
-      basis: `三组营养（肉类含鸡蛋、蔬菜、主食）是幸福基础${s ? `，当前饮食基础 ${s.dietBase.toFixed(1)} / 5` : ''}；礼拜记忆可叠加休闲记忆，幸福总上限 5；饥饿和亲属哀伤会降低幸福目标。完成酒馆休闲即时 +0.4、完成礼拜即时 +0.2（均不超过 5）；日终向目标最多变化 0.1。`,
+      basis: `三组营养（肉类含鸡蛋、蔬菜含苹果和梨、主食）是幸福基础${s ? `，当前饮食基础 ${s.dietBase.toFixed(1)} / 5` : ''}；礼拜记忆可叠加休闲记忆，幸福总上限 5；饥饿和亲属哀伤会降低幸福目标。完成酒馆休闲即时 +0.4、完成礼拜即时 +0.2（均不超过 5）；日终向目标最多变化 0.1。`,
     };
   },
   citizenLeisureMarkup: function (c) {
@@ -2844,8 +2892,9 @@ G.ui = {
       if (medicalData) extra += this.medicalInfoMarkup(b, medicalData);
       const outputs = { gatherer: ['vegetables'], hunting: ['meat', 'leather'], dock: ['meat'], farm: ['grain'], orchard: ['vegetables'], pasture: ['meat', 'wool'], tailor: ['clothes'], herbalist: ['herbs'] };
       if(b.type==='pasture')outputs.pasture=G.productionOutputsOf(b).filter(k=>k!=='food');
+      if(b.type==='orchard')outputs.orchard=G.productionOutputsOf(b).filter(k=>k!=='food');
       const produced = (chainData || tailorData || farmData ? [] : outputs[b.type] || []).filter(type => G.RES[type]);
-      if (produced.length) extra += `<div class="row resource-output"${b.type==='pasture'?' data-pasture-output':''}>产出：${produced.map(type => `${this.resourceIcon(type)}${G.RES[type].name}`).join(' · ')}</div>`;
+      if (produced.length) extra += `<div class="row resource-output"${b.type==='pasture'?' data-pasture-output':b.type==='orchard'?' data-orchard-output':''}>产出：${produced.map(type => `${this.resourceIcon(type)}${G.RES[type].name}`).join(' · ')}</div>`;
       if (b.type === 'tailor' && !tailorData) extra += `<div class="row">原料库存：皮革 ${Math.floor(G.game.res.leather || 0)} · 羊毛 ${Math.floor(G.game.res.wool || 0)}</div><div class="row">成衣库存：${Math.floor(G.game.res.clothes || 0)}</div>`;
       if (b.type !== 'woodcutter' && !medicalData && !chainData && !tavernData && !chapelData && !tailorData && !farmData && G.buildingGoalStatus(b)) extra += `<div class="row desc"${['tradingpost', 'pasture', 'orchard'].includes(b.type) ? ' data-economy-goals' : ''}>${this.escHtml(G.buildingGoalStatus(b))}</div>`;
       if (['gatherer', 'hunting', 'forester'].includes(b.type)) {
@@ -2915,7 +2964,7 @@ G.ui = {
         ${this.studentInfoMarkup(c)}
         <div class="row">饥饿 ${'▕'.repeat(Math.min(4, c.hunger)) || '无'} · 受冻 ${c.cold > 1 ? '是' : '无'}</div>
         ${this.citizenClothingMarkup(c)}
-        ${Number.isFinite(c.dietVariety) ? `<div class="row">最近饮食：${Math.max(0, Math.min(3, c.dietVariety))} / 3 营养组（肉类含鸡蛋）${Number.isFinite(c.dietScore) ? ' · 长期均衡 ' + c.dietScore.toFixed(1) + '/3' : ''}</div>` : ''}
+        ${Number.isFinite(c.dietVariety) ? `<div class="row">最近饮食：${Math.max(0, Math.min(3, c.dietVariety))} / 3 营养组（肉类含鸡蛋，蔬菜含苹果和梨）${Number.isFinite(c.dietScore) ? ' · 长期均衡 ' + c.dietScore.toFixed(1) + '/3' : ''}</div>` : ''}
         ${this.citizenHealthMarkup(c)}
         ${this.citizenLeisureMarkup(c)}`;
       const supplyHolder = el.querySelector?.('[data-citizen-household-supply]');
@@ -2997,7 +3046,7 @@ G.ui = {
           <label for="trade-payment">用一种待售物资支付</label><select id="trade-payment">${payments}</select>
           <p data-economy-live="quote" class="trade-quote" role="status" aria-live="polite"></p>
           <button type="submit" id="trade-execute">确认交易</button>
-          <p class="desc">付款数量向上取整，不找零。买入普通物资先进入本站库存，低于现存数量的待售目标会让商人搬回；肉类与鸡蛋可分别买卖，鸡蛋价值2，肉类价值1；羊、牛或鸡购入后进入各自待安置数量，到同种牧场放入。果树、卷心菜与早熟豆类种子各买 1 次永久解锁，不能复购，不是库存物品，也不占贸易站或仓库容量。卷心菜和早熟豆类解锁后到农田选择种植，产出都计入蔬菜。</p>
+          <p class="desc">付款数量向上取整，不找零。买入普通物资先进入本站库存，低于现存数量的待售目标会让商人搬回；肉类与鸡蛋可分别买卖，鸡蛋价值2，肉类价值1；羊、牛或鸡购入后进入各自待安置数量，到同种牧场放入。旧通用果树、苹果、梨、卷心菜与早熟豆类种子分别买 1 次永久解锁，不能复购，不是库存物品，也不占贸易站或仓库容量。苹果、梨种子各2500，购买后到果园明确选择以后种植品种；旧通用果树继续产蔬菜，不解锁苹果或梨。卷心菜和早熟豆类解锁后到农田选择种植，产出都计入蔬菜。</p>
         </form>
         <form id="trade-order-form" class="economy-form">
           <h3>③ 向这位商人订货</h3>
@@ -3033,7 +3082,11 @@ G.ui = {
     </section>`;
     if(b.type==='orchard')return `<section class="economy-details" data-economy="orchard">
       <p data-economy-live="orchard-age"></p><p data-economy-live="orchard-harvest"></p><p data-economy-live="orchard-renewal"></p>
+      <p data-economy-live="orchard-types"></p><p data-economy-live="orchard-stock"></p><p data-economy-live="orchard-logistics"></p>
+      <form id="orchard-type-form" class="economy-form"><label for="orchard-type">以后空位种植品种</label><select id="orchard-type">${Object.entries(G.ORCHARD_TYPES).map(([type, def]) => `<option value="${type}"${G.orchardTypeOf(b) === type ? ' selected' : ''}${!G.game.unlocks?.[def.unlock] ? ' disabled' : ''}>${this.escHtml(def.name)} → ${G.RES[def.output].name}${!G.game.unlocks?.[def.unlock] ? '（尚未解锁）' : ''}</option>`).join('')}</select><div class="economy-actions"><button type="submit" id="orchard-type-apply">应用以后种植品种</button><button type="button" id="orchard-type-cancel">取消未应用选择</button></div><p data-economy-live="orchard-selection"></p></form>
       <form id="orchard-replant-form" class="economy-form"><label for="orchard-replant">空位补种</label><select id="orchard-replant"><option value="on"${b.orchardReplant!==false?' selected':''}>允许农夫补种</option><option value="off"${b.orchardReplant===false?' selected':''}>暂停新补种</option></select><button type="submit">应用补种设置</button></form>
+      <p class="desc">苹果和梨种子各2500，分别购买一次永久解锁；购买后仍需在此明确应用，只改变以后新接的种植任务。旧通用果树种子仅解锁旧通用树，继续产蔬菜，不赠苹果、梨或新种子。已有树的品种、年龄、待采果实和已接任务/在途货不改换；买新果种不必先买通用种子。</p>
+      <p class="desc">苹果与梨独立存量、贸易和生产目标；实际送仓后可食用或酿酒。营养都归蔬菜组，与肉类（含鸡蛋）、主食合为三组，不增加第四组。</p>
       <p class="desc">每株由农夫实际到达后种植、照料或采收。秋季先采果，再种空位和养幼树；暂停补种只影响新任务，已开始的单株工作照常完成。4年有效养护成熟，每株每秋最多20果，搬运后才入库；满仓携果保留，冬季未采果损失。</p>
       <p class="desc">树龄达到12–20年时按株错峰枯尽，届时该株未采果实一起损失（不计为已产出）；一年内将枯尽会预警，应优先采收。补种重新养4年。本作适配寿命，不是原版精确数值。旧成熟园从4岁迁移，至少还有8年宽限；不影响已有在途果实。</p>
       <p class="desc" data-economy-live="orchard-trees" style="white-space:pre-line"></p><p class="economy-message" data-economy-message role="status" aria-live="polite"></p>
@@ -3042,11 +3095,11 @@ G.ui = {
   },
 
   initEconomyInfo: function (b) {
-    const el = this.el.info, w = G.world, g = G.game;
+    const el = this.el.info, w = G.world, g = G.game, buildingType = b.type;
     const panel = el.querySelector && el.querySelector('[data-economy]');
     if (!panel) return;
     const valid = node => G.world === w && G.game === g && this.el.info === el && !el.classList.contains('hidden') &&
-      G.sel && G.sel.kind === 'b' && G.sel.id === b.id && w.bmap[b.id] === b && b.state === 'ok' &&
+      G.sel && G.sel.kind === 'b' && G.sel.id === b.id && w.bmap[b.id] === b && b.type === buildingType && b.state === 'ok' &&
       el.querySelector('[data-economy]') === panel && (!node || !node.id || el.querySelector('#' + node.id) === node);
     const message = text => { const node = el.querySelector('[data-economy-message]'); if (node) node.textContent = text; };
     const onSubmit = (id, callback) => {
@@ -3082,7 +3135,8 @@ G.ui = {
         if (!quote.ok) { message(quote.reason); return; }
         const result = G.executeTrade(b, quote.good, quote.qty, quote.payment, renderedMerchant);
         const seed = G.seedUnlockKey ? G.seedUnlockKey(quote.good) : quote.good === 'orchardSeed' ? 'orchard' : null;
-        message(result.ok ? `已购买${G.TRADE_GOODS[quote.good].name} × ${quote.qty}，支付${G.RES[quote.payment].name} × ${result.paid}。${G.isLivestockType(quote.good) ? `到${G.TRADE_GOODS[quote.good].name}牧场放入，不能混养。` : seed === 'orchard' ? '所有果园已永久解锁种植，种子不占仓位。' : seed && G.CROPS[seed] ? `所有农田已永久解锁${G.CROPS[seed].name}，请到农田选择；本季已开始的作物保留，改选留到下一春。种子不占仓位。` : '物资已到本站，等待商人按目标搬回仓库。'}` : result.reason || '交易未完成。');
+        const orchardType = Object.values(G.ORCHARD_TYPES).find(type => type.unlock === seed);
+        message(result.ok ? `已购买${G.TRADE_GOODS[quote.good].name} × ${quote.qty}，支付${G.RES[quote.payment].name} × ${result.paid}。${G.isLivestockType(quote.good) ? `到${G.TRADE_GOODS[quote.good].name}牧场放入，不能混养。` : orchardType ? `已永久解锁${orchardType.name}，请到果园明确选择以后种植品种；已有树和在途果实保留。种子不占仓位。` : seed && G.CROPS[seed] ? `所有农田已永久解锁${G.CROPS[seed].name}，请到农田选择；本季已开始的作物保留，改选留到下一春。种子不占仓位。` : '物资已到本站，等待商人按目标搬回仓库。'}` : result.reason || '交易未完成。');
         this.refreshHUD();
       });
       for (const id of ['trade-order-good', 'trade-order-quantity']) {
@@ -3105,7 +3159,26 @@ G.ui = {
       });
       this.initAutoTradeInfo(b);
     }
-    if(b.type==='orchard')onSubmit('orchard-replant-form',()=>{const value=el.querySelector('#orchard-replant').value;message(['on','off'].includes(value)&&G.setOrchardReplant(b,value==='on')?value==='on'?'允许新补种；需农夫到空树位劳动。':'已暂停新补种；现果、养护与已开始的工作继续。':'补种设置无效');});
+    if(b.type==='orchard') {
+      onSubmit('orchard-replant-form',()=>{const value=el.querySelector('#orchard-replant').value;message(['on','off'].includes(value)&&G.setOrchardReplant(b,value==='on')?value==='on'?'允许新补种；需农夫到空树位劳动。':'已暂停新补种；现果、养护与已开始的工作继续。':'补种设置无效');});
+      const form = el.querySelector('#orchard-type-form'), select = el.querySelector('#orchard-type');
+      const cancel = el.querySelector('#orchard-type-cancel'), apply = el.querySelector('#orchard-type-apply');
+      for (const node of [form, select, cancel, apply]) node.addEventListener('keydown', e => {
+        if (e.repeat && ['Enter', ' '].includes(e.key)) e.preventDefault();
+      });
+      form.addEventListener('submit', e => {
+        e.preventDefault();
+        if (e.repeat || !valid(form) || !valid(select) || !valid(apply) || panel.querySelector('#orchard-type-form') !== form || panel.querySelector('#orchard-type') !== select || panel.querySelector('#orchard-type-apply') !== apply || G.hasOpenModal?.()) return;
+        const type = select.value;
+        if (type === G.orchardTypeOf(b)) { message('以后种植品种已是此选择；已有果树继续。'); return; }
+        message(G.setOrchardType(b, type) ? `以后新接种植任务使用${G.ORCHARD_TYPES[type].name}；已有果树、已接任务和在途果实保留。` : '品种未更改，请先在贸易站购买对应种子并选择已解锁品种。');
+        this.refreshEconomyInfo(b);
+      });
+      cancel.addEventListener('click', e => {
+        if (e.detail > 1 || !valid(cancel) || !valid(select) || panel.querySelector('#orchard-type-cancel') !== cancel || panel.querySelector('#orchard-type') !== select || G.hasOpenModal?.()) return;
+        select.value = G.orchardTypeOf(b); select.focus(); message('已取消未应用的种植品种选择。');
+      });
+    }
     if (b.type === 'pasture') {
       onSubmit('pasture-type-form',()=>{const type=el.querySelector('#pasture-type').value;message(G.setPastureType(b,type)?`牧场物种已设为${G.LIVESTOCK[type].name}；下一次放入只接收该物种。`:G.pastureSwitchReason(b)||'物种选择无效');});
       onSubmit('pasture-stock-form', () => {
@@ -3464,7 +3537,7 @@ G.ui = {
       const profile = G.merchantProfile(b), order = G.merchantOrderSummary(b);
       set('[data-economy-live="merchant"]', merchant ? `${profile.name}停靠中，将在 ${b.merchant.leaveDay - G.game.day} 天后离开。` : `下一艘商船约 ${Math.max(0, (b.nextMerchantDay || G.game.day) - G.game.day)} 天后到达；不一定是已订货的商人。`);
       const accepted = Object.keys(G.TRADE_VALUES).filter(type => G.merchantAccepts(b, type)).map(type => G.RES[type].name).join('、');
-      set('[data-economy-live="merchant-payments"]', merchant ? `收购：${accepted}。${profile.acceptsFood ? '接受肉类、鸡蛋、蔬菜、主食付款。' : '拒收食物：肉类、鸡蛋、蔬菜、主食。'}` : '各商人有不同目录与收购物资；订货要等同一商人回访。');
+      set('[data-economy-live="merchant-payments"]', merchant ? `收购：${accepted}。${profile.acceptsFood ? '接受肉类、鸡蛋、蔬菜、主食、苹果、梨付款。' : '拒收食物：肉类、鸡蛋、蔬菜、主食、苹果、梨。'}` : '各商人有不同目录与收购物资；订货要等同一商人回访。');
       const inventory = b.tradeInventory || {}, targets = b.tradeTargets || {};
       const stored = G.tradeStored ? G.tradeStored(b) : Object.values(inventory).reduce((sum, value) => sum + value, 0);
       set('[data-economy-live="trade-capacity"]', `已入站 ${Math.floor(stored)} + 在途占位 ${G.tradeIncoming(b)} / ${G.TRADE_CAPACITY || 2000} · 可用空位 ${G.tradeFreeSpace(b)}（各资源共享；在途货尚不可交易）`);
@@ -3516,12 +3589,19 @@ G.ui = {
       this.refreshPastureEmpty(b);
       const output=el.querySelector('[data-pasture-output]');if(output){const html='产出：'+G.productionOutputsOf(b).filter(k=>k!=='food').map(k=>`${this.resourceIcon(k)}${G.RES[k].name}`).join(' · ');if(output.innerHTML!==html)output.innerHTML=html;}
     } else {
-      const d=G.orchardSummary(b),unlocked=G.game.unlocks?.orchard;
-      set('[data-economy-live="orchard-age"]',`种子：${unlocked?'永久解锁':'尚未购买'} · 空位 ${d.empty} / 幼树 ${d.young} / 成树 ${d.mature}（共9位）`);
-      set('[data-economy-live="orchard-harvest"]',`本季未采果实 ${Math.floor(d.fruit)}（蔬菜）；实际采收/送仓才记产出/入库。${d.status}`);
+      const d=G.orchardSummary(b), types=G.ORCHARD_TYPES, chosen=types[G.orchardTypeOf(b)], trees=b.orchardTrees||[];
+      set('[data-economy-live="orchard-age"]',`种子：${Object.values(types).map(type => `${type.name}${G.game.unlocks?.[type.unlock]?'已永久解锁':'尚未购买'}`).join(' · ')} · 空位 ${d.empty} / 幼树 ${d.young} / 成树 ${d.mature}（共9位）`);
+      const composition=Object.entries(types).map(([type,def])=>{const planted=trees.filter(t=>t.planted&&G.orchardTreeType(t)===type);return `${def.name} ${planted.length}株 · 待采${G.RES[def.output].name} ${this.supplyNumber(planted.reduce((n,t)=>n+(t.fruit||0),0))}`;}).join('；');
+      set('[data-economy-live="orchard-types"]',`现有果树：${composition}`);
+      set('[data-economy-live="orchard-selection"]',`已应用以后种植：${chosen.name} → ${G.RES[chosen.output].name}${G.game.unlocks?.[chosen.unlock]?'':'（尚未解锁，需买对应种子或选择已解锁品种）'}。仅作用于以后新接的空位种植任务。`);
+      set('[data-economy-live="orchard-harvest"]',`本季未采果实合计 ${this.supplyNumber(d.fruit)}；品种明细见下方现有果树，实际采收/送仓才记产出/入库。${d.status}`);
+      set('[data-economy-live="orchard-stock"]',`公共库存：${['vegetables','apples','pears'].map(type=>`${G.RES[type].name} ${this.supplyNumber(G.game.res[type])}`).join(' · ')}（不含树上待采与携果）；三种物品各有独立目标，并受总食物目标限制。`);
+      const cargo=G.world.citizens.filter(c=>!c.dead&&c.carry?.orchardId===b.id).map(c=>`${c.name}：${G.RES[c.carry.type].name} ${this.supplyNumber(c.carry.qty)}，${G.cargoWaitReason(c)||'送仓途中'}`);
+      set('[data-economy-live="orchard-logistics"]',cargo.length?'已采在途：'+cargo.join('；')+'；尚未入库，满仓保留。':'暂无已采在途果实。');
+      for(const option of el.querySelector('#orchard-type').querySelectorAll('option')){const def=types[option.value],unlocked=!!G.game.unlocks?.[def.unlock];option.disabled=!unlocked;const text=`${def.name} → ${G.RES[def.output].name}${unlocked?'':'（尚未解锁）'}`;if(option.textContent!==text)option.textContent=text;}
       set('[data-economy-live="orchard-renewal"]',`已应用补种：${b.orchardReplant?'允许':'暂停'} · 一年内将枯尽 ${d.soon} 株${Number.isFinite(d.nextDeath)?' · 最短还差 '+d.nextDeath+' 树龄日':''}；空位没有产量。`);
-      set('[data-economy-live="orchard-trees"]',(b.orchardTrees||[]).map((t,i)=>`第${i+1}株：${t.planted?`树龄 ${(t.age/G.YEAR_DAYS).toFixed(1)} 年 / 寿命 ${G.orchardLifetime(i)/G.YEAR_DAYS} 年 · ${t.age<G.ORCHARD.matureDays?'尚需 '+(G.ORCHARD.matureDays-t.age)+' 有效养护日':'成熟'} · 待采 ${Math.floor(t.fruit)}`:'空位，待种植'}`).join('\n'));
-
+      set('[data-economy-live="orchard-trees"]',trees.map((t,i)=>`第${i+1}株：${t.planted?`${types[G.orchardTreeType(t)].name} · 树龄 ${(t.age/G.YEAR_DAYS).toFixed(1)} 年 / 寿命 ${G.orchardLifetime(i)/G.YEAR_DAYS} 年 · ${t.age<G.ORCHARD.matureDays?'尚需 '+(G.ORCHARD.matureDays-t.age)+' 有效养护日':'成熟'} · 待采${G.RES[G.orchardOutput(t)].name} ${this.supplyNumber(t.fruit)}`:'空位，待种植'}`).join('\n'));
+      const output=el.querySelector('[data-orchard-output]');if(output){const html='产出：'+G.productionOutputsOf(b).filter(k=>k!=='food').map(k=>`${this.resourceIcon(k)}${G.RES[k].name}`).join(' · ');if(output.innerHTML!==html)output.innerHTML=html;}
     }
     return true;
   },
@@ -3540,7 +3620,7 @@ G.ui = {
     rows.innerHTML = G.RES_KEYS.map(type => {
       const step = type === 'food' || (G.FOOD_KEYS || []).includes(type) ? 100 : ['tools', 'steelTools', 'clothes', 'warmCoats'].includes(type) ? 10 : 50;
       return `<section class="production-goal-row" aria-labelledby="goal-label-${type}">
-        <label id="goal-label-${type}" for="goal-input-${type}">${this.resourceIcon(type)}${type === 'food' ? '总食物（肉类 + 蔬菜 + 主食）' : G.RES[type].name}</label>
+        <label id="goal-label-${type}" for="goal-input-${type}">${this.resourceIcon(type)}${type === 'food' ? '总食物（六种食物物品之和）' : G.RES[type].name}</label>
         <p id="goal-stock-${type}"></p>
         <div class="goal-controls"><button type="button" data-goal="${type}" data-step="${-step}" aria-label="减少${G.RES[type].name}目标${step}">−${step}</button>
         <input id="goal-input-${type}" type="number" inputmode="numeric" min="0" max="${G.PRODUCTION_GOAL_MAX}" step="1" placeholder="未设置" aria-describedby="goal-status-${type}">
@@ -3608,11 +3688,12 @@ G.ui = {
       if (distributedGoal) stock.textContent += `；目标计量 ${this.supplyNumber(type === 'food' ? G.supplyFood(supplies) : supplies[type])}（公共 + 市场/住处/配送在途/待回收，不含火情封存；逐户现货才可使用）`;
       status.textContent = target === null ? '未设置全镇目标，继承原规则' :
         `已应用目标 ${target} · ${target === 0 ? '关闭新自动生产' : `恢复线 ≤${G.productionResumeAt(target)} · ${G.goalPaused(type) ? '达标暂停' : '可生产'}`}`;
-      if (target !== null && !tool && target > cap) status.textContent += type === 'eggs' ? '；目标高于公共仓容，场内与随身已有鸡蛋保留，需仓库腾位后送入' : distributedGoal ? '；目标高于公共仓容，但已配送存量也计入目标；公共仓满仍需腾位，未保护的普通交货可能损失' : '；目标高于仓容，需扩建仓库；' + (type === 'ale' ? '余麦酒保留随身，等待空间' : ['stone', 'iron', 'coal'].includes(type) ? '余矿保留随身，等待空间' : '满仓交货仍可能损失');
+      if (target !== null && !tool && target > cap) status.textContent += type === 'eggs' ? '；目标高于公共仓容，场内与随身已有鸡蛋保留，需仓库腾位后送入' : ['apples','pears'].includes(type) ? '；目标高于公共仓容，随身已有果实保留，需仓库腾位后送入；树上未采果仍受冬损与枯尽影响' : distributedGoal ? '；目标高于公共仓容，但已配送存量也计入目标；公共仓满仍需腾位，未保护的普通交货可能损失' : '；目标高于仓容，需扩建仓库；' + (type === 'ale' ? '余麦酒保留随身，等待空间' : ['stone', 'iron', 'coal'].includes(type) ? '余矿保留随身，等待空间' : '满仓交货仍可能损失');
       if (type === 'firewood' || tool) status.textContent += '；各屋原目标保留，实际按全镇与本屋较低值执行（见建筑详情）';
       if (tool) status.textContent += '；只限制正在生产本类工具的铁匠，另一类工具有独立目标';
       if (type === 'food') status.textContent += '；总量目标与各食物物品独立目标同时生效，总量达标会暂停食物新生产';
       if (foodClass) status.textContent += '；同时受总食物目标限制，本物品达标不拦停其他食物物品';
+      if (['apples', 'pears'].includes(type)) status.textContent += '；独立果品目标，已有树上待采与随身果实不转换品种；随身果实满仓保留；营养归蔬菜组，仍为三组';
       if (type === 'eggs') status.textContent += '；鸡蛋独立目标只暂停新产蛋，已有场内与随身鸡蛋保留并可继续送仓；与肉类同属一个营养组';
       if ((type === 'food' || foodClass) && target !== null) status.textContent += ['food','vegetables','grain'].includes(type) ? '；已开始的整田继续播种和收获，过低目标可能断粮' : '；过低目标可能断粮';
       if (type === 'firewood' && target !== null) status.textContent += '；过低目标可能挨冻';

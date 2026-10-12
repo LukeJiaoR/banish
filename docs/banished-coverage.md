@@ -3,7 +3,7 @@
 ## 核查口径
 
 - 核查日期：2026-10-12。已交付基线为 [`main@6cfbe2d7f91d4a41fe3cc06caa3b6954d1fefdea`](https://github.com/LukeJiaoR/banish/tree/6cfbe2d7f91d4a41fe3cc06caa3b6954d1fefdea)，版本 **0.3.64**；[鸡牧场 PR #66](https://github.com/LukeJiaoR/banish/pull/66) 已在此基线上。
-- 本文随 **0.3.65** 记录牧场疫病及整群搬空增量，跟踪 [Issue #67](https://github.com/LukeJiaoR/banish/issues/67)，源码使用同提交的相对链接。本文若位于未合并分支，则该增量仅为候选；交付以普通 PR 合并到 main 的事实为准，不能只因工作区出现代码就宣称已交付。
+- 本文记录 **0.3.65** 牧场疫病/整群搬空增量（[Issue #67](https://github.com/LukeJiaoR/banish/issues/67)，[PR #68](https://github.com/LukeJiaoR/banish/pull/68)已合并），以及 **0.3.66** 两果树/果品酿酒增量（[Issue #69](https://github.com/LukeJiaoR/banish/issues/69)）。增量源码用同提交相对链接；本文若位于未合并分支，最新增量仅是候选，交付仍以普通PR合并main为准。
 - 共列 40 项核心系统，按玩家能够做出的经营选择核查，不计算没有统一分母的“整体完成百分比”。本文件是范围审计，不是全功能、全平台或真实浏览器试玩通过证明。
 - 查验了实际定义、模拟、菜单、序列化及加载逻辑；先核完整 Git 树，再以固定 SHA 读取本地缺少的相关设计文档。README、旧片文档中的“下一步”不能单独证明现在缺失。例如旧医疗文档称游民传染未做，但当前 `advanceNomads` / `decideNomads` 已接上疾病；旧市政厅文档称市场配送未做，当前 `supply.js` 已实现。
 - 以下源码链接固定到上述基线，定位以函数或字段名为准。与原版比较的依据使用用户指定的 [Banished Wiki](https://banished-wiki.com/)；Wiki 里有旧版、预发布及互相不一致的描述，疑点单列，不把本作数值冒称为原版数值。
@@ -26,7 +26,7 @@
 | A1 木屋、石屋与原址升级 | 已交付 | [定义][defs] `house` / `stonehouse`；[模拟][sim] `assignHousing`、`upgradeHouse`、`heatHome`；升级会迁出、重新施工，家庭和生活物资有处理。菜单提供两类住宅。 | 已有住房成本、家中取暖和升级时的安置取舍。占地、美术样式数量及施工节奏适配；尚无原版每种住宅六款外观切换。不应再做一套住房升级。[Housing](https://banished-wiki.com/wiki/Housing) |
 | A2 宿舍与无房家庭安置 | 有适配简化 | [定义][defs] `boarding`；[模拟][sim] `boardingFamilies`、`assignHousing`，容纳 5 户，空独栋优先，无房多人户与单人户可入住；有独栋后迁出。 | 临时收容闭环已存在。每屋 75 柴/年、4×3 占地是本作设定；Wiki 宿舍页面的燃料说法与现有数值不同，不写成完全对齐。无需以“缺宿舍”另开功能。[Boarding House](https://banished-wiki.com/wiki/Boarding_House) |
 | A3 成家、生育、成长与老死 | 有适配简化 | [模拟][sim] `normalizeFamilyRelations`、`areCloseKin`、`joinFamilies`、`formFamilies`、`tryBirths`、`killCitizen`；空房约束新家庭，保存亲属/配偶；日界 `age += 1 / G.YEAR_DAYS`，70 岁后有老死概率。[存档][main]保存年龄与亲属关系。 | 人口不是只增不减。18 岁成家、在读学生不配对、亲属排除和每历年长 1 岁是适配；Wiki 的年龄时间换算与此不同，且其页面内部算例不一致。缺口是人口节奏对齐与展示，不是从零加家庭/寿命。未经独立玩法决策不直接把旧村年龄加速。[Housing](https://banished-wiki.com/wiki/Housing)、[Citizens](https://banished-wiki.com/wiki/Citizens) |
-| A4 吃饭、营养、饥饿与御寒 | 有适配简化 | [核心][core] `FOOD_KEYS`、`foodGroup`、`foodBasket`；[模拟][sim] 日界吃饭、`consumeFood`、`coldStep`、`heatHome`、`advanceHealth`；[配送][supply] `eatHousehold`。食物、服装、房屋和燃料各有真实作用，饥饿/寒冷可致死。 | 明确保持肉/蛋白、蔬菜、主食 **三营养组**；鸡蛋是独立货品、与肉共享蛋白组，果园产物仍归蔬菜。原版有更多具体食物及水果/坚果类别。本矩阵不授权新增第四营养组；应与果树品种和酒原料扩展分开决策。[Food](https://banished-wiki.com/wiki/Food)、[Citizens](https://banished-wiki.com/wiki/Citizens#Health) |
+| A4 吃饭、营养、饥饿与御寒 | 有适配简化 | [核心][core] `FOOD_KEYS`、`foodGroup`、`foodBasket`；[模拟][sim] 日界吃饭、`consumeFood`、`coldStep`、`heatHome`、`advanceHealth`；[配送][supply] `eatHousehold`。食物、服装、房屋和燃料各有真实作用，饥饿/寒冷可致死。 | 明确保持肉/蛋白、蔬菜、主食 **三营养组**；鸡蛋是独立货品、与肉共享蛋白组，旧通用树仍产蔬菜；0.3.66苹果/梨为独立物品，营养仍归蔬菜组。原版有更多具体食物及水果/坚果类别。本矩阵不授权新增第四营养组；应与果树品种和酒原料扩展分开决策。[Food](https://banished-wiki.com/wiki/Food)、[Citizens](https://banished-wiki.com/wiki/Citizens#Health) |
 | A5 用工、散工、清场和施工优先级 | 有适配简化 | [模拟][sim] `scheduleJobs`、`setWorkerLimit`、`setConstructionPaused`、`setConstructionPriority`、`siteTrees`、`addBuilding`；[地图][map] 标记采伐/采矿；[界面][ui] 用工及工地操作。工人清场、搬货后施工，暂停/撤岗保护既有货批。 | 已有真实工人与生产机会成本；本作以建筑用工上限、自动调度为主，不等同原版按职业总数分配。建材付款仍主要为开工时公共扣款，没有逐件运建材到工地。不为“补职业面板”重写现有调度。[Citizens / Professions](https://banished-wiki.com/wiki/Citizens#Professions) |
 
 ## 二、食物生产（10 项）
@@ -39,7 +39,7 @@
 | F4 自由农田、季节劳动与抢收 | 已交付 | [地图][map] `farmDefinition` / `initialFarmWorkers`；[模拟][sim] 逐格播种/收割、`earlyHarvestQuote` / `beginEarlyHarvest`；[主程序][main] 农田框选与 `farmSize` 保存；[界面][ui] 预览确认。新田每边 4–15 格。 | 面积、用工、播种承诺、秋收/早熟收获、冬季未收损失都已有决策；14/格等产量、播种窗口和成熟日数为适配，不是原版精确气温模型。[Crop Field](https://banished-wiki.com/wiki/Crop_Field)、[Farming](https://banished-wiki.com/wiki/Farming) |
 | F5 作物种子、换种及生长期差异 | 有适配简化 | [模拟][sim] `CROPS` 为小麦、卷心菜、早熟豆类；`cropUnlocked`、`setFarmCrop`、`cropChoiceOf`、`seedUnlockKey`；交易永久解锁，开种后变更留给下一季，豆类夏季成熟。 | 原版还有玉米、辣椒、马铃薯、南瓜、笋瓜等；当前未覆盖完整八作物，也无逐作物耐寒阈值。**已有三作物而非只有小麦**；12 日/10 每格的豆类是本作适配。[Farming](https://banished-wiki.com/wiki/Farming)、[Seeds](https://banished-wiki.com/wiki/Seeds) |
 | F6 果园逐树生长、采果和补种 | 已交付 | [模拟][sim] `newOrchardTrees`、`makeOrchardTask`、`completeOrchardTask`、`advanceOrchard`、`setOrchardReplant`；[存档][main] `orchardTrees`。农夫逐株种植/养护/采果，老树死亡、空位补种，货物仍需送仓。 | 已有多年投资和更新空窗。固定 9 株、4 年有效养护、12–20 年错峰寿命、每株 20 果为适配；不要再次开发“老树死亡/补种”。[Orchard](https://banished-wiki.com/wiki/Orchard)、[已交付说明][orchard-doc] |
-| F7 果树品种与可变果园面积 | 真实缺失 | [定义][defs] `orchard` 固定 6×6；[模拟][sim] 只有一个 `orchardSeed` / `unlocks.orchard`，`ORCHARD.count=9`、`orchardPoint` 固定 3×3 树位，收成写入 `vegetables`；[存档][main] 无果种或果园尺寸字段。 | 缺苹果/梨等独立种子选择、果品区分、坚果种类和矩形果园规划；原版果园包含八类果/坚果树，可到 15×15。品种扩展优先于重写已好的生命周期；面积可另片推进。[Orchard](https://banished-wiki.com/wiki/Orchard) |
+| F7 果树品种与可变果园面积 | 有适配简化（0.3.66 增量） | [本片模拟](../js/sim.js) `ORCHARD_TYPES`、`setOrchardType`、逐树 `type`；[规则](fruit-brewing.md)，[Issue #69](https://github.com/LukeJiaoR/banish/issues/69)。苹果/梨种子各自永久解锁，实际种植/采果/搬运；修改未来品种不改已种树或在途货，旧通用树仍产蔬菜。 | 两种果品独立，营养仍归既有蔬菜组；原版其余果/坚果品种及可变15×15以内果园仍缺。固定6×6/9株与现有树龄节奏保留；不能把两种品种切片称为完整八果树或面积规划。[Orchard](https://banished-wiki.com/wiki/Orchard) |
 | F8 羊、牛、鸡及牧产品 | 已交付 | [模拟][sim] `LIVESTOCK`、`setPastureType`、`stockPasture`、`advanceChickenEggs`、`completeEconomyWork`；[核心][core] 独立鸡蛋；[界面][ui] 选种、放入、保留量与生产；[鸡牧场说明](chickens.md)。 | 三物种已覆盖，禁止混养，照料繁殖、羊毛、肉、皮、鸡蛋及真实运出可玩。肉品合并、固定容量和繁殖/蛋产量是适配；鸡已经合并，不再作为下一片。[Pasture](https://banished-wiki.com/wiki/Pasture) |
 | F9 按面积规划牧场与容量 | 真实缺失 | [定义][defs] `pasture` 固定 6×6；[模拟][sim] 容量来自 `LIVESTOCK` 常数羊 12 / 牛 10 / 鸡 24；[地图][map] 仅 `farmDefinition` 支持变尺寸；[存档][main] 无 `pastureSize`。 | 缺土地面积、畜种密度、最大保留量和牧人需求的取舍。原版每牛 20 格、每羊 16 格、每鸡 6 格；不能把现有 6×6 / 24 鸡宣称原版面积规则，也不能直接把旧场套新密度挤死牲畜。[Pasture](https://banished-wiki.com/wiki/Pasture) |
 | F10 同种分群扩场 | 已交付 | [模拟][sim] `pastureSplitFacts`、`pastureSplitQuote`、`splitPasture`；不少于 10 头可向可达同种空场分一半，检查容量/残留任务，分配繁殖进度；沿原头数保存。[分群说明][split-doc] | 这是基线功能。牲畜仍按群体直接划拨，没有逐头赶畜行走；别把“分群”与本片“整群搬空”混为一项，后者见 D5。[Farming](https://banished-wiki.com/wiki/Farming#Pasture) |
@@ -53,7 +53,7 @@
 | M3 铁/煤矿井、采石场与永久矿坑 | 有适配简化 | [模拟][sim] `setMineMode`、`MINERAL_RULES`、`mineralAvailable`、`completeMineralTask`、矿点拆除留坑；[定义][defs] `mine` / `stonequarry` / `mineralpit`；[存档][main] `mineralUnits` 与旧档兼容。 | 已有专采、有限储量、真实搬矿和占地不可再用。旧档可保留无限矿；3×3、两人岗位、4000 石等适配，未要求矿井贴山，也未做矿难。**采矿耗尽已经交付**。[Mine](https://banished-wiki.com/wiki/Mine)、[Quarry](https://banished-wiki.com/wiki/Quarry) |
 | M4 铁/钢工具与个人领取磨损 | 已交付 | [模拟][sim] `blacksmithRecipe`、`setToolRecipe`、铁匠多阶段取料、`enablePersonalTools`、`tryToolFetch`、`stepToolFetch`、`toolLifeHours`；[存档][main] `toolMode`、`toolType` / `toolHours`。[个人工具说明][tools-doc] | 铁/钢制作、钢双倍耐久、本人缺工具低效及真实到仓领取已做；个人模式须在市政厅明确启用，默认保留共用池。50% 速度、寿命小时是适配，市场不配送工具。不再安排一次“个人工具”。[Tools](https://banished-wiki.com/wiki/Tools) |
 | M5 皮/毛裁缝、暖衣与实际穿戴 | 已交付 | [模拟][sim] `setCoatMaterial`、`setCoatRecipe`、裁缝真实取料、`wearClothing`、`clothingColdMul`；[配送][supply] `clothingSupplyEnabled`、衣物需求/配送；[存档][main] 衣型与余寿。 | 皮或毛可做普通衣，皮+毛做暖衣，个人穿旧后更换、户外保暖均已有。皮衣/毛衣仍共用普通衣库存；衣物配送需另行启用。48 日耐穿与保暖倍率为适配，不把“有公共衣服”误说成每人已穿。[Clothing](https://banished-wiki.com/wiki/Clothing) |
-| M6 酿酒、口粮竞争与可选原料 | 有适配简化 | [模拟][sim] `tavernBrewStatus`、`completeBrew`、`setTavernReserve`；工人搬 30 `grain` 回馆酿酒，先满足口粮保留，产酒供休闲。[酒馆说明](tavern-leisure.md) | 酿酒和消费已有；**缺小麦/浆果/果园水果的原料切换**，当前取料和携货校验硬编码 `grain`。原版可用小麦及六种水果来源酿酒；不能用任意蔬菜假充果酒原料。[Tavern](https://banished-wiki.com/wiki/Tavern) |
+| M6 酿酒、口粮竞争与可选原料 | 有适配简化（0.3.66 增量） | [本片模拟](../js/sim.js) `BREW_RECIPES`、`tavernRecipeOf`、`setTavernRecipe`、`completeBrew`；主食、苹果、梨三配方有真实整批取料/携回/加工/送酒，已接批次不随改选漂移。[规则](fruit-brewing.md) | 苹果/梨30→10酒参照原版；原主食30→3/4的本作旧合同不变。通用蔬菜不能冒充果品，其他原版水果来源尚未覆盖。酒仍汇同一ale库存供既有休闲，不新增营养组。[Tavern](https://banished-wiki.com/wiki/Tavern)、[Ale](https://banished-wiki.com/wiki/Ale) |
 
 ## 四、物流、储存、贸易与交通（8 项）
 
@@ -87,23 +87,17 @@
 | D3 住房火灾、水井与真实扑救 | 有适配简化 | [火灾][fire] `setFireDisasters`、`igniteHouse`、`assignFireRescuers`、`fireWaterSpot`、`completeFirefighting`、`finishHouseFire`；[存档][main] `houseFire` / `ruinFrom`。有烟警、迁出、提水、蔓延、烧毁与付费重建。 | 默认关闭；只覆盖独栋住房，至多有限邻屋、无直接火灾死亡，非原版全城建筑火灾。水井供扑救，不制造可交易“水”。已足以产生预备住房/消防路线选择，不优先扩更多火灾条款。[Well](https://banished-wiki.com/wiki/Well)、[Disasters](https://banished-wiki.com/wiki/Disasters) |
 | D4 农田虫害、抢收与轮作 | 有适配简化 | [模拟][sim] `setFarmPests`、`advanceFarmPests`、`farmPestSummary`、`beginEarlyHarvest`；[存档][main] `farmPests`、`pestInfestation`、`lastPestCrop`。选择启用后，未收作物会损失，换作物影响复发。 | 核心应对已做，概率/宽限/损失批次为适配；不能从“已有农田虫害”推断果园也感染。Wiki 明确支持抢收和改种，但同页已澄清土壤退化未实现，不应开发伪原版“强制肥力耗尽”。[Farming / Infestation](https://banished-wiki.com/wiki/Farming#Infestation) |
 | D5 牧场疫病与整群搬空 | 有适配简化（0.3.65 增量） | [Issue #67](https://github.com/LukeJiaoR/banish/issues/67)；[本片模拟](../js/sim.js) `advancePasturePests` / `emptyPasture`、[规则](pasture-pests.md)。从0.3.64的繁殖/产物/分群扩展为明确确认的可选疫病和独立整群搬空，最后1–2头也可保种；旧村默认关闭。 | 12日宽限、2日预警、每天1死、全镇最多1场为适配，搬空清疫；原场已产物/携货与繁殖进度守恒。动物仍按群体直接安置，不是逐头赶畜；不接人类诊所或无依据邻场传播。交付条件见顶部合并口径。[Pasture](https://banished-wiki.com/wiki/Pasture) |
-| D6 其他原版灾难范围 | 真实缺失 | [模拟][sim] 果园生命周期没有虫害；[火灾][fire] 仅住房；[定义][defs]、[地图][map]、[存档][main] 无龙卷风实体/路径及工作事故机制。 | 果园虫害、龙卷风、工作事故等未覆盖。列明事实即可；在地图设置、牧场面积、果树/酿酒选择仍有空缺时，暂不把连续加灾难作为默认路线。[Farming / Orchards](https://banished-wiki.com/wiki/Farming#Orchards)、[Disasters](https://banished-wiki.com/wiki/Disasters)、[Hunting Cabin / Risk](https://banished-wiki.com/wiki/Hunting_Cabin#Risk) |
+| D6 其他原版灾难范围 | 真实缺失 | [模拟][sim] 果园生命周期没有虫害；[火灾][fire] 仅住房；[定义][defs]、[地图][map]、[存档][main] 无龙卷风实体/路径及工作事故机制。 | 果园虫害、龙卷风、工作事故等未覆盖。列明事实即可；在地图设置、牧场面积、果园面积/剩余品种仍有空缺时，暂不把连续加灾难作为默认路线。[Farming / Orchards](https://banished-wiki.com/wiki/Farming#Orchards)、[Disasters](https://banished-wiki.com/wiki/Disasters)、[Hunting Cabin / Risk](https://banished-wiki.com/wiki/Hunting_Cabin#Risk) |
 
-## 下一步最高价值的 3 项非灾难玩法
+## 下一步优先的非灾难玩法
 
-以下是按新增经营选择、现有系统复用和美术可见性排序的建议，**不是已开始实现或已交付的承诺**。后续开发先建对应 Issue，写清最小范围、旧档策略、美术及完成条件，再关联任务分支与 PR；不替已经合并的片段补造“事前跟踪票”。当前 #67 完成后再选下一片，不为填满表格重写已交付系统。
+以下是按新增经营选择、现有系统复用和美术可见性排序的建议，**不是已开始实现或已交付的承诺**。后续开发先建对应 Issue，写清最小范围、旧档策略、美术及完成条件，再关联任务分支与 PR；不替已经合并的片段补造“事前跟踪票”。当前 #69 完成后再选下一片，不为填满表格重写已交付系统。
 
-### 1. 果树品种与果酒原料选择（F7 + M6）
+### 已完成的最小切片：两果树与果品酿酒
 
-**最小可玩范围：**先做两种可辨识果树（例如苹果、梨），种子分别贸易解锁、果园选择后只影响后续新种/补种，现有树与已结水果保留原品种。两种果实分别作为可保存/送仓/消费/交易的货品；酒馆在小麦及这些明确果品间选原料，继续真实领料、口粮保留、生产目标与到馆消费。复用现有逐树生长和酒馆劳动，不重写成新生产平台。
+0.3.66按 [#69](https://github.com/LukeJiaoR/banish/issues/69) 补苹果/梨与真实果品配方，三营养组、旧树旧蔬菜合同保留；详见 [本片说明](fruit-brewing.md)。不再把这两个品种和原料选择重复排为新任务。其余六种果/坚果目录、第四营养组和面积扩展仍需独立范围决策。
 
-**库存与营养边界：**货品区分不等于新增营养组。首片保持当前三组，把新增果品明确映射到既有蔬菜组并在面板说明适配；鸡蛋仍只算蛋白组。旧蔬菜库存没有可恢复的果品来源，绝不能凭空拆成苹果/梨或变成可酿原料。旧 `orchardSeed` 解锁和已有通用果树需要明示迁移方案，优先保留旧树旧产物合同，未来补种才使用新种。原版水果/坚果营养完整性、八果树全目录和可变果园面积另片评估；若要改第四组，须先明确改变既定营养规则的范围。
-
-**最小美术：**原创苹果/梨树的幼树、成熟带果/采空状态及货品/种子图标，与现有等距树位保持同一尺度；不只换面板文字。
-
-**主要阻碍与完成证据：**`FOOD_KEYS` / `foodGroup`、家庭混合篮、贸易目录、生产目标、账本和存档都要识别新货品；`completeBrew` 的 `grain` 硬编码要改为已承诺配方。只需围绕真实种植→采果→配送/酿造→消费、换种与在途货、旧档/反复加载的定向验证，不能靠发一份免费果实完成演示。
-
-### 2. 按面积规划牧场（F9）
+### 1. 按面积规划牧场（F9）
 
 **最小可玩范围：**沿现有农田两角规划交互，新增牧场矩形尺寸；预览同时显示各物种容量、建造成本和建议牧人数量。新场按面积决定容量，保留量受该场实际容量约束；羊/牛/鸡现有生产、分群、以及 #67 合并后的整群搬空都复用同一容量查询。无需先做逐头动物寻路或新的繁殖系统。
 
@@ -113,7 +107,7 @@
 
 **主要阻碍与完成证据：**现在大量上限直接用 `LIVESTOCK[type].cap`，树位式畜群绘制和保存也假定固定场地；要集中成每场容量/范围，避免只放大外框。选两种面积、至少两物种实际建造并验证容量差、正常繁殖/出货、向不足/足够容量场分群及搬空、旧场加载不损畜即可，不扩大为通用区域规划重构。
 
-### 3. 可重玩的开局设置（D1，D2 分阶段）
+### 2. 可重玩的开局设置（D1，D2 分阶段）
 
 **最小可玩范围：**先交付新游戏设置面板，玩家能输入/查看/复用地图种子，选择明确说明资源、家庭、初始种子/牲畜差别的开局预设；保留当前适配中等作为默认和旧档行为。预览不删除当前村，最终确认后才开新村，设置随存档保存并可查看。固定同种子＋同配置可重建初始世界，不宣称中途存档是确定性回放。
 

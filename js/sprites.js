@@ -21,7 +21,7 @@ G.SPRITE_SIZES = {
   crop_ripe: { w: 46 }, crop_dead: { w: 42 },
   cabbage_stage0:{w:64}, cabbage_stage1:{w:64}, cabbage_stage2:{w:64}, cabbage_ripe:{w:64},
   bean_stage0:{w:64}, bean_stage1:{w:64}, bean_stage2:{w:64}, bean_ripe:{w:64},
-  orchard: { w: 52 }, orchard_leafy: { w: 52 }, sheep: { w: 24 }, chicken:{w:16}, cattle:{w:32}, grave:{w:16},
+  orchard: { w: 52 }, orchard_leafy: { w: 52 }, orchard_pear:{w:52}, orchard_pear_leafy:{w:52}, sheep: { w: 24 }, chicken:{w:16}, cattle:{w:32}, grave:{w:16},
   adult_walk_0: { h: 17 }, adult_walk_1: { h: 17 }, adult_walk_2: { h: 17 }, adult_walk_3: { h: 17 },
   adult_work_0: { h: 17 }, adult_work_1: { h: 17 },
   adult_carry_walk_0: { h: 17 }, adult_carry_walk_1: { h: 17 },
@@ -45,7 +45,7 @@ G.SPRITE_SIZES = {
     props: ['tree_sapling', 'tree_young', 'tree_mature',
       'tree_sapling_snow', 'tree_young_snow', 'tree_mature_snow',
       'rock_a', 'rock_b', 'rock_a_snow', 'rock_b_snow',
-      'crop_stage0', 'crop_stage1', 'crop_stage2', 'crop_ripe', 'crop_dead', 'cabbage_stage0', 'cabbage_stage1', 'cabbage_stage2', 'cabbage_ripe', 'bean_stage0', 'bean_stage1', 'bean_stage2', 'bean_ripe', 'sheep', 'chicken', 'cattle', 'orchard_leafy', 'grave'],
+      'crop_stage0', 'crop_stage1', 'crop_stage2', 'crop_ripe', 'crop_dead', 'cabbage_stage0', 'cabbage_stage1', 'cabbage_stage2', 'cabbage_ripe', 'bean_stage0', 'bean_stage1', 'bean_stage2', 'bean_ripe', 'sheep', 'chicken', 'cattle', 'orchard_leafy', 'orchard_pear', 'orchard_pear_leafy', 'grave'],
     bridges: ['bridge_x', 'bridge_y'],
     buildings: ['house', 'stonehouse', 'well', 'burntruins', 'boarding', 'storage', 'market', 'stockpile', 'mine', 'stonequarry', 'mineralpit', 'gatherer',
       'forester', 'woodcutter', 'dock', 'school', 'townhall', 'blacksmith', 'hunting',
@@ -57,7 +57,7 @@ G.SPRITE_SIZES = {
       'child_walk_0', 'child_walk_1', 'child_walk_2', 'child_walk_3', 'child_idle',
       'carry_wood', 'carry_stone', 'carry_food', 'carry_firewood', 'carry_iron', 'carry_tools'],
     icons: ['res_wood', 'res_stone', 'res_food', 'res_firewood', 'res_iron', 'res_tools', 'res_coal', 'res_steelTools',
-      'res_meat', 'res_eggs', 'res_vegetables', 'res_grain', 'res_leather', 'res_wool', 'res_clothes', 'res_warmCoats', 'res_herbs', 'res_ale',
+      'res_meat', 'res_eggs', 'res_apples', 'res_pears', 'res_vegetables', 'res_grain', 'res_leather', 'res_wool', 'res_clothes', 'res_warmCoats', 'res_herbs', 'res_ale',
       'tool_stonehouse', 'tool_boarding', 'tool_mine', 'tool_stonequarry', 'tool_blacksmith', 'tool_hunting',
       'tool_house', 'tool_storage', 'tool_stockpile', 'tool_gatherer', 'tool_forester', 'tool_woodcutter',
       'tool_dock', 'tool_tavern', 'tool_townhall', 'tool_school', 'tool_herbalist', 'tool_hospital', 'tool_farm', 'tool_road', 'tool_stoneroad', 'tool_bridge', 'tool_demolish', 'alert'],
@@ -70,7 +70,7 @@ G.SPRITE_SIZES = {
       im.onload = () => {
         G.SPR.map.set(n, im);
         // Resource and carried-goods art share the same tiny PNG, without duplicate requests.
-        if (['res_meat', 'res_eggs', 'res_vegetables', 'res_grain', 'res_leather', 'res_wool', 'res_clothes', 'res_warmCoats', 'res_herbs', 'res_ale', 'res_coal', 'res_steelTools'].includes(n))
+        if (['res_meat', 'res_eggs', 'res_apples', 'res_pears', 'res_vegetables', 'res_grain', 'res_leather', 'res_wool', 'res_clothes', 'res_warmCoats', 'res_herbs', 'res_ale', 'res_coal', 'res_steelTools'].includes(n))
           G.SPR.map.set('carry_' + n.slice(4), im);
         if (dir === 'tiles' || dir === 'terrain-v2' || n === 'res_iron') G.needGround = true; // 地表纹理到位后重建地面缓存
         if (--pending === 0) G.SPR.ready = true;

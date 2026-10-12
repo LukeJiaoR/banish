@@ -87,7 +87,7 @@ G.BDEF = {
     id: 'orchard', name: '果园', icon: '🍎', w: 6, h: 6,
     cost: { wood: 12 }, buildWork: 36, jobs: 2, passable: true,
     wall: '#8b7958', wallD: '#695936', roof: '#77924d',
-    desc: '贸易果树种子永久解锁。9株逐株种植、养护4年，成熟每株秋收20蔬菜。老树12–20岁错峰枯尽，农夫可补种；已有果实实际送仓，空位不再凭空产粮。',
+    desc: '种子永久解锁对应果树。9株逐株种植、养护4年，每株秋收20；苹果与梨分别入库，旧通用果树仍产蔬菜。改选只影响后续补种，老树12–20岁错峰枯尽；果实须实际送仓。',
   },
   chapel: {
     id:'chapel', name:'礼拜堂', icon:'⛪', w:3, h:3,
@@ -99,7 +99,7 @@ G.BDEF = {
     id: 'tavern', name: '酒馆', icon: '🍺', w: 3, h: 3,
     cost: {wood:52,stone:12,iron:20}, buildWork:90, jobs:1, passable:false,
     wall:'#956a45', wallD:'#704b32', roof:'#804f3a',
-    desc:'1名成年酿酒工，30主食酿3麦酒（受教育4）。先留足设定天数的全村口粮；18岁以上居民真实到馆休闲，耗1麦酒、2小时，获得6天休闲记忆。幸福仅给予温和正向劳动加成。',
+    desc:'1名成年酿酒工，可选30主食酿3麦酒（受教育4），或30苹果／梨酿10麦酒。改配方只影响下一批，实际取料、携回加工6小时后送仓。先留足设定天数的全村口粮；18岁以上居民真实到馆休闲，耗1麦酒、2小时，获得6天休闲记忆。幸福仅给予温和正向劳动加成。',
   },
   tailor: {
     id: 'tailor', name: '裁缝铺', icon: '🧥', w: 3, h: 3,
@@ -296,7 +296,7 @@ G.TREE_COLORS = {
 
 /* Serialized household-supply values, shared by the save validator. */
 G.CLOTHING_KEYS=['clothes','warmCoats'];
-G.SUPPLY={types:['grain','vegetables','meat','eggs','firewood','coal',...G.CLOTHING_KEYS],marketCap:240,homeCap:350,vendorCarry:80,homeCarry:40,marketRadius:18,foodDays:4,fuelDays:4,fetchH:.35,unloadH:.25};
+G.SUPPLY={types:['grain','vegetables','meat','eggs','apples','pears','firewood','coal',...G.CLOTHING_KEYS],marketCap:240,homeCap:350,vendorCarry:80,homeCarry:40,marketRadius:18,foodDays:4,fuelDays:4,fetchH:.35,unloadH:.25};
 G.emptySupplyStock=()=>Object.fromEntries(G.SUPPLY.types.map(k=>[k,0]));
 G.supplySum=s=>G.SUPPLY.types.reduce((n,k)=>n+(s?.[k]||0),0);
 G.supplyFood=s=>G.FOOD_KEYS.reduce((n,k)=>n+(s?.[k]||0),0);

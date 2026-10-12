@@ -119,7 +119,7 @@ G.serializeGame = function () {
       workers: b.workers, family: b.family, noWork: b.noWork, warnText: b.warnText,
       bridgeAxis: b.bridgeAxis, bridgeLength: b.type === 'bridge' ? b.w + b.h - 1 : undefined,
       houseFire:b.houseFire&&{...b.houseFire},ruinFrom:b.ruinFrom,ruinIncident:b.ruinIncident,
-      mineralUnits:b.mineralUnits, pitSource:b.pitSource, mineMode: b.mineMode, legacyMine: b.legacyMine, mineTick: b.mineTick, toolRecipe: b.toolRecipe, reserveDays:b.reserveDays, coatRecipe:b.coatRecipe, coatMaterial:b.coatMaterial,
+      mineralUnits:b.mineralUnits, pitSource:b.pitSource, mineMode: b.mineMode, legacyMine: b.legacyMine, mineTick: b.mineTick, toolRecipe: b.toolRecipe, reserveDays:b.reserveDays, brewRecipe:b.brewRecipe, coatRecipe:b.coatRecipe, coatMaterial:b.coatMaterial,
       doCut: b.doCut, doPlant: b.doPlant, fuelLimit: b.fuelLimit, toolLimit: b.toolLimit,
       farmSize:b.type==='farm'&&b.farmSize?[...b.farmSize]:undefined,
       farm: b.farm ? b.farm.map(f => [f.sown ? 1 : 0, f.harvested ? 1 : 0, f.pestLost ? 1 : 0]) : undefined,
@@ -129,7 +129,7 @@ G.serializeGame = function () {
       supplyStock:b.supplyStock,lastHeating:b.lastHeating, unheated:b.unheated, graves:b.graves,
       animalType:b.animalType, pastureInfestation:b.pastureInfestation, pastureProducts:b.pastureProducts, animals: b.animals, animalGrowth: b.animalGrowth, animalTarget: b.animalTarget, woolReady: b.woolReady, eggProgress:b.eggProgress, eggDay:b.eggDay,
       orchardAge: b.orchardAge, orchardYield: b.orchardYield, orchardSeason: b.orchardSeason, tendedDay: b.tendedDay,
-      orchardTrees:b.orchardTrees?b.orchardTrees.map(t=>({...t})):undefined,orchardDay:b.orchardDay,orchardReplant:b.orchardReplant,orchardWarnYear:b.orchardWarnYear,
+      orchardType:b.orchardType,orchardTrees:b.orchardTrees?b.orchardTrees.map(t=>({...t})):undefined,orchardDay:b.orchardDay,orchardReplant:b.orchardReplant,orchardWarnYear:b.orchardWarnYear,
     })),
     families: w.families.map(f => ({ id: f.id, members: f.members, houseId: f.houseId, coupleIds: f.coupleIds,supplyCamp:f.supplyCamp&&{x:f.supplyCamp.x,y:f.supplyCamp.y,supplyStock:f.supplyCamp.supplyStock} })),
     citizens: w.citizens.map(c => ({
@@ -240,10 +240,14 @@ G.prepareSaveData = function (d) {
   const clone = v => JSON.parse(JSON.stringify(v));
   const supplyStock=(value,field,limit=Infinity)=>{
     record(value,field);const keys=Object.keys(value),oldTypes=['grain','vegetables','meat','firewood','coal'];
-    const legacy=gd.clothingSupply===undefined&&(keys.length===5||keys.length===6&&keys.includes('eggs'))&&oldTypes.every(k=>keys.includes(k));
-    const preEggs=keys.length===G.SUPPLY.types.length-1&&G.SUPPLY.types.filter(k=>k!=='eggs').every(k=>keys.includes(k));
-    if(!legacy&&!preEggs&&(keys.length!==G.SUPPLY.types.length||keys.some(k=>!G.SUPPLY.types.includes(k))))bad(field+'种类');
-    const stock=Object.fromEntries(G.SUPPLY.types.map(k=>[k,number((legacy||preEggs)&&k==='eggs'&&value[k]===undefined||legacy&&G.CLOTHING_KEYS.includes(k)?0:value[k],field,0)]));
+    const same=types=>keys.length===types.length&&types.every(k=>keys.includes(k));
+    const legacy=gd.clothingSupply===undefined&&(same(oldTypes)||same([...oldTypes,'eggs']));
+    const preFruit=same([...oldTypes,...G.CLOTHING_KEYS])||same([...oldTypes,'eggs',...G.CLOTHING_KEYS])||same(G.SUPPLY.types.filter(k=>k!=='eggs'));
+    if(!legacy&&!preFruit&&!same(G.SUPPLY.types))bad(field+'种类');
+    // Preserve all four historical 5/6/7/8-item shapes; only genuinely absent
+    // new inventory slots become zero. The earlier optional-egg shape also works
+    // with both fruits; an incomplete fruit pair never discards a stored item.
+    const stock=Object.fromEntries(G.SUPPLY.types.map(k=>[k,number((legacy||preFruit)&&value[k]===undefined?0:value[k],field,0)]));
     for(const k of G.CLOTHING_KEYS)if(!Number.isSafeInteger(stock[k])||stock[k]>0&&!g.clothingSupply)bad(field+'衣物');
     if(G.supplySum(stock)>limit+1e-6)bad(field+'容量');return stock;
   };
@@ -262,7 +266,7 @@ G.prepareSaveData = function (d) {
   const hasFoodClasses = G.FOOD_KEYS.some(k => gd.res[k] !== undefined);
   if (hasFoodClasses && Math.abs(G.FOOD_KEYS.reduce((n,k) => n + g.res[k], 0) - g.res.food) > 0.00001) bad('食物分类合计');
   if (!hasFoodClasses) g.res.grain = g.res.food; // legacy stock is preserved once
-  if (gd.unlocks !== undefined) {record(gd.unlocks,'产业解锁');if(typeof gd.unlocks.orchard !== 'boolean')bad('果树种子解锁');for(const key of ['cabbage','beans'])if(gd.unlocks[key]!==undefined&&typeof gd.unlocks[key]!=='boolean')bad('农田种子解锁');g.unlocks={orchard:gd.unlocks.orchard,cabbage:gd.unlocks.cabbage===true,beans:gd.unlocks.beans===true};}
+  if (gd.unlocks !== undefined) {record(gd.unlocks,'产业解锁');if(typeof gd.unlocks.orchard !== 'boolean')bad('果树种子解锁');for(const key of ['cabbage','beans','apple','pear'])if(gd.unlocks[key]!==undefined&&typeof gd.unlocks[key]!=='boolean')bad('农田种子解锁');g.unlocks={orchard:gd.unlocks.orchard,cabbage:gd.unlocks.cabbage===true,beans:gd.unlocks.beans===true,apple:gd.unlocks.apple===true,pear:gd.unlocks.pear===true};}
   if (gd.livestock !== undefined) {record(gd.livestock,'待安置牲畜');g.livestock={sheep:integer(gd.livestock.sheep,'待安置羊',0,1000000),cattle:gd.livestock.cattle===undefined?0:integer(gd.livestock.cattle,'待安置牛',0,1000000),chicken:gd.livestock.chicken===undefined?0:integer(gd.livestock.chicken,'待安置鸡',0,1000000)};}
   if(gd.fishingRules!==undefined&&!['classic','shared'].includes(gd.fishingRules))bad('渔场规则');
   g.fishingRules=gd.fishingRules===undefined?'classic':gd.fishingRules;
@@ -334,15 +338,15 @@ G.prepareSaveData = function (d) {
     const startDay=integer(l.startDay,'流水起始日',0,g.day),startHour=number(l.startHour,'流水起始小时',0,G.DAY_H);
     if(startHour>=G.DAY_H)bad('流水起始小时');
     const exactKeys=(obj,keys,field)=>{record(obj,field);if(Object.keys(obj).length!==keys.length||Object.keys(obj).some(k=>!keys.includes(k)))bad(field+'字段');};
-    const foodLedgerKeys=value=>Object.hasOwn(value,'eggs')?G.LEDGER_RES:G.LEDGER_RES.filter(k=>k!=='eggs');
-    const stock=(value,field)=>{record(value,field);exactKeys(value,foodLedgerKeys(value),field);return Object.fromEntries(G.LEDGER_RES.map(k=>[k,k==='eggs'&&value[k]===undefined?0:number(value[k],field,0)]));};
+    const foodLedgerKeys=value=>G.LEDGER_RES.filter(k=>!['eggs','apples','pears'].includes(k)||Object.hasOwn(value,k));
+    const stock=(value,field)=>{record(value,field);exactKeys(value,foodLedgerKeys(value),field);return Object.fromEntries(G.LEDGER_RES.map(k=>[k,['eggs','apples','pears'].includes(k)&&value[k]===undefined?0:number(value[k],field,0)]));};
     const bucket=(value,closed)=>{
       const r=record(value,'流水日记录'),day=integer(r.day,'流水日',startDay,g.day),fromHour=number(r.fromHour,'流水日开始小时',0,G.DAY_H);
       if(fromHour>=G.DAY_H||fromHour!==(day===startDay?startHour:0)||r.partial!==(fromHour>0))bad('流水部分日');
       if(closed?(day>=g.day||r.toHour!==G.DAY_H):(day!==g.day||fromHour>g.h))bad('流水日范围');
       record(r.flows,'流水资源');exactKeys(r.flows,foodLedgerKeys(r.flows),'流水资源');const flows={};
       for(const k of G.LEDGER_RES){
-        if(k==='eggs'&&r.flows[k]===undefined){flows[k]=Object.fromEntries(G.LEDGER_METRICS.map(m=>[m,0]));continue;}
+        if(['eggs','apples','pears'].includes(k)&&r.flows[k]===undefined){flows[k]=Object.fromEntries(G.LEDGER_METRICS.map(m=>[m,0]));continue;}
         const old=r.flows[k]?.distributedUsed===undefined&&r.flows[k]?.distributedLost===undefined;
         exactKeys(r.flows[k],old?G.LEDGER_METRICS.filter(m=>!m.startsWith('distributed')):G.LEDGER_METRICS,'流水计量');
         flows[k]=Object.fromEntries(G.LEDGER_METRICS.map(m=>[m,old&&m.startsWith('distributed')?0:number(r.flows[k][m],'流水数量',0)]));
@@ -432,6 +436,8 @@ G.prepareSaveData = function (d) {
       fuelLimit: bd.type === 'woodcutter' ? G.fuelLimitOf(bd) : undefined,
       reserveDays:bd.type==='tavern'?(bd.reserveDays===undefined?12:integer(bd.reserveDays,'酿酒储粮天数',8,48)):undefined,
     };
+    if(bd.brewRecipe!==undefined&&(bd.type!=='tavern'||typeof bd.brewRecipe!=='string'||!Object.hasOwn(G.BREW_RECIPES,bd.brewRecipe)))bad('酿酒配方');
+    if(bd.type==='tavern')b.brewRecipe=bd.brewRecipe===undefined?'grain':bd.brewRecipe;
     if(bd.houseFire!==undefined){const h=record(bd.houseFire,'住房火情');if(!['house','stonehouse'].includes(b.type)||b.state!=='ok'||b.family!==null||b.workers.length||g.fireDisasters.startedDay===null)bad('住房火情状态');
       const incident=integer(h.incident,'火情来源',1),elapsed=number(h.elapsed,'火情发展小时',0,48),spreadAt=integer(h.spreadAt,'下次传播小时',18,54);
       if(incident!==g.fireDisasters.serial||!g.fireDisasters.incidentHomes.includes(b.id)||elapsed>=48||spreadAt%6)bad('火情进度');
@@ -539,8 +545,10 @@ G.prepareSaveData = function (d) {
         b.pastureInfestation={animalType:p.animalType,startedDay,lost:integer(p.lost,'牧场病死数量',0,Math.max(0,g.pasturePests.lastDay-startedDay-G.PASTURE_PESTS.warningDays+1)*G.PASTURE_PESTS.lossPerDay)};
       }
     }
-    if(['orchardTrees','orchardDay','orchardReplant','orchardWarnYear'].some(k=>bd[k]!==undefined)&&bd.type!=='orchard')bad('果园树株字段');
+    if(['orchardType','orchardTrees','orchardDay','orchardReplant','orchardWarnYear'].some(k=>bd[k]!==undefined)&&bd.type!=='orchard')bad('果园树株字段');
     if(bd.type==='orchard'){
+      const validVariety=(type,field)=>{if(typeof type!=='string'||!Object.hasOwn(G.ORCHARD_TYPES,type)||type!=='legacy'&&!G.orchardUnlocked(type,g))bad(field);return type;};
+      b.orchardType=bd.orchardType===undefined?'legacy':validVariety(bd.orchardType,'果园补种品种');
       const age=bd.orchardAge===undefined?0:integer(bd.orchardAge,'果树养护年龄',0,G.ORCHARD.matureDays);
       let fruit=bd.orchardYield===undefined?0:number(bd.orchardYield,'待收果实',0,180);
       const season=bd.orchardSeason===undefined?0:integer(bd.orchardSeason,'果树产季',1,g.year);
@@ -549,13 +557,13 @@ G.prepareSaveData = function (d) {
       if(bd.orchardTrees!==undefined){
         if(!Array.isArray(bd.orchardTrees)||bd.orchardTrees.length!==G.ORCHARD.count)bad('果园树株数量');
         b.orchardTrees=bd.orchardTrees.map((t,i)=>{record(t,'果园树株');if(typeof t.planted!=='boolean')bad('果树种植状态');
-          const tree={planted:t.planted,age:integer(t.age,'单株树龄',0,G.orchardLifetime(i)-1),fruit:number(t.fruit,'单株果实',0,G.ORCHARD.fruit),season:integer(t.season,'单株产季',0,g.year),tendedDay:integer(t.tendedDay,'单株照料日',-1,g.day),cycle:integer(t.cycle,'单株更新次数',0)};
+          const tree={type:t.type===undefined?'legacy':validVariety(t.type,'单株果树品种'),planted:t.planted,age:integer(t.age,'单株树龄',0,G.orchardLifetime(i)-1),fruit:number(t.fruit,'单株果实',0,G.ORCHARD.fruit),season:integer(t.season,'单株产季',0,g.year),tendedDay:integer(t.tendedDay,'单株照料日',-1,g.day),cycle:integer(t.cycle,'单株更新次数',0)};
           if(!tree.planted&&(tree.age||tree.fruit))bad('空果树位含生长或果实');return tree;});
         b.orchardDay=integer(bd.orchardDay,'果园推进日',0,g.day);
         G.syncOrchardTotals(b);if(b.orchardAge!==age||Math.abs(b.orchardYield-fruit)>1e-7)bad('果园汇总与树株不符');
       }else{
         const tended=bd.tendedDay===undefined?-1:integer(bd.tendedDay,'旧果园照料日',0,g.day);
-        b.orchardTrees=Array.from({length:G.ORCHARD.count},()=>{const n=Math.min(G.ORCHARD.fruit,fruit);fruit-=n;return {planted:true,age,fruit:n,season,tendedDay:tended,cycle:0};});
+        b.orchardTrees=Array.from({length:G.ORCHARD.count},()=>{const n=Math.min(G.ORCHARD.fruit,fruit);fruit-=n;return {type:'legacy',planted:true,age,fruit:n,season,tendedDay:tended,cycle:0};});
         b.orchardDay=g.day;G.syncOrchardTotals(b);
       }
       if(bd.orchardWarnYear!==undefined)b.orchardWarnYear=integer(bd.orchardWarnYear,'果园预警年份',1,g.year);
@@ -630,9 +638,9 @@ G.prepareSaveData = function (d) {
       if(cd.carry.tailorId!==undefined){if(!['clothes','warmCoats'].includes(carry.type)||carry.qty>2||['extra','smithInput','fuelInput','brewIngredient','pastureId','orchardId','firewoodId','coatInput'].some(k=>cd.carry[k]!==undefined))bad('裁缝成衣货批');carry.tailorId=integer(cd.carry.tailorId,'成衣来源',1);}
       if(cd.carry.fuelInput!==undefined){if(cd.carry.fuelInput!==true||carry.type!=='wood'||!carry.staffingReturn||carry.qty>G.PROD.woodcutter.logsIn||['extra','smithInput','brewIngredient','pastureId','orchardId','firewoodId'].some(k=>cd.carry[k]!==undefined))bad('伐木屋原木货批');carry.fuelInput=true;}
       if(cd.carry.firewoodId!==undefined){if(carry.type!=='firewood'||carry.qty>G.PROD.woodcutter.logsIn*G.PROD.woodcutter.eduFirewoodPerLog||['extra','smithInput','brewIngredient','pastureId','orchardId','fuelInput'].some(k=>cd.carry[k]!==undefined))bad('伐木屋成柴货批');carry.firewoodId=integer(cd.carry.firewoodId,'伐木屋成柴来源',1);}
-      if(cd.carry.orchardId!==undefined){if(carry.type!=='vegetables'||cd.carry.extra!==undefined||cd.carry.smithInput!==undefined||cd.carry.brewIngredient!==undefined||cd.carry.pastureId!==undefined||carry.qty>G.ORCHARD.fruit)bad('果园携果类型');carry.orchardId=integer(cd.carry.orchardId,'果园携果来源',1);}
+      if(cd.carry.orchardId!==undefined){if(!['vegetables','apples','pears'].includes(carry.type)||['extra','smithInput','coatInput','fuelInput','firewoodId','tailorId','brewIngredient','pastureId'].some(k=>cd.carry[k]!==undefined)||carry.qty>G.ORCHARD.fruit)bad('果园携果类型');carry.orchardId=integer(cd.carry.orchardId,'果园携果来源',1);}
       if(cd.carry.pastureId!==undefined){if(!['meat','eggs','leather','wool'].includes(carry.type)||cd.carry.extra!==undefined||(carry.type==='eggs'&&carry.qty>G.CHICKEN.haul))bad('牧场携货类型');carry.pastureId=integer(cd.carry.pastureId,'牧场携货来源',1);}
-      if(cd.carry.brewIngredient!==undefined){if(cd.carry.brewIngredient!==true||carry.type!=='grain')bad('酿造原粮标记');carry.brewIngredient=true;}
+      if(cd.carry.brewIngredient!==undefined){if(cd.carry.brewIngredient!==true||!Object.hasOwn(G.BREW_RECIPES,carry.type)||carry.qty<=0||carry.qty>G.BREW_RECIPES[carry.type].inputQty||['extra','smithInput','coatInput','fuelInput','firewoodId','tailorId','orchardId','pastureId'].some(k=>cd.carry[k]!==undefined))bad('酿造原料标记');carry.brewIngredient=true;}
       if(cd.carry.supplyBatch!==undefined){const batch=record(cd.carry.supplyBatch,'生活配送货批');
         if(g.supplyMode!=='physical'||!carry.staffingReturn||!G.SUPPLY.types.includes(carry.type)||['smithInput','coatInput','tailorId','fuelInput','firewoodId','orchardId','pastureId','brewIngredient'].some(k=>cd.carry[k]!==undefined))bad('生活配送货批类型');
         if(!['home','vendor','return'].includes(batch.kind)||Object.keys(batch).some(k=>!['kind','to','familyId'].includes(k)))bad('生活配送目的类型');
