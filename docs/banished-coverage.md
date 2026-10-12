@@ -3,7 +3,7 @@
 ## 核查口径
 
 - 核查日期：2026-10-12。已交付基线为 [`main@6cfbe2d7f91d4a41fe3cc06caa3b6954d1fefdea`](https://github.com/LukeJiaoR/banish/tree/6cfbe2d7f91d4a41fe3cc06caa3b6954d1fefdea)，版本 **0.3.64**；[鸡牧场 PR #66](https://github.com/LukeJiaoR/banish/pull/66) 已在此基线上。
-- 本文记录 **0.3.65** 牧场疫病/整群搬空增量（[Issue #67](https://github.com/LukeJiaoR/banish/issues/67)，[PR #68](https://github.com/LukeJiaoR/banish/pull/68)已合并），以及 **0.3.66** 两果树/果品酿酒增量（[Issue #69](https://github.com/LukeJiaoR/banish/issues/69)，[PR #70](https://github.com/LukeJiaoR/banish/pull/70)已合并），以及 **0.3.67** 面积牧场增量（[Issue #71](https://github.com/LukeJiaoR/banish/issues/71)）。增量源码用同提交相对链接；本文若位于未合并分支，最新增量仅是候选，交付仍以普通PR合并main为准。
+- 本文记录 **0.3.65** 牧场疫病/整群搬空增量（[Issue #67](https://github.com/LukeJiaoR/banish/issues/67)，[PR #68](https://github.com/LukeJiaoR/banish/pull/68)已合并），以及 **0.3.66** 两果树/果品酿酒增量（[Issue #69](https://github.com/LukeJiaoR/banish/issues/69)，[PR #70](https://github.com/LukeJiaoR/banish/pull/70)已合并），以及 **0.3.67** 面积牧场增量（[Issue #71](https://github.com/LukeJiaoR/banish/issues/71)，[PR #72](https://github.com/LukeJiaoR/banish/pull/72)已合并），以及 **0.3.68** 地图种子/无种子困难开局增量（[Issue #73](https://github.com/LukeJiaoR/banish/issues/73)）。增量源码用同提交相对链接；本文若位于未合并分支，最新增量仅是候选，交付仍以普通PR合并main为准。
 - 共列 40 项核心系统，按玩家能够做出的经营选择核查，不计算没有统一分母的“整体完成百分比”。本文件是范围审计，不是全功能、全平台或真实浏览器试玩通过证明。
 - 查验了实际定义、模拟、菜单、序列化及加载逻辑；先核完整 Git 树，再以固定 SHA 读取本地缺少的相关设计文档。README、旧片文档中的“下一步”不能单独证明现在缺失。例如旧医疗文档称游民传染未做，但当前 `advanceNomads` / `decideNomads` 已接上疾病；旧市政厅文档称市场配送未做，当前 `supply.js` 已实现。
 - 以下源码链接固定到上述基线，定位以函数或字段名为准。与原版比较的依据使用用户指定的 [Banished Wiki](https://banished-wiki.com/)；Wiki 里有旧版、预发布及互相不一致的描述，疑点单列，不把本作数值冒称为原版数值。
@@ -82,7 +82,7 @@
 
 | 编号 / 系统 | 状态 | 真实实现与源码证据 | 相对原版的差异 / 剩余缺口及依据 |
 | --- | --- | --- | --- |
-| D1 玩家地图种子与开局设置 | 真实缺失 | [主程序][main] `newGame(seed, options)` 能内部传种子，但只生成固定五家庭开局；[界面][ui] `btn-new` / `over-restart` 直接 `G.newGame()`；[核心][core] `MAP=128`；[存档][main] 保留 `seed` / `N`。 | 缺玩家种子输入/显示、简单/中等/困难预设及明确开局资源选择；并非没有种子生成或存档。现有五家庭、500 食物等是适配，不标“原版中等完整参数”。[Map Seeds](https://banished-wiki.com/wiki/Map_Seeds)、[Hard Difficulty：Map Settings](https://banished-wiki.com/wiki/Tutorials/First_Year_on_Hard_Difficulty#Map_Settings) |
+| D1 玩家地图种子与开局设置 | 有适配简化 | 0.3.68的[主程序](../js/main.js) `startConfigQuote` / `prepareNewGame` / `confirmNewGame`、[预设](../js/defs.js) `START_PRESETS` 和[界面](../js/ui.js) `showNewGameSettings` 支持查看/复用/输入种子（含0）、现行五家庭与无种子四家庭；两阶段最终确认、原子生成、旧档未知配置保全。困难小麦需真实贸易买种后播种，见[说明](start-settings.md)。 | 家庭结构依Wiki，库存与48日年为本作适配；尚无简单六家庭预建村、随机初始种子/牲畜，现行五家庭不是原版中等完整参数。地图类型/气候仍见D2。[Map Seeds](https://banished-wiki.com/wiki/Map_Seeds)、[Difficulty Levels](https://www.banished-wiki.com/wiki/Tutorials/Getting_Started_Guide#Difficulty_Levels) |
 | D2 山地、地图类型/尺寸与气候 | 真实缺失 | [地图][map] `genWorld` 的噪声高度只用来划水/沙滩，世界对象不保留山体/坡度；`tileBlocked` 仅处理水/建筑/桥。[核心][core] 固定地图和四季日数；[主程序][main] 无气候/地形类型配置保存。 | 基础随机森林、矿石、水体与四季已存在；缺“选择山地/山谷、小中大、温和/严酷气候”对应的可玩差异、气温与霜期。它们涉及可建区、作物、取暖和存档，不能只添选择框；隧道依赖此项。[Hard Difficulty：Map Settings](https://banished-wiki.com/wiki/Tutorials/First_Year_on_Hard_Difficulty#Map_Settings)、[Mountain Men 条件](https://banished-wiki.com/wiki/Tutorials/Achievement_Guide) |
 | D3 住房火灾、水井与真实扑救 | 有适配简化 | [火灾][fire] `setFireDisasters`、`igniteHouse`、`assignFireRescuers`、`fireWaterSpot`、`completeFirefighting`、`finishHouseFire`；[存档][main] `houseFire` / `ruinFrom`。有烟警、迁出、提水、蔓延、烧毁与付费重建。 | 默认关闭；只覆盖独栋住房，至多有限邻屋、无直接火灾死亡，非原版全城建筑火灾。水井供扑救，不制造可交易“水”。已足以产生预备住房/消防路线选择，不优先扩更多火灾条款。[Well](https://banished-wiki.com/wiki/Well)、[Disasters](https://banished-wiki.com/wiki/Disasters) |
 | D4 农田虫害、抢收与轮作 | 有适配简化 | [模拟][sim] `setFarmPests`、`advanceFarmPests`、`farmPestSummary`、`beginEarlyHarvest`；[存档][main] `farmPests`、`pestInfestation`、`lastPestCrop`。选择启用后，未收作物会损失，换作物影响复发。 | 核心应对已做，概率/宽限/损失批次为适配；不能从“已有农田虫害”推断果园也感染。Wiki 明确支持抢收和改种，但同页已澄清土壤退化未实现，不应开发伪原版“强制肥力耗尽”。[Farming / Infestation](https://banished-wiki.com/wiki/Farming#Infestation) |
@@ -101,15 +101,17 @@
 
 0.3.67按 [#71](https://github.com/LukeJiaoR/banish/issues/71) 补新场矩形规划、密度容量、成本/用工和转场约束，旧场容量保全；见 [本片说明](pasture-area.md)。原围栏源码本已按宽高画段和入口，因此复用而非新造美术；新增真实区域畜群分布，不再把面积牧场重复排为新任务。
 
-### 1. 可重玩的开局设置（D1，D2 分阶段）
+### 已交付的下一片：地图种子与困难开局（D1首片）
 
-**最小可玩范围：**先交付新游戏设置面板，玩家能输入/查看/复用地图种子，选择明确说明资源、家庭、初始种子/牲畜差别的开局预设；保留当前适配中等作为默认和旧档行为。预览不删除当前村，最终确认后才开新村，设置随存档保存并可查看。固定同种子＋同配置可重建初始世界，不宣称中途存档是确定性回放。
+0.3.68按 [#73](https://github.com/LukeJiaoR/banish/issues/73) 补真实新局设置、种子0、现行/困难预设与小麦买种闭环；旧村设置未记录就如实显示，未最终确认不清理自动档。见[本片说明](start-settings.md)。不再把整个玩家种子入口排为缺失，简单预建村和原版全部难度仍是剩余范围。
 
-**范围边界：**先只开放有真实实现的选项。不要同时摆出未生效的气候、山谷/山地、地图大小下拉框。第二阶段才连同地形可建区、霜期/取暖和存档实现 D2；隧道随后接山地。Wiki 的困难开局资料可作依据，但本作 48 日/年的经济时钟与已有开局平衡不同，应明确标出适配，而不是复制一行物资数就称原版困难模式。
+### 1. 地形与气候选择（D2分阶段）
 
-**最小美术：**清晰的开局卡片/原创建镇插图，显示资源、种子/牲畜和风险；地图类型尚未实现时不画成可选择的成品。
+**下一片候选：**先核原版温和/严寒气候对霜期、作物、取暖的实际影响，再落一个可解释的气候选择闭环，设置同时出现在新局预览、温度/风险提示和存档中。只对主动选择的新村生效，旧村保持既有时钟与霜期。新游戏面板已具备安全预览/最终确认，不需重建新平台。
 
-**主要阻碍与完成证据：**`newGameState`、`newGame` 目前把人口、物资和解锁写死；种子 0 的 `seed || random` 语义也要在输入范围中处理。只验证取消不动旧村、同配置同初始世界、两个预设真实开局差别、首冬可解释的经营压力、存档保留配置；不用因此扩平台、CI、性能工程或全量随机种子矩阵。
+**依赖与边界：**当前地形没有独立山体不可建区；山谷/山地和隧道应一起拆解，不能只改标签。地图大小会影响生成、可达性和存档裸索引，需另票。下一片先查重建Issue、核原版再定范围；不得把此候选文字当成已经做好的功能。
+
+**验收方向：**所选气候实际改变受影响规则与季节提示；同种子同配置仍能重建初始世界，旧档无数值漂移，新存档保留选择。美术复用现有季节图，必要差异跟实际状态走，不增无效下拉框或宣传图。具体气候数值尚待专页核实，本片不预设原版参数。
 
 ## 暂不优先的边界与资料可信度
 

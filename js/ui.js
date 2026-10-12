@@ -223,11 +223,12 @@ G.ui = {
     this.initRoadControls();
     this.initFarmPlanControls();
     this.initPasturePlanControls();
+    this.initNewGameSettings();
 
     // 顶栏按钮
     document.getElementById('btn-save').addEventListener('click', () => { G.saveGame(); });
     document.getElementById('btn-load').addEventListener('click', () => this.showSaves());
-    document.getElementById('btn-new').addEventListener('click', () => { if (confirm('放弃当前进度，开创新家园？')) G.newGame(); });
+    document.getElementById('btn-new').addEventListener('click', () => this.showNewGameSettings());
     document.getElementById('btn-help').addEventListener('click', () => this.toggleHelp());
     document.getElementById('btn-err').addEventListener('click', () => this.showErrs());
     document.getElementById('errs-close').addEventListener('click', () => this.closeErrs());
@@ -236,7 +237,7 @@ G.ui = {
       this.refreshHUD();
     });
     document.getElementById('help-close').addEventListener('click', () => this.toggleHelp(false));
-    document.getElementById('over-restart').addEventListener('click', () => { this.el.over.classList.add('hidden'); G.newGame(); });
+    document.getElementById('over-restart').addEventListener('click', () => this.showNewGameSettings());
     document.getElementById('saves-close').addEventListener('click', () => this.closeSaves());
 
     this.refreshHUD();
@@ -706,6 +707,7 @@ G.ui = {
     const g = G.game, physical = G.supplyEnabled && G.supplyEnabled(), supplies = physical ? G.supplyInventory() : null;
     this.refreshGuide();
     this.refreshProductionGoals();
+    this.refreshNewGameSettings();
     const hauling = G.harvestFeedback();
     // Household/vendor cargo already left public stock and may contain several
     // resources. Exclude its primary slot from the legacy inbound-stock count;
@@ -788,7 +790,7 @@ G.ui = {
     const g = G.game, w = G.world, physical = G.supplyEnabled && G.supplyEnabled(), supplies = physical ? G.supplyInventory().available : g.res;
     const days = w.citizens.length ? (physical ? G.supplyFood(supplies) : g.res.food) / (w.citizens.length * G.LIFE.eatPerDay) : 0;
     const untilWinter = (G.SEASON_DAYS * 3 - g.day % G.YEAR_DAYS + G.YEAR_DAYS) % G.YEAR_DAYS;
-    const food = w.buildings.some(b => ['gatherer', 'dock', 'hunting', 'farm', 'orchard', 'pasture'].includes(b.type) && b.state === 'ok');
+    const food = w.buildings.some(b => ['gatherer', 'dock', 'hunting', 'farm', 'orchard', 'pasture'].includes(b.type) && b.state === 'ok' && (b.type !== 'farm' || G.cropUnlocked(G.farmCropOf(b))));
     const fuel = w.buildings.some(b => b.type === 'woodcutter' && b.state === 'ok');
     const homeless = w.families.filter(f => f.members.length && f.houseId == null).length;
     const heat = this.heatDemand();
@@ -801,7 +803,7 @@ G.ui = {
       else risks.push('木材耗尽：向更远可达森林标记砍伐，后续护林补种；避开食物林。');
     }
     if (g.season >= 2 && G.usableHeatingFuel() < remainingHeat) risks.push(G.heatingPolicy().allowCoal?`取暖燃料不足：可用 ${Math.floor(G.usableHeatingFuel())} 柴火当量 / ${heat.winter ? '本冬此后' : '整冬'}约需 ${Math.ceil(remainingHeat)}，伐木屋需原木；住房可设煤补柴。`:`柴火不足：${physical ? '全村实物合计' : '现有'} ${Math.floor(physical ? supplies.firewood : g.res.firewood)} / ${heat.winter ? '本冬此后' : '整冬'}约需 ${Math.ceil(remainingHeat)}，伐木屋需原木。`);
-    const stage = !food ? '① 先保持续食物：在近仓森林建采集小屋；不要先连盖五屋耗尽木石。'
+    const stage = !food ? '① 先保持续食物：在近仓森林建采集小屋；不要先连盖住房耗尽木石。'
       : !fuel ? '② 近仓建伐木屋备柴；在食物林外标记砍伐和矿石，保留散工。'
       : homeless ? `③ 入冬前安家：还有 ${homeless} 家无房；逐步补住房和取暖柴。`
       : '④ 补齐肉类（含鸡蛋）、蔬菜（含苹果和梨）、主食三组营养与衣物，再扩教育、医疗和贸易，为下一代留空房。';
@@ -2204,7 +2206,7 @@ G.ui = {
       choice: `下季 / 空田选择：${choice.name} → ${G.RES[s.choiceOutput].name}${s.pending ? '（下一春生效）' : '（与本季一致）'}`,
       timing: `本季${crop.name}：全田播完后成长 ${s.growDays} 天，${s.summerHarvest ? '夏、秋全熟后正常收获' : '秋季全熟后正常收获'}；基础每格 ${G.farmBaseYield(b)} ${G.RES[s.output].name}，每年只种收一季`,
       reason: s.reason,
-      seeds: `种子：${Object.keys(crops).map(type => `${crops[type].name}${type === 'wheat' ? '已解锁' : s.unlocked[type] ? '已永久解锁' : '未解锁，需贸易购买' + crops[type].name + '种子'}`).join(' · ')}（永久解锁，不是库存物品，不占仓位）`,
+      seeds: `种子：${Object.keys(crops).map(type => `${crops[type].name}${s.unlocked[type] ? '已永久解锁' : '未解锁，需贸易购买' + crops[type].name + '种子'}`).join(' · ')}（永久解锁，不是库存物品，不占仓位）`,
       progress: `播种 ${s.sown}/${s.total} · 成长 ${Math.floor(s.growth * 100)}% · 实际收获 ${s.harvested}/${s.total} · 虫害损失 ${pests.lost}/${s.total}`,
       pestField: this.farmPestFieldText(pests),
       rotation: this.farmRotationText(pests),
@@ -2218,7 +2220,7 @@ G.ui = {
     return `<section class="farm-details" data-farm-panel>
       <div class="economy-form farm-crop"><label for="farm-crop">下季 / 空田选择</label>
         <select id="farm-crop" aria-describedby="farm-crop-note">${Object.keys(G.CROPS).map(type => `<option value="${type}"${type === facts.summary.choice ? ' selected' : ''}${facts.summary.unlocked[type] ? '' : ' disabled'}>${this.escHtml(G.CROPS[type].name)}${facts.summary.unlocked[type] ? '' : '（需购买种子）'}</option>`).join('')}</select>
-        <p class="desc" id="farm-crop-note">春、夏尚未开始播种的空田立即应用；已接第一播种任务、已播种、生长或已收获的本季作物锁定，改选留到下一春。已背起的粮食不变。新局与旧农田默认小麦。</p>
+        <p class="desc" id="farm-crop-note">春、夏尚未开始播种的空田立即应用；已接第一播种任务、已播种、生长或已收获的本季作物锁定，改选留到下一春。已背起的粮食不变。空田默认显示小麦；困难开局须先购种子。旧档缺少小麦解锁字段时保留可种。</p>
       </div>
       ${Object.keys(facts.data).filter(key => !['status', 'workers'].includes(key)).map(key => `<p class="row" data-farm="${key}">${this.escHtml(facts.data[key])}</p>`).join('')}
       <div class="farm-pests-setting" data-farm-pests-setting>
@@ -3803,6 +3805,108 @@ G.ui = {
       if (type === 'clothes' || type === 'warmCoats') status.textContent += '；两类衣物目标独立，仅暂停生产本类的新批次；本类衣物仓满也会暂停裁缝，已接批次保留';
       if (type === 'ale') status.textContent += '；只控制麦酒新酿造，仍受酒馆储粮保护；麦酒不计入食物，不能充饥';
     }
+  },
+
+  /* Two-stage, world-bound new-game choices; the draft never resets the village. */
+  initNewGameSettings: function () {
+    const modal=document.getElementById('new-game-settings');if(!modal||modal._startBound)return;
+    modal._startBound=true;
+    const current=s=>!!s&&this._startSession===s&&s.world===G.world&&s.game===G.game&&
+      document.getElementById('new-game-settings')===modal&&!modal.classList.contains('hidden')&&G.topModal()===modal;
+    const bind=(id,action)=>{
+      const button=document.getElementById(id);if(!button)return;
+      let armed=null,held=false,interrupted=false;
+      const capture=source=>{const s=this._startSession;interrupted=false;armed=current(s)?{session:s,rev:s.rev,phase:s.phase,source,used:false}:null;};
+      for(const name of(window.PointerEvent?['pointerdown']:['mousedown','touchstart']))button.addEventListener(name,e=>{
+        if(e.button!==undefined&&e.button!==0)return;if(e.type==='mousedown'&&armed?.source==='touchstart')return;held=false;capture(e.type);
+      });
+      button.addEventListener('keydown',e=>{if(!['Enter',' '].includes(e.key))return;
+        if(e.repeat||held){e.preventDefault();interrupted=true;return;}held=true;capture('keyboard');});
+      button.addEventListener('keyup',e=>{if(['Enter',' '].includes(e.key))held=false;});
+      for(const name of ['pointercancel','touchcancel'])button.addEventListener(name,()=>{armed=null;held=false;interrupted=true;});
+      window.addEventListener('blur',()=>{armed=null;held=false;interrupted=true;});
+      button.addEventListener('focus',()=>{if(armed&&armed.session!==this._startSession){armed=null;held=false;interrupted=false;}});
+      button.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();
+        const s=this._startSession,a=armed;
+        if(interrupted||e.detail>1||button.disabled||document.getElementById(id)!==button||!modal.contains(button)||!current(s))return;
+        if(a&&(a.used||a.session!==s||a.rev!==s.rev||a.phase!==s.phase))return;
+        if(!a&&e.detail===0&&document.activeElement!==button)return;
+        if(a)a.used=true;
+        action(s);this.refreshNewGameSettings();
+      });
+    };
+    const seed=document.getElementById('new-game-seed');
+    seed?.addEventListener('input',()=>{if(current(this._startSession))this.invalidateStartDraft();});
+    seed?.addEventListener('change',()=>{if(current(this._startSession))this.invalidateStartDraft();});
+    for(const preset of ['classic','hard'])bind('new-game-preset-'+preset,s=>{s.preset=preset;this.invalidateStartDraft();});
+    bind('new-game-random',()=>{seed.value=String(Math.floor(Math.random()*0x100000000));this.invalidateStartDraft('随机数只用于本次草稿，当前村未改变。');});
+    bind('new-game-reuse',s=>{seed.value=String(s.world.seed);this.invalidateStartDraft('已复用当前地图种子；开局配置仍按下方选择。');});
+    bind('new-game-review-button',s=>{
+      if(s.phase!=='edit')return;const q=G.startConfigQuote({seed:seed.value,preset:s.preset});
+      if(!q.ok){s.message=q.reason;return;}
+      s.intent={world:s.world,game:s.game,key:q.key,config:{...q.config}};s.phase='review';s.rev++;s.message='请核对新村参数和旧进度处理，再单独确认。';
+      this.refreshNewGameSettings();document.getElementById('new-game-confirm')?.focus();
+    });
+    bind('new-game-back',()=>{this.invalidateStartDraft('已返回修改，尚未创建新村。');seed?.focus();});
+    bind('new-game-confirm',s=>{
+      if(s.phase!=='review'||!s.intent)return;
+      const q=G.startConfigQuote({seed:seed.value,preset:s.preset});
+      if(!q.ok||q.key!==s.intent.key){this.invalidateStartDraft('参数已变，请重新检查开局。');return;}
+      let result;try{result=G.confirmNewGame(s.intent);}catch(error){result={ok:false,reason:error.message||'新村生成失败'};}
+      if(result.ok)this.closeNewGameSettings(true);
+      else this.invalidateStartDraft((result.reason||'新村未创建')+'；当前村保留，请重新检查。');
+    });
+    bind('new-game-export',()=>{
+      this.invalidateStartDraft();
+      try{G.exportSaveFile();this._startSession.message='已请求浏览器下载当前村，请自行核对文件已保存；未创建新村，需要重新检查并确认。';}
+      catch(error){this._startSession.message='导出未完成：'+(error.message||'未知错误')+'；当前村未更改。';}
+    });
+    bind('new-game-close',()=>this.closeNewGameSettings());
+    window.addEventListener('blur',()=>{if(current(this._startSession))this.invalidateStartDraft('窗口已失焦，最终确认已取消；回来后重新检查开局。');});
+    document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'&&current(this._startSession))this.invalidateStartDraft('页面已隐藏，最终确认已取消。');});
+  },
+  invalidateStartDraft: function(message='') {
+    const s=this._startSession;if(!s)return;s.rev++;s.phase='edit';s.intent=null;s.message=message;this.refreshNewGameSettings();
+  },
+  showNewGameSettings: function () {
+    const modal=document.getElementById('new-game-settings');if(!modal||!G.world||!G.startConfigQuote)return;
+    const front=G.topModal();if(front&&front!==this.el.over&&front!==modal)return;
+    if(!modal.classList.contains('hidden'))return;
+    this.initNewGameSettings();
+    const esc=value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    this._startSession={world:G.world,game:G.game,paused:!!G.game.paused,preset:'classic',phase:'edit',rev:0,intent:null,message:''};
+    G.game.paused=true;document.getElementById('new-game-seed').value=String(Math.floor(Math.random()*0x100000000));
+    for(const preset of ['classic','hard']){
+      const p=G.startConfigQuote({seed:0,preset}).presetSummary,card=document.getElementById('new-game-preset-'+preset);
+      card.innerHTML=`<strong>${esc(p.name)}</strong><span>${p.families}家庭 · ${p.population}人（${p.adults}成人 / ${p.children}儿童）</span><span>${['wood','stone','food','firewood','tools'].map(k=>`${this.resourceIcon(k)}${G.RES[k].name} ${p.resources[k]}`).join(' · ')}</span><span>${esc(p.seedNote)}</span>`;
+    }
+    modal.classList.remove('hidden');this.refreshNewGameSettings();this.enterDialog('new-game-settings');
+    document.getElementById('new-game-seed').focus();this.refreshHUD();
+  },
+  closeNewGameSettings: function (started=false) {
+    const modal=document.getElementById('new-game-settings'),s=this._startSession;
+    if(!modal||modal.classList.contains('hidden'))return;
+    modal.classList.add('hidden');this._startSession=null;
+    if(!started&&s&&s.world===G.world&&s.game===G.game&&!G.game.over)G.game.paused=s.paused;
+    if(started){if(this._dialogFocus)delete this._dialogFocus['new-game-settings'];G.keys={};}
+    else this.leaveDialog('new-game-settings');
+    this.refreshHUD();
+  },
+  refreshNewGameSettings: function () {
+    const modal=document.getElementById('new-game-settings'),s=this._startSession;
+    if(!modal||modal.classList.contains('hidden')||!s)return;
+    const seed=document.getElementById('new-game-seed'),status=document.getElementById('new-game-status'),review=document.getElementById('new-game-review'),check=document.getElementById('new-game-review-button'),confirm=document.getElementById('new-game-confirm');
+    if(s.world!==G.world||s.game!==G.game){s.phase='edit';s.intent=null;review.classList.add('hidden');check.disabled=confirm.disabled=true;status.textContent='当前村已改变，此设置已过期；请取消后重新打开。';return;}
+    const recorded=G.game.startConfig,known=recorded&&G.startConfigQuote(recorded),currentName=known?.ok?known.presetSummary.name:'旧档未记录开局配置（不根据现存资源猜测）';
+    document.getElementById('new-game-current').textContent=`当前村：地图种子 ${G.world.seed} · ${currentName}。打开、修改和取消不会替换此村或删除存档。`;
+    for(const preset of ['classic','hard'])document.getElementById('new-game-preset-'+preset).setAttribute('aria-pressed',String(s.preset===preset));
+    const q=G.startConfigQuote({seed:seed.value,preset:s.preset}),summary=document.getElementById('new-game-summary');
+    if(q.ok){const p=q.presetSummary;summary.textContent=`新村预览：种子 ${q.config.seed} · ${p.name}\n${p.families}家庭 / ${p.population}人（${p.adults}成人、${p.children}儿童）；仅有储物车，住房需自行建设\n${['wood','stone','iron','food','firewood','tools'].map(k=>`${G.RES[k].name} ${p.resources[k]}`).join(' · ')}\n${p.seedNote}\n${p.equipmentNote} ${p.adaptationNote}`;}
+    else summary.textContent=q.reason;
+    const reviewing=s.phase==='review'&&!!s.intent&&q.ok&&s.intent.key===q.key;
+    review.classList.toggle('hidden',!reviewing);check.classList.toggle('hidden',reviewing);check.disabled=!q.ok;confirm.disabled=!reviewing;
+    if(reviewing)document.getElementById('new-game-confirm-summary').textContent=`将创建：种子 ${s.intent.config.seed} · ${q.presetSummary.name} · ${q.presetSummary.population}人。不会重放或搬入当前村的库存、建筑和居民。`;
+    status.textContent=s.message||(!q.ok?q.reason:'草稿不会触发开局发放；先检查，再单独确认。');
   },
 
   enterDialog: function (id) {

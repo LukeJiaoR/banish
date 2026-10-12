@@ -8,6 +8,13 @@
  *   伐木屋约 320-640 柴火/工人/年（紧邻仓库取高值）。具体随地图与布局浮动，以 tests/bench.js 实测为准。
  * ============================================================ */
 
+/* Two explicit starting conditions. Stocks and population totals are this
+ * small-map adaptation; selecting a preset never changes an existing town. */
+G.START_PRESETS = Object.freeze({
+  classic: Object.freeze({name:'经典开局',kidPlan:Object.freeze([2,2,1,0,0]),stocks:Object.freeze({wood:80,stone:48,grain:500,firewood:50,tools:15}),wheat:true}),
+  hard: Object.freeze({name:'困难（无种子）',kidPlan:Object.freeze([2,2,1,0]),stocks:Object.freeze({grain:400,firewood:40,tools:12}),wheat:false}),
+});
+
 /* 建筑（w/h 为占地格数；cost 为建造消耗；buildWork 为建造所需工时（游戏小时））
  * jobs: 工作岗位数；passable: 建成后是否可通行
  * warmWoodPerYear: 每年取暖柴火（原版：木屋 ≈30，石屋省一半 ≈15）
@@ -178,7 +185,7 @@ G.BDEF = {
     id: 'farm', name: '农田', icon: '🌾', w: 8, h: 8,
     cost: {}, buildWork: 12, jobs: 4, passable: true,
     wall: '#6b4f33', wallD: '#573f29', roof: '#6b4f33',
-    desc: '免费；新田框选矩形，每边4–15格，按面积设初始1–4人上限，可手动调整。旧田仍8×8。默认小麦产主食；贸易购入卷心菜种子后可种蔬菜，两种均约14食物/格/年。春夏播种、秋收冬损，攒满一筐（28）才送仓。本季开种后改选只用于下一春，不改在田作物或在途收获。',
+    desc: '免费；新田框选矩形，每边4–15格，按面积设初始1–4人上限，可手动调整。旧田仍8×8。小麦产主食；困难开局需先买种子。贸易购入卷心菜种子后可种蔬菜，两种均约14食物/格/年。春夏播种、秋收冬损，攒满一筐（28）才送仓。本季开种后改选只用于下一春，不改在田作物或在途收获。',
   },
   stoneroad: {
     id: 'stoneroad', name: '石路', icon: '🧱', w: 1, h: 1,
