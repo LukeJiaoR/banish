@@ -133,7 +133,7 @@ G.BUILD_SPR_W = {
   house: 1.16, stonehouse: 1.12, boarding: 1.04, storage: 1.03, stockpile:1.25, mine: 1.12,
   gatherer: 1.10, forester: 1.06, woodcutter: 1.12, dock: 1.0,
   school: 1.06, blacksmith: 1.06, hunting: 1.08, site_2x2: 1.0, site_3x3: 1.0,
-  market:7/6, well: 1.25, burntruins: 1.25, tailor: 1.04, tavern: 7 / 6, tradingpost: 0.875, herbalist: 1.25, hospital: 7 / 6, stonequarry: 7 / 6, mineralpit: 7 / 6, townhall: 7 / 6,
+  market:7/6, well: 1.25, burntruins: 1.25, tailor: 1.04, tavern: 7 / 6, tradingpost: 0.875, herbalist: 1.25, hospital: 7 / 6, stonequarry: 7 / 6, mineralpit: 7 / 6, townhall: 7 / 6, chapel: 1.08,
 };
 /* 精灵内烟囱的横向位置（相对精灵宽度，负=偏左），用于挂炊烟粒子 */
 G.BUILD_CHIMNEY_X = { house: -0.30, stonehouse: 0.02, boarding: -0.32 };
@@ -386,7 +386,7 @@ G.drawBuilding = function (ctx, b, time) {
   // 建筑精灵：脚点 = 占地菱形最下角，宽度 = 占地菱形宽 × 出格系数
   const sprW = (b.w + b.h) * 32 * (G.BUILD_SPR_W[b.type] || 1.08);
   // 贸易站按原图50%显示；补偿底角下方3px透明余量，让石基脚点贴合占地底角。
-  const sprFootY = B[1] + ((b.type === 'tradingpost'||b.type==='market') ? 1.5 : b.type === 'mineralpit' ? 2 : b.type==='burntruins'?2.5:b.type==='well'?1:0);
+  const sprFootY = B[1] + ((b.type === 'tradingpost'||b.type==='market') ? 1.5 : b.type === 'mineralpit' ? 2 : b.type==='burntruins'?2.5:b.type==='well'?1:b.type==='chapel'?6:0);
   const spr = G.sprDraw(ctx, b.type, B[0], sprFootY, { w: sprW });
   if (spr) {
     if (def.chimney) { // 挂烟囱粒子锚点（精灵内烟囱横向位置见 BUILD_CHIMNEY_X）
@@ -707,7 +707,7 @@ G.citizenFacing = function (c, workTarget) {
 };
 
 G.drawCitizen = function (ctx, c, time, homes) {
-  if (G.citizenIndoorHome(c, homes) || (G.inMedicalCare && G.inMedicalCare(c)) || (G.inSchool && G.inSchool(c))) return;
+  if (G.citizenIndoorHome(c, homes) || (G.inMedicalCare && G.inMedicalCare(c)) || (G.inSchool && G.inSchool(c)) || (G.inChapel && G.inChapel(c))) return;
   const [sx0, sy0] = G.T2S(c.x, c.y);
   const sy = sy0 + 16 - (G.bridgeAt(G.world,Math.round(c.x),Math.round(c.y))?.state==='ok'?8:0);
   const child = c.age < G.ADULT_AGE;

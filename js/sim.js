@@ -161,6 +161,7 @@ G.endDay = function () {
     } else { c.hunger++; c.dietVariety = 0; }
     G.wearClothing(c);
     c.leisureDays=Math.max(0,G.leisureDaysOf(c)-1);
+    c.chapelDays=Math.max(0,G.chapelDaysOf(c)-1);if(!c.chapelDays)c.chapelId=null;
     c.happiness=G.clamp((c.happiness||3)+G.clamp(G.happinessTarget(c)-(c.happiness||3),-.1,.1),1,5);
   }
 
@@ -549,7 +550,7 @@ G.spawnCitizen = function (opt) {
     state: 'idle', walkKind: '', path: null, pi: 0, camped: false,
     wanderT: G.rng() * 3,
     toolType:null,toolHours:0,
-    hunger: 0, cold: 0, clothingLeft: 0, clothingType:null, dietVariety: 0, dietScore: 1, happiness: 3, leisureDays:0, health: 4, sickDays: 0, immunityDays: 0, herbCooldown: 0, careHours: 0,
+    hunger: 0, cold: 0, clothingLeft: 0, clothingType:null, dietVariety: 0, dietScore: 1, happiness: 3, leisureDays:0, chapelDays:0, chapelId:null, health: 4, sickDays: 0, immunityDays: 0, herbCooldown: 0, careHours: 0,
     animT: G.rng() * 10,
     dead: false,
   };
@@ -644,7 +645,7 @@ G.alternateTaskEndpoint = function (c, t) {
   if (!t || G.physicalTaskEndpoint(t) || !t.b || G.world.bmap[t.b.id] !== t.b) return null;
   if (['build','clearSite'].includes(t.kind) ? t.b.state !== 'site' : t.b.state !== 'ok') return null;
   if (t.kind === 'clearSite' && (!t.tree || G.world.trees[G.world.treeIdx[t.tree.i]] !== t.tree)) return null;
-  if (['care', 'clinic', 'arrival', 'leisure', 'host', 'study', 'teach'].includes(t.kind)) return G.workSpot(G.world, t.b, c.x, c.y, true);
+  if (['care', 'clinic', 'arrival', 'leisure', 'host', 'worship', 'cleric', 'study', 'teach'].includes(t.kind)) return G.workSpot(G.world, t.b, c.x, c.y, true);
   if (t.kind === 'clearSite') return G.siteClearSpot(c, t.b, t.tree);
   if(['smith','fuel'].includes(t.kind)&&t.phase==='fetch'&&!G.hasStorageBuilding())return G.workSpot(G.world,t.b,c.x,c.y,true);
   if (['firewood', 'trade', 'brew', 'smith', 'fuel', 'tailor'].includes(t.kind) && t.phase === 'fetch') return G.storageRoute(c.x,c.y,G.fetchStorageTypes(t))?.spot || null;
@@ -670,7 +671,7 @@ G.routeCanReuse = function (route, c, tx, ty) {
 G.sendTo = function (c, tx, ty, planned = null) {
   let route=planned||(c.task&&c.task.dispatchRoute);
   if(c.task) delete c.task.dispatchRoute;
-  const buildingTask=c.task && (['build','clearSite','firewood','trade','care','clinic','arrival','leisure','host','brew','smith','fuel','tailor','study','teach','firefight','supply','toolFetch'].includes(c.task.kind) || (c.task.kind==='work' && c.task.b && ['dock','mine','stonequarry','blacksmith','pasture','orchard'].includes(c.task.b.type)));
+  const buildingTask=c.task && (['build','clearSite','firewood','trade','care','clinic','arrival','leisure','host','worship','cleric','brew','smith','fuel','tailor','study','teach','firefight','supply','toolFetch'].includes(c.task.kind) || (c.task.kind==='work' && c.task.b && ['dock','mine','stonequarry','blacksmith','pasture','orchard'].includes(c.task.b.type)));
   if((route && !G.routeCanReuse(route,c,tx,ty)) || (!route && buildingTask)) {
     const spot=G.alternateTaskEndpoint(c,c.task);
     if(!spot){if(c.task)G.dropBlockedTask(c,c.task);c.path=null;c.state='idle';c.wanderT=.5;return false;}
@@ -685,7 +686,7 @@ G.sendTo = function (c, tx, ty, planned = null) {
   if (!p) { c.state = 'idle'; c.task = null; return false; }
   // The path planner rounds its start cell. Physically checked factory/mineral
   // tasks still walk the final fraction after an interrupted commute.
-  if((c.task?.mineral||['firefight','supply','toolFetch'].includes(c.task?.kind)||['fuel','tailor'].includes(c.task?.kind)) && p.length===0 && G.d2(c.x,c.y,tx,ty)>1e-8) {
+  if((c.task?.mineral||['firefight','supply','toolFetch','cleric','worship'].includes(c.task?.kind)||['fuel','tailor'].includes(c.task?.kind)) && p.length===0 && G.d2(c.x,c.y,tx,ty)>1e-8) {
     c.path=[{x:tx,y:ty}];c.pi=0;c.state='walk';c.walkKind='task';return true;
   }
   c.path = p; c.pi = 0;
@@ -731,7 +732,7 @@ G.resumeTask = function (c) {
   c.pausedTask = null;
   if(t?.kind==='toolFetch'){if(G.tryHouseholdSupply&&G.tryHouseholdSupply(c))return true;c.task=t;return G.planToolFetch(c,t);}
   if(t?.kind==='supply'){c.task=t;return G.planSupplyLeg(c,t);}
-  if(t&&['teach','clinic','host'].includes(t.kind)&&G.tryHouseholdSupply&&G.tryHouseholdSupply(c))return true;
+  if(t&&['teach','clinic','host','cleric'].includes(t.kind)&&G.tryHouseholdSupply&&G.tryHouseholdSupply(c))return true;
   if (!t) return false;
   const w = G.world;
   // 建筑任务要求仍在原岗位；散工任务还须保留玩家标记，不能续接已取消的命令。
@@ -995,7 +996,7 @@ G.goalCommitment = function (c) {
   if(G.fireTaskOf&&G.fireTaskOf(c))return true;
   if(G.supplyTaskOf&&G.supplyTaskOf(c))return true;
   if(c.carry?.staffingReturn===true||(c.staffingRelease!=null&&c.staffingRelease===c.job))return true;
-  if (G.isArriving(c) || G.isLeisureVisitor(c)) return true;
+  if (G.isArriving(c) || G.isLeisureVisitor(c) || G.isChapelVisitor(c)) return true;
   if ([c.task,c.pausedTask].some(t=>t&&t.kind==='brew'&&t.phase==='process') && c.carry?.brewIngredient) return true;
   if (c.task && c.task.kind === 'care') return true;
   const b = G.world.bmap[c.job];
@@ -1238,7 +1239,7 @@ G.detourCitizen = function (c, dtH) {
     if (G.physicalTaskEndpoint(t)) { G.dropBlockedTask(c, t); return; }
     if (t) {
       const spot = G.alternateTaskEndpoint(c, t);
-      if (!spot) { if(['smith','fuel','tailor'].includes(t.kind)){G.returnSmithBatch(c);return;} if (t.kind === 'care') G.cancelMedicalCare(c); else if(t.kind==='leisure')G.cancelLeisure(c);else if(['study','teach'].includes(t.kind)){G.clearSchoolTasks(c);c.schoolWaitReason='上学路线受阻，保留学籍等待通路';c.wanderT=4;} return; }
+      if (!spot) { if(['smith','fuel','tailor'].includes(t.kind)){G.returnSmithBatch(c);return;} if (t.kind === 'care') G.cancelMedicalCare(c); else if(t.kind==='leisure')G.cancelLeisure(c);else if(t.kind==='worship')G.cancelWorship(c);else if(['study','teach'].includes(t.kind)){G.clearSchoolTasks(c);c.schoolWaitReason='上学路线受阻，保留学籍等待通路';c.wanderT=4;} return; }
       goal = spot; t.tx = spot.x; t.ty = spot.y;
     } else if (c.walkKind === 'wander') { c.path = null; c.state = 'idle'; c.wanderT = 2; return; }
     else return;
@@ -1249,6 +1250,7 @@ G.detourCitizen = function (c, dtH) {
     if(c.task&&['study','teach'].includes(c.task.kind)){const b=c.task.b;b.warnText='上学路线受阻';G.clearSchoolTasks(c);c.schoolWaitReason='上学路线受阻，保留学籍等待通路';c.wanderT=4;return;}
     if (c.task && c.task.kind === 'care') { G.cancelMedicalCare(c); return; }
     if(G.isLeisureVisitor(c)){G.cancelLeisure(c);return;}
+    if(G.isChapelVisitor(c)){G.cancelWorship(c);return;}
     // A route to the old door may be lost while another compatible store is
     // still reachable. Replan the destination, not just the same door. If none
     // works, startHaul keeps this cargo and the existing 2h wait/retry cadence.
@@ -1272,6 +1274,8 @@ G.stepCitizen = function (c, dtH) {
   if(G.stepFirefighting&&G.stepFirefighting(c,dtH))return;
   if(G.stepSupply&&G.stepSupply(c,dtH))return;
   c.leisureRetryH=Math.max(0,(c.leisureRetryH||0)-dtH);
+  c.chapelRetryH=Math.max(0,(c.chapelRetryH||0)-dtH);
+  if(G.isChapelVisitor(c)&&(!G.validWorshipTask(c)||G.isRestTime()))G.cancelWorship(c);
   if(G.isLeisureVisitor(c) && (!G.validLeisureTask(c) || G.isRestTime()))G.cancelLeisure(c);
   c.careRetryH = Math.max(0, (c.careRetryH || 0) - dtH);
   if (c.task && c.task.kind === 'care' && !G.validCareTask(c)) G.cancelMedicalCare(c);
@@ -1337,6 +1341,8 @@ G.stepCitizen = function (c, dtH) {
       }
       if(c.task&&['study','teach'].includes(c.task.kind)){G.stepSchool(c,dtH);return;}
       if(G.isLeisureVisitor(c)){G.stepLeisure(c,dtH);return;}
+      if(G.isChapelVisitor(c)){G.stepWorship(c,dtH);return;}
+      if(c.task?.kind==='cleric'){G.stepCleric(c,dtH);return;}
       if(c.task?.kind==='brew'&&c.task.phase==='process'&&(G.isSick(c)||!G.tavernBrewStatus(c.task.b,true).ok)){G.returnBrewGrain(c);return;}
       if (!c.task) { c.state = 'idle'; return; }
       if (c.task.b && c.task.b.state === 'site') c.task.b.constructionStarted = true;
@@ -1350,7 +1356,7 @@ G.stepCitizen = function (c, dtH) {
       if (c.wanderT <= 0) {
         c.wanderT = 2 + G.rng() * 5;
         if (G.isArriving(c) || c.age >= G.ADULT_AGE) G.requestTask(c); // 有岗位的接活；无业散工顺路处理「砍伐」标记
-        else if (!G.tryMedicalCare(c)) G.wander(c);
+        else if (!G.tryMedicalCare(c)&&!G.tryChapel(c)) G.wander(c);
       }
     }
   }
@@ -1433,11 +1439,12 @@ G.requestTask = function (c) {
   if (G.isArriving(c)) {if(G.isRestTime())G.goHome(c);else G.startImmigration(c);return;}
   if (!c.carry && G.tryMedicalCare(c)) return;
   if (G.isRestTime()) { G.goHome(c); return; } // 深夜不接受新任务
-  if(c.student){if(c.carry)G.startHaul(c);else G.startStudy(c);return;}
-  if(!c.adult){G.wander(c);return;}
+  if(c.student){if(c.carry)G.startHaul(c);else if(!G.tryChapel(c))G.startStudy(c);return;}
+  if(!c.adult){if(!G.tryChapel(c))G.wander(c);return;}
   if(!c.carry&&G.tryHouseholdSupply&&G.tryHouseholdSupply(c))return;
   if(!c.carry && G.tryToolFetch(c))return;
   if(!c.carry && G.tryLeisure(c))return;
+  if(!c.carry && G.tryChapel(c))return;
   const w = G.world;
   const b = c.job != null ? w.bmap[c.job] : null;
   // 换岗/任务中断后先交货；农田未满批可继续收割，找不到下一格时也必须交货。
@@ -1617,6 +1624,7 @@ G.makeTask = function (b, c) {
     case 'herbalist': return G.makeHerbalistTask(b, c);
     case 'hospital': return G.makeClinicTask(b, c);
     case 'tavern': return G.makeTavernTask(b,c);
+    case 'chapel': return G.makeClericTask(b,c);
     case 'woodcutter': return G.makeFuelTask(b,c);
     case 'forester': {
       const R = P.forester.radius;
@@ -1777,7 +1785,8 @@ G.completeTask = function (c) {
       break;
     }
     case 'clinic':
-    case 'host': break;
+    case 'host':
+    case 'cleric': break;
     case 'brew': G.completeBrew(c,t);return;
     case 'build': {
       if (b && G.world.bmap[b.id]===b && b.state === 'site'&&!b.sitePaused) {
@@ -1918,6 +1927,7 @@ G.releaseWorker = function (c) {
 G.assignWorker = function (b, c) {
   if(!c||c.dead||!c.adult||c.student||c.job!=null||c.carry?.staffingReturn===true||G.toolFetchTask(c)||(G.fireTaskOf&&G.fireTaskOf(c))||(G.supplyTaskOf&&G.supplyTaskOf(c))||G.isArriving(c)||G.world.bmap[b.id]!==b||b.workers.length>=G.workerLimitOf(b))return;
   if(b.type==='tavern'&&b.state==='ok'&&(c.age<18||G.isSick(c)))return;
+  if(b.type==='chapel'&&b.state==='ok'&&(G.isSick(c)||c.hunger>0))return;
   if (b.type === 'hospital' && b.state === 'ok' && G.isSick(c)) return;
   c.job = b.id;
   b.workers.push(c.id);
@@ -2123,7 +2133,7 @@ G.scheduleJobs = function () {
     if (b.type !== 'herbalist' && G.productionLimited(b)) continue; // 柴火/工具达到上限的岗位不拉人，空闲者留给「砍伐」标记
     let guard = 0;
     while (b.workers.length < G.workerLimitOf(b) && guard++ < 6) {
-      const pool = jobless().filter(c => (b.type !== 'hospital' || !G.isSick(c)) && (b.type!=='tavern'||(c.age>=18&&!G.isSick(c))));
+      const pool = jobless().filter(c => (b.type !== 'hospital' || !G.isSick(c)) && (b.type!=='chapel'||(!G.isSick(c)&&c.hunger<=0)) && (b.type!=='tavern'||(c.age>=18&&!G.isSick(c))));
       if (wantLabor && pool.length <= wantLabor) break;
       const c = G.pickNearest(pool, b);
       if (!c) break;
@@ -2140,7 +2150,7 @@ G.scheduleJobs = function () {
     .filter(b => b.state === 'ok' && G.BDEF[b.type].jobs > 0 && b.workers.length < G.workerLimitOf(b) && !b.noWork && G.jobCanProduce(b))
     .sort((a, b2) => (a.type === 'woodcutter' ? -1 : b2.type === 'woodcutter' ? 1 : 0));
   for (const b of targets) {
-    const eligibleForTarget = c => c && !G.goalCommitment(c) && (b.type !== 'hospital' || !G.isSick(c)) && (b.type!=='tavern'||(c.age>=18&&!G.isSick(c)));
+    const eligibleForTarget = c => c && !G.goalCommitment(c) && (b.type !== 'hospital' || !G.isSick(c)) && (b.type!=='chapel'||(!G.isSick(c)&&c.hunger<=0)) && (b.type!=='tavern'||(c.age>=18&&!G.isSick(c)));
     if (jobless().filter(eligibleForTarget).length > wantLabor) break; // 不能任医师的病人不能挡住健康接班人。
     // 从供体岗位抽人：优先抽当下正闲置的那个（别的工人还在干活）
     const available = x => x.workers.some(id => eligibleForTarget(w.cmap[id]));
@@ -2372,6 +2382,8 @@ G.removeBuilding = function (b, confirmationKey) {
   for (const c of w.citizens) {
     if(c.task && c.task.kind==='care' && c.task.b===b)G.cancelMedicalCare(c);
     if(G.isLeisureVisitor(c)&&c.task.b===b)G.cancelLeisure(c);
+    if(G.isChapelVisitor(c)&&c.task.b===b)G.cancelWorship(c);
+    if(c.chapelId===b.id)c.chapelId=null;
   }
   // 尚未开工的规划全额撤销；已经劳动/建成的建筑拆除返还一半。
   const def = G.BDEF[b.type];
@@ -3112,10 +3124,10 @@ G.townHallSummary = function(b) {
  * fetching and before fermenting. Reserved grain is physical refundable cargo. */
 G.LEISURE={age:18,hours:2,days:6,capacity:4,maxTravelHours:6,retryHours:6};
 G.leisureDaysOf=c=>G.clamp(Number.isFinite(c.leisureDays)?c.leisureDays:0,0,G.LEISURE.days);
-G.happinessTarget=c=>G.clamp(2.5+.5*(Number.isFinite(c.dietScore)?c.dietScore:1)+(G.leisureDaysOf(c)>0?1:0)-Math.min(2,(c.hunger||0)/3)-G.griefLoss(c),1,5);
+G.happinessTarget=c=>G.clamp(2.5+.5*(Number.isFinite(c.dietScore)?c.dietScore:1)+(G.leisureDaysOf(c)>0?1:0)+(G.chapelDaysOf(c)>0?G.CHAPEL.bonus:0)-Math.min(2,(c.hunger||0)/3)-G.griefLoss(c),1,5);
 G.happinessBonus=c=>G.clamp(((c.happiness||3)-3)*.025,0,.05);
 G.leisureSummary=c=>({dietBase:2.5+.5*(Number.isFinite(c.dietScore)?c.dietScore:1),leisureBonus:G.leisureDaysOf(c)>0?1:0,
-  target:G.happinessTarget(c),happiness:c.happiness||3,workBonus:G.happinessBonus(c),remainingDays:G.leisureDaysOf(c)});
+  target:G.happinessTarget(c),happiness:c.happiness||3,workBonus:G.happinessBonus(c),remainingDays:G.leisureDaysOf(c),chapelBonus:G.chapelDaysOf(c)>0?G.CHAPEL.bonus:0,chapelDays:G.chapelDaysOf(c)});
 G.tavernReserveDays=b=>Number.isInteger(b.reserveDays)?G.clamp(b.reserveDays,8,48):12;
 G.setTavernReserve=function(b,days){
   if(!b||G.world.bmap[b.id]!==b||b.type!=='tavern'||b.state!=='ok'||!Number.isInteger(days)||days<8||days>48)return false;
@@ -3173,6 +3185,7 @@ G.validLeisureTask=function(c){
 };
 G.cancelLeisure=function(c){c.task=null;c.path=null;c.pi=0;c.state='idle';c.walkKind='';c.wanderT=1;c.leisureRetryH=G.LEISURE.retryHours;};
 G.tryLeisure=function(c){
+  if(G.world.bmap[c.job]?.type==='chapel')return false;
   const school=G.world.bmap[c.job];if(school?.type==='school'&&G.world.citizens.some(x=>x.student&&x.school===school.id&&!x.dead))return false;
   if(c.dead||c.age<18||!c.adult||c.carry||G.isArriving(c)||G.isSick(c)||G.isRestTime()||c.leisureRetryH>0||G.leisureDaysOf(c)>0||G.game.res.ale<1)return false;
   const w=G.world,pop=w.citizens.filter(x=>!x.dead).length;
@@ -3201,6 +3214,80 @@ G.tavernSummary=function(b){
   return {...s,canBrew:s.ok,visitors:G.tavernVisitors(b).length,ale:G.game.res.ale,
     workers:b.workers.filter(id=>G.world.cmap[id]&&!G.world.cmap[id].dead).length,onDuty:G.tavernStaff(b),
     capacity:G.LEISURE.capacity,eligibleAdults:cs.filter(c=>!c.dead&&c.adult&&c.age>=18).length,batchGrain:30,batchAle:3,workHours:6,aleLimit:G.productionGoalOf('ale')??30};
+};
+
+/* Chapel: one physically present cleric serves a bounded congregation. The
+ * 200-person rule is from Banished; 8 concurrent visits, two service hours and
+ * six-day memory are explicit small-map adaptations, not remote aura income. */
+G.CHAPEL={capacity:200,visitorCapacity:8,hours:2,days:6,bonus:.5,maxTravelHours:6,retryHours:6};
+G.chapelDaysOf=c=>G.clamp(Number.isFinite(c.chapelDays)?c.chapelDays:0,0,G.CHAPEL.days);
+G.isChapelVisitor=c=>!!c&&!c.dead&&c.task?.kind==='worship';
+G.chapelVisitors=b=>G.world.citizens.filter(c=>G.isChapelVisitor(c)&&c.task.b===b);
+G.chapelMembers=b=>G.world.citizens.filter(c=>!c.dead&&((c.chapelId===b.id&&G.chapelDaysOf(c)>0)||(G.isChapelVisitor(c)&&c.task.b===b)));
+G.chapelClerics=function(b){
+  if(!b||G.world.bmap[b.id]!==b||b.type!=='chapel'||b.state!=='ok'||G.workerLimitOf(b)<=0)return [];
+  return b.workers.map(id=>G.world.cmap[id]).filter(c=>c&&!c.dead&&c.adult&&!c.student&&c.job===b.id);
+};
+G.inChapel=c=>!!c&&c.state==='work'&&['worship','cleric'].includes(c.task?.kind)&&G.world.bmap[c.task.b.id]===c.task.b&&c.task.b.state==='ok'&&G.atMedicalDoor(c,c.task.b)&&G.d2(c.x,c.y,c.task.tx,c.task.ty)<.04;
+G.chapelStaff=b=>!G.isRestTime()&&G.chapelClerics(b).some(c=>!G.isSick(c)&&c.hunger<=0&&c.state==='work'&&c.task?.kind==='cleric'&&c.task.b===b&&G.atMedicalDoor(c,b)&&G.d2(c.x,c.y,c.task.tx,c.task.ty)<.04&&!G.tileBlocked(G.world,Math.round(c.x),Math.round(c.y)));
+G.makeClericTask=function(b,c){
+  if(!G.chapelClerics(b).includes(c)||G.isSick(c)||c.hunger>0){b.noWork=true;b.warnText='需要健康、未饥饿的牧师';return null;}
+  const spot=G.workSpot(G.world,b,c.x,c.y,true);
+  if(!spot){b.noWork=true;b.warnText='牧师无法到达礼拜堂入口';return null;}
+  return G.withTaskRoute({kind:'cleric',b,tx:spot.x,ty:spot.y,work:4,workLeft:4},spot.route);
+};
+G.stepCleric=function(c,dtH){
+  const t=c.task;
+  if(!G.chapelClerics(t.b).includes(c)||G.isSick(c)||c.hunger>0){c.task=null;c.path=null;c.state='idle';c.wanderT=2;return;}
+  if(!G.atMedicalDoor(c,t.b)||G.d2(c.x,c.y,t.tx,t.ty)>.04||G.tileBlocked(G.world,Math.round(c.x),Math.round(c.y))){
+    const next=G.makeClericTask(t.b,c);c.task=next;if(next)G.sendTo(c,next.tx,next.ty);else{c.state='idle';c.wanderT=2;}return;
+  }
+  // Service consumes real time, never tool wear or education/health speedups.
+  t.workLeft-=dtH;if(t.workLeft<=0)G.completeTask(c);
+};
+G.chapelLifeReady=function(c){
+  if(c.dead||c.carry||G.isArriving(c)||G.isSick(c)||c.hunger>0||c.cold>=1||G.isRestTime())return false;
+  if(c.student&&G.studyTodayOf(c)<G.EDUCATION.dailyHours-1e-8&&G.studyHoursOf(c)<G.EDUCATION.totalHours-1e-8)return false;
+  const job=G.world.bmap[c.job];
+  if(job?.state==='site'||job?.type==='chapel')return false;
+  if(job?.type==='school'&&G.world.citizens.some(x=>x.student&&x.school===job.id&&!x.dead))return false;
+  if(job?.type==='hospital'&&G.world.citizens.some(G.isSick))return false;
+  const pop=G.world.citizens.filter(x=>!x.dead).length;
+  const food=G.supplyEconomyStock?G.supplyEconomyStock('food'):G.game.res.food;
+  return food>=pop*G.LIFE.eatPerDay*8;
+};
+G.validWorshipTask=function(c){
+  const b=c.task?.b;return G.isChapelVisitor(c)&&G.chapelLifeReady(c)&&b&&G.world.bmap[b.id]===b&&b.type==='chapel'&&b.state==='ok'&&G.workerLimitOf(b)>0;
+};
+G.cancelWorship=function(c){c.task=null;c.path=null;c.pi=0;c.state='idle';c.walkKind='';c.wanderT=1;c.chapelRetryH=G.CHAPEL.retryHours;};
+G.tryChapel=function(c){
+  if(!G.chapelLifeReady(c)||c.chapelRetryH>0||G.chapelDaysOf(c)>0||G.isChapelVisitor(c))return false;
+  // Calls at task boundaries cannot discard labor/cargo already in progress.
+  if(c.task&&!(c.task.kind==='study'&&(G.studyTodayOf(c)>=G.EDUCATION.dailyHours-1e-8||G.studyHoursOf(c)>=G.EDUCATION.totalHours-1e-8)))return false;
+  const w=G.world,chapels=w.buildings.filter(b=>b.type==='chapel'&&b.state==='ok'&&G.chapelStaff(b)&&G.chapelVisitors(b).length<G.CHAPEL.visitorCapacity&&G.chapelMembers(b).length<G.CHAPEL.capacity&&G.d2(c.x,c.y,b.x,b.y)<=24*24)
+    .sort((a,b)=>G.d2(c.x,c.y,a.x,a.y)-G.d2(c.x,c.y,b.x,b.y));
+  for(const b of chapels){
+    const spot=G.workSpot(w,b,c.x,c.y,true);if(!spot||spot.route.eta>G.CHAPEL.maxTravelHours)continue;
+    const old=c.task;c.task={kind:'worship',b,tx:spot.x,ty:spot.y,work:G.CHAPEL.hours,workLeft:G.CHAPEL.hours,waitingH:0};
+    if(G.sendTo(c,spot.x,spot.y,spot.route))return true;
+    c.task=old;
+  }
+  c.chapelRetryH=G.CHAPEL.retryHours;return false;
+};
+G.stepWorship=function(c,dtH){
+  if(!G.validWorshipTask(c)||!G.atMedicalDoor(c,c.task.b)||G.d2(c.x,c.y,c.task.tx,c.task.ty)>.04||G.tileBlocked(G.world,Math.round(c.x),Math.round(c.y))){G.cancelWorship(c);return;}
+  const t=c.task;
+  if(!G.chapelStaff(t.b)){t.waitingH+=dtH;if(t.waitingH>=4)G.cancelWorship(c);return;}
+  t.waitingH=0;t.workLeft-=dtH;if(t.workLeft>1e-8)return;
+  c.chapelDays=G.CHAPEL.days;c.chapelId=t.b.id;c.happiness=Math.min(5,(c.happiness||3)+.2);
+  G.cancelWorship(c);G.game.schedT=0;G.requestTask(c);
+};
+G.chapelSummary=function(b){
+  const clerics=G.chapelClerics(b),visitors=G.chapelVisitors(b),onDuty=G.chapelStaff(b),members=G.chapelMembers(b).length;
+  const status=G.workerLimitOf(b)<=0?'已停用牧师岗位，暂停礼拜':!clerics.length?'缺牧师，尚不能接待':G.isRestTime()?'夜间休息，暂停礼拜':
+    clerics.every(c=>G.isSick(c)||c.hunger>0)?'牧师生病或饥饿，暂停礼拜':!onDuty?(b.warnText||'牧师未到场，暂不计礼拜时间'):
+    members>=G.CHAPEL.capacity?'200名服务覆盖已满，等待记忆到期':visitors.length>=G.CHAPEL.visitorCapacity?'8个礼拜预约已满，等待本次服务结束':'牧师已到场，可接待礼拜';
+  return {capacity:G.CHAPEL.capacity,members,visitors:visitors.length,onSite:visitors.filter(c=>c.state==='work'&&G.atMedicalDoor(c,b)).length,staffAssigned:clerics.length,onDuty,status};
 };
 
 /* Ordinary clothes remain the legacy stock. Warm coats are an optional
@@ -3412,7 +3499,7 @@ G.clearSchoolTasks=function(c){
 G.restrictStudentWork=function(c){
   c.adult=false;
   if(c.job!=null){const b=G.world.bmap[c.job];if(b)b.workers=b.workers.filter(id=>id!==c.id);c.job=null;}
-  const forbidden=t=>t&&!['study','care','arrival'].includes(t.kind);
+  const forbidden=t=>t&&!['study','care','arrival','worship'].includes(t.kind);
   if(forbidden(c.task)){c.task=null;if(c.state==='work'||(c.state==='walk'&&c.walkKind==='task')){c.path=null;c.pi=0;c.state='idle';c.walkKind='';c.wanderT=0;}}
   if(forbidden(c.pausedTask))c.pausedTask=null;
 };
@@ -3480,6 +3567,7 @@ G.stepSchool=function(c,dtH){
   if(c.task.kind!=='study'||!G.schoolTeacherPresent(c.task.b))return;
   const today=G.studyTodayOf(c),hours=G.studyHoursOf(c),earned=Math.min(Math.max(0,dtH),G.EDUCATION.dailyHours-today,G.EDUCATION.totalHours-hours);
   c.studyDay=G.game.day;c.studyToday=today+earned;c.studyHours=hours+earned;
+  if(c.studyToday>=G.EDUCATION.dailyHours-1e-8||c.studyHours>=G.EDUCATION.totalHours-1e-8)G.tryChapel(c);
 };
 G.leaveSchool=function(c){
   if(!c||G.world.cmap[c.id]!==c||c.dead||!c.student||c.educated||c.age<G.ADULT_AGE)return false;
@@ -3524,7 +3612,7 @@ G.releaseStaffingWorker=function(c,b){
   if(!c.task&&c.state!=='rest'){c.state='idle';c.wanderT=.5;}
 };
 G.workforceWorkers=b=>G.world.citizens.filter(c=>!c.dead&&c.adult&&!c.student&&c.job===b.id);
-G.staffingBatchActive=(c,b)=>!!c.carry||[c.task,c.pausedTask].some(t=>t?.b===b&&!['teach','clinic','host','toolFetch'].includes(t.kind));
+G.staffingBatchActive=(c,b)=>!!c.carry||[c.task,c.pausedTask].some(t=>t?.b===b&&!['teach','clinic','host','cleric','toolFetch'].includes(t.kind));
 G.enforceWorkerLimit=function(b){
   if(b.workerLimit===undefined&&!b.sitePaused)return; // Old/default automatic play is unchanged.
   const workers=G.workforceWorkers(b),excess=Math.max(0,workers.length-G.workerLimitOf(b));
@@ -3542,6 +3630,7 @@ G.syncStoppedServices=function(b){
   for(const c of G.world.citizens){
     if(c.task?.b===b&&c.task.kind==='care')G.cancelMedicalCare(c);
     if(c.task?.b===b&&c.task.kind==='leisure')G.cancelLeisure(c);
+    if(c.task?.b===b&&c.task.kind==='worship')G.cancelWorship(c);
     if(c.student&&c.school===b.id){G.clearSchoolTasks(c);G.assignSchool(c);}
   }
 };
@@ -3594,6 +3683,7 @@ G.workforceBlockReason=function(b){
   if(b.type==='blacksmith'){const missing=G.blacksmithRecipe(b).filter(x=>r[x.type]<x.qty);if(missing.length)return '缺原料：'+missing.map(x=>G.RES[x.type].name+' '+x.qty).join('、');}
   if(b.type==='tailor')return G.tailorProductionStatus(b).reason;
   if(b.type==='tavern')return G.tavernBrewStatus(b).reason;
+  if(b.type==='chapel')return G.chapelSummary(b).status;
   if(b.type==='hospital')return '暂无病人需要接诊';
   if(b.type==='dock'&&G.fishingWaterSummary(b).catch===0)return G.fishingWaterSummary(b).reason;
   if(b.type==='farm')return G.farmSummary(b).status;
@@ -3704,7 +3794,7 @@ G.toolProductiveTask=t=>!!t&&(['build','clearSite','clearrock','chop','plant','s
 G.toolWorker=function(c){
  if(!c||c.dead||!c.adult||c.student||G.isArriving(c))return false;
  const b=G.world.bmap[c.job];if(!b)return !!(G.world.marked.size||G.world.markedRocks.size);
- return G.workerLimitOf(b)>0&&(b.state==='site'||!['school','hospital','market','tradingpost'].includes(b.type));
+ return G.workerLimitOf(b)>0&&(b.state==='site'||!['school','hospital','market','tradingpost','chapel'].includes(b.type));
 };
 G.toolWorkProgress=function(c,t,dt){
  const rate=(1+G.happinessBonus(c))/G.healthWorkMul(c);

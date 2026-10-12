@@ -137,7 +137,7 @@ G.serializeGame = function () {
       x: c.x, y: c.y, familyId: c.familyId, job: c.job,
       partnerId: c.partnerId, parentIds: c.parentIds, grandparentIds: c.grandparentIds, ancestorIds: c.ancestorIds, birthFamilyId: c.birthFamilyId,
       student: c.student ? 1 : 0, educated: c.educated ? 1 : 0, school: c.school != null ? c.school : null, studyHours:G.studyHoursOf(c),studyToday:G.studyTodayOf(c),studyDay:g.day,
-      toolType:c.toolType,toolHours:c.toolHours,arrivalHallId:c.arrivalHallId, hunger: c.hunger, cold: c.cold, clothingLeft: c.clothingLeft, clothingType:c.clothingType, dietVariety: c.dietVariety, dietScore: c.dietScore, happiness: c.happiness, leisureDays:c.leisureDays, grief:c.grief, health: c.health, sickDays: c.sickDays, immunityDays: c.immunityDays, herbCooldown: c.herbCooldown, careHours: c.careHours, camped: c.camped ? 1 : 0, carry: c.carry,
+      toolType:c.toolType,toolHours:c.toolHours,arrivalHallId:c.arrivalHallId, hunger: c.hunger, cold: c.cold, clothingLeft: c.clothingLeft, clothingType:c.clothingType, dietVariety: c.dietVariety, dietScore: c.dietScore, happiness: c.happiness, leisureDays:c.leisureDays, chapelDays:c.chapelDays, chapelId:c.chapelId, grief:c.grief, health: c.health, sickDays: c.sickDays, immunityDays: c.immunityDays, herbCooldown: c.herbCooldown, careHours: c.careHours, camped: c.camped ? 1 : 0, carry: c.carry,
     })),
     supplyCaches:(w.supplyCaches||[]).map(b=>({id:b.id,x:b.x,y:b.y,w:b.w,h:b.h,supplyStock:b.supplyStock})),
     nextUid: G._peekUid(),
@@ -658,6 +658,8 @@ G.prepareSaveData = function (d) {
       dietScore: cd.dietScore === undefined ? 1 : number(cd.dietScore, '饮食多样性', 0, 3),
       happiness: cd.happiness === undefined ? 3 : number(cd.happiness, '幸福度', 1, 5),
       leisureDays:cd.leisureDays===undefined?0:number(cd.leisureDays,'休闲记忆天数',0,6),
+      chapelDays:cd.chapelDays===undefined?0:number(cd.chapelDays,'礼拜记忆天数',0,G.CHAPEL.days),
+      chapelId:nullableId(cd.chapelId,'礼拜堂来源'),
       health: cd.health === undefined ? 4 : number(cd.health, '健康', 0, 5),
       sickDays: cd.sickDays === undefined ? 0 : integer(cd.sickDays, '患病天数', 0, 8),
       immunityDays: cd.immunityDays === undefined ? 0 : integer(cd.immunityDays, '免疫天数', 0, 12),
@@ -668,6 +670,13 @@ G.prepareSaveData = function (d) {
       c.grief={loss:number(r.loss,'哀伤幅度',0,G.MEMORIAL.maxLoss),days:integer(r.days,'哀伤天数',1,G.MEMORIAL.griefDays),name:r.name,buried:r.buried};
     }else c.grief=null;
     w.citizens.push(c); w.cmap[c.id] = c;
+  }
+  const chapelCounts={};
+  for(const c of w.citizens)if(c.chapelId!==null){
+    const chapel=w.bmap[c.chapelId];
+    if(!chapel||chapel.type!=='chapel'||chapel.state!=='ok'||c.chapelDays<=0)bad('礼拜堂记忆来源失效');
+    chapelCounts[c.chapelId]=(chapelCounts[c.chapelId]||0)+1;
+    if(chapelCounts[c.chapelId]>G.CHAPEL.capacity)bad('礼拜堂服务容量超限');
   }
   w.supplyCaches=optionalArray(d.supplyCaches,'散落生活物资').map(row=>{
     record(row,'散落生活物资');if(g.supplyMode!=='physical')bad('自动供给带散落物资');
@@ -1349,7 +1358,7 @@ G.selectAt = function (tx, ty, p) {
   let best = null, bd = 18 * 18, citizenHomes = null;
   for (const c of w.citizens) {
     if (c.state === 'rest' && c.camped === false && !citizenHomes && G.citizenHomeLookup) citizenHomes = G.citizenHomeLookup(w);
-    if ((G.citizenIndoorHome && G.citizenIndoorHome(c, citizenHomes)) || G.inMedicalCare(c) || G.inSchool(c)) continue;
+    if ((G.citizenIndoorHome && G.citizenIndoorHome(c, citizenHomes)) || G.inMedicalCare(c) || G.inSchool(c) || G.inChapel(c)) continue;
     const [sx, sy] = G.T2S(c.x, c.y);
     const px = sx * G.cam.z + G.cam.x - p.x;
     const py = (sy + 16) * G.cam.z + G.cam.y - p.y;

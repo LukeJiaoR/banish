@@ -1,0 +1,15 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
+const root=path.resolve(__dirname,'..'),queued=[];
+const context={console,document:{},addEventListener(){},Image:class{set src(value){this.srcPath=value;queued.push(this);}}};context.window=context;vm.createContext(context);
+for(const n of ['core','defs','map','sim','sprites','render'])vm.runInContext(fs.readFileSync(path.join(root,'js',n+'.js'),'utf8'),context);
+const G=context.G,asset=queued.find(x=>x.srcPath==='assets/buildings/chapel.png');assert(asset,'chapel must load through existing sprite manifest');
+const bytes=fs.readFileSync(path.join(root,asset.srcPath));assert(bytes.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])));assert.equal(bytes.readUInt32BE(16),448);assert.equal(bytes.readUInt32BE(20),496);assert.equal(bytes[25],6);assert(bytes.length<400000);asset.onload();assert(G.SPR.get('chapel'));
+G.world={};G.game={season:0,h:12};const calls=[],ctx=new Proxy({},{get:(_,name)=>(...args)=>calls.push([name,...args]),set:()=>true});
+const b={id:1,type:'chapel',state:'ok',x:10,y:10,w:3,h:3};
+const placed=[];G.sprDraw=(_,name,x,y,options)=>{placed.push({name,x,y,width:options.w});return[options.w,options.w*496/448];};G.drawBuilding(ctx,b,0);assert.deepEqual(placed.pop(),{name:'chapel',x:0,y:422,width:207.36});
+b.state='site';G.drawBuilding(ctx,b,0);assert.equal(placed.pop().name,'site_3x3');b.state='ok';G.sprDraw=()=>null;assert.doesNotThrow(()=>G.drawBuilding(ctx,b,0));assert(calls.some(x=>x[0]==='fill'),'missing chapel image retains geometry fallback');
+G.world={bmap:{1:b},N:128,water:new Uint8Array(128*128),rock:new Uint8Array(128*128),bgrid:new Int32Array(128*128).fill(-1)};
+const c={state:'work',x:9,y:10,task:{kind:'worship',b,tx:9,ty:10}};assert(G.inChapel(c));let draws=0;G.sprDraw=()=>{draws++;return[17,20];};G.drawCitizen(ctx,c,0,new Map());assert.equal(draws,0,'indoor worship must not use woodcutting animation');c.state='walk';assert(!G.inChapel(c));
+assert(fs.readFileSync(path.join(root,'js/main.js'),'utf8').includes('|| G.inChapel(c)) continue;'),'hidden indoor worshipers must not retain map hit targets');
+console.log('Chapel render: PNG/manifest, footprint/footpoint, construction/fallback, indoor animation/hit filtering passed (offline, not browser acceptance).');
