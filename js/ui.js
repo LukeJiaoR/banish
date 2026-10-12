@@ -223,6 +223,7 @@ G.ui = {
     this.initRoadControls();
     this.initFarmPlanControls();
     this.initPasturePlanControls();
+    this.initOrchardPlanControls();
     this.initNewGameSettings();
 
     // 顶栏按钮
@@ -318,8 +319,8 @@ G.ui = {
     };
     const def = G.BDEF[t], action = special[t];
     const name = action ? action.name : def.name, icon = action ? action.icon : def.icon;
-    const cost = action ? action.cost : t === 'pasture' ? '7–20格 · 按面积圈地' : this.resourceCost(def.cost, true);
-    const tip = action ? action.tip : t === 'pasture' ? '牧场：每边7–20格，选两个角或拖出矩形；预览羊、牛、鸡容量和建材用工，确认后清场施工' : t === 'road' ? '道路：点选或鼠标拖出起终点预览连通路线，确认后铺设；树木需先标记由工人清除' :
+    const cost = action ? action.cost : t === 'pasture' ? '7–20格 · 按面积圈地' : t === 'orchard' ? '4–15格 · 按树列开园' : this.resourceCost(def.cost, true);
+    const tip = action ? action.tip : t === 'pasture' ? '牧场：每边7–20格，选两个角或拖出矩形；预览羊、牛、鸡容量和建材用工，确认后清场施工' : t === 'orchard' ? '果园：每边4–15格，选两个角或拖矩形；按东西2格/南北3格树距预览株数、成本与农夫用工，确认后清场施工' : t === 'road' ? '道路：点选或鼠标拖出起终点预览连通路线，确认后铺设；树木需先标记由工人清除' :
       `${def.name}（${this.resourceCost(def.cost, false)}${def.jobs ? ' · 岗位×' + def.jobs : ''}）— ${def.desc}`;
     const imagePath = icons[t] ? `assets/icons/${icons[t]}.png` : ['tailor', 'tradingpost', 'pasture', 'orchard', 'chapel'].includes(t) ? `assets/buildings/${t}.png` : null;
     const image = imagePath ? `<img class="icimg" src="${imagePath}" alt="" onerror="this.remove()">` : '';
@@ -360,7 +361,7 @@ G.ui = {
     if (status) {
       const t = G.tool && (G.tool.kind === 'build' ? G.tool.type : G.tool.kind==='road' ? (G.tool.surface==='bridge'?'bridge':G.tool.surface==='stone'?'stoneroad':'road') : G.tool.kind);
       const names = { fell: '砍伐', quarry: '采石采铁', demolish: '拆除', road: '铺路' };
-      status.textContent = t ? `当前：${names[t] || G.BDEF[t].name} · ${t === 'demolish' ? '点击建筑或道路拆除；已开采的有限矿点须确认永久废坑' : ['fell', 'quarry'].includes(t) ? '框选范围后确认标记' : ['road','stoneroad','bridge'].includes(t) ? '选起终点后预览并确认' : t==='farm'?'选两个角或拖出矩形，再确认开田' : t==='pasture'?'选两个角或拖出矩形，再确认圈地' : '点击地图放置，可连续建造'} · Esc / 右键取消${this.mineralBuildRisk(t) ? '\n' + this.mineralBuildRisk(t) : ''}` :
+      status.textContent = t ? `当前：${names[t] || G.BDEF[t].name} · ${t === 'demolish' ? '点击建筑或道路拆除；已开采的有限矿点须确认永久废坑' : ['fell', 'quarry'].includes(t) ? '框选范围后确认标记' : ['road','stoneroad','bridge'].includes(t) ? '选起终点后预览并确认' : t==='farm'?'选两个角或拖出矩形，再确认开田' : t==='pasture'?'选两个角或拖出矩形，再确认圈地' : t==='orchard'?'选两个角或拖出矩形，再确认开园' : '点击地图放置，可连续建造'} · Esc / 右键取消${this.mineralBuildRisk(t) ? '\n' + this.mineralBuildRisk(t) : ''}` :
         group ? '未选择工具。点击一项开始；返回分类可切换功能。' : '选择分类，再选择建筑或操作。';
     }
   },
@@ -391,6 +392,7 @@ G.ui = {
     this.refreshRoadControls();
     this.refreshFarmPlanControls();
     this.refreshPasturePlanControls();
+    this.refreshOrchardPlanControls();
   },
 
   initHarvestRangeControls: function () {
@@ -567,6 +569,97 @@ G.ui = {
     lines.push('鼠标拖矩形或点两个角；手机点两个角。每边7–20格，确认才扣建材并创建工地。重选不撤销已确认工地；Esc / 右键退出。');
     const message = lines.join('\n'); if (text.textContent !== message) text.textContent = message;
     button._pastureIntent = s.ok ? { plan: s.plan, signature: s.signature, ...panel._pastureContext } : null;
+    button.disabled = !s.ok || G.hasOpenModal();
+  },
+
+  initOrchardPlanControls: function () {
+    const panel = document.getElementById('orchard-plan-controls');
+    const confirm = document.getElementById('orchard-plan-confirm'), cancel = document.getElementById('orchard-plan-cancel');
+    if (!panel || !confirm || !cancel || panel._orchardBound) return;
+    panel._orchardBound = true;
+    let activation = null, held = false, interrupted = false;
+    const valid = intent => !!intent && G.world === intent.world && G.game === intent.game && G.tool === intent.tool &&
+      G.orchardGestureVersion === intent.generation && G.isOrchardPlanning() && !G.hasOpenModal() &&
+      document.getElementById('orchard-plan-controls') === panel && !panel.classList.contains('hidden') &&
+      document.getElementById('orchard-plan-confirm') === confirm && document.getElementById('orchard-plan-cancel') === cancel &&
+      panel.contains(confirm) && panel.contains(cancel);
+    const capture = e => {
+      if (e.type === 'mousedown' && activation?.source === 'touchstart') return;
+      held = false; interrupted = false;
+      activation = { intent: confirm._orchardIntent, source: e.type, used: false };
+    };
+    for (const name of (window.PointerEvent ? ['pointerdown'] : ['mousedown', 'touchstart'])) confirm.addEventListener(name, capture);
+    confirm.addEventListener('keydown', e => {
+      if (!['Enter', ' '].includes(e.key)) return;
+      if (e.repeat || held) { e.preventDefault(); return; }
+      held = true; interrupted = false;
+      activation = { intent: confirm._orchardIntent, source: 'keyboard', used: false };
+    });
+    confirm.addEventListener('keyup', e => { if (['Enter', ' '].includes(e.key)) held = false; });
+    const interrupt = () => { activation = null; held = false; interrupted = true; };
+    for (const name of ['pointercancel', 'touchcancel', 'blur']) confirm.addEventListener(name, interrupt);
+    window.addEventListener('blur', interrupt);
+    confirm.addEventListener('click', e => {
+      e.preventDefault(); e.stopPropagation();
+      if (interrupted || e.detail > 1 || activation?.used) return;
+      const intent = activation ? activation.intent : confirm._orchardIntent;
+      if (activation) activation.used = true;
+      if (!valid(intent) || confirm.disabled) return;
+      const result = G.confirmOrchardPlan({ plan: intent.plan, signature: intent.signature });
+      if (result.ok) this.toast(`果园 ${result.b.w}×${result.b.h} 已规划；工人清场施工后，农夫才会逐株种植已购种子`, 'good');
+      else if (result.reason) this.toast(result.reason, 'warn');
+      this.refreshOrchardPlanControls();
+    });
+    let cancelActivation = null, cancelHeld = false, cancelInterrupted = false;
+    const captureCancel = e => {
+      if (e.type === 'mousedown' && cancelActivation?.source === 'touchstart') return;
+      cancelHeld = false; cancelInterrupted = false;
+      cancelActivation = { context: panel._orchardContext, plan: G.orchardPlan, source: e.type, used: false };
+    };
+    for (const name of (window.PointerEvent ? ['pointerdown'] : ['mousedown', 'touchstart'])) cancel.addEventListener(name, captureCancel);
+    cancel.addEventListener('keydown', e => {
+      if (!['Enter', ' '].includes(e.key)) return;
+      if (e.repeat || cancelHeld) { e.preventDefault(); return; }
+      captureCancel(e); cancelHeld = true;
+    });
+    cancel.addEventListener('keyup', e => { if (['Enter', ' '].includes(e.key)) cancelHeld = false; });
+    const interruptCancel = () => { cancelActivation = null; cancelHeld = false; cancelInterrupted = true; };
+    for (const name of ['pointercancel', 'touchcancel', 'blur']) cancel.addEventListener(name, interruptCancel);
+    window.addEventListener('blur', interruptCancel);
+    cancel.addEventListener('click', e => {
+      e.preventDefault(); e.stopPropagation();
+      if (cancelInterrupted || e.detail > 1 || cancelActivation?.used) return;
+      const context = cancelActivation ? cancelActivation.context : panel._orchardContext;
+      if (cancelActivation) { cancelActivation.used = true; if (cancelActivation.plan !== G.orchardPlan) return; }
+      if (!valid(context)) return;
+      interrupt(); G.cancelOrchardPlan(); this.refreshOrchardPlanControls();
+      const button = this.el.toolbar?.querySelector('[data-tool="orchard"]');
+      if (button?.focus) button.focus({ preventScroll: true });
+    });
+  },
+  refreshOrchardPlanControls: function () {
+    const panel = document.getElementById('orchard-plan-controls'); if (!panel) return;
+    const text = document.getElementById('orchard-plan-status'), button = document.getElementById('orchard-plan-confirm');
+    const visible = !!G.world && !!G.isOrchardPlanning && G.isOrchardPlanning();
+    if (!visible && panel.contains(document.activeElement)) {
+      const selected = G.tool && (G.tool.kind === 'build' ? G.tool.type : G.tool.kind === 'road' ? (G.tool.surface === 'bridge' ? 'bridge' : G.tool.surface === 'stone' ? 'stoneroad' : 'road') : G.tool.kind);
+      const target = this.el.toolbar?.querySelector(`[data-tool="${selected || 'orchard'}"]`);
+      if (target?.focus) target.focus({ preventScroll: true });
+    }
+    panel.classList.toggle('hidden', !visible);
+    panel._orchardContext = visible ? { world: G.world, game: G.game, tool: G.tool, generation: G.orchardGestureVersion } : null;
+    if (!visible) { if (button) { button._orchardIntent = null; button.disabled = true; } return; }
+    if (!text || !button) return;
+    const s = G.orchardPlanStatus(), lines = [];
+    if (s.size) lines.push(`果园 ${s.size[0]}×${s.size[1]} · ${s.area ?? s.size[0] * s.size[1]}格`);
+    if (Number.isFinite(s.count)) lines.push(`可种 ${s.count} 株：东西 ${s.columns} 列 × 南北 ${s.rows} 行；东西每2格一树，南北每3格一行，方向互换可能改变株数。`);
+    if (s.cost && Number.isFinite(s.work)) lines.push(`建材 ${this.resourceCost(s.cost, false)} · 施工 ${s.work} 工时（本作适配）；先清 ${s.trees || 0} 棵树，工人实际砍伐搬木后施工`);
+    if (Number.isFinite(s.workers)) lines.push(`本园农夫上限 ${s.workers} 人：每72格增加一岗，最多3人（本作适配）；可调低，上限不保证配足，不直接增加每株产量。`);
+    if (s.reason) lines.push(s.reason);
+    lines.push('买对应种子后逐株种植，4年有效养护成熟；每株秋收最多20果，实际采收送仓。旧6×6果园保留9株和2岗位，不按此新树距改排。');
+    lines.push('鼠标拖矩形或点两个角；手机点两个角。每边4–15格，确认才扣建材并创建工地。重选不撤销已确认工地；Esc / 右键退出。');
+    const message = lines.join('\n'); if (text.textContent !== message) text.textContent = message;
+    button._orchardIntent = s.ok ? { plan: s.plan, signature: s.signature, ...panel._orchardContext } : null;
     button.disabled = !s.ok || G.hasOpenModal();
   },
 
@@ -852,6 +945,7 @@ G.ui = {
     if (this.refreshRoadControls) this.refreshRoadControls();
     if(this.refreshFarmPlanControls)this.refreshFarmPlanControls();
     if(this.refreshPasturePlanControls)this.refreshPasturePlanControls();
+    if(this.refreshOrchardPlanControls)this.refreshOrchardPlanControls();
     if (this.refreshHarvestRangeControls) this.refreshHarvestRangeControls(false);
     if (this.refreshHarvestControls) this.refreshHarvestControls();
     const el = this.el.placement;
@@ -902,7 +996,7 @@ G.ui = {
     if (G.workerMaximumOf && b.state !== 'site') s.maximum = G.workerMaximumOf(b);
     const data = {
       current: s.supported ? `当前占岗 ${s.current} 人 · 其中收尾 ${s.draining} 人` : '本建筑无需安排工人',
-      limit: s.supported ? `已应用上限 ${s.limit} 人 · ${b.type === 'pasture' && b.pastureSize ? '本场最大' : '原最大'} ${s.maximum} 人` : '',
+      limit: s.supported ? `已应用上限 ${s.limit} 人 · ${(b.type === 'pasture' && b.pastureSize) || (b.type === 'orchard' && b.orchardSize) ? '本场最大' : '原最大'} ${s.maximum} 人` : '',
       reason: s.supported ? s.reason || '等待下一次派工检查。' : '可在下方查看全镇人力。',
       rule: !s.supported ? '全镇概览只读，各建筑的岗位在各自详情中调整。' : s.rule || (b.state === 'site' ? '暂停保留已完成工段和已付建材，取消未完成的小工段；恢复不重复扣建材。' : '上限不保证配足人数。设为 0 后停止接新工作，已接有限批次结清才释放；服务岗位立即停服务。'),
       population: `成人 ${g.adults} 人 · 学生 ${g.students} 人`,
@@ -3181,7 +3275,7 @@ G.ui = {
       <p class="economy-message" data-economy-message role="status" aria-live="polite"></p>
     </section>`;
     if(b.type==='orchard')return `<section class="economy-details" data-economy="orchard">
-      <p data-economy-live="orchard-age"></p><p data-economy-live="orchard-harvest"></p><p data-economy-live="orchard-renewal"></p>
+      <p data-economy-live="orchard-area"></p><p class="desc" data-economy-live="orchard-area-rule"></p><p data-economy-live="orchard-age"></p><p data-economy-live="orchard-harvest"></p><p data-economy-live="orchard-renewal"></p>
       <p data-economy-live="orchard-types"></p><p data-economy-live="orchard-stock"></p><p data-economy-live="orchard-logistics"></p>
       <form id="orchard-type-form" class="economy-form"><label for="orchard-type">以后空位种植品种</label><select id="orchard-type">${Object.entries(G.ORCHARD_TYPES).map(([type, def]) => `<option value="${type}"${G.orchardTypeOf(b) === type ? ' selected' : ''}${!G.game.unlocks?.[def.unlock] ? ' disabled' : ''}>${this.escHtml(def.name)} → ${G.RES[def.output].name}${!G.game.unlocks?.[def.unlock] ? '（尚未解锁）' : ''}</option>`).join('')}</select><div class="economy-actions"><button type="submit" id="orchard-type-apply">应用以后种植品种</button><button type="button" id="orchard-type-cancel">取消未应用选择</button></div><p data-economy-live="orchard-selection"></p></form>
       <form id="orchard-replant-form" class="economy-form"><label for="orchard-replant">空位补种</label><select id="orchard-replant"><option value="on"${b.orchardReplant!==false?' selected':''}>允许农夫补种</option><option value="off"${b.orchardReplant===false?' selected':''}>暂停新补种</option></select><button type="submit">应用补种设置</button></form>
@@ -3694,7 +3788,11 @@ G.ui = {
       const output=el.querySelector('[data-pasture-output]');if(output){const html='产出：'+G.productionOutputsOf(b).filter(k=>k!=='food').map(k=>`${this.resourceIcon(k)}${G.RES[k].name}`).join(' · ');if(output.innerHTML!==html)output.innerHTML=html;}
     } else {
       const d=G.orchardSummary(b), types=G.ORCHARD_TYPES, chosen=types[G.orchardTypeOf(b)], trees=b.orchardTrees||[];
-      set('[data-economy-live="orchard-age"]',`种子：${Object.values(types).map(type => `${type.name}${G.game.unlocks?.[type.unlock]?'已永久解锁':'尚未购买'}`).join(' · ')} · 空位 ${d.empty} / 幼树 ${d.young} / 成树 ${d.mature}（共9位）`);
+      const layout=G.orchardLayout(b);
+      set('[data-economy-live="orchard-area"]',`果园 ${b.w}×${b.h} · ${b.w*b.h}格 · ${layout.count}树位 · 农夫上限可设0–${G.workerMaximumOf(b)}人${layout.legacy?'（旧场适配）':''}`);
+      set('[data-economy-live="orchard-area-rule"]',layout.legacy?'旧6×6果园保留原9株、3×3树位、2岗位和原12木/36工时；不会因加载新版本重新排树。':`新树距：东西${layout.columns}列，每2格一树；南北${layout.rows}行，每3格一行。成本按周长、工时按面积、岗位最多3人为本作适配；大园仍受实际劳动和秋收搬运限制。`);
+
+      set('[data-economy-live="orchard-age"]',`种子：${Object.values(types).map(type => `${type.name}${G.game.unlocks?.[type.unlock]?'已永久解锁':'尚未购买'}`).join(' · ')} · 空位 ${d.empty} / 幼树 ${d.young} / 成树 ${d.mature}（共${G.orchardTreeCount(b)}位）`);
       const composition=Object.entries(types).map(([type,def])=>{const planted=trees.filter(t=>t.planted&&G.orchardTreeType(t)===type);return `${def.name} ${planted.length}株 · 待采${G.RES[def.output].name} ${this.supplyNumber(planted.reduce((n,t)=>n+(t.fruit||0),0))}`;}).join('；');
       set('[data-economy-live="orchard-types"]',`现有果树：${composition}`);
       set('[data-economy-live="orchard-selection"]',`已应用以后种植：${chosen.name} → ${G.RES[chosen.output].name}${G.game.unlocks?.[chosen.unlock]?'':'（尚未解锁，需买对应种子或选择已解锁品种）'}。仅作用于以后新接的空位种植任务。`);

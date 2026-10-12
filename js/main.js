@@ -100,7 +100,7 @@ G.newGame = function (seed, options) {
   try {candidate=G.prepareNewGame(quote.config);}catch(e){return {ok:false,reason:'新局生成失败：'+e.message};}
   G.world=candidate.world;G.game=candidate.game;G.rng=candidate.rng;G.setUid(candidate.nextUid);
   G.autosaveBlocked=!!options.preserveSaves;
-  G.sel=null;G.tool=null;G.cancelRoadPlan();G.cancelHarvestPlan();G.cancelFarmPlan();G.cancelPasturePlan();
+  G.sel=null;G.tool=null;G.cancelRoadPlan();G.cancelHarvestPlan();G.cancelFarmPlan();G.cancelPasturePlan();G.cancelOrchardPlan();
   G.smoke=[];G.flakes=null;G.keys={};
   if(!options.preserveSaves){
     try {localStorage.removeItem(G.AUTOSAVE_KEY);}catch(e){G.ui.toast('无法清理本机旧自动档：'+e.message,'warn');}
@@ -162,7 +162,8 @@ G.serializeGame = function () {
       doCut: b.doCut, doPlant: b.doPlant, fuelLimit: b.fuelLimit, toolLimit: b.toolLimit,
       farmSize:b.type==='farm'&&b.farmSize?[...b.farmSize]:undefined,
       pastureSize:b.type==='pasture'&&b.pastureSize?[...b.pastureSize]:undefined,
-      w:b.type==='pasture'&&b.pastureSize?b.w:undefined,h:b.type==='pasture'&&b.pastureSize?b.h:undefined,
+      orchardSize:b.type==='orchard'&&b.orchardSize?[...b.orchardSize]:undefined,
+      w:b.pastureSize||b.orchardSize?b.w:undefined,h:b.pastureSize||b.orchardSize?b.h:undefined,
       farm: b.farm ? b.farm.map(f => [f.sown ? 1 : 0, f.harvested ? 1 : 0, f.pestLost ? 1 : 0]) : undefined,
       sownAll: b.sownAll, growth: b.growth, harvestDone: b.harvestDone, cropType:b.cropType, cropChoice:b.cropChoice,
       sowingCommitted: b.sowingCommitted, pestInfestation:b.pestInfestation, lastPestCrop:b.lastPestCrop, earlyHarvestYield:b.earlyHarvestYield, productionPaused: b.productionPaused,
@@ -465,6 +466,8 @@ G.prepareSaveData = function (d) {
     let def = G.BDEF[bd.type];
     if(bd.farmSize!==undefined){if(bd.type!=='farm'||!G.farmDefinition(bd.farmSize))bad('农田尺寸');def=G.farmDefinition(bd.farmSize);}
     if(bd.pastureSize!==undefined){if(bd.type!=='pasture'||!G.pastureDefinition(bd.pastureSize))bad('牧场尺寸');def=G.pastureDefinition(bd.pastureSize);}
+    if(bd.orchardSize!==undefined){if(bd.type!=='orchard'||!G.orchardDefinition(bd.orchardSize))bad('果园尺寸');def=G.orchardDefinition(bd.orchardSize);}
+    if(bd.type==='orchard'&&(((bd.orchardSize!==undefined||bd.w!==undefined)&&bd.w!==def.w)||((bd.orchardSize!==undefined||bd.h!==undefined)&&bd.h!==def.h)))bad('果园尺寸与占地不符');
     if(bd.type==='pasture'&&(((bd.pastureSize!==undefined||bd.w!==undefined)&&bd.w!==def.w)||((bd.pastureSize!==undefined||bd.h!==undefined)&&bd.h!==def.h)))bad('牧场尺寸与占地不符');
     if (bd.type === 'bridge') {
       if (!['x','y'].includes(bd.bridgeAxis)) bad('木桥方向');
@@ -486,6 +489,12 @@ G.prepareSaveData = function (d) {
       fuelLimit: bd.type === 'woodcutter' ? G.fuelLimitOf(bd) : undefined,
       reserveDays:bd.type==='tavern'?(bd.reserveDays===undefined?12:integer(bd.reserveDays,'酿酒储粮天数',8,48)):undefined,
     };
+    if(bd.type==='orchard'&&bd.orchardSize===undefined&&b.totalWork!==def.buildWork)bad('旧果园总工时不符');
+    if(bd.orchardSize!==undefined){
+      b.orchardSize=[...bd.orchardSize];b.workerLimit=G.initialOrchardWorkers(b.orchardSize);
+      if(bd.totalWork!==def.buildWork||bd.workLeft===undefined||bd.progress===undefined||b.workLeft<0||b.workLeft>def.buildWork||Math.abs(b.progress-(1-b.workLeft/def.buildWork))>1e-8)bad('面积果园施工工时');
+      if((b.state==='ok'&&(b.workLeft!==0||b.progress!==1))||(b.state==='site'&&b.workLeft<=0))bad('面积果园施工状态');
+    }
     if(bd.type==='pasture'&&bd.pastureSize===undefined&&b.totalWork!==def.buildWork)bad('旧牧场总工时不符');
     if(bd.pastureSize!==undefined){
       b.pastureSize=[...bd.pastureSize];b.workerLimit=G.initialPastureWorkers(b.pastureSize);
@@ -607,14 +616,16 @@ G.prepareSaveData = function (d) {
       const validVariety=(type,field)=>{if(typeof type!=='string'||!Object.hasOwn(G.ORCHARD_TYPES,type)||type!=='legacy'&&!G.orchardUnlocked(type,g))bad(field);return type;};
       b.orchardType=bd.orchardType===undefined?'legacy':validVariety(bd.orchardType,'果园补种品种');
       const age=bd.orchardAge===undefined?0:integer(bd.orchardAge,'果树养护年龄',0,G.ORCHARD.matureDays);
-      let fruit=bd.orchardYield===undefined?0:number(bd.orchardYield,'待收果实',0,180);
+      let fruit=bd.orchardYield===undefined?0:number(bd.orchardYield,'待收果实',0,G.orchardTreeCount(b)*G.ORCHARD.fruit);
       const season=bd.orchardSeason===undefined?0:integer(bd.orchardSeason,'果树产季',1,g.year);
       if(bd.orchardReplant!==undefined&&typeof bd.orchardReplant!=='boolean')bad('果园补种开关');
       b.orchardReplant=bd.orchardReplant!==false;
+      if(b.orchardSize&&(!Array.isArray(bd.orchardTrees)||bd.orchardAge===undefined||bd.orchardYield===undefined))bad('面积果园缺树株记录');
       if(bd.orchardTrees!==undefined){
-        if(!Array.isArray(bd.orchardTrees)||bd.orchardTrees.length!==G.ORCHARD.count)bad('果园树株数量');
+        if(!Array.isArray(bd.orchardTrees)||bd.orchardTrees.length!==G.orchardTreeCount(b))bad('果园树株数量');
         b.orchardTrees=bd.orchardTrees.map((t,i)=>{record(t,'果园树株');if(typeof t.planted!=='boolean')bad('果树种植状态');
           const tree={type:t.type===undefined?'legacy':validVariety(t.type,'单株果树品种'),planted:t.planted,age:integer(t.age,'单株树龄',0,G.orchardLifetime(i)-1),fruit:number(t.fruit,'单株果实',0,G.ORCHARD.fruit),season:integer(t.season,'单株产季',0,g.year),tendedDay:integer(t.tendedDay,'单株照料日',-1,g.day),cycle:integer(t.cycle,'单株更新次数',0)};
+          if(b.orchardSize&&b.state==='site'&&(tree.planted||tree.age||tree.fruit||tree.cycle))bad('未建成果园已有果树');
           if(!tree.planted&&(tree.age||tree.fruit))bad('空果树位含生长或果实');return tree;});
         b.orchardDay=integer(bd.orchardDay,'果园推进日',0,g.day);
         G.syncOrchardTotals(b);if(b.orchardAge!==age||Math.abs(b.orchardYield-fruit)>1e-7)bad('果园汇总与树株不符');
@@ -637,6 +648,9 @@ G.prepareSaveData = function (d) {
         b.paidCost[key] = number(bd.paidCost[key], '已付建材数量', 0);
       }
     }
+    if(b.orchardSize&&(!b.paidCost||Object.keys(b.paidCost).some(k=>k!=='wood')||(Object.keys(b.paidCost).length&&b.paidCost.wood!==def.cost.wood)))bad('面积果园已付建材');
+    // Only genuine 12-wood / 36-work legacy orchards may retain the dense nine slots.
+    if(b.type==='orchard'&&!b.orchardSize&&b.paidCost&&(Object.keys(b.paidCost).some(k=>k!=='wood')||(Object.keys(b.paidCost).length&&b.paidCost.wood!==def.cost.wood)))bad('旧果园已付建材不符');
     if(b.pastureSize){
       if(!b.paidCost||Object.keys(b.paidCost).some(k=>k!=='wood')||(Object.keys(b.paidCost).length&&b.paidCost.wood!==def.cost.wood))bad('面积牧场已付建材');
     }
@@ -673,6 +687,7 @@ G.prepareSaveData = function (d) {
     }
     for (let yy = y; yy < y + b.h; yy++) for (let xx = x; xx < x + b.w; xx++) {
       const i = yy * w.N + xx; if (w.bgrid[i] >= 0) bad('建筑重叠');
+      if(b.orchardSize&&(w.water[i]===1||w.rock[i]||(b.state==='ok'&&w.treeIdx[i]>=0)))bad('面积果园占地未清理或在水上');
       if(b.pastureSize&&(w.water[i]===1||w.rock[i]||(b.state==='ok'&&w.treeIdx[i]>=0)))bad('面积牧场占地未清理或在水上');
       w.bgrid[i] = b.id;
     }
@@ -822,7 +837,7 @@ G.applySaveData = function (d) {
   const candidate = G.prepareSaveData(d);
   G.world = candidate.world; G.game = candidate.game; G.rng = candidate.rng; G.setUid(candidate.nextUid);
   if (G._recoveryBackedUp) G.autosaveBlocked = false;
-  G.sel = null; G.tool = null; G.cancelRoadPlan(); G.cancelHarvestPlan(); G.cancelFarmPlan(); G.cancelPasturePlan(); G.smoke = []; G.flakes = null; G.keys = {};
+  G.sel = null; G.tool = null; G.cancelRoadPlan(); G.cancelHarvestPlan(); G.cancelFarmPlan(); G.cancelPasturePlan();G.cancelOrchardPlan(); G.smoke = []; G.flakes = null; G.keys = {};
   G.ui.hideInfo(); G.ui.setToolActive();
   document.getElementById('over').classList.add('hidden');
   // All cargo is validated and owned by the candidate; now resume its deliveries.
@@ -928,7 +943,7 @@ G.clampCam = function () {
 
 /* ---------- 工具模式 ---------- */
 G.setTool = function (t) {
-  G.cancelRoadPlan(); G.cancelHarvestPlan(); G.cancelFarmPlan(); G.cancelPasturePlan();
+  G.cancelRoadPlan(); G.cancelHarvestPlan(); G.cancelFarmPlan(); G.cancelPasturePlan();G.cancelOrchardPlan();
   if (t == null) { G.tool = null; }
   else if (t === 'demolish') G.tool = { kind: 'demolish' };
   else if (['road','stoneroad','bridge'].includes(t)) G.tool = { kind: 'road', surface:t==='stoneroad'?'stone':t==='bridge'?'bridge':'dirt' };
@@ -973,6 +988,7 @@ G.tryPlace = function (tx, ty) {
   const type = G.tool.type;
   if(type==='farm'){G.selectFarmCorner(tx,ty);return;}
   if(type==='pasture'){G.selectPastureCorner(tx,ty);return;}
+  if(type==='orchard'){G.selectOrchardCorner(tx,ty);return;}
   const def = G.BDEF[type];
   const ox = tx - ((def.w - 1) >> 1), oy = ty - ((def.h - 1) >> 1);
   const r = G.addBuilding(type, ox, oy);
@@ -1027,7 +1043,7 @@ G.confirmFarmPlan=function(intent){
   const s=G.farmPlanStatus();if(!s.ok)return s;
   if(!intent||intent.plan!==s.plan||intent.signature!==s.signature)return {ok:false,reason:'地块或清树需求已变，请复查预览后重新确认'};
   const r=G.addBuilding('farm',s.bounds.x,s.bounds.y,{farmSize:s.size});
-  if(r.ok){G.cancelFarmPlan(); G.cancelPasturePlan();G.ui.refreshHUD();}return r;
+  if(r.ok){G.cancelFarmPlan(); G.cancelPasturePlan();G.cancelOrchardPlan();G.ui.refreshHUD();}return r;
 };
 
 /* Area pasture planning is transient. Old no-size pens keep their saved rules. */
@@ -1058,7 +1074,38 @@ G.confirmPasturePlan=function(intent){
   const s=G.pasturePlanStatus();if(!s.ok)return s;
   if(!intent||intent.plan!==s.plan||intent.signature!==s.signature)return {ok:false,reason:'地块、建材或清树需求已变，请复查预览后重新确认'};
   const r=G.addBuilding('pasture',s.bounds.x,s.bounds.y,{pastureSize:s.size});
-  if(r.ok){G.cancelPasturePlan();G.ui.refreshHUD();}return r;
+  if(r.ok){G.cancelPasturePlan();G.cancelOrchardPlan();G.ui.refreshHUD();}return r;
+};
+
+/* Area orchard planning is transient. Missing size remains a legacy orchard. */
+G.orchardPlan=null;G.orchardDrag=null;G.orchardGestureVersion=0;
+G.isOrchardPlanning=()=>G.tool?.kind==='build'&&G.tool.type==='orchard';
+G.cancelOrchardPlan=function(){G.orchardPlan=null;G.orchardDrag=null;G.orchardGestureVersion++;};
+G.selectOrchardCorner=function(x,y){
+  if(!G.world||!G.isOrchardPlanning()||G.hasOpenModal())return;
+  const point=G.farmPoint(x,y);if(!point)return;
+  const old=G.orchardPlan;
+  G.orchardPlan=!old||old.world!==G.world||old.game!==G.game||old.end?
+    {world:G.world,game:G.game,start:point,end:null}:{...old,end:point};
+};
+G.orchardPlanStatus=function(){
+  const plan=G.orchardPlan,w=G.world;
+  if(G.orchardDrag)return {ok:false,reason:'正在选择果园矩形；松开后查看株数、建材与岗位，再确认开园'};
+  if(!plan||plan.world!==w||plan.game!==G.game||!plan.end)return {ok:false,reason:plan?.world===w?'已选第一角，请选择果园对角':'鼠标拖出矩形，或点击两个对角；每边4至15格'};
+  const bounds=G.farmBounds(plan),size=[bounds.w,bounds.h],def=G.orchardDefinition(size),base={plan,bounds,size,area:bounds.w*bounds.h};
+  if(!def)return {...base,ok:false,reason:'果园每边须为4至15格；当前 '+bounds.w+'×'+bounds.h};
+  const trees=G.siteTrees(bounds),preview={type:'orchard',orchardSize:size},facts={...base,workers:G.initialOrchardWorkers(size),work:def.buildWork,
+    trees:trees.length,cost:{...def.cost},...G.orchardLayout(preview)};
+  const check=G.canPlace(w,'orchard',bounds.x,bounds.y,size);if(!check.ok)return {...facts,...check};
+  for(const [k,n]of Object.entries(def.cost))if(G.game.res[k]<n)return {...facts,ok:false,reason:G.RES[k].name+'不足（需要 '+n+'）'};
+  return {...facts,ok:true,signature:JSON.stringify([bounds.x,bounds.y,size,w.navigationRevision||0,trees.map(t=>[t.i,t.b]),Object.keys(def.cost).map(k=>[k,G.game.res[k]])])};
+};
+G.confirmOrchardPlan=function(intent){
+  if(!G.isOrchardPlanning()||G.hasOpenModal())return {ok:false,reason:'先关闭弹窗并回到果园规划'};
+  const s=G.orchardPlanStatus();if(!s.ok)return s;
+  if(!intent||intent.plan!==s.plan||intent.signature!==s.signature)return {ok:false,reason:'地块、建材或清树需求已变，请复查预览后重新确认'};
+  const r=G.addBuilding('orchard',s.bounds.x,s.bounds.y,{orchardSize:s.size});
+  if(r.ok){G.cancelOrchardPlan();G.ui.refreshHUD();}return r;
 };
 
 /* Transient, explicitly confirmed road plan. Existing marked work is never
@@ -1220,21 +1267,21 @@ G.init = function () {
   window.addEventListener('beforeunload', () => G.autosave());
   window.addEventListener('pagehide', () => G.autosave());
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') { resetInput(); G.cancelRoadPlan(); G.cancelHarvestPlan(); G.cancelFarmPlan(); G.cancelPasturePlan(); G.autosave(); }
+    if (document.visibilityState === 'hidden') { resetInput(); G.cancelRoadPlan(); G.cancelHarvestPlan(); G.cancelFarmPlan(); G.cancelPasturePlan();G.cancelOrchardPlan(); G.autosave(); }
   });
   // 定时自动存档：每 90 秒（游戏进行中）
   setInterval(() => G.autosave(), 90000);
 
   /* ----- 输入 ----- */
   let dragging = false, dragBtn = -1, dragMoved = 0, lastX = 0, lastY = 0, pressX = 0, pressY = 0;
-  let roadTouch = null, harvestTouch = null, roadMouse = null, farmTouch=null, farmMouse=null, pastureTouch=null, pastureMouse=null;
+  let roadTouch = null, harvestTouch = null, roadMouse = null, farmTouch=null, farmMouse=null, pastureTouch=null, pastureMouse=null, orchardTouch=null, orchardMouse=null;
   function resetInput() {
     if (G.harvestPlan && !G.harvestPlan.frozen) G.cancelHarvestPlan();
     G.keys = {};
     dragging = false; dragBtn = -1; dragMoved = 0;
-    roadTouch = null; harvestTouch = null; roadMouse = null; G.roadDrag = null;farmTouch=null;farmMouse=null;G.farmDrag=null;pastureTouch=null;pastureMouse=null;G.pastureDrag=null;
+    roadTouch = null; harvestTouch = null; roadMouse = null; G.roadDrag = null;farmTouch=null;farmMouse=null;G.farmDrag=null;pastureTouch=null;pastureMouse=null;G.pastureDrag=null;orchardTouch=null;orchardMouse=null;G.orchardDrag=null;
   }
-  window.addEventListener('blur', () => { resetInput(); roadTouch = null; G.cancelRoadPlan(); G.cancelHarvestPlan(); G.cancelFarmPlan(); G.cancelPasturePlan(); });
+  window.addEventListener('blur', () => { resetInput(); roadTouch = null; G.cancelRoadPlan(); G.cancelHarvestPlan(); G.cancelFarmPlan(); G.cancelPasturePlan();G.cancelOrchardPlan(); });
   document.addEventListener('focusin', e => { if (G.isInputTarget(e.target)) resetInput(); });
 
   const toLocal = (e) => {
@@ -1252,9 +1299,10 @@ G.init = function () {
     if (e.button === 2 && G.tool) { G.setTool(null); return; } // 右键取消工具
     dragging = true; dragBtn = e.button; dragMoved = 0;
     lastX = pressX = p.x; lastY = pressY = p.y;
-    roadMouse = null;farmMouse=null;pastureMouse=null;
+    roadMouse = null;farmMouse=null;pastureMouse=null;orchardMouse=null;
     if(e.button===0&&G.isFarmPlanning()){const t=G.screenToTile(p.x,p.y);farmMouse={start:G.farmPoint(t.tx,t.ty),world:G.world,generation:G.farmGestureVersion};}
     if(e.button===0&&G.isPasturePlanning()){const t=G.screenToTile(p.x,p.y);pastureMouse={start:G.farmPoint(t.tx,t.ty),world:G.world,generation:G.pastureGestureVersion};}
+    if(e.button===0&&G.isOrchardPlanning()){const t=G.screenToTile(p.x,p.y);orchardMouse={start:G.farmPoint(t.tx,t.ty),world:G.world,generation:G.orchardGestureVersion};}
     if (e.button === 0 && G.tool && G.tool.kind === 'road') {
       const t = G.screenToTile(p.x, p.y);
       roadMouse = { start: { x: Math.floor(t.tx), y: Math.floor(t.ty) }, world: G.world, generation: G.roadGestureVersion };
@@ -1281,6 +1329,8 @@ G.init = function () {
       G.farmDrag={world:G.world,start:farmMouse.start,end:G.farmPoint(t.tx,t.ty)};
     } else if(dragBtn===0&&G.isPasturePlanning()&&pastureMouse&&pastureMouse.world===G.world&&pastureMouse.generation===G.pastureGestureVersion&&dragMoved>4){
       G.pastureDrag={world:G.world,start:pastureMouse.start,end:G.farmPoint(t.tx,t.ty)};
+    } else if(dragBtn===0&&G.isOrchardPlanning()&&orchardMouse&&orchardMouse.world===G.world&&orchardMouse.generation===G.orchardGestureVersion&&dragMoved>4){
+      G.orchardDrag={world:G.world,start:orchardMouse.start,end:G.farmPoint(t.tx,t.ty)};
     } else if (dragBtn === 0 && G.tool && G.tool.kind === 'road' && roadMouse && roadMouse.world === G.world && roadMouse.generation === G.roadGestureVersion && dragMoved > 4) {
       G.roadPlan = null;
       G.roadDrag = { world: G.world, start: roadMouse.start, end: { x: Math.floor(t.tx), y: Math.floor(t.ty) } };
@@ -1300,6 +1350,7 @@ G.init = function () {
     dragMoved = Math.max(dragMoved, Math.abs(p.x - pressX) + Math.abs(p.y - pressY));
     if(e.button===0&&G.isFarmPlanning()){const gesture=farmMouse;farmMouse=null;G.farmDrag=null;if(!gesture||gesture.world!==G.world||gesture.generation!==G.farmGestureVersion)return;if(dragMoved>4){G.farmPlan=null;G.selectFarmCorner(gesture.start.x,gesture.start.y);G.selectFarmCorner(tx,ty);}else G.selectFarmCorner(tx,ty);return;}
     if(e.button===0&&G.isPasturePlanning()){const gesture=pastureMouse;pastureMouse=null;G.pastureDrag=null;if(!gesture||gesture.world!==G.world||gesture.generation!==G.pastureGestureVersion)return;if(dragMoved>4){G.pasturePlan=null;G.selectPastureCorner(gesture.start.x,gesture.start.y);G.selectPastureCorner(tx,ty);}else G.selectPastureCorner(tx,ty);return;}
+    if(e.button===0&&G.isOrchardPlanning()){const gesture=orchardMouse;orchardMouse=null;G.orchardDrag=null;if(!gesture||gesture.world!==G.world||gesture.generation!==G.orchardGestureVersion)return;if(dragMoved>4){G.orchardPlan=null;G.selectOrchardCorner(gesture.start.x,gesture.start.y);G.selectOrchardCorner(tx,ty);}else G.selectOrchardCorner(tx,ty);return;}
     if (e.button === 0 && G.tool && G.tool.kind === 'road') {
       const gesture = roadMouse; roadMouse = null; G.roadDrag = null;
       if (!gesture || gesture.world !== G.world || gesture.generation !== G.roadGestureVersion) return;
@@ -1336,8 +1387,11 @@ G.init = function () {
   G.cv.addEventListener('touchmove',e=>{if(!G.isFarmPlanning())return;e.preventDefault();if(!farmTouch||e.touches.length!==1||Math.abs(e.touches[0].clientX-farmTouch.x)+Math.abs(e.touches[0].clientY-farmTouch.y)>10)farmTouch=null;},{passive:false});
   G.cv.addEventListener('touchend',e=>{if(!G.isFarmPlanning()){farmTouch=null;return;}e.preventDefault();if(farmTouch&&farmTouch.world===G.world&&farmTouch.generation===G.farmGestureVersion&&e.changedTouches.length===1&&!G.hasOpenModal()){const p=toLocal(e.changedTouches[0]),t=G.screenToTile(p.x,p.y);G.selectFarmCorner(t.tx,t.ty);}farmTouch=null;},{passive:false});
   G.cv.addEventListener('touchstart',e=>{if(!G.isPasturePlanning())return;e.preventDefault();resetInput();pastureTouch=!G.hasOpenModal()&&e.touches.length===1?{x:e.touches[0].clientX,y:e.touches[0].clientY,world:G.world,generation:G.pastureGestureVersion}:null;},{passive:false});
+  G.cv.addEventListener('touchstart',e=>{if(!G.isOrchardPlanning())return;e.preventDefault();resetInput();orchardTouch=!G.hasOpenModal()&&e.touches.length===1?{x:e.touches[0].clientX,y:e.touches[0].clientY,world:G.world,generation:G.orchardGestureVersion}:null;},{passive:false});
   G.cv.addEventListener('touchmove',e=>{if(!G.isPasturePlanning())return;e.preventDefault();if(!pastureTouch||e.touches.length!==1||Math.abs(e.touches[0].clientX-pastureTouch.x)+Math.abs(e.touches[0].clientY-pastureTouch.y)>10)pastureTouch=null;},{passive:false});
+  G.cv.addEventListener('touchmove',e=>{if(!G.isOrchardPlanning())return;e.preventDefault();if(!orchardTouch||e.touches.length!==1||Math.abs(e.touches[0].clientX-orchardTouch.x)+Math.abs(e.touches[0].clientY-orchardTouch.y)>10)orchardTouch=null;},{passive:false});
   G.cv.addEventListener('touchend',e=>{if(!G.isPasturePlanning()){pastureTouch=null;return;}e.preventDefault();if(pastureTouch&&pastureTouch.world===G.world&&pastureTouch.generation===G.pastureGestureVersion&&e.changedTouches.length===1&&!G.hasOpenModal()){const p=toLocal(e.changedTouches[0]),t=G.screenToTile(p.x,p.y);G.selectPastureCorner(t.tx,t.ty);}pastureTouch=null;},{passive:false});
+  G.cv.addEventListener('touchend',e=>{if(!G.isOrchardPlanning()){orchardTouch=null;return;}e.preventDefault();if(orchardTouch&&orchardTouch.world===G.world&&orchardTouch.generation===G.orchardGestureVersion&&e.changedTouches.length===1&&!G.hasOpenModal()){const p=toLocal(e.changedTouches[0]),t=G.screenToTile(p.x,p.y);G.selectOrchardCorner(t.tx,t.ty);}orchardTouch=null;},{passive:false});
   const harvesting = () => G.tool && ['fell', 'quarry'].includes(G.tool.kind);
   G.cv.addEventListener('touchstart', e => {
     if (!harvesting()) return;
@@ -1369,7 +1423,7 @@ G.init = function () {
     e.preventDefault();
     if (e.touches.length !== 1 || !roadTouch || Math.abs(e.touches[0].clientX - roadTouch.x) + Math.abs(e.touches[0].clientY - roadTouch.y) > 10) roadTouch = null;
   }, { passive: false });
-  G.cv.addEventListener('touchcancel', () => { roadTouch = null; harvestTouch = null; G.cancelRoadPlan(); G.cancelHarvestPlan(); G.cancelFarmPlan(); G.cancelPasturePlan(); });
+  G.cv.addEventListener('touchcancel', () => { roadTouch = null; harvestTouch = null; G.cancelRoadPlan(); G.cancelHarvestPlan(); G.cancelFarmPlan(); G.cancelPasturePlan();G.cancelOrchardPlan(); });
   G.cv.addEventListener('touchend', e => {
     if (!G.tool || G.tool.kind !== 'road') { roadTouch = null; return; }
     e.preventDefault();
