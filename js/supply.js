@@ -201,14 +201,14 @@ G.stepSupply=function(c,dt){
  G.finishSupplyTask(c);return true;
 };
 G.useSupplyStock=function(stock,type,qty){stock[type]=Math.max(0,(stock[type]||0)-qty);G.game.supplyUsed[type]=(G.game.supplyUsed[type]||0)+qty;G.ledgerRecord('distributedUsed',type,qty);};
-G.eatHousehold=function(c,qty){const target=G.supplyFamilyTarget(G.familyOf(c),true);if(!target)return [];const stock=G.supplyStock(target);if(G.supplyFood(stock)+1e-8<qty)return [];
- const basket=G.supplyBasket(stock,{food:qty,firewood:0,coal:0,room:qty},qty),eaten=[];for(const[k,n]of Object.entries(basket)){G.useSupplyStock(stock,k,n);eaten.push(k);}return G.foodGroupsOf(eaten);
+G.eatHousehold=function(c,qty,legacy=false){const mealDay=legacy?G.game.day-1:G.game.day;if(c.lastMealDay!=null&&c.lastMealDay>=mealDay)return [];const target=G.supplyFamilyTarget(G.familyOf(c),true);if(!target||(!(legacy&&G.mealTransitionActive())&&(!G.atMealTarget(c,target)||!c.mealJourney||c.mealJourney.target!==target||c.mealJourney.familyId!==c.familyId||!(c.mealJourney.remaining<=0))))return [];const stock=G.supplyStock(target);if(G.supplyFood(stock)+1e-8<qty)return [];
+ const basket=G.supplyBasket(stock,{food:qty,firewood:0,coal:0,room:qty},qty),eaten=[];for(const[k,n]of Object.entries(basket)){G.useSupplyStock(stock,k,n);eaten.push(k);}c.lastMealDay=mealDay;return G.foodGroupsOf(eaten);
 };
 G.heatSuppliedHome=function(b,need){const r=G.supplyStock(b),wood=Math.min(r.firewood,need),coal=G.heatingPolicy().allowCoal?Math.min(r.coal,Math.max(0,need-wood)/G.COAL_HEAT):0;
  G.useSupplyStock(r,'firewood',wood);G.useSupplyStock(r,'coal',coal);b.lastHeating={day:G.game.day,wood,coal,need};b.unheated=wood+coal*G.COAL_HEAT+1e-8<need;
 };
 G.burnSupplyStock=function(b){if(!b.supplyStock)return;for(const[k,q]of Object.entries(b.supplyStock)){G.game.supplyLost[k]=(G.game.supplyLost[k]||0)+q;G.ledgerRecord('distributedLost',k,q);}delete b.supplyStock;};
-G.enablePhysicalSupplyPrototype=function(){if(G.supplyEnabled())return false;G.game.supplyMode='physical';G.game.supplyStartedDay=G.game.day;G.game.supplyUsed=G.emptySupplyStock();G.game.supplyLost=G.emptySupplyStock();for(const b of G.world.buildings)if(G.supplyHome(b)||(b.type==='market'&&b.state==='ok'))G.supplyStock(b);G.reconcileSupplyHomes();return true;};
+G.enablePhysicalSupplyPrototype=function(){if(G.supplyEnabled())return false;G.game.supplyMode='physical';G.game.mealRuleVersion=1;G.game.mealTransitionStart=null;G.game.mealTransitionEnd=null;for(const c of G.world.citizens)c.lastMealDay=c.hunger>0?null:G.game.day;G.game.supplyStartedDay=G.game.day;G.game.supplyUsed=G.emptySupplyStock();G.game.supplyLost=G.emptySupplyStock();for(const b of G.world.buildings)if(G.supplyHome(b)||(b.type==='market'&&b.state==='ok'))G.supplyStock(b);G.reconcileSupplyHomes();return true;};
 
 /* Read-only aggregate. Industry and trade still see public stock only; food
  * warnings and production limits also see already distributed food/fuel. */
@@ -248,7 +248,7 @@ G.supplyModeQuote=function(){
  const readyStores=w.buildings.filter(b=>b.state==='ok'&&b.type==='storage').length;
  const key=JSON.stringify([g.day,g.season,g.supplyMode,G.SUPPLY.types.map(k=>g.res[k]),g.heating,rows,w.citizens.map(c=>[c.id,c.familyId,c.adult,c.student,G.isSick(c),c.job]),w.buildings.map(b=>[b.id,b.type,b.state,b.houseFire?.incident]),w.navigationRevision||0]);
  return {ok:pop>0,reason:pop?'':'当前没有居民',key,rows,cost,population:pop,foodDays:pop?G.supplyFood(cost)/(pop*G.LIFE.eatPerDay):0,foodShortfall:Math.max(0,foodNeed-G.supplyFood(cost)),fuelShortfall:Math.max(0,fuelNeed-wood-coal*G.COAL_HEAT),familiesWithoutBuyer,readyStores,
-  rule:'一次性从公共库存划入最多两日启动口粮；冷季另划入最多两日取暖燃料。以后必须实际搬运，本存档不能切回自动供给。库存不足只按实际数量分配，无重复领取。'};
+  rule:'一次性从公共库存划入最多两日启动口粮；冷季另划入最多两日取暖燃料。以后必须实际搬运并到家或营地完成用餐才消耗口粮；每天最多一份，断路不能隔空吃饭。本存档不能切回自动供给。库存不足只按实际数量分配，无重复领取。'};
 };
 G.enableHouseholdSupply=function(key,expectedGame=G.game){
  const q=G.supplyModeQuote();if(expectedGame!==G.game||!q.ok||q.key!==key)return false;
@@ -301,3 +301,86 @@ G.clothingSupplyQuote=function(){
   public:{clothes:g.res.clothes,warmCoats:g.res.warmCoats},rule:'一次性启用后，穿坏才从住处或临时补给点的现货换衣；成人提前为7日内需换衣的家人采购。已穿衣耐久保留，不划拨或赠送衣物，不能切回远程领取。衣物不到家时即使公共有货也不能换上。'};
 };
 G.enableClothingSupply=function(key,expectedGame=G.game){const q=G.clothingSupplyQuote();if(expectedGame!==G.game||!q.ok||q.key!==key)return false;G.game.clothingSupply=true;G.game.schedT=0;return true;};
+
+/* Reachable meals, physical mode only. The existing pausedTask slot retains
+ * work; cargo never leaves its citizen during this short survival trip. */
+G.MEAL_HOURS=.25;
+G.mealTransitionActive=(g=G.game)=>g.supplyMode==='physical'&&g.mealRuleVersion===1&&g.mealTransitionStart!=null&&g.day<g.mealTransitionEnd;
+G.mealDue=c=>G.supplyEnabled()&&!c.dead&&c.lastMealDay!==G.game.day;
+G.mealTarget=c=>G.supplyFamilyTarget(G.familyOf(c),true);
+G.atMealTarget=function(c,target){
+ if(!target||target!==G.mealTarget(c)||!G.supplyEntityCurrent(target))return false;
+ const x=Math.round(c.x),y=Math.round(c.y);
+ if(G.d2(c.x,c.y,x,y)>1e-8||G.tileBlocked(G.world,x,y))return false;
+ if(target.type!=='supplycamp')return G.supplyHome(target)&&G.atMedicalDoor(c,target);
+ if(G.tunnelInteriorAt(G.world,target.x,target.y))return G.d2(c.x,c.y,target.x,target.y)<1e-8;
+ return G.surfaceAccess(G.world,x,y)&&x>=target.x-1&&x<=target.x+target.w&&y>=target.y-1&&y<=target.y+target.h;
+};
+G.recordHouseholdMeal=function(c,groups,day=G.game.day){
+ c.lastMealDay=day;c.hunger=0;c.dietVariety=groups.length;
+ c.dietScore=(c.dietScore??1)*.9+groups.length*.1;
+};
+G.finishMealJourney=function(c){
+ c.mealJourney=null;c.path=null;c.state='idle';c.walkKind='';c.mealRetryH=2;c.wanderT=0;
+ if(c.pausedTask&&G.resumeTask(c))return;
+ if(c.carry)G.startHaul(c);
+};
+G.planMealJourney=function(c,planned=null){
+ const m=c.mealJourney,target=G.mealTarget(c),spot=planned||(target&&G.supplyEntitySpot(c,target));
+ if(!m)return false;
+ if(!spot){c.mealWaitReason='用餐目标断路：等待道路、桥或隧道恢复';G.finishMealJourney(c);return false;}
+ m.target=target;m.familyId=c.familyId;m.tx=spot.x;m.ty=spot.y;m.navigationRevision=G.world.navigationRevision||0;m.remaining=G.MEAL_HOURS;
+ // route.eta is the existing weighted planner cost; actual motion below uses
+ // the same cargo/winter-aware speed and road/tunnel path as other citizens.
+ m.eta=spot.route.eta/(G.isWinter() ? 0.75 : 1)/(c.carry ? 0.9 : 1);c.path=spot.route.path;c.pi=0;c.camped=false;
+ if(!c.path.length&&G.d2(c.x,c.y,m.tx,m.ty)>1e-8)c.path=[{x:m.tx,y:m.ty}];
+ c.state=c.path.length?'walk':'meal';c.walkKind='meal';return true;
+};
+G.tryMealJourney=function(c,boundary=false){
+ if(!G.mealDue(c)||c.mealJourney||c.mealRetryH>0||G.isArriving(c)||
+   ['care','clinic','firefight'].includes(c.task?.kind))return false;
+ // Finish ordinary working/delivery legs when fed; hunger can interrupt even
+ // a full warehouse wait, without transferring or discarding its cargo.
+ const busy=!boundary&&!['idle','rest','waitStorage','supplyWait'].includes(c.state);
+ if(busy&&c.hunger<1&&G.game.h<12)return false;
+ if(c.task&&c.pausedTask)return false;
+ const target=G.mealTarget(c);
+ if(!target||G.supplyFood(target.supplyStock)+1e-8<G.LIFE.eatPerYear/G.YEAR_DAYS){c.mealWaitReason='家庭口粮不足一份：等待成人实际补给';c.mealRetryH=2;return false;}
+ const spot=G.supplyEntitySpot(c,target);
+ if(!spot){c.mealWaitReason='用餐目标断路：等待道路、桥或隧道恢复';c.mealRetryH=2;return false;}
+ const eta=spot.route.eta/(G.isWinter() ? 0.75 : 1)/(c.carry ? 0.9 : 1);
+ if(busy&&c.hunger<1&&eta+G.MEAL_HOURS<G.DAY_H-G.game.h){c.mealRetryH=2;return false;}
+ if(c.task)c.pausedTask=c.task;c.task=null;c.mealJourney={};c.mealWaitReason='';
+ return G.planMealJourney(c,spot);
+};
+G.stepHouseholdMeal=function(c,dt){
+ if(c.mealJourney&&['care','clinic','firefight'].includes(c.task?.kind)){c.mealJourney=null;c.mealRetryH=2;return false;}
+ c.mealRetryH=Math.max(0,(c.mealRetryH||0)-dt);
+ if(!c.mealJourney)G.tryMealJourney(c);
+ const m=c.mealJourney;if(!m)return false;
+ G.coldStep(c,dt);
+ if(!G.mealDue(c)){G.finishMealJourney(c);return true;}
+ if(m.target!==G.mealTarget(c)||m.familyId!==c.familyId||m.navigationRevision!==(G.world.navigationRevision||0)){
+  G.planMealJourney(c);return true;
+ }
+ if(c.state==='walk'){G.walkCitizenPath(c,dt);return true;}
+ if(!G.atMealTarget(c,m.target)){G.planMealJourney(c);return true;}
+ if(!(dt>0))return true;
+ m.remaining-=dt;
+ if(m.remaining<=0){const groups=G.eatHousehold(c,G.LIFE.eatPerYear/G.YEAR_DAYS);
+  if(groups.length)G.recordHouseholdMeal(c,groups);else c.mealWaitReason='家庭口粮不足或住处变更：等待补给后重试';
+  G.finishMealJourney(c);
+ }
+ return true;
+};
+G.householdMealStatus=function(c){
+ if(!G.supplyEnabled())return '';
+ const m=c.mealJourney;
+ if(m){const target=m.target?.type==='supplycamp'?'家庭营地':'当前住处';return c.state==='meal'?`已到${target}，用餐中（余 ${Math.max(0,m.remaining).toFixed(2)} 小时）`:`正在前往${target}进食（计划行程约 ${m.eta.toFixed(1)} 小时，保留原任务与携货）`;}
+ if(c.lastMealDay===G.game.day)return '今日已实扣一份口粮，不会重复进食';
+ return c.mealWaitReason||'今日待到家进食：先完成当前安全任务边界';
+};
+G.mealTransitionNotice=function(){
+ if(!G.mealTransitionActive())return '';
+ return `旧村进食过渡：首次载入第 ${G.game.mealTransitionStart} 日，第 ${G.game.mealTransitionEnd} 日起严格到家进食。剩余 ${G.game.mealTransitionEnd-G.game.day} 游戏日仍按原规则实扣家庭口粮，不赠粮；请检查回家通路。8 日宽限为本作迁移保护，暂停不推进。`;
+};

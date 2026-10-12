@@ -157,7 +157,7 @@ G.serializeGame = function () {
       v: G.VERSION, startConfig:g.startConfig ? {...g.startConfig} : null,
       h: g.h, day: g.day, season: g.season, year: g.year,
       res: g.res, stats: g.stats, prevFood: g.prevFood, foodNet: g.foodNet, foodUrgent: g.foodUrgent, warned: g.warned,
-      supplyMode:g.supplyMode,clothingSupply:g.clothingSupply,supplyStartedDay:g.supplyStartedDay,supplyUsed:g.supplyUsed,supplyLost:g.supplyLost,
+      supplyMode:g.supplyMode,mealRuleVersion:g.mealRuleVersion,mealTransitionStart:g.mealTransitionStart,mealTransitionEnd:g.mealTransitionEnd,clothingSupply:g.clothingSupply,supplyStartedDay:g.supplyStartedDay,supplyUsed:g.supplyUsed,supplyLost:g.supplyLost,
       huntingLost:{...g.huntingLost},
       constructionVersion:1,constructionLost:{...g.constructionLost},
       heating:g.heating, fishingRules:g.fishingRules, fireDisasters:g.fireDisasters, farmPests:g.farmPests, pasturePests:g.pasturePests, townLedger:g.townLedger, challenges:g.challenges, hist: g.hist, buildLog: g.buildLog, toolMode:g.toolMode,toolRemainders:g.toolRemainders,toolWear: g.toolWear, steelToolWear: g.steelToolWear, healthStartDay: g.healthStartDay, nomads:g.nomads, unlocks: g.unlocks, livestock: g.livestock,
@@ -203,7 +203,7 @@ G.serializeGame = function () {
       x: c.x, y: c.y, familyId: c.familyId, job: c.job,
       partnerId: c.partnerId, parentIds: c.parentIds, grandparentIds: c.grandparentIds, ancestorIds: c.ancestorIds, birthFamilyId: c.birthFamilyId,
       student: c.student ? 1 : 0, educated: c.educated ? 1 : 0, school: c.school != null ? c.school : null, studyHours:G.studyHoursOf(c),studyToday:G.studyTodayOf(c),studyDay:g.day,
-      toolType:c.toolType,toolHours:c.toolHours,arrivalHallId:c.arrivalHallId, hunger: c.hunger, cold: c.cold, clothingLeft: c.clothingLeft, clothingType:c.clothingType, dietVariety: c.dietVariety, dietScore: c.dietScore, happiness: c.happiness, leisureDays:c.leisureDays, chapelDays:c.chapelDays, chapelId:c.chapelId, grief:c.grief, health: c.health, sickDays: c.sickDays, immunityDays: c.immunityDays, herbCooldown: c.herbCooldown, careHours: c.careHours, camped: c.camped ? 1 : 0, carry: c.carry,
+      lastMealDay:c.lastMealDay,toolType:c.toolType,toolHours:c.toolHours,arrivalHallId:c.arrivalHallId, hunger: c.hunger, cold: c.cold, clothingLeft: c.clothingLeft, clothingType:c.clothingType, dietVariety: c.dietVariety, dietScore: c.dietScore, happiness: c.happiness, leisureDays:c.leisureDays, chapelDays:c.chapelDays, chapelId:c.chapelId, grief:c.grief, health: c.health, sickDays: c.sickDays, immunityDays: c.immunityDays, herbCooldown: c.herbCooldown, careHours: c.careHours, camped: c.camped ? 1 : 0, carry: c.carry,
     })),
     supplyCaches:(w.supplyCaches||[]).map(b=>({id:b.id,x:b.x,y:b.y,w:b.w,h:b.h,supplyStock:b.supplyStock})),
     nextUid: G._peekUid(),
@@ -363,6 +363,21 @@ G.prepareSaveData = function (d) {
   if(gd.clothingSupply!==undefined&&typeof gd.clothingSupply!=='boolean')bad('衣物配送规则');
   g.clothingSupply=gd.clothingSupply===true;if(g.clothingSupply&&gd.supplyMode!=='physical')bad('衣物配送须先启用家庭配送');
   g.supplyMode=gd.supplyMode||'automatic';g.supplyStartedDay=gd.supplyStartedDay==null?null:integer(gd.supplyStartedDay,'配送启用日',0,g.day);
+  const legacyPhysicalMeals=g.supplyMode==='physical'&&gd.mealRuleVersion===undefined;
+  if(gd.mealRuleVersion!==undefined&&gd.mealRuleVersion!==1)bad('进食规则版本');
+  if(g.supplyMode==='automatic'&&(gd.mealRuleVersion!==undefined||gd.mealTransitionStart!=null||gd.mealTransitionEnd!=null))bad('自动供给带进食迁移');
+  if(g.supplyMode==='physical'){
+    g.mealRuleVersion=1;
+    if(legacyPhysicalMeals){
+      if(gd.mealTransitionStart!=null||gd.mealTransitionEnd!=null)bad('缺少进食规则版本');
+      g.mealTransitionStart=g.day;g.mealTransitionEnd=g.day+8;
+    }else{
+      g.mealTransitionStart=gd.mealTransitionStart==null?null:integer(gd.mealTransitionStart,'进食过渡开始日',0,g.day);
+      g.mealTransitionEnd=gd.mealTransitionEnd==null?null:integer(gd.mealTransitionEnd,'进食过渡截止日',0);
+      if((g.mealTransitionStart===null)!==(g.mealTransitionEnd===null)||g.mealTransitionStart!==null&&g.mealTransitionEnd!==g.mealTransitionStart+8)bad('进食过渡须固定八日');
+    }
+  }
+
   g.supplyUsed=gd.supplyUsed===undefined?G.emptySupplyStock():supplyStock(gd.supplyUsed,'家庭实际消耗');
   g.supplyLost=gd.supplyLost===undefined?G.emptySupplyStock():supplyStock(gd.supplyLost,'家庭实际损失');
   if(g.supplyMode==='automatic'&&(g.supplyStartedDay!==null||G.supplySum(g.supplyUsed)||G.supplySum(g.supplyLost)))bad('自动供给带配送记录');
@@ -465,7 +480,7 @@ G.prepareSaveData = function (d) {
   const families = array(d.families, '家庭'), citizens = array(d.citizens, '市民');
   g.foodUrgent = typeof gd.foodUrgent === 'boolean' ? gd.foodUrgent : g.res.food < citizens.length * G.LIFE.eatPerDay * 8;
   // Loading while reading a dialog must never secretly resume its simulation.
-  g.paused = !!(G.game && G.game.paused) || G.hasOpenModal();
+  g.paused = legacyPhysicalMeals || !!(G.game && G.game.paused) || G.hasOpenModal();
   g.speed = G.game && [1, 2, 5].includes(G.game.speed) ? G.game.speed : 1;
 
   const w = authoritative ? G.emptyWorld(d.seed,2) : G.genWorld(d.seed, { starterResources: d.mapVersion >= 1 });
@@ -954,6 +969,7 @@ G.prepareSaveData = function (d) {
       studyToday:cd.studyToday===undefined?0:number(cd.studyToday,'本日学习课时',0,G.EDUCATION.dailyHours),
       studyDay:cd.studyDay===undefined?g.day:integer(cd.studyDay,'学习日期',0,g.day),
       arrivalHallId:nullableId(cd.arrivalHallId,'入村登记点'), task: null, pausedTask: null, carry, state: 'idle', walkKind: '', path: null, pi: 0, camped: !!cd.camped,
+      lastMealDay:legacyPhysicalMeals?(cd.hunger>0?null:g.day):(cd.lastMealDay==null?null:integer(cd.lastMealDay,'最近进食日',0,g.day)),
       wanderT: 0, hunger: cd.hunger === undefined ? 0 : number(cd.hunger, '饥饿', 0),
       cold: cd.cold === undefined ? 0 : number(cd.cold, '寒冷', 0), animT: 0, dead: false,
       clothingLeft: cd.clothingLeft === undefined ? 0 : number(cd.clothingLeft, '衣物耐久天数', 0, G.YEAR_DAYS),

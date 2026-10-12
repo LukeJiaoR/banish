@@ -402,7 +402,8 @@ test('fully funded startup avoids floating-point shortage warnings while real sh
 
 test('real mixed household pickup is shown as full supply transit, separate from production awaiting public deposit', () => {
   const f = setup(), G = f.G; begin(f); confirm(f); G.game.h = 8;
-  for (let n = 0; n < 2; n++) G.eatHousehold(f.c, G.LIFE.eatPerDay);
+  // Empty the two-day startup ration through two actual daily meals.
+  for(let day=G.game.day+1,end=day+2;day<end;day++){G.game.day=day;f.c.mealRetryH=0;assert(G.tryMealJourney(f.c,true));for(let n=0;n<2000&&f.c.lastMealDay!==day;n++)G.stepCitizen(f.c,.1);assert.equal(f.c.lastMealDay,day);}
   assert(G.tryHouseholdSupply(f.c));
   for (let n = 0; n < 2000 && !f.c.carry; n++) G.stepCitizen(f.c, .1);
   assert(f.c.carry?.supplyBatch); const basket = G.supplyCargoItems(f.c.carry);
@@ -498,6 +499,16 @@ test('real save replacement and help revoke old personal-tool callbacks without 
  G.ui.el.help=f.mount('help');G.ui.el.help.classList.add('hidden');f.info.querySelector('#tool-mode-start').click();G.ui.toggleHelp(true);G.ui.toggleHelp(false);f.info.querySelector('#tool-mode-confirm').click();assert(!G.personalToolsEnabled());
  f.info.querySelector('#tool-mode-start').click();f.info.querySelector('#tool-mode-confirm').click();assert(G.personalToolsEnabled());
  f.select(G.world.bmap[f.home.id]);assert.equal(f.info.querySelector('#tool-mode-start'),null);
+});
+
+test('reachable meal status and legacy deadline remain visible and do not mutate stock',()=>{
+ const f=setup(),G=f.G;begin(f);confirm(f);const notice=f.mount('meal-transition-notice');
+ G.game.mealTransitionStart=G.game.day;G.game.mealTransitionEnd=G.game.day+8;
+ const before=state(f);G.ui.refreshHUD();assert.equal(state(f),before);assert.equal(notice.hidden,false);assert.match(notice.textContent,/8 日宽限.*暂停不推进/);
+ f.select(f.home);assert.match(f.info.querySelector('[data-household-supply="meals"]').textContent,/实际到达.*每天最多一份/);
+ G.sel={kind:'c',id:f.c.id};G.ui.showInfo();assert.match(f.info.querySelector('[data-citizen-meal]').textContent,/今日已/);
+ f.c.lastMealDay=null;f.c.mealRetryH=0;assert(G.tryMealJourney(f.c,true));G.ui.refreshCitizenSupplyInfo(f.c);assert.match(f.info.querySelector('[data-citizen-meal]').textContent,/正在前往.*进食/);assert.match(G.ui.citizenStatus(f.c),/进食/);
+ G.game.day=G.game.mealTransitionEnd;G.ui.refreshHUD();assert.equal(notice.hidden,true);
 });
 
 console.log(`Household supply UI: ${passed} suites passed (headless DOM with real migration/save APIs; browser/mobile visual acceptance not performed).`);
