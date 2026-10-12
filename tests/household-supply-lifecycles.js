@@ -478,7 +478,13 @@ function clothingMode(G) { assert(G.enableClothingSupply(G.clothingSupplyQuote()
 test('clothing adoption is explicit, allocates nothing and migrates five-item physical saves without changing worn life', () => {
   const G=fresh(),h=build(G,'house',18,10),{c}=family(G,h);G.enablePhysicalSupplyPrototype();c.clothingType='basic';c.clothingLeft=9;
   G.game.res.clothes=3;G.game.res.warmCoats=2;const old=save(G);delete old.game.clothingSupply;
-  for(const stock of [old.game.supplyUsed,old.game.supplyLost,...old.buildings.map(b=>b.supplyStock).filter(Boolean)])for(const k of G.CLOTHING_KEYS)delete stock[k];
+  // Build the historical five-item schema explicitly; deleting only clothing
+  // from a current save would leave later eggs/fruit in an invented old shape.
+  const legacyTypes=['grain','vegetables','meat','firewood','coal'];
+  for(const stock of [old.game.supplyUsed,old.game.supplyLost,...old.buildings.map(b=>b.supplyStock).filter(Boolean)]){
+    for(const k of Object.keys(stock))if(!legacyTypes.includes(k)){assert.equal(stock[k],0);delete stock[k];}
+    assert.equal(Object.keys(stock).length,5);
+  }
   G.applySaveData(old);assert.equal(G.clothingSupplyEnabled(),false);assert.equal(G.world.cmap[c.id].clothingLeft,9);
   const before=inventory(G),q=G.clothingSupplyQuote();clothingMode(G);conserved(G,before,'enable no gift');assert.equal(G.world.cmap[c.id].clothingLeft,9);
   assert.equal(G.enableClothingSupply(q.key),false);roundtrip(G,before);assert(G.clothingSupplyEnabled());

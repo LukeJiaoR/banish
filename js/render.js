@@ -627,7 +627,10 @@ G.drawEconomyFieldPart = function (ctx, p) {
     const growth=Math.max(0,Math.min(1,(tree?tree.age:p.b.orchardAge||0)/(G.YEAR_DAYS*4)));
     const fruit=G.game.season===2&&(tree?tree.fruit>0:growth>=1&&p.b.orchardYield>0);
     // Small new trees have no misleading harvest-ready fruit; the ripe sprite appears in autumn.
-    G.sprDraw(ctx, fruit ? 'orchard' : 'orchard_leafy', sx, sy, { w: 24 + 28 * growth });
+    const pear=G.orchardTreeType(tree)==='pear',sprite=pear?(fruit?'orchard_pear':'orchard_pear_leafy'):(fruit?'orchard':'orchard_leafy');
+    // Apples reuse the established red-fruit art; old generic trees keep it too.
+    // Missing pear art falls back to foliage, not misleading red apple fruit.
+    if(!G.sprDraw(ctx,sprite,sx,sy,{w:24+28*growth})&&pear)G.sprDraw(ctx,'orchard_leafy',sx,sy,{w:24+28*growth});
   }
 };
 

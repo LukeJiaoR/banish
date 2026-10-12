@@ -6,7 +6,7 @@
 window.G = {};
 
 /* 游戏版本：进反馈 payload 与结算画面——反馈可归因到数值补丁（发版时手动递增） */
-G.VERSION = '0.3.65';
+G.VERSION = '0.3.66';
 
 /* ---------- 常量 ---------- */
 G.TILE_W = 64;            // 等距菱形瓦片宽（缩放 1 时的像素）
@@ -37,6 +37,8 @@ G.RES = {
   meat: { name: '肉类', color: '#c77564', icon: '🍖', iconAsset: 'res_meat' },
   eggs: { name: '鸡蛋', color: '#e4cda4', icon: '🥚', iconAsset: 'res_eggs' },
   vegetables: { name: '蔬菜', color: '#91aa62', icon: '🥬', iconAsset: 'res_vegetables' },
+  apples: { name: '苹果', color: '#c7634f', icon: '🍎', iconAsset: 'res_apples' },
+  pears: { name: '梨', color: '#b8bd59', icon: '🍐', iconAsset: 'res_pears' },
   grain: { name: '主食', color: '#d5b465', icon: '🌾', iconAsset: 'res_grain' },
   leather: { name: '皮革', color: '#9d704d', icon: '🟫', iconAsset: 'res_leather' },
   wool: { name: '羊毛', color: '#e4dac7', icon: '🧶', iconAsset: 'res_wool' },
@@ -46,12 +48,12 @@ G.RES = {
   herbs: { name: '草药', color: '#7b9e5c', icon: '🌿', iconAsset: 'res_herbs' },
   firewood: { name: '柴火', color: '#e8a33d', icon: '🔥', iconAsset: 'res_firewood' },
 };
-// Items are individually stored/traded; meat and eggs are one nutritional group.
-G.FOOD_KEYS = ['meat', 'eggs', 'vegetables', 'grain'];
-G.foodGroup = type => type === 'eggs' ? 'meat' : type;
+// Individual inventory items retain the original three nutritional groups.
+G.FOOD_KEYS = ['meat', 'eggs', 'vegetables', 'grain', 'apples', 'pears'];
+G.foodGroup = type => type === 'eggs' ? 'meat' : ['apples','pears'].includes(type) ? 'vegetables' : type;
 G.foodGroupsOf = keys => [...new Set(keys.filter(k=>G.FOOD_KEYS.includes(k)).map(G.foodGroup))];
 // Equal shares across the original three groups, then within each available
-// protein item. Pure planning serves both public meals and physical baskets.
+// item in that group. Pure planning serves public meals and physical baskets.
 G.foodBasket = function(stock,qty){
   const out=Object.fromEntries(G.FOOD_KEYS.map(k=>[k,0]));let left=Math.max(0,qty);
   for(let pass=0;pass<G.FOOD_KEYS.length&&left>1e-9;pass++){

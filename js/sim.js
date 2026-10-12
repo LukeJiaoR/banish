@@ -71,7 +71,7 @@ G.newGameState = function () {
   const g = {
     h: 6, day: 0, season: 0, year: 1,
     speed: 1, paused: false,
-    res: { wood: 80, stone: 48, iron: 0, tools: 15, food: 500, meat: 0, eggs:0, vegetables: 0, grain: 500, leather: 0, wool: 0, clothes: 0, warmCoats: 0, herbs: 0, coal: 0, steelTools: 0, ale: 0, firewood: 50 }, // 开局（原版中难度 5 家庭，工具 15 件≈第一轮磨损周期）；存粮较原版加厚：15 人 6 天食物跑道撑不到第一座采集屋建成
+    res: { wood: 80, stone: 48, iron: 0, tools: 15, food: 500, meat: 0, eggs:0, vegetables: 0, apples:0, pears:0, grain: 500, leather: 0, wool: 0, clothes: 0, warmCoats: 0, herbs: 0, coal: 0, steelTools: 0, ale: 0, firewood: 50 }, // 开局（原版中难度 5 家庭，工具 15 件≈第一轮磨损周期）；存粮较原版加厚：15 人 6 天食物跑道撑不到第一座采集屋建成
     heating:{allowCoal:false,coalReserve:20}, fishingRules:'shared', supplyMode:'automatic',clothingSupply:false,toolMode:'pooled',toolRemainders:{tools:0,steelTools:0},
     fireDisasters:{enabled:false,startedDay:null,graceUntil:0,lastDay:-1,nextIgnitionDay:0,serial:0,incidentHomes:[]},
     healthStartDay: 0, farmPests:{enabled:false,graceUntil:0,lastDay:-1}, pasturePests:{enabled:false,graceUntil:0,lastDay:-1}, challenges:{v:1,completed:{}},
@@ -80,7 +80,7 @@ G.newGameState = function () {
     over: false,
     stats: { born: 0, died: 0, deadReasons: {} },
     prevFood: 200,
-    unlocks: { orchard: false, cabbage:false, beans:false }, livestock: { sheep: 0, cattle: 0, chicken:0 },
+    unlocks: { orchard: false, apple:false, pear:false, cabbage:false, beans:false }, livestock: { sheep: 0, cattle: 0, chicken:0 },
     foodNet: 0,
     foodUrgent: false,
     warned: {},
@@ -687,7 +687,7 @@ G.sendTo = function (c, tx, ty, planned = null) {
   if (!p) { c.state = 'idle'; c.task = null; return false; }
   // The path planner rounds its start cell. Physically checked factory/mineral
   // tasks still walk the final fraction after an interrupted commute.
-  if((c.task?.mineral||c.task?.economy==='pasture'||['firefight','supply','toolFetch','cleric','worship'].includes(c.task?.kind)||['fuel','tailor'].includes(c.task?.kind)) && p.length===0 && G.d2(c.x,c.y,tx,ty)>1e-8) {
+  if((c.task?.mineral||c.task?.economy==='pasture'||['firefight','supply','toolFetch','cleric','worship'].includes(c.task?.kind)||['fuel','tailor','brew'].includes(c.task?.kind)) && p.length===0 && G.d2(c.x,c.y,tx,ty)>1e-8) {
     c.path=[{x:tx,y:ty}];c.pi=0;c.state='walk';c.walkKind='task';return true;
   }
   c.path = p; c.pi = 0;
@@ -779,7 +779,7 @@ G.STOCKPILE_TYPES=['wood','stone','iron','coal','firewood'];
 G.STOCKPILE_CAP=250;
 G.storageAccepts=(b,types)=>!!b&&b.state==='ok'&&(b.type==='storage'||(b.type==='stockpile'&&types!=null&&(Array.isArray(types)?types:[types]).length>0&&(Array.isArray(types)?types:[types]).every(t=>G.STOCKPILE_TYPES.includes(t))));
 G.cargoStorageTypes=cargo=>[cargo.type,...Object.keys(cargo.extra||{}).filter(k=>cargo.extra[k]>0)];
-G.fetchStorageTypes=t=>t.kind==='trade'?t.resource:t.kind==='brew'?'grain':G.taskIngredients(t).map(x=>x.type);
+G.fetchStorageTypes=t=>t.kind==='trade'?t.resource:t.kind==='brew'?G.brewRecipeSnapshot(t).inputType:G.taskIngredients(t).map(x=>x.type);
 G.hasStorageBuilding=()=>G.world.buildings.some(b=>b.state==='ok'&&['storage','stockpile'].includes(b.type));
 G.atStorageDoor=(c,types)=>G.world.buildings.some(b=>G.storageAccepts(b,types)&&G.atMedicalDoor(c,b)&&!G.tileBlocked(G.world,Math.round(c.x),Math.round(c.y)));
 G.nearestStorage = function (x, y, types) {
@@ -806,10 +806,10 @@ G.storageRoute = function (x, y, types) {
 };
 
 /* Limited minerals retain one ordinary carried batch when a warehouse rejects
- * part of a delivery. Tavern output, refundable raw grain and the specific current batch marked
+ * part of a delivery. Fruit, tavern output, refundable ingredients and the current batch marked
  * on staffing withdrawal share this bounded path. Ordinary unmarked cargo
  * keeps its existing delivery policy; the marker dies with its cargo object. */
-G.isMineralCargo = function (c) { return !!c.carry && (c.carry.staffingReturn===true || ['stone','iron','coal','ale','clothes','warmCoats'].includes(c.carry.type) || (c.carry.type==='grain' && c.carry.brewIngredient===true) || (Number.isInteger(c.carry.pastureId)&&['meat','eggs','leather','wool'].includes(c.carry.type)) || (Number.isInteger(c.carry.orchardId)&&c.carry.type==='vegetables') || (Number.isInteger(c.carry.firewoodId)&&c.carry.type==='firewood')); };
+G.isMineralCargo = function (c) { return !!c.carry && (c.carry.staffingReturn===true || ['stone','iron','coal','ale','apples','pears','clothes','warmCoats'].includes(c.carry.type) || (Object.hasOwn(G.BREW_RECIPES,c.carry.type) && c.carry.brewIngredient===true) || (Number.isInteger(c.carry.pastureId)&&['meat','eggs','leather','wool'].includes(c.carry.type)) || (Number.isInteger(c.carry.orchardId)&&['vegetables','apples','pears'].includes(c.carry.type)) || (Number.isInteger(c.carry.firewoodId)&&c.carry.type==='firewood')); };
 G.mineralStorageSpace = function (type) { return G.isTool(type) ? Infinity : Math.max(0, G.storageCap(type) - G.game.res[G.isFood(type)?'food':type]); };
 // Ordinary in-flight minerals remain eligible as before; only an already
 // blocked delivery cannot count as available labour or occupy a productive slot.
@@ -845,7 +845,12 @@ G.startMineralHaul = function (c) {
   c.haulPending = true;
   if(c.carry.qty<=0){G.finishMineralHaul(c);return;}
   if (G.mineralStorageSpace(c.carry.type) <= 0) { G.warnMineralStorage(); G.waitForMineralStorage(c, 'space'); return; }
-  if (!G.hasStorageBuilding()) { G.finishMineralHaul(c); return; } // legacy no-warehouse save
+  if (!G.hasStorageBuilding()) {
+    // Explicit orchard/brewing trips must retain their cargo until a real
+    // warehouse exists, including legacy saves with no finished store.
+    if(c.carry.brewIngredient||Number.isInteger(c.carry.orchardId)||['ale','apples','pears'].includes(c.carry.type)){G.waitForMineralStorage(c,'route');return;}
+    G.finishMineralHaul(c); return;
+  } // Other legacy no-warehouse cargo retains its earlier contract.
   const route = G.storageRoute(c.x,c.y,G.cargoStorageTypes(c.carry));
   if (!route) { G.waitForMineralStorage(c, 'route'); return; }
   c.haulWait = ''; c.haulTo = route.storage.id; c.path = route.path; c.pi = 0; c.task = null;
@@ -1045,7 +1050,7 @@ G.consumeFood = function (qty) {
   r.food=G.FOOD_KEYS.reduce((n,k)=>n+r[k],0);return G.foodGroupsOf(Object.keys(basket));
 };
 G.depositCargo = function (cargo) {
-  const accepted = G.deposit(cargo.type, cargo.qty, cargo.staffingReturn===true||cargo.brewIngredient===true||Number.isInteger(cargo.pastureId)||Number.isInteger(cargo.orchardId)||Number.isInteger(cargo.firewoodId));
+  const accepted = G.deposit(cargo.type, cargo.qty, cargo.staffingReturn===true||cargo.brewIngredient===true||['apples','pears'].includes(cargo.type)||Number.isInteger(cargo.pastureId)||Number.isInteger(cargo.orchardId)||Number.isInteger(cargo.firewoodId));
   if (cargo.extra&&cargo.staffingReturn!==true) { for (const [type, qty] of Object.entries(cargo.extra)) G.deposit(type, qty); delete cargo.extra; }
   return accepted;
 };
@@ -1236,13 +1241,14 @@ G.detourCitizen = function (c, dtH) {
     if (G.physicalTaskEndpoint(t)) { G.dropBlockedTask(c, t); return; }
     if (t) {
       const spot = G.alternateTaskEndpoint(c, t);
-      if (!spot) { if(['smith','fuel','tailor'].includes(t.kind)){G.returnSmithBatch(c);return;} if (t.kind === 'care') G.cancelMedicalCare(c); else if(t.kind==='leisure')G.cancelLeisure(c);else if(t.kind==='worship')G.cancelWorship(c);else if(['study','teach'].includes(t.kind)){G.clearSchoolTasks(c);c.schoolWaitReason='上学路线受阻，保留学籍等待通路';c.wanderT=4;} return; }
+      if (!spot) { if(t.kind==='brew'){G.returnBrewGrain(c);return;} if(['smith','fuel','tailor'].includes(t.kind)){G.returnSmithBatch(c);return;} if (t.kind === 'care') G.cancelMedicalCare(c); else if(t.kind==='leisure')G.cancelLeisure(c);else if(t.kind==='worship')G.cancelWorship(c);else if(['study','teach'].includes(t.kind)){G.clearSchoolTasks(c);c.schoolWaitReason='上学路线受阻，保留学籍等待通路';c.wanderT=4;} return; }
       goal = spot; t.tx = spot.x; t.ty = spot.y;
     } else if (c.walkKind === 'wander') { c.path = null; c.state = 'idle'; c.wanderT = 2; return; }
     else return;
   }
   const path = G.routeCanReuse(goal.route,c,goal.x,goal.y) ? goal.route.path : G.findPath(G.world, Math.round(c.x), Math.round(c.y), goal.x, goal.y);
   if (!path) {
+    if(c.task?.kind==='brew'){G.returnBrewGrain(c);return;}
     if(c.task&&['smith','fuel','tailor'].includes(c.task.kind)){G.returnSmithBatch(c);return;}
     if(c.task&&['study','teach'].includes(c.task.kind)){const b=c.task.b;b.warnText='上学路线受阻';G.clearSchoolTasks(c);c.schoolWaitReason='上学路线受阻，保留学籍等待通路';c.wanderT=4;return;}
     if (c.task && c.task.kind === 'care') { G.cancelMedicalCare(c); return; }
@@ -1340,7 +1346,7 @@ G.stepCitizen = function (c, dtH) {
       if(G.isLeisureVisitor(c)){G.stepLeisure(c,dtH);return;}
       if(G.isChapelVisitor(c)){G.stepWorship(c,dtH);return;}
       if(c.task?.kind==='cleric'){G.stepCleric(c,dtH);return;}
-      if(c.task?.kind==='brew'&&c.task.phase==='process'&&(G.isSick(c)||!G.tavernBrewStatus(c.task.b,true).ok)){G.returnBrewGrain(c);return;}
+      if(c.task?.kind==='brew'&&c.task.phase==='process'&&(G.isSick(c)||!G.tavernBrewStatus(c.task.b,true,G.brewRecipeSnapshot(c.task)).ok)){G.returnBrewGrain(c);return;}
       if (!c.task) { c.state = 'idle'; return; }
       if (c.task.b && c.task.b.state === 'site') c.task.b.constructionStarted = true;
       c.task.workLeft -= G.toolWorkProgress(c,c.task,dtH);
@@ -2250,9 +2256,9 @@ G.addBuilding = function (type, x, y, opt) {
   if (type === 'mine') { b.mineMode = 'iron'; b.legacyMine = false; b.mineTick = 0; }
   if (type === 'blacksmith') { b.toolLimit = G.PROD.blacksmith.toolLimit; b.toolRecipe = 'iron'; }
   if(type==='cemetery')b.graves=[];
-  if(type==='tavern')b.reserveDays=12;
+  if(type==='tavern'){b.reserveDays=12;b.brewRecipe='grain';}
   if(type==='tailor'){b.coatRecipe='basic';b.coatMaterial='auto';}
-  if(type==='orchard'){b.orchardTrees=G.newOrchardTrees();b.orchardDay=G.game.day;b.orchardReplant=true;G.syncOrchardTotals(b);}
+  if(type==='orchard'){b.orchardType='legacy';b.orchardTrees=G.newOrchardTrees();b.orchardDay=G.game.day;b.orchardReplant=true;G.syncOrchardTotals(b);}
   if (type === 'woodcutter') b.fuelLimit = G.PROD.woodcutter.fuelLimit; // 燃料上限（原版 Fuel Limit）
   if (G.game && G.game.buildLog) { // 建造/拆除记录（反馈分析用；负号前缀 = 拆除）
     G.game.buildLog.push({ d: G.game.day, t: type });
@@ -2442,8 +2448,8 @@ G.tradeIncoming=function(b,exclude=null){
 };
 G.tradeFreeSpace=(b,exclude=null)=>Math.max(0,G.TRADE_CAPACITY-G.tradeStored(b)-G.tradeIncoming(b,exclude));
 
-G.TRADE_VALUES = {wood:2,stone:7,iron:5,tools:8,firewood:4,meat:1,eggs:2,vegetables:1,grain:1,leather:10,wool:5,clothes:15,warmCoats:20,herbs:4,coal:6,steelTools:10};
-G.TRADE_GOODS = {chicken:{name:'鸡',price:400,stock:4},eggs:{name:'鸡蛋',price:2,stock:200},meat:{name:'肉类',price:1,stock:200},coal:{name:'煤',price:6,stock:100},steelTools:{name:'钢工具',price:10,stock:20},sheep:{name:'羊',price:600,stock:4},cattle:{name:'牛',price:800,stock:4},orchardSeed:{name:'果树种子',price:2500,stock:1},cabbageSeed:{name:'卷心菜种子',price:2500,stock:1},beanSeed:{name:'早熟豆类种子',price:2500,stock:1},grain:{name:'主食',price:1,stock:400},iron:{name:'铁',price:5,stock:100},leather:{name:'皮革',price:10,stock:80}};
+G.TRADE_VALUES = {wood:2,stone:7,iron:5,tools:8,firewood:4,meat:1,eggs:2,vegetables:1,apples:1,pears:1,grain:1,leather:10,wool:5,clothes:15,warmCoats:20,herbs:4,coal:6,steelTools:10};
+G.TRADE_GOODS = {chicken:{name:'鸡',price:400,stock:4},eggs:{name:'鸡蛋',price:2,stock:200},meat:{name:'肉类',price:1,stock:200},coal:{name:'煤',price:6,stock:100},steelTools:{name:'钢工具',price:10,stock:20},sheep:{name:'羊',price:600,stock:4},cattle:{name:'牛',price:800,stock:4},orchardSeed:{name:'果树种子',price:2500,stock:1},appleSeed:{name:'苹果种子',price:2500,stock:1},pearSeed:{name:'梨种子',price:2500,stock:1},apples:{name:'苹果',price:1,stock:200},pears:{name:'梨',price:1,stock:200},cabbageSeed:{name:'卷心菜种子',price:2500,stock:1},beanSeed:{name:'早熟豆类种子',price:2500,stock:1},grain:{name:'主食',price:1,stock:400},iron:{name:'铁',price:5,stock:100},leather:{name:'皮革',price:10,stock:80}};
 // Profile selection and visit timing are compact-map adaptations. Orders follow
 // the original same-merchant / pay-on-purchase / floor(1.25*price) rules.
 G.MERCHANT_CYCLE=['general','supplies','seeds'];
@@ -2451,7 +2457,7 @@ G.MERCHANT_INTERVAL=16;
 G.MERCHANTS={
   general:{id:'general',name:'河湾杂货商',goods:Object.keys(G.TRADE_GOODS),acceptsFood:true,assortment:4},
   supplies:{id:'supplies',name:'山路物资商',goods:['coal','steelTools','iron','leather'],acceptsFood:false,assortment:2},
-  seeds:{id:'seeds',name:'绿篱种子商',goods:['orchardSeed','cabbageSeed','beanSeed'],acceptsFood:false,assortment:1}
+  seeds:{id:'seeds',name:'绿篱种子商',goods:['orchardSeed','appleSeed','pearSeed','cabbageSeed','beanSeed'],acceptsFood:false,assortment:1}
 };
 G.merchantProfile=b=>G.MERCHANTS[b?.merchant?.id]||G.MERCHANTS.general;
 G.merchantPrice=(b,good)=>Object.hasOwn(G.TRADE_GOODS,good)?(b?.merchant?.orderedGood===good?Math.floor(G.TRADE_GOODS[good].price*1.25):G.TRADE_GOODS[good].price):0;
@@ -2771,7 +2777,7 @@ G.advanceTownEconomy = function(){
       b.animalGrowth=Math.min(1,b.animalGrowth);if(G.pastureTypeOf(b)==='sheep')b.woolReady=Math.min(48,b.woolReady+b.animals/G.SEASON_DAYS);
     }
     if(b.type==='pasture'&&G.pastureTypeOf(b)==='chicken')G.advanceChickenEggs(b);
-    if(b.type==='orchard'&&g.unlocks.orchard)G.advanceOrchard(b);
+    if(b.type==='orchard')G.advanceOrchard(b);
   }
 };
 G.completeEconomyWork = function(c,t){
@@ -2798,16 +2804,29 @@ G.completeEconomyWork = function(c,t){
 /* Orchard trees are fixed plot slots, not map forest trees. Ages, work and
  * lifespan are small-map adaptations; old mature saves get at least eight years. */
 G.ORCHARD={count:9,matureDays:G.YEAR_DAYS*4,fruit:20,plantHours:4,tendHours:.5,harvestHours:6};
+G.ORCHARD_TYPES={legacy:{name:'旧通用果树',output:'vegetables',unlock:'orchard'},apple:{name:'苹果',output:'apples',unlock:'apple'},pear:{name:'梨',output:'pears',unlock:'pear'}};
+G.orchardTypeOf=b=>typeof b?.orchardType==='string'&&Object.hasOwn(G.ORCHARD_TYPES,b.orchardType)?b.orchardType:'legacy';
+G.orchardTreeType=t=>typeof t?.type==='string'&&Object.hasOwn(G.ORCHARD_TYPES,t.type)?t.type:'legacy';
+G.orchardOutput=t=>G.ORCHARD_TYPES[G.orchardTreeType(t)].output;
+G.orchardUnlocked=(type,g=G.game)=>typeof type==='string'&&Object.hasOwn(G.ORCHARD_TYPES,type)&&g.unlocks[G.ORCHARD_TYPES[type].unlock]===true;
+G.setOrchardType=function(b,type){
+  if(!b||G.world.bmap[b.id]!==b||b.type!=='orchard'||b.state!=='ok'||!G.orchardUnlocked(type))return false;
+  // Trees and already accepted planting tasks own their variety. Only the next
+  // unclaimed planting slot reads this selection; no fruit is ever relabelled.
+  b.orchardType=type;b.noWork=false;b.warnText='';G.game.schedT=0;return true;
+};
 G.orchardLifetime=i=>(12+i)*G.YEAR_DAYS;
-G.newOrchardTree=(cycle=0)=>({planted:false,age:0,fruit:0,season:0,tendedDay:-1,cycle});
+G.newOrchardTree=(cycle=0)=>({type:'legacy',planted:false,age:0,fruit:0,season:0,tendedDay:-1,cycle});
 G.newOrchardTrees=()=>Array.from({length:G.ORCHARD.count},()=>G.newOrchardTree());
 G.ensureOrchard=function(b){
   if(!b.orchardTrees){
     let fruit=b.orchardYield||0;const age=Math.min(G.ORCHARD.matureDays,b.orchardAge||0);
-    b.orchardTrees=Array.from({length:G.ORCHARD.count},()=>{const n=Math.min(G.ORCHARD.fruit,fruit);fruit-=n;return {planted:true,age,fruit:n,season:b.orchardSeason||0,tendedDay:b.tendedDay??-1,cycle:0};});
+    b.orchardTrees=Array.from({length:G.ORCHARD.count},()=>{const n=Math.min(G.ORCHARD.fruit,fruit);fruit-=n;return {type:'legacy',planted:true,age,fruit:n,season:b.orchardSeason||0,tendedDay:b.tendedDay??-1,cycle:0};});
     b.orchardDay=G.game.day; // Unknown old partial day is not replayed.
   }
   if(b.orchardReplant===undefined)b.orchardReplant=true;
+  if(b.orchardType===undefined)b.orchardType='legacy';
+  for(const tree of b.orchardTrees)if(tree.type===undefined)tree.type='legacy';
   G.syncOrchardTotals(b);
 };
 G.syncOrchardTotals=function(b){
@@ -2816,16 +2835,16 @@ G.syncOrchardTotals=function(b){
 };
 G.orchardPoint=(b,i)=>({x:b.x+1+(i%3)*2,y:b.y+1+Math.floor(i/3)*2});
 G.orchardAction=function(b,t){
-  if(!G.game.unlocks.orchard)return '';
-  if(t.fruit>0&&G.game.season===2&&!G.goalPaused('vegetables'))return 'harvest';
-  if(!t.planted&&b.orchardReplant!==false)return 'plant';
-  if(t.planted&&t.age<G.ORCHARD.matureDays&&t.tendedDay!==G.game.day)return 'tend';
+  if(!t.planted)return b.orchardReplant!==false&&G.orchardUnlocked(G.orchardTypeOf(b))?'plant':'';
+  if(!G.orchardUnlocked(G.orchardTreeType(t)))return '';
+  if(t.fruit>0&&G.game.season===2&&!G.goalPaused(G.orchardOutput(t)))return 'harvest';
+  if(t.age<G.ORCHARD.matureDays&&t.tendedDay!==G.game.day)return 'tend';
   return '';
 };
 G.orchardHasWork=function(b){G.ensureOrchard(b);return b.orchardTrees.some(t=>G.orchardAction(b,t));};
 G.orchardTaskCurrent=function(c,t){
   if(!c||G.world.cmap[c.id]!==c||c.dead||!t||t.completed||t.kind!=='orchard'||G.world.bmap[t.b?.id]!==t.b||t.b.state!=='ok'||c.job!==t.b.id)return false;
-  const tree=t.b.orchardTrees?.[t.ti];if(!tree||tree.cycle!==t.cycle||tree!==t.tree||!G.game.unlocks.orchard)return false;
+  const tree=t.b.orchardTrees?.[t.ti];if(!tree||tree.cycle!==t.cycle||tree!==t.tree||!G.orchardUnlocked(t.phase==='plant'?(t.orchardType||'legacy'):G.orchardTreeType(tree)))return false;
   return t.phase==='plant'?!tree.planted:t.phase==='tend'?tree.planted&&tree.age<G.ORCHARD.matureDays:t.phase==='harvest'?tree.fruit>0&&G.game.season===2&&t.year===G.game.year:false;
 };
 G.atOrchardTree=(c,t)=>G.orchardTaskCurrent(c,t)&&G.d2(c.x,c.y,t.tx,t.ty)<.04&&!G.tileBlocked(G.world,t.tx,t.ty);
@@ -2838,23 +2857,23 @@ G.makeOrchardTask=function(b,c){
     if(!targets.length)continue;const route=G.findPathToAny(G.world,c.x,c.y,targets);if(!route)continue;const q=route.target;
     const hours=q.phase==='plant'?G.ORCHARD.plantHours:q.phase==='tend'?G.ORCHARD.tendHours:G.ORCHARD.harvestHours;
     b.noWork=false;b.warnText='';
-    return G.withTaskRoute({kind:'orchard',b,ti:q.ti,tree:q.tree,cycle:q.tree.cycle,phase:q.phase,year:G.game.year,tx:q.x,ty:q.y,work:G.taskWork(c,hours),workLeft:0},route);
+    return G.withTaskRoute({kind:'orchard',b,ti:q.ti,tree:q.tree,cycle:q.tree.cycle,orchardType:q.phase==='plant'?G.orchardTypeOf(b):G.orchardTreeType(q.tree),phase:q.phase,year:G.game.year,tx:q.x,ty:q.y,work:G.taskWork(c,hours),workLeft:0},route);
   }
-  b.noWork=!claimed.size;b.warnText=!G.game.unlocks.orchard?'需贸易购买果树种子':candidates.length?'果树工作点不可达':claimed.size?'其他工人正在照料已认领果树':G.orchardSummary(b).status;return null;
+  b.noWork=!claimed.size;b.warnText=candidates.length?'果树工作点不可达':claimed.size?'其他工人正在照料已认领果树':G.orchardSummary(b).status;return null;
 };
 G.completeOrchardTask=function(c,t){
   if(!G.atOrchardTree(c,t)||c.carry)return;
   const tree=t.tree,b=t.b;t.completed=true;
-  if(t.phase==='plant'){tree.planted=true;tree.age=0;tree.tendedDay=G.game.day;}
+  if(t.phase==='plant'){tree.type=t.orchardType||'legacy';tree.planted=true;tree.age=0;tree.tendedDay=G.game.day;}
   else if(t.phase==='tend')tree.tendedDay=G.game.day;
-  else {const qty=tree.fruit;tree.fruit=0;c.carry={type:'vegetables',qty,orchardId:b.id};G.recordProduction(b,'vegetables',qty);}
+  else {const qty=tree.fruit,type=G.orchardOutput(tree);tree.fruit=0;c.carry={type,qty,orchardId:b.id};G.recordProduction(b,type,qty);}
   G.syncOrchardTotals(b);
 };
 G.advanceOrchard=function(b){
   G.ensureOrchard(b);const g=G.game;if(b.orchardDay>=g.day)return;b.orchardDay=g.day;
   let expired=0;
   for(let i=0;i<b.orchardTrees.length;i++){
-    let t=b.orchardTrees[i];if(!t.planted)continue;
+    let t=b.orchardTrees[i];if(!t.planted||!G.orchardUnlocked(G.orchardTreeType(t)))continue;
     if(t.age>=G.ORCHARD.matureDays||t.tendedDay>=g.day-2)t.age++;
     if(t.age>=G.orchardLifetime(i)){b.orchardTrees[i]=G.newOrchardTree(t.cycle+1);expired++;continue;}
     if(g.season===2&&t.age>=G.ORCHARD.matureDays&&t.season!==g.year){t.fruit=G.ORCHARD.fruit;t.season=g.year;}
@@ -2869,7 +2888,9 @@ G.setOrchardReplant=function(b,enabled){if(!b||G.world.bmap[b.id]!==b||b.type!==
 G.orchardSummary=function(b){
   const trees=b.orchardTrees||[],empty=trees.filter(t=>!t.planted).length,young=trees.filter(t=>t.planted&&t.age<G.ORCHARD.matureDays).length,mature=trees.length-empty-young;
   const fruit=trees.reduce((n,t)=>n+t.fruit,0),remaining=trees.map((t,i)=>t.planted?G.orchardLifetime(i)-t.age:Infinity),soon=remaining.filter(n=>n<=G.YEAR_DAYS).length;
-  return {empty,young,mature,fruit,soon,nextDeath:Math.min(...remaining),status:!G.game.unlocks.orchard?'需从贸易站购买果树种子':fruit&&G.game.season===2?(G.goalPaused('vegetables')?'果实等待：蔬菜或食物目标已达':'秋季逐树采果'):empty&&b.orchardReplant?'空位待补种':young?'幼树逐株养护，4年有效照料成熟':empty===9?'空园，补种已暂停':'成熟果树等待秋季'};
+  const fruitByType={vegetables:0,apples:0,pears:0};for(const t of trees)fruitByType[G.orchardOutput(t)]+=t.fruit;
+  const selected=G.orchardTypeOf(b),plantable=G.orchardUnlocked(selected),hasUnlockedTree=trees.some(t=>t.planted&&G.orchardUnlocked(G.orchardTreeType(t)));
+  return {empty,young,mature,fruit,fruitByType,selected,soon,nextDeath:Math.min(...remaining),status:!plantable&&!hasUnlockedTree?'需从贸易站购买对应果树种子并选择补种品种':fruit&&G.game.season===2?(trees.some(t=>t.fruit>0&&!G.goalPaused(G.orchardOutput(t)))?'秋季逐树采果':'果实等待：对应果品或食物目标已达'):empty&&b.orchardReplant?(plantable?'空位待补种':'所选补种品种尚未解锁'):young?'幼树逐株养护，4年有效照料成熟':empty===9?'空园，补种已暂停':'成熟果树等待秋季'};
 };
 
 /* Health is separate from happiness. Rates/capacity are small-town adaptations;
@@ -3042,6 +3063,7 @@ G.blacksmithOutput = b => b && b.toolRecipe === 'steel' ? 'steelTools' : 'tools'
 G.blacksmithRecipe = b => G.blacksmithOutput(b) === 'steelTools' ? [...G.PROD.blacksmith.consume,{type:'coal',qty:2}] : G.PROD.blacksmith.consume;
 G.productionOutputsOf = function (b) {
   if(b.type==='farm')return ['food',G.farmOutput(b)];
+  if(b.type==='orchard')return ['food',...new Set([G.ORCHARD_TYPES[G.orchardTypeOf(b)].output,...(b.orchardTrees||[]).filter(t=>t.planted).map(G.orchardOutput)])];
   if(b.type==='pasture')return ['food','meat',G.pastureTypeOf(b)==='chicken'?'eggs':G.pastureTypeOf(b)==='cattle'?'leather':'wool'];
   if(b.type==='tailor')return [G.tailorOutput(b)];
   if (b.type === 'mine') return G.mineModeOf(b) === 'legacy' ? ['stone','iron'] : [G.mineModeOf(b)];
@@ -3211,7 +3233,7 @@ G.townHallSummary = function(b) {
 };
 
 /* Tavern: one explicit food-to-leisure chain. Food safety is rechecked when
- * fetching and before fermenting. Reserved grain is physical refundable cargo. */
+ * fetching and before fermenting. Reserved ingredients are physical refundable cargo. */
 G.LEISURE={age:18,hours:2,days:6,capacity:4,maxTravelHours:6,retryHours:6};
 G.leisureDaysOf=c=>G.clamp(Number.isFinite(c.leisureDays)?c.leisureDays:0,0,G.LEISURE.days);
 G.happinessTarget=c=>G.clamp(2.5+.5*(Number.isFinite(c.dietScore)?c.dietScore:1)+(G.leisureDaysOf(c)>0?1:0)+(G.chapelDaysOf(c)>0?G.CHAPEL.bonus:0)-Math.min(2,(c.hunger||0)/3)-G.griefLoss(c),1,5);
@@ -3223,12 +3245,22 @@ G.setTavernReserve=function(b,days){
   if(!b||G.world.bmap[b.id]!==b||b.type!=='tavern'||b.state!=='ok'||!Number.isInteger(days)||days<8||days>48)return false;
   b.reserveDays=days;b.noWork=false;G.game.schedT=0;return true;
 };
-G.tavernBrewStatus=function(b,reserved=false){
+// Recipes are deliberately small, explicit contracts. Fruit uses the original
+// 30 -> 10 ratio; the earlier grain 30 -> 3/4 adaptation stays unchanged.
+G.BREW_RECIPES={grain:{name:'主食',inputType:'grain',inputQty:30,outputQty:3,educatedOutputQty:4},apples:{name:'苹果',inputType:'apples',inputQty:30,outputQty:10,educatedOutputQty:10},pears:{name:'梨',inputType:'pears',inputQty:30,outputQty:10,educatedOutputQty:10}};
+G.tavernRecipeOf=b=>typeof b?.brewRecipe==='string'&&Object.hasOwn(G.BREW_RECIPES,b.brewRecipe)?b.brewRecipe:'grain';
+G.setTavernRecipe=function(b,type){
+  if(!b||G.world.bmap[b.id]!==b||b.type!=='tavern'||b.state!=='ok'||typeof type!=='string'||!Object.hasOwn(G.BREW_RECIPES,type))return false;
+  b.brewRecipe=type;b.noWork=false;b.warnText='';G.game.schedT=0;return true;
+};
+G.brewRecipeSnapshot=t=>t?.recipe||{key:'grain',...G.BREW_RECIPES.grain,outputQty:t?.yield?.qty||3};
+G.tavernBrewStatus=function(b,reserved=false,recipeSnapshot=null){
+  const key=typeof recipeSnapshot==='string'?recipeSnapshot:recipeSnapshot?.key||G.tavernRecipeOf(b),recipe=typeof recipeSnapshot==='object'&&recipeSnapshot?recipeSnapshot:G.BREW_RECIPES[key];
   const r=G.game.res,reserveDays=G.tavernReserveDays(b),reserveFood=G.world.citizens.filter(c=>!c.dead).length*G.LIFE.eatPerDay*reserveDays;
-  const foodAfterBatch=r.food-(reserved?0:30),info={reserveDays,reserveFood,foodAfterBatch};
-  let reason='口粮充足，可取30主食酿酒';
-  if(!reserved && r.grain<30)reason='主食不足：每批需要30';
-  else if(foodAfterBatch<reserveFood)reason=reserved?`低于全村${reserveDays}天口粮，退回未酿原粮`:`取粮后不足全村${reserveDays}天口粮，暂停新酿造`;
+  const {inputType,inputQty,outputQty}=recipe,foodAfterBatch=r.food-(reserved?0:inputQty),info={recipe:key,inputType,inputQty,outputQty,reserveDays,reserveFood,foodAfterBatch};
+  let reason=`口粮充足，可取${inputQty}${G.RES[inputType].name}酿酒`;
+  if(!reserved && r[inputType]<inputQty)reason=`${G.RES[inputType].name}不足：每批需要${inputQty}`;
+  else if(foodAfterBatch<reserveFood)reason=reserved?`低于全村${reserveDays}天口粮，退回未酿原料`:`取料后不足全村${reserveDays}天口粮，暂停新酿造`;
   else if(!reserved && G.goalPaused('ale'))reason='麦酒生产目标已达，仍可接待休闲';
   else if(!reserved && r.ale>=Math.min(G.productionGoalOf('ale')??30,G.storageCap()))reason='麦酒备货目标或仓容已满，仍可接待休闲（未设全镇目标时备30）';
   else return {...info,ok:true,reason};
@@ -3252,23 +3284,27 @@ G.makeTavernTask=function(b,c){
     const spot=G.workSpot(G.world,b,c.x,c.y);if(!spot){b.noWork=true;b.warnText='酒馆入口不可达';return null;}
     return G.withTaskRoute({kind:'host',b,tx:spot.x,ty:spot.y,work:4,workLeft:4},spot.route);
   }
-  const route=G.storageRoute(c.x,c.y);if(!route){b.noWork=true;b.warnText='取粮仓库不可达';return null;}
-  return G.withTaskRoute({kind:'brew',phase:'fetch',b,tx:route.spot.x,ty:route.spot.y,work:.1,workLeft:.1,yield:{type:'ale',qty:c.educated?4:3}},route.spot.route);
+  const key=status.recipe,recipe={key,...G.BREW_RECIPES[key],outputQty:c.educated?G.BREW_RECIPES[key].educatedOutputQty:G.BREW_RECIPES[key].outputQty};
+  const route=G.storageRoute(c.x,c.y,recipe.inputType);if(!route){b.noWork=true;b.warnText='取料仓库不可达';return null;}
+  return G.withTaskRoute({kind:'brew',phase:'fetch',b,recipe,tx:route.spot.x,ty:route.spot.y,work:.1,workLeft:.1,yield:{type:'ale',qty:recipe.outputQty}},route.spot.route);
 };
 G.returnBrewGrain=function(c){c.task=null;c.pausedTask=null;if(c.carry)G.startHaul(c);else{c.state='idle';c.wanderT=2;}};
 G.completeBrew=function(c,t){
-  const b=t.b,w=G.world;
+  if(t.completed)return;
+  const b=t.b,w=G.world,recipe=G.brewRecipeSnapshot(t);
   if(!b||w.bmap[b.id]!==b||b.state!=='ok'||c.job!==b.id||G.isSick(c)||G.d2(c.x,c.y,t.tx,t.ty)>.04||G.tileBlocked(w,t.tx,t.ty)){G.returnBrewGrain(c);return;}
   if(t.phase==='fetch'){
-    if(!w.buildings.some(s=>s.type==='storage'&&s.state==='ok'&&G.atMedicalDoor(c,s))||!G.tavernBrewStatus(b).ok){G.returnBrewGrain(c);return;}
+    G.reconcileFood();
+    if(c.carry||!G.atStorageDoor(c,recipe.inputType)||!G.tavernBrewStatus(b,false,recipe).ok){G.returnBrewGrain(c);return;}
     const spot=G.workSpot(w,b,c.x,c.y);if(!spot){G.returnBrewGrain(c);return;}
-    const qty=G.withdrawResource('grain',30);c.carry={type:'grain',qty,brewIngredient:true};
+    const qty=G.withdrawResource(recipe.inputType,recipe.inputQty);c.carry={type:recipe.inputType,qty,brewIngredient:true};
+    if(qty!==recipe.inputQty){G.returnBrewGrain(c);return;}
     t.phase='process';t.tx=spot.x;t.ty=spot.y;t.work=t.workLeft=G.taskWork(c,6);c.task=t;
     if(!G.sendTo(c,t.tx,t.ty,spot.route))G.returnBrewGrain(c);
     return;
   }
-  if(t.phase!=='process'||!G.atMedicalDoor(c,b)||!c.carry?.brewIngredient||c.carry.type!=='grain'||c.carry.qty!==30||!G.tavernBrewStatus(b,true).ok){G.returnBrewGrain(c);return;}
-  c.carry={type:'ale',qty:t.yield.qty};G.recordProduction(b,'ale',t.yield.qty);G.startHaul(c);
+  if(t.phase!=='process'||!G.atMedicalDoor(c,b)||!c.carry?.brewIngredient||c.carry.type!==recipe.inputType||c.carry.qty!==recipe.inputQty||!G.tavernBrewStatus(b,true,recipe).ok){G.returnBrewGrain(c);return;}
+  t.completed=true;c.carry={type:'ale',qty:recipe.outputQty};G.recordProduction(b,'ale',recipe.outputQty);G.startHaul(c);
 };
 G.validLeisureTask=function(c){
   const b=c.task?.b;return G.isLeisureVisitor(c)&&c.age>=18&&!G.isSick(c)&&!c.carry&&b&&G.world.bmap[b.id]===b&&b.state==='ok'&&b.type==='tavern'&&G.workerLimitOf(b)>0;
@@ -3300,10 +3336,15 @@ G.stepLeisure=function(c,dtH){
   G.cancelLeisure(c);G.game.schedT=0;G.requestTask(c);
 };
 G.tavernSummary=function(b){
-  const s=G.tavernBrewStatus(b),cs=G.world.citizens;
-  return {...s,canBrew:s.ok,visitors:G.tavernVisitors(b).length,ale:G.game.res.ale,
+  const s=G.tavernBrewStatus(b),cs=G.world.citizens,batches=[];
+  for(const c of cs){if(c.dead)continue;const t=[c.task,c.pausedTask].find(t=>t?.kind==='brew'&&t.b===b);
+    if(t){const r=G.brewRecipeSnapshot(t);batches.push({citizenId:c.id,name:c.name,phase:t.phase,recipe:r.key,inputType:r.inputType,inputQty:r.inputQty,outputQty:r.outputQty});}
+    else if(c.job===b.id&&c.carry?.brewIngredient)batches.push({citizenId:c.id,name:c.name,phase:'return',recipe:c.carry.type,inputType:c.carry.type,inputQty:c.carry.qty,outputQty:0});
+    else if(c.job===b.id&&c.carry?.type==='ale')batches.push({citizenId:c.id,name:c.name,phase:'deliver',recipe:null,inputType:null,inputQty:0,outputQty:c.carry.qty});
+  }
+  return {...s,batches,canBrew:s.ok,visitors:G.tavernVisitors(b).length,ale:G.game.res.ale,
     workers:b.workers.filter(id=>G.world.cmap[id]&&!G.world.cmap[id].dead).length,onDuty:G.tavernStaff(b),
-    capacity:G.LEISURE.capacity,eligibleAdults:cs.filter(c=>!c.dead&&c.adult&&c.age>=18).length,batchGrain:30,batchAle:3,workHours:6,aleLimit:G.productionGoalOf('ale')??30};
+    capacity:G.LEISURE.capacity,eligibleAdults:cs.filter(c=>!c.dead&&c.adult&&c.age>=18).length,batchGrain:s.inputType==='grain'?s.inputQty:0,batchAle:s.outputQty,workHours:6,aleLimit:G.productionGoalOf('ale')??30};
 };
 
 /* Chapel: one physically present cleric serves a bounded congregation. The
@@ -3437,7 +3478,7 @@ G.tailorSummary=function(b){
 /* Crop diversity stays inside the three existing food classes. Selection is
  * next-season intent; a started field and its cargo keep the actual crop. */
 G.CROPS={wheat:{name:'小麦',output:'grain',growDays:24,perTile:14,sprite:'crop'},cabbage:{name:'卷心菜',output:'vegetables',growDays:24,perTile:14,sprite:'cabbage'},beans:{name:'早熟豆类',output:'vegetables',growDays:12,perTile:10,sprite:'bean',summerHarvest:true}};
-G.seedUnlockKey=good=>good==='orchardSeed'?'orchard':good==='cabbageSeed'?'cabbage':good==='beanSeed'?'beans':null;
+G.seedUnlockKey=good=>good==='orchardSeed'?'orchard':good==='appleSeed'?'apple':good==='pearSeed'?'pear':good==='cabbageSeed'?'cabbage':good==='beanSeed'?'beans':null;
 G.seedTradeReason=function(good,qty){
   const key=G.seedUnlockKey(good);if(!key)return '';
   if(G.game.unlocks[key])return `${G.TRADE_GOODS[good].name}已永久解锁，无需重复购买`;
@@ -3779,7 +3820,7 @@ G.workforceBlockReason=function(b){
   if(b.type==='farm')return G.farmSummary(b).status;
   if(b.type==='tradingpost')return '待售目标已满足，或仓库没有所需备货';
   if(b.type==='pasture')return G.pastureSummary(b).status;
-  if(b.type==='orchard'&&!G.game.unlocks.orchard)return '尚未购买果树种子';
+  if(b.type==='orchard')return G.orchardSummary(b).status;
   if(['gatherer','hunting','forester'].includes(b.type))return b.warnText||'工作范围内没有合适森林或种植位置';
   return b.warnText||'暂时没有可执行工作';
 };
