@@ -52,7 +52,7 @@ G.startConfigQuote = function (input) {
   const config=terrain==='mountain'?{v:2,preset,seed,terrain}:{v:1,preset,seed},p=G.START_PRESETS[preset],families=p.kidPlan.length,children=p.kidPlan.reduce((n,k)=>n+k,0);
   const resources=Object.fromEntries(G.RES_KEYS.map(k=>[k,p.stocks[k]||0]));resources.food=G.FOOD_KEYS.reduce((n,k)=>n+resources[k],0);
   return {ok:true,config,key:JSON.stringify(config),terrainSummary:{name:G.START_TERRAINS[terrain].name,mapVersion:G.START_TERRAINS[terrain].mapVersion,
-    note:terrain==='mountain'?'41×37初始山谷为本作明确保底：有限木石铁与成熟食物林须劳动取得；山体阻路，当前尚无隧道':'沿用现行地图算法、镇址与启动铁矿'},presetSummary:{name:p.name,families,population:families*2+children,adults:families*2,children,resources,
+    note:terrain==='mountain'?'41×37初始山谷为本作明确保底：有限木石铁与成熟食物林须劳动取得；山体阻路；可从陆地洞口规划隧道，实运建成后才通行':'沿用现行地图算法、镇址与启动铁矿'},presetSummary:{name:p.name,families,population:families*2+children,adults:families*2,children,resources,
     unlockedSeeds:p.wheat?['wheat']:[],seedNote:p.wheat?'已有小麦种子；其他作物与果树种子须贸易购买':'没有作物或果树种子，也没有牲畜；种子须贸易购买，永久解锁',
     equipmentNote:'衣物库存0、无预穿衣；工具默认共用池，寿命规则沿用现有系统',adaptationNote:'家庭数参考原版难度；人口组成与库存数量为本作适配'}};
 };
@@ -176,6 +176,7 @@ G.serializeGame = function () {
       construction:b.construction&&{required:{...b.construction.required},onsite:{...b.construction.onsite},consumed:b.construction.consumed,...(b.construction.legacyRefundHalf?{legacyRefundHalf:true}:{})},
       workers: b.workers, family: b.family, noWork: b.noWork, warnText: b.warnText,
       bridgeAxis: b.bridgeAxis, bridgeLength: b.type === 'bridge' ? b.w + b.h - 1 : undefined,
+      ...(b.type==='tunnel'?{tunnelAxis:b.tunnelAxis,tunnelLength:b.w+b.h-1,tunnelStart:b.tunnelStart}:{}),
       houseFire:b.houseFire&&{...b.houseFire},ruinFrom:b.ruinFrom,ruinIncident:b.ruinIncident,
       mineralUnits:b.mineralUnits, pitSource:b.pitSource, mineMode: b.mineMode, legacyMine: b.legacyMine, mineTick: b.mineTick, toolRecipe: b.toolRecipe, reserveDays:b.reserveDays, brewRecipe:b.brewRecipe, coatRecipe:b.coatRecipe, coatMaterial:b.coatMaterial,
       huntingReadyDay:b.type==='hunting'?(b.huntingReadyDay||0):undefined,
@@ -540,6 +541,11 @@ G.prepareSaveData = function (d) {
       const length = integer(bd.bridgeLength,'木桥长度',3,24);
       def = {...def,w:bd.bridgeAxis==='x'?length:1,h:bd.bridgeAxis==='y'?length:1,buildWork:length*3};
     }
+    if(bd.type==='tunnel'){
+      if(!authoritative)bad('隧道需要权威山地存档');
+      const length=integer(bd.tunnelLength,'隧道总长',3,w.N);def=G.tunnelDefinition(bd.tunnelAxis,length);if(!def)bad('隧道方向');
+      if(bd.totalWork!==def.buildWork||bd.workLeft===undefined||bd.progress===undefined)bad('隧道施工记录缺失');
+    }else if(['tunnelAxis','tunnelLength','tunnelStart'].some(k=>bd[k]!==undefined))bad('非隧道几何字段');
     const x = integer(bd.x, '建筑 x', 0, Math.min(oldN, w.N) - def.w);
     const y = integer(bd.y, '建筑 y', 0, Math.min(oldN, w.N) - def.h);
     if (bd.state !== 'ok' && bd.state !== 'site') bad('建筑状态');
@@ -596,6 +602,11 @@ G.prepareSaveData = function (d) {
     if (bd.type === 'bridge') {
       b.bridgeAxis=bd.bridgeAxis;
       if(!G.planBridge(w,{x,y},{x:x+b.w-1,y:y+b.h-1}).ok) bad('木桥跨岸几何');
+    }
+    if(bd.type==='tunnel'){
+      b.tunnelAxis=bd.tunnelAxis;b.tunnelStart=integer(bd.tunnelStart,'首施工洞口',0,1);
+      const ends=G.tunnelEndpoints(b);if(!G.planTunnel(w,ends.start,ends.end).ok)bad('隧道穿山几何');
+      if(b.workLeft<0||b.workLeft>b.totalWork||Math.abs(b.progress-(1-b.workLeft/b.totalWork))>1e-8||(b.state==='ok'?(b.workLeft!==0||b.progress!==1||b.workers.length>0):b.workLeft<=0))bad('隧道施工状态');
     }
     if (bd.type === 'mine') {
       b.mineMode = bd.mineMode === undefined ? 'legacy' : bd.mineMode;
@@ -754,6 +765,7 @@ G.prepareSaveData = function (d) {
       const required=b.paidCost||def.cost;b.construction=G.newConstruction(required,required);
       if(b.constructionStarted||b.progress>0||b.workLeft<b.totalWork)b.construction.legacyRefundHalf=true;
     }
+    if(b.type==='tunnel'&&(!b.paidCost||Object.keys(b.paidCost).length!==1||b.paidCost.stone!==def.cost.stone||!b.construction||b.construction.legacyRefundHalf))bad('隧道实运建材合同');
     if(b.type==='cemetery'&&((b.cemeterySize&&!b.paidCost)||b.paidCost&&(Object.keys(b.paidCost).some(k=>!Object.hasOwn(def.cost,k))||Object.keys(b.paidCost).length&&Object.keys(def.cost).some(k=>b.paidCost[k]!==def.cost[k]))))bad('墓园已付建材不符');
     if(b.orchardSize&&(!b.paidCost||Object.keys(b.paidCost).some(k=>k!=='wood')||(Object.keys(b.paidCost).length&&b.paidCost.wood!==def.cost.wood)))bad('面积果园已付建材');
     // Only genuine 12-wood / 36-work legacy orchards may retain the dense nine slots.
@@ -800,7 +812,7 @@ G.prepareSaveData = function (d) {
     }
     for (let yy = y; yy < y + b.h; yy++) for (let xx = x; xx < x + b.w; xx++) {
       const i = yy * w.N + xx; if (w.bgrid[i] >= 0) bad('建筑重叠');
-      if(authoritative&&(w.mountain[i]||w.rock[i]||b.type!=='bridge'&&w.water[i]===1||b.state==='ok'&&w.treeIdx[i]>=0))bad('建筑与权威地形冲突');
+      if(authoritative&&((b.type!=='tunnel'&&w.mountain[i])||w.rock[i]||b.type!=='bridge'&&w.water[i]===1||b.state==='ok'&&w.treeIdx[i]>=0))bad('建筑与权威地形冲突');
       if((b.cemeterySize||b.type==='graveremnant')&&(w.water[i]===1||w.rock[i]||(b.state==='ok'&&w.treeIdx[i]>=0)))bad('墓园占地未清理或在水上');
       if(b.orchardSize&&(w.water[i]===1||w.rock[i]||(b.state==='ok'&&w.treeIdx[i]>=0)))bad('面积果园占地未清理或在水上');
       if(b.pastureSize&&(w.water[i]===1||w.rock[i]||(b.state==='ok'&&w.treeIdx[i]>=0)))bad('面积牧场占地未清理或在水上');
@@ -962,11 +974,12 @@ G.prepareSaveData = function (d) {
   // Loose goods can remain on rock or on water after a bridge is removed.
   // Preserve their finite ownership; only impossible static mountain overlap fails.
   if(authoritative)for(const p of [...w.supplyCaches,...w.families.map(f=>f.supplyCamp).filter(Boolean)])
-    for(let y=p.y;y<p.y+p.h;y++)for(let x=p.x;x<p.x+p.w;x++)if(G.isMountain(w,x,y))bad('散落或临时物资与山体冲突');
+    for(let y=p.y;y<p.y+p.h;y++)for(let x=p.x;x<p.x+p.w;x++)if(G.isMountain(w,x,y)&&!(p.type==='supplycache'&&p.w===1&&p.h===1&&G.tunnelInteriorAt(w,x,y)))bad('散落或临时物资与山体冲突');
   for(const f of w.families)if(f.houseId!==null&&(w.bmap[f.houseId]?.houseFire||w.bmap[f.houseId]?.type==='burntruins'))bad('火情住房不能入住');
   for(const c of w.citizens)if(c.job!==null&&['well','burntruins'].includes(w.bmap[c.job]?.type))bad('无岗位消防设施');
   if(g.nomads.offer){const h=w.bmap[g.nomads.offer.hallId];if(!h||h.type!=='townhall'||h.state!=='ok')bad('来访申请市政厅失效');}
   for(const c of w.citizens)if(c.job!==null&&(w.bmap[c.job]?.type==='graveremnant'||w.bmap[c.job]?.type==='cemetery'&&w.bmap[c.job].state==='ok'))bad('墓位没有常驻岗位');
+  for(const c of w.citizens)if(c.job!==null&&w.bmap[c.job]?.type==='tunnel'&&w.bmap[c.job].state==='ok')bad('完工隧道没有岗位');
   for(const c of w.citizens)if(c.job!==null&&w.bmap[c.job]?.type==='mineralpit')bad('永久矿坑不能分配岗位');
   for(const c of w.citizens)if(G.isArriving(c)){c.job=null;for(const b of w.buildings)b.workers=b.workers.filter(id=>id!==c.id);}
   // Old resource huts held four workers. Keep two stable assignments on completed
@@ -990,6 +1003,7 @@ G.prepareSaveData = function (d) {
   // Relocate old saves' citizens trapped inside a footprint before committing.
   for (const c of w.citizens) {
     const cx = Math.round(c.x), cy = Math.round(c.y);
+    const tunnel=G.tunnelInteriorAt(w,cx,cy);if(tunnel&&(tunnel.tunnelAxis==='x'?Math.abs(c.y-tunnel.y)>1e-8:Math.abs(c.x-tunnel.x)>1e-8))bad('洞内市民偏离隧道轴线');
     if (G.tileBlocked(w, cx, cy)) {
       if(authoritative)bad('市民位于不可通行地格');
       const spot = G.nearestWalkable(w, cx, cy, 8);
@@ -1119,7 +1133,7 @@ G.setTool = function (t) {
   G.cancelRoadPlan(); G.cancelHarvestPlan(); G.cancelFarmPlan(); G.cancelPasturePlan();G.cancelOrchardPlan();G.cancelCemeteryPlan();
   if (t == null) { G.tool = null; }
   else if (t === 'demolish') G.tool = { kind: 'demolish' };
-  else if (['road','stoneroad','bridge'].includes(t)) G.tool = { kind: 'road', surface:t==='stoneroad'?'stone':t==='bridge'?'bridge':'dirt' };
+  else if (['road','stoneroad','bridge','tunnel'].includes(t)) G.tool = { kind: 'road', surface:t==='stoneroad'?'stone':t==='bridge'?'bridge':t==='tunnel'?'tunnel':'dirt' };
   else if (t === 'fell') G.tool = { kind: 'fell' };
   else if (t === 'quarry') G.tool = { kind: 'quarry' };
   else G.tool = { kind: 'build', type: t };
@@ -1323,21 +1337,22 @@ G.selectRoadEndpoint = function (x, y) {
   if (!G.world || !G.tool || G.tool.kind !== 'road' || G.hasOpenModal()) return;
   const w = G.world, old = G.roadPlan, surface=G.tool.surface||'dirt';
   let point={x,y};
-  if(surface==='bridge'&&old&&old.start&&!old.end)point=G.bridgeEnd(old.start,point);
+  if(['bridge','tunnel'].includes(surface)&&old&&old.start&&!old.end)point=G.bridgeEnd(old.start,point);
   if (!old || old.world !== w || old.end) {
-    const check = surface==='bridge' ? G.bridgeStartStatus(w,point) : G.planRoad(w, point, point);
+    const check = surface==='tunnel'?G.tunnelStartStatus(w,point):surface==='bridge' ? G.bridgeStartStatus(w,point) : G.planRoad(w, point, point);
     G.roadPlan = { world: w, surface, start: point, end: null, result: check, message: check.ok ? '起点已选，请点击终点' : check.reason };
     if (!check.ok) G.roadPlan.start = null;
     return;
   }
   if (!old.start) { G.roadPlan = null; G.selectRoadEndpoint(x, y); return; }
-  const result = surface==='bridge'?G.planBridge(w,old.start,point):G.planRoad(w, old.start, point);
+  const result = surface==='tunnel'?G.planTunnel(w,old.start,point):surface==='bridge'?G.planBridge(w,old.start,point):G.planRoad(w, old.start, point);
   G.roadPlan = { world: w, surface, start: old.start, end: point, result, message: result.ok ? '' : result.reason };
 };
 G.roadPlanStatus = function () {
   if (G.roadDrag && G.roadDrag.world === G.world) return { ok: false, reason: '正在选择终点；松开后计算路线，再确认铺路。虚线仅表示起终点方向。' };
   const plan = G.roadPlan, w = G.world;
   if (!plan || plan.world !== w || (plan.surface||'dirt') !== (G.tool?.surface||'dirt') || !plan.end || !plan.result.ok) return { ok: false, reason: plan && plan.world === w ? plan.message : '点击起点，再点击终点预览路线' };
+  if(plan.surface==='tunnel'){const result=G.planTunnel(w,plan.start,plan.end);if(!result.ok)return result;return {ok:true,trees:[],added:[],plan,materials:result.materials,tunnel:true};}
   if(plan.surface==='bridge') {
     const result=G.planBridge(w,plan.start,plan.end);
     if(!result.ok)return result;
@@ -1358,10 +1373,11 @@ G.confirmRoadPlan = function (intent) {
   const status = G.roadPlanStatus();
   if (!status.ok) return status;
   const w = G.world, plan = status.plan;
-  const mode = status.bridge?'bridge':status.trees.length ? 'clear' : 'pave';
+  const mode = status.tunnel?'tunnel':status.bridge?'bridge':status.trees.length ? 'clear' : 'pave';
   const treeSignature = status.trees.map(p => p.y * w.N + p.x).join(',');
   if (intent && (intent.plan !== plan || intent.mode !== mode || intent.trees !== treeSignature))
     return { ok: false, reason: '路线或清树需求已变化，请复查预览后重新确认' };
+  if(status.tunnel){if(!intent)return {ok:false,reason:'请先查看两端和材料预览，再确认隧道'};const result=G.addTunnel(plan.start,plan.end);if(result.ok){G.cancelRoadPlan();G.ui.refreshHUD();}return {...result,tunnel:true};}
   if(status.bridge){const result=G.addBridge(plan.start,plan.end);if(result.ok){G.cancelRoadPlan();G.ui.refreshHUD();}return {...result,bridge:true};}
   if (status.trees.length) {
     for (const p of status.added) G.markFellAt(w, p.x, p.y);
@@ -1764,7 +1780,7 @@ G.selectAt = function (tx, ty, p) {
   for (const c of w.citizens) {
     if(mountain&&c.x+c.y+.01<=tx+ty+1)continue; // Hidden behind the clicked ridge; foreground people remain selectable.
     if (c.state === 'rest' && c.camped === false && !citizenHomes && G.citizenHomeLookup) citizenHomes = G.citizenHomeLookup(w);
-    if ((G.citizenIndoorHome && G.citizenIndoorHome(c, citizenHomes)) || G.inMedicalCare(c) || G.inSchool(c) || G.inChapel(c)) continue;
+    if (G.tunnelInteriorAt(w,Math.round(c.x),Math.round(c.y)) || (G.citizenIndoorHome && G.citizenIndoorHome(c, citizenHomes)) || G.inMedicalCare(c) || G.inSchool(c) || G.inChapel(c)) continue;
     const [sx, sy] = G.T2S(c.x, c.y);
     const px = sx * G.cam.z + G.cam.x - p.x;
     const py = (sy + 16) * G.cam.z + G.cam.y - p.y;
@@ -1774,7 +1790,7 @@ G.selectAt = function (tx, ty, p) {
   if (best) {
     G.sel = { kind: 'c', id: best.id };
     G.ui.showInfo(G.sel);
-  } else {G.sel=null;G.ui.hideInfo();if(mountain)G.ui.toast('山体不可步行或建造，请沿山谷选址；隧道尚未接入','info');}
+  } else {G.sel=null;G.ui.hideInfo();if(mountain)G.ui.toast('山体不可直接步行或建造；可从两个陆地洞口规划直线隧道，完工后沿轴通行','info');}
 };
 
 window.addEventListener('DOMContentLoaded', G.init);

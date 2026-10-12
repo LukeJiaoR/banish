@@ -630,7 +630,7 @@ G.wander = function (c) {
     const tx = G.clamp(Math.round(a.x + G.ri(-4, 4)), 0, G.world.N - 1);
     const ty = G.clamp(Math.round(a.y + G.ri(-4, 4)), 0, G.world.N - 1);
     if (G.tileBlocked(G.world, tx, ty)) continue;
-    const p = G.findPath(G.world, Math.round(c.x), Math.round(c.y), tx, ty);
+    const p = G.findPath(G.world, c.x, c.y, tx, ty);
     if (p && p.length) {
       c.path = p; c.pi = 0; c.state = 'walk'; c.walkKind = 'wander';
       return;
@@ -697,7 +697,7 @@ G.sendTo = function (c, tx, ty, planned = null) {
     if (!spot) { if (c.task) G.dropBlockedTask(c, c.task); c.state = 'idle'; c.path = null; c.wanderT = .5; return false; }
     tx = spot.x; ty = spot.y; route=spot.route; c.task.tx = tx; c.task.ty = ty;
   }
-  const p = G.routeCanReuse(route,c,tx,ty) ? route.path : G.findPath(G.world, Math.round(c.x), Math.round(c.y), tx, ty);
+  const p = G.routeCanReuse(route,c,tx,ty) ? route.path : G.findPath(G.world, c.x, c.y, tx, ty);
   if (!p) { c.state = 'idle'; c.task = null; return false; }
   // The path planner rounds its start cell. Physically checked factory/mineral
   // tasks still walk the final fraction after an interrupted commute.
@@ -722,7 +722,7 @@ G.goHome = function (c) {
   const d = Math.sqrt(G.d2(c.x, c.y, h.x + h.w / 2, h.y + h.h / 2));
   if (d > G.LIFE.campDist) { c.path = null; c.state = 'rest'; c.camped = true; return; }
   const spot = G.workSpot(G.world, h, c.x, c.y);
-  const p = spot ? (G.routeCanReuse(spot.route,c,spot.x,spot.y) ? spot.route.path : G.findPath(G.world,Math.round(c.x),Math.round(c.y),spot.x,spot.y)) : null;
+  const p = spot ? (G.routeCanReuse(spot.route,c,spot.x,spot.y) ? spot.route.path : G.findPath(G.world,c.x,c.y,spot.x,spot.y)) : null;
   // A nearby home can require a long detour around water or buildings. For a
   // suspended job, reuse the route already found rather than restarting the same
   // unfinished commute every morning. No new path search or cross-day cache.
@@ -816,7 +816,7 @@ G.storageRoute = function (x, y, types) {
     if (!G.storageAccepts(storage,types)) continue;
     for (let sy=storage.y-1;sy<=storage.y+storage.h;sy++)
       for (let sx=storage.x-1;sx<=storage.x+storage.w;sx++)
-        if ((sx<storage.x||sx>=storage.x+storage.w||sy<storage.y||sy>=storage.y+storage.h)&&!G.tileBlocked(w,sx,sy)) targets.push({x:sx,y:sy,storage});
+        if ((sx<storage.x||sx>=storage.x+storage.w||sy<storage.y||sy>=storage.y+storage.h)&&G.surfaceAccess(w,sx,sy)) targets.push({x:sx,y:sy,storage});
   }
   const route=G.findPathToAny(w,x,y,targets);
   return route ? {storage:route.target.storage,spot:G.routeSpot(route),path:route.path,eta:route.eta} : null;
@@ -1232,14 +1232,7 @@ G.coldStep = function (c, dtH) {
 
 /* Validate only the next segment after dispatch, including diagonal side
  * tiles. Failed detours retain the task/cargo and retry every two hours. */
-G.pathStepBlocked = function (w, c, t) {
-  if (G.tileBlocked(w, t.x, t.y)) return true;
-  const dx = t.x - c.x, dy = t.y - c.y;
-  if (Math.abs(dx) < 1e-8 || Math.abs(dy) < 1e-8) return false;
-  const sx = Math.round(c.x), sy = Math.round(c.y);
-  if (sx === t.x || sy === t.y) return false;
-  return G.tileBlocked(w, t.x, sy) || G.tileBlocked(w, sx, t.y);
-};
+G.pathStepBlocked = (w,c,t)=>!G.tunnelSegmentAllowed(w,c.x,c.y,t.x,t.y);
 G.detourCitizen = function (c, dtH) {
   if(c.task?.kind==='toolFetch'){G.planToolFetch(c,c.task);return;}
   if(c.task?.kind==='constructionMaterial'){const t=c.task,spot=G.constructionLegSpot(c,t);if(spot){t.tx=spot.x;t.ty=spot.y;G.sendTo(c,t.tx,t.ty,spot.route);}else if(G.constructionCargo(c))G.returnConstructionCargo(c);else G.dropBlockedTask(c,t);return;}
@@ -1267,7 +1260,7 @@ G.detourCitizen = function (c, dtH) {
     } else if (c.walkKind === 'wander') { c.path = null; c.state = 'idle'; c.wanderT = 2; return; }
     else return;
   }
-  const path = G.routeCanReuse(goal.route,c,goal.x,goal.y) ? goal.route.path : G.findPath(G.world, Math.round(c.x), Math.round(c.y), goal.x, goal.y);
+  const path = G.routeCanReuse(goal.route,c,goal.x,goal.y) ? goal.route.path : G.findPath(G.world, c.x, c.y, goal.x, goal.y);
   if (!path) {
     if(c.task?.kind==='hunt'){G.dropBlockedTask(c,c.task);return;}
     if(c.task?.kind==='brew'){G.returnBrewGrain(c);return;}
@@ -1628,7 +1621,7 @@ G.foresterReachability = function (w, c) {
       const i = queue[head++], cx = i % N, cy = Math.floor(i / N);
       for (const [dx, dy] of directions) {
         const nx = cx + dx, ny = cy + dy, ni = ny * N + nx;
-        if (nx < 0 || ny < 0 || nx >= N || ny >= N || seen[ni] || G.tileBlocked(w, nx, ny)) continue;
+        if (nx < 0 || ny < 0 || nx >= N || ny >= N || seen[ni] || !G.walkEdgeAllowed(w,cx,cy,nx,ny)) continue;
         seen[ni] = 1; queue.push(ni);
       }
     }
@@ -1661,7 +1654,7 @@ G.deerHabitat=function(w,x,y){
 G.huntingDoors=function(w,b){
   const doors=[],width=b.w||G.BDEF.hunting.w,height=b.h||G.BDEF.hunting.h;
   for(let y=b.y-1;y<=b.y+height;y++)for(let x=b.x-1;x<=b.x+width;x++)
-    if((x<b.x||x>=b.x+width||y<b.y||y>=b.y+height)&&!G.tileBlocked(w,x,y))doors.push({x,y});
+    if((x<b.x||x>=b.x+width||y<b.y||y>=b.y+height)&&G.surfaceAccess(w,x,y))doors.push({x,y});
   return doors;
 };
 G.deerCandidates=function(w){
@@ -2350,7 +2343,7 @@ G.constructionSummary=function(b){const state=b.construction,required=state?.req
 G.constructionCarryState=function(c){if(G.constructionCargo(c))return c.carry.constructionReturn?'建材退回仓库：'+(G.cargoWaitReason(c)||'前往可达仓库'):'携带建材前往工地 #'+c.carry.constructionId;
  const t=c.task||c.pausedTask;return t?.kind==='constructionMaterial'?'前往仓库领取工地建材':'';};
 G.constructionTaskCurrent=(c,t)=>!!t&&!t.completed&&G.world.cmap[c.id]===c&&!c.dead&&c.adult&&!c.student&&G.world.bmap[t.b?.id]===t.b&&t.b.state==='site'&&!t.b.sitePaused&&c.job===t.b.id&&!t.b.construction?.consumed;
-G.constructionDoor=(c,b)=>G.atMedicalDoor(c,b)&&G.d2(c.x,c.y,Math.round(c.x),Math.round(c.y))<1e-8;
+G.constructionDoor=(c,b)=>(b.type==='tunnel'?G.d2(c.x,c.y,G.tunnelEndpoints(b).start.x,G.tunnelEndpoints(b).start.y)<1e-8:G.atMedicalDoor(c,b))&&G.d2(c.x,c.y,Math.round(c.x),Math.round(c.y))<1e-8;
 G.atConstructionTask=(c,t)=>G.constructionTaskCurrent(c,t)&&G.d2(c.x,c.y,t.tx,t.ty)<1e-8&&!G.tileBlocked(G.world,t.tx,t.ty)&&(t.phase==='fetch'?G.atStorageDoor(c,t.resource):G.constructionDoor(c,t.b));
 G.returnConstructionCargo=function(c){if(!G.constructionCargo(c))return false;c.carry.constructionReturn=true;c.carry.staffingReturn=true;
  if(c.task?.kind==='constructionMaterial')c.task=null;if(c.pausedTask?.kind==='constructionMaterial')c.pausedTask=null;
@@ -2391,7 +2384,7 @@ G.siteClearSpot = function (c, b, tree) {
   if (!G.tileBlocked(w, tree.x, tree.y)) spots.push({ x: tree.x, y: tree.y });
   else for (let y = b.y - 1; y <= b.y + b.h; y++) for (let x = b.x - 1; x <= b.x + b.w; x++) {
     if (x !== b.x - 1 && x !== b.x + b.w && y !== b.y - 1 && y !== b.y + b.h) continue;
-    if (!G.tileBlocked(w, x, y)) spots.push({ x, y });
+    if (G.surfaceAccess(w,x,y)) spots.push({x,y});
   }
   for(const spot of spots){spot.building=b;spot.state=b.state;}
   return G.routeSpot(G.findPathToAny(w,c.x,c.y,spots));
@@ -2406,6 +2399,7 @@ G.siteTrees = function (b) {
 };
 G.addBuilding = function (type, x, y, opt) {
   opt = opt || {};
+  if(type==='tunnel')return {ok:false,reason:'隧道须通过道路工具选择两个洞口'};
   const def=type==='farm'?G.farmDefinition(opt.farmSize):type==='pasture'?G.pastureDefinition(opt.pastureSize):type==='orchard'?G.orchardDefinition(opt.orchardSize):type==='cemetery'?G.cemeteryDefinition(opt.cemeterySize):G.BDEF[type];
   if(def?.unbuildable)return {ok:false,reason:def.name+'不能主动建造或重新开发'};
   if(!def||(opt.farmSize!==undefined&&type!=='farm')||(opt.pastureSize!==undefined&&type!=='pasture')||(opt.orchardSize!==undefined&&type!=='orchard')||(opt.cemeterySize!==undefined&&type!=='cemetery'))return {ok:false,reason:type==='cemetery'?'墓园每边须为7至20格的整数':type==='pasture'?'牧场每边须为7至20格的整数':(type==='orchard'?'果园':'农田')+'每边须为4至15格的整数'};
@@ -2552,7 +2546,7 @@ G.finishBuilding = function (b) {
   G.bumpNavigation(G.world);
   // 建造工人多于正式岗位时，释放多余人员
   const def = G.buildingDefinition(b);
-  if(b.pastureSize||b.orchardSize||b.cemeterySize)b.workLeft=0;
+  if(b.pastureSize||b.orchardSize||b.cemeterySize||b.type==='tunnel')b.workLeft=0;
   while (b.workers.length > def.jobs) {
     const id = b.workers.pop();
     const c = G.world.cmap[id];
@@ -2583,6 +2577,10 @@ G.removeBuilding = function (b, confirmationKey) {
     return false;
   }
   if(b.type==='townhall'&&G.game.nomads.offer?.hallId===b.id)G.game.nomads.offer=null;
+  if(b.type==='tunnel'&&b.state==='ok'){const q=G.tunnelRemovalQuote(b);if(!q.ok||confirmationKey!==q.key){
+    if(q.ok&&confirmationKey===undefined&&G.ui.confirmTunnelRemoval)G.ui.confirmTunnelRemoval(b,q);
+    else G.ui.toast(q.ok?'隧道状态或退款已变，请重新查看并确认':q.reason,'warn');return false;
+  }}
   if (b.type === 'bridge') { const check=G.bridgeRemovalStatus(w,b); if(!check.ok){G.ui.toast(check.reason,'warn');return;} }
   if (b.type === 'tradingpost' && Object.values(b.tradeInventory || {}).some(q => q > 0)) { G.ui.toast('先把待售目标设0，搬空贸易库存再拆除','warn'); return; }
   if(b.type==='pasture'&&b.animals>0&&b.pastureInfestation){G.ui.toast('染疫牧场仍有活畜，请先整群搬到同种空场，不能拆除回收绕过疫情','warn');return false;}
@@ -2613,6 +2611,9 @@ G.removeBuilding = function (b, confirmationKey) {
   for (const fam of w.families) if (fam.houseId === b.id) fam.houseId = null;
   const displacedHaulers=b.type==='stockpile'?w.citizens.filter(c=>c.carry&&c.haulTo===b.id):[];
   for(const c of displacedHaulers)G.markStaffingCargo(c);
+  // Match ordinary supply reconciliation: an exhausted cache (including only
+  // sub-epsilon arithmetic residue) must not remain inside restored solid rock.
+  if(b.type==='tunnel')w.supplyCaches=(w.supplyCaches||[]).filter(p=>!(p.x>=b.x&&p.x<b.x+b.w&&p.y>=b.y&&p.y<b.y+b.h&&G.isMountain(w,p.x,p.y)&&G.supplySum(p.supplyStock)<=1e-8));
   w.buildings = w.buildings.filter(x => x !== b);
   delete w.bmap[b.id];
   const pit=leavesPit?{id:G.nextId(),type:'mineralpit',x:b.x,y:b.y,w:b.w,h:b.h,state:'ok',progress:1,workLeft:0,totalWork:1,
@@ -3141,7 +3142,7 @@ G.medicalStaff = function (b) {
   });
 };
 G.atMedicalDoor = (c, b) => c.x >= b.x - 1 && c.x <= b.x + b.w && c.y >= b.y - 1 && c.y <= b.y + b.h &&
-  (c.x < b.x || c.x >= b.x + b.w || c.y < b.y || c.y >= b.y + b.h) && !G.tileBlocked(G.world, Math.round(c.x), Math.round(c.y));
+  (c.x < b.x || c.x >= b.x + b.w || c.y < b.y || c.y >= b.y + b.h) && G.surfaceAccess(G.world,Math.round(c.x),Math.round(c.y));
 G.validCareTask = function (c) {
   const t = c.task, b = t && t.b;
   return !!(t && t.kind === 'care' && b && G.world.bmap[b.id] === b && b.state === 'ok' && G.workerLimitOf(b)>0 &&
@@ -4286,3 +4287,26 @@ G.warnPersonalTools=function(){const n=G.world.citizens.filter(c=>G.toolWorker(c
  if(n&&!G.game.warned.personalTools){G.game.warned.personalTools=true;G.ui.toast(`⚠ ${n} 名劳动者尚无个人工具，仅本人半速；需沿可达路线到通用仓领取，公共有货不等于已装备`,'warn');}
  if(!n)G.game.warned.personalTools=false;
 };
+
+
+/* Tunnel plans reserve no stock. Construction's existing cargo/site/consumption
+ * ledger owns every stone; the first chosen ground mouth is the only work spot. */
+G.addTunnel=function(start,end){
+ const w=G.world,q=G.planTunnel(w,start,end);if(!q.ok)return q;
+ if(!w.citizens.some(c=>!c.dead&&c.adult&&!c.student&&G.findPathToAny(w,c.x,c.y,[q.start])))return {ok:false,reason:'没有成人能到首洞口施工，请从城镇可达的一端起建'};
+ const b={id:G.nextId(),type:'tunnel',x:Math.min(start.x,end.x),y:Math.min(start.y,end.y),w:Math.abs(start.x-end.x)+1,h:Math.abs(start.y-end.y)+1,tunnelAxis:q.axis,tunnelStart:start.x>end.x||start.y>end.y?1:0,state:'site',progress:0,workLeft:q.length*3,totalWork:q.length*3,workers:[],family:null,noWork:false,warnText:'',paidCost:{...q.materials},constructionStarted:false,construction:G.newConstruction(q.materials)};
+ w.buildings.push(b);w.bmap[b.id]=b;for(const p of q.path)w.bgrid[p.y*w.N+p.x]=b.id;
+ G.bumpNavigation(w);G.game.buildLog.push({d:G.game.day,t:'tunnel'});if(G.game.buildLog.length>30)G.game.buildLog.shift();G.scheduleJobs();return {ok:true,b};
+};
+G.tunnelLooseGoods=function(b){const w=G.world;return [...(w.supplyCaches||[]),...(w.families||[]).map(f=>f.supplyCamp).filter(Boolean)].filter(p=>p.x>=b.x&&p.x<b.x+b.w&&p.y>=b.y&&p.y<b.y+b.h&&G.isMountain(w,p.x,p.y)&&G.supplySum(p.supplyStock)>1e-8);};
+G.tunnelRemovalQuote=function(b){
+ const w=G.world;if(!b||w.bmap[b.id]!==b||b.type!=='tunnel')return {ok:false,reason:'隧道已不存在'};
+ const {start,end}=G.tunnelEndpoints(b),refund=G.constructionRefund(b),length=b.w+b.h-1,base={start,end,length,refund};
+ // Includes mouths and fractional crossing segments. Check again at final confirmation.
+ if(w.citizens.some(c=>!c.dead&&c.x>=b.x-.5&&c.x<=b.x+b.w-.5&&c.y>=b.y-.5&&c.y<=b.y+b.h-.5))return {...base,ok:false,reason:'洞内或洞口仍有人，请等居民完全离开后再拆除'};
+ if(G.tunnelLooseGoods(b).length)return {...base,ok:false,reason:'洞内有死亡后散落实货，请实际搬空后再拆除'};
+ const shadow={...w,bmap:{...w.bmap},_pf:null};delete shadow.bmap[b.id];
+ if(b.state==='ok'&&!G.findPathToAny(shadow,start.x,start.y,[end]))return {...base,ok:false,reason:'这是两端唯一通路；请先建成替代路线，不能把居民困在另一侧'};
+ return {...base,ok:true,reason:'拆除后山体恢复阻路；两端原地面道路保留',key:JSON.stringify([b.id,b.state,b.progress,b.workLeft,b.construction,refund])};
+};
+G.tunnelSummary=function(b){const {start,end}=G.tunnelEndpoints(b);return {start,end,length:b.w+b.h-1,inside:G.world.citizens.filter(c=>!c.dead&&G.tunnelInteriorAt(G.world,Math.round(c.x),Math.round(c.y))===b).length,looseGoods:G.tunnelLooseGoods(b).reduce((n,p)=>n+G.supplySum(p.supplyStock),0)};};

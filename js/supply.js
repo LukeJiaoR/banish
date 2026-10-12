@@ -18,7 +18,8 @@ G.supplyEntitySpot=function(c,b){
  // Loose goods/camps occupy no navigation tile. Reach the point itself when
  // possible, otherwise a real perimeter tile; never teleport through a wall.
  const w=G.world,targets=[];
- for(let y=b.y-1;y<=b.y+b.h;y++)for(let x=b.x-1;x<=b.x+b.w;x++)if(!G.tileBlocked(w,x,y))targets.push({x,y});
+ if(G.tunnelInteriorAt(w,b.x,b.y))return G.routeSpot(G.findPathToAny(w,c.x,c.y,[{x:b.x,y:b.y}]));
+ for(let y=b.y-1;y<=b.y+b.h;y++)for(let x=b.x-1;x<=b.x+b.w;x++)if(G.surfaceAccess(w,x,y))targets.push({x,y});
  return targets.length?G.routeSpot(G.findPathToAny(w,c.x,c.y,targets)):null;
 };
 G.supplyCache=function(stock,at){
@@ -32,7 +33,8 @@ G.supplyFamilyTarget=function(f,create=false){
  if(!f)return null;const home=G.world.bmap[f.houseId];if(G.supplyHome(home))return home;
  if(f.supplyCamp)return f.supplyCamp;if(!create)return null;
  const c=G.world.citizens.find(c=>!c.dead&&c.familyId===f.id);if(!c)return null;
- f.supplyCamp={id:f.id,type:'supplycamp',x:Math.round(c.x),y:Math.round(c.y),w:1,h:1,state:'ok',supplyStock:G.emptySupplyStock()};return f.supplyCamp;
+ const tunnel=G.tunnelInteriorAt(G.world,Math.round(c.x),Math.round(c.y)),point=tunnel?G.tunnelEndpoints(tunnel).start:c;
+ f.supplyCamp={id:f.id,type:'supplycamp',x:Math.round(point.x),y:Math.round(point.y),w:1,h:1,state:'ok',supplyStock:G.emptySupplyStock()};return f.supplyCamp;
 };
 G.reconcileSupplyHomes=function(){
  if(!G.supplyEnabled())return;
@@ -167,7 +169,7 @@ G.stepSupply=function(c,dt){
  if(c.state!=='work')return false;
  const endpoint=t.phase==='deliver'?t.to:t.source;
  const physical=G.supplyEntityCurrent(endpoint)&&G.d2(c.x,c.y,t.tx,t.ty)<1e-6&&!G.tileBlocked(G.world,Math.round(c.x),Math.round(c.y))&&
-  (['supplycache','supplycamp'].includes(endpoint.type)?c.x>=endpoint.x-1&&c.x<=endpoint.x+endpoint.w&&c.y>=endpoint.y-1&&c.y<=endpoint.y+endpoint.h:G.atMedicalDoor(c,endpoint));
+  (['supplycache','supplycamp'].includes(endpoint.type)?(G.tunnelInteriorAt(G.world,endpoint.x,endpoint.y)?G.d2(c.x,c.y,endpoint.x,endpoint.y)<1e-8:G.surfaceAccess(G.world,Math.round(c.x),Math.round(c.y))&&c.x>=endpoint.x-1&&c.x<=endpoint.x+endpoint.w&&c.y>=endpoint.y-1&&c.y<=endpoint.y+endpoint.h):G.atMedicalDoor(c,endpoint));
  if(!physical){G.planSupplyLeg(c,t);return true;}
  t.workLeft-=dt;if(t.workLeft>0)return true;
  if(t.phase==='recover'){

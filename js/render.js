@@ -105,10 +105,11 @@ G.screenToMapTile = function(sx,sy) {
   const px=(sx-G.cam.x)/G.cam.z,py=(sy-G.cam.y)/G.cam.z,candidates=[];
   for(let y=Math.floor(flat.ty)-1;y<=Math.floor(flat.ty)+3;y++)
     for(let x=Math.floor(flat.tx)-1;x<=Math.floor(flat.tx)+3;x++)
-      if(G.isMountain(w,x,y))candidates.push({x,y,d:x+y+1});
+      {if(G.isMountain(w,x,y))candidates.push({x,y,d:x+y+1});
+       const b=G.tunnelAt(w,x,y);if(b){const ends=G.tunnelEndpoints(b);for(const [p,first]of [[ends.start,true],[ends.end,false]])if(p.x===x&&p.y===y)candidates.push({x,y,d:x+y+.62,portal:G.tunnelPortalGeometry(b,p,first)});}}
   candidates.sort((a,b)=>b.d-a.d||b.y-a.y||b.x-a.x);
-  for(const p of candidates)if(G.mountainPolygons(w,p.x,p.y).some(face=>G.pointInMountainPolygon(px,py,face.points)))
-    return {tx:p.x+.5,ty:p.y+.5,mountain:true};
+  for(const p of candidates){if(p.portal?G.pointInMountainPolygon(px,py,p.portal.points):G.mountainPolygons(w,p.x,p.y).some(face=>G.pointInMountainPolygon(px,py,face.points)))
+    return {tx:p.x+.5,ty:p.y+.5,...(p.portal?{tunnel:true}:{mountain:true})};}
   return flat;
 };
 G.drawMountain = function(ctx,w,x,y) {
@@ -549,6 +550,7 @@ G.drawBuilding = function (ctx, b, time) {
   const def = G.BDEF[b.type];
 
   if (b.type === 'bridge') { G.drawBridge(ctx,b); return; }
+  if(b.type==='tunnel'){const ends=G.tunnelEndpoints(b);G.drawTunnelPortal(ctx,b,ends.start,true);G.drawTunnelPortal(ctx,b,ends.end,false);return;}
   if (b.type === 'farm') { G.drawFarm(ctx, b); return; }
   if (b.type === 'dock') { G.drawDock(ctx, b); return; }
 
@@ -1029,6 +1031,7 @@ G.citizenFacing = function (c, workTarget) {
 };
 
 G.drawCitizen = function (ctx, c, time, homes) {
+  if(G.tunnelInteriorAt(G.world,Math.round(c.x),Math.round(c.y)))return;
   if (G.citizenIndoorHome(c, homes) || (G.inMedicalCare && G.inMedicalCare(c)) || (G.inSchool && G.inSchool(c)) || (G.inChapel && G.inChapel(c))) return;
   const [sx0, sy0] = G.T2S(c.x, c.y);
   const sy = sy0 + 16 - (G.bridgeAt(G.world,Math.round(c.x),Math.round(c.y))?.state==='ok'?8:0);
@@ -1282,7 +1285,7 @@ G.frame = function (dtReal) {
       const px = sx * G.cam.z + G.cam.x, py = sy * G.cam.z + G.cam.y;
       if (px < -40 * G.cam.z || px > cv.clientWidth + 40 * G.cam.z || py < -20 * G.cam.z || py > cv.clientHeight + 20 * G.cam.z) continue;
       G.diamondPath(ctx, sx, sy);
-      ctx.fillStyle = (w.water[i] === 1 && plan.surface!=='bridge') || (G.isMountain&&G.isMountain(w,p.x,p.y)) || w.rock[i] || w.bgrid[i] >= 0 ? 'rgba(230,90,80,.6)' : w.treeIdx[i] >= 0 ? 'rgba(235,180,65,.6)' : 'rgba(120,230,140,.5)';
+      ctx.fillStyle = (w.water[i] === 1 && plan.surface!=='bridge') || (plan.surface!=='tunnel'&&G.isMountain&&G.isMountain(w,p.x,p.y)) || w.rock[i] || w.bgrid[i] >= 0 ? 'rgba(230,90,80,.6)' : w.treeIdx[i] >= 0 ? 'rgba(235,180,65,.6)' : 'rgba(120,230,140,.5)';
       ctx.fill();
     }
   }
@@ -1314,6 +1317,7 @@ G.frame = function (dtReal) {
     G.addEconomyFieldParts(items, b, { tx0, ty0, tx1, ty1 });
   // 建筑
   for (const b of w.buildings) {
+    if(b.type==='tunnel'){const ends=G.tunnelEndpoints(b);for(const [p,first]of [[ends.start,true],[ends.end,false]])if(p.x>=tx0-2&&p.x<=tx1+2&&p.y>=ty0-2&&p.y<=ty1+2)items.push({d:p.x+p.y+.62,k:9,b,p,first});continue;}
     if(b.type==='bridge'||b.type==='graveremnant')continue; // Decks sit above water, below people and bankside objects.
     const cx = b.x + b.w / 2, cy = b.y + b.h / 2;
     if (cx < tx0 - 3 || cx > tx1 + 3 || cy < ty0 - 3 || cy > ty1 + 3) continue;
@@ -1326,7 +1330,7 @@ G.frame = function (dtReal) {
     if (c.state === 'rest' && c.camped === false && !citizenHomes) citizenHomes = G.citizenHomeLookup(w);
     items.push({ d: c.x + c.y + 0.01, k: 2, c });
   }
-  for(const pile of [...(w.supplyCaches||[]),...(w.families||[]).map(f=>f.supplyCamp).filter(Boolean)])if(G.supplySum(pile.supplyStock)>1e-8&&pile.x>=tx0-3&&pile.x<=tx1+3&&pile.y>=ty0-3&&pile.y<=ty1+3)items.push({d:pile.x+pile.y+.005,k:6,pile});
+  for(const pile of [...(w.supplyCaches||[]),...(w.families||[]).map(f=>f.supplyCamp).filter(Boolean)])if(!G.tunnelInteriorAt(w,pile.x,pile.y)&&G.supplySum(pile.supplyStock)>1e-8&&pile.x>=tx0-3&&pile.x<=tx1+3&&pile.y>=ty0-3&&pile.y<=ty1+3)items.push({d:pile.x+pile.y+.005,k:6,pile});
   G.addDeerDrawItems(items,w,{tx0,ty0,tx1,ty1});
   items.sort((a, b) => a.d - b.d);
   const now = performance.now() / 1000;
@@ -1355,6 +1359,7 @@ G.frame = function (dtReal) {
     else if (it.k === 6) G.drawSupplyPile(ctx,it.pile);
     else if (it.k === 7) G.drawDeer(ctx,it.deer);
     else if (it.k === 8) G.drawMountain(ctx,w,it.x,it.y);
+    else if(it.k===9)G.drawTunnelPortal(ctx,it.b,it.p,it.first);
     else if (it.k === 1) {
       if(it.b.type==='farm')G.drawFarmPestBadge(ctx,it.b);
       if(it.b.type==='pasture')G.drawPasturePestBadge(ctx,it.b);
@@ -1379,6 +1384,9 @@ G.frame = function (dtReal) {
       }
     } else G.drawCitizen(ctx, it.c, now, citizenHomes);
   }
+
+  if(G.tool?.kind==='road'&&G.roadPlan?.surface==='tunnel'&&G.roadPlan.world===w&&G.roadPlan.start&&G.roadPlan.end)G.drawTunnelGuide(ctx,G.roadPlan.start,G.roadPlan.end,G.roadPlan.result.ok);
+  if(G.sel?.kind==='b'&&w.bmap[G.sel.id]?.type==='tunnel'){const ends=G.tunnelEndpoints(w.bmap[G.sel.id]);G.drawTunnelGuide(ctx,ends.start,ends.end,true);}
 
   // Raised mountain hit surfaces stay visible for all tools, including invalid builds.
   const mountainHover=G.hover&&G.hover.tx>=0&&G.drawMountainHover(ctx,w,G.hover.tx,G.hover.ty);
@@ -1472,4 +1480,24 @@ G.drawSupplyPile=function(ctx,pile){
  quadFill(ctx,x,by-1,x+6,by-4,x+6,by,x,by+3,'#5d452e');
  const types=G.SUPPLY.types.filter(k=>(pile.supplyStock[k]||0)>1e-8).slice(0,3);
  types.forEach((type,i)=>G.sprDraw(ctx,'carry_'+type,x+(i-(types.length-1)/2)*5,by-2,{w:8}));
+};
+
+
+/* Small code-native masonry mouths reuse the existing warm stone/wood palette.
+ * No bitmap is generated or repainted. Mountain collision and body stay intact;
+ * each mouth is depth-sorted/cullable separately even for a very long tunnel. */
+G.tunnelArchOutline=(half,h)=>[[-half,0],[-half,h-7],[-half*.83,h-2],[-half*.5,h+1],[0,h+2],[half*.5,h+1],[half*.83,h-2],[half,h-7],[half,0]];
+G.tunnelPortalGeometry=function(b,p,first){const {start,end}=G.tunnelEndpoints(b),other=first?end:start,dx=Math.sign(other.x-p.x),dy=Math.sign(other.y-p.y),[sx,sy]=G.T2S(p.x+dx*.45,p.y+dy*.45),ux=.894,uy=b.tunnelAxis==='x'?-.447:.447,outline=b.state==='ok'?G.tunnelArchOutline(12,23):[[-12,0],[-12,19],[12,19],[12,0]];return {sx,sy,ux,uy,points:outline.map(([x,h])=>[sx+ux*x,sy+16+uy*x-h])};};
+G.drawTunnelPortal=function(ctx,b,p,first){
+ const {sx,sy,ux,uy}=G.tunnelPortalGeometry(b,p,first),complete=b.state==='ok';ctx.save();ctx.transform(ux,uy,0,-1,sx,sy+16);
+ const arch=(half,h)=>G.mountainPolygonPath(ctx,G.tunnelArchOutline(half,h));
+ if(complete){arch(12,23);ctx.fillStyle=first?'#9d8d73':'#ad9c80';ctx.fill();ctx.strokeStyle='#625b4c';ctx.lineWidth=1;ctx.stroke();arch(7,18);ctx.fillStyle='#282b24';ctx.fill();
+  ctx.strokeStyle='#756955';ctx.lineWidth=.7;for(const side of [-1,1])for(const y of [6,12,17]){ctx.beginPath();ctx.moveTo(side*7,y);ctx.lineTo(side*12,y);ctx.stroke();}
+  for(const x of [-6,0,6]){ctx.beginPath();ctx.moveTo(x*.7,19-Math.abs(x)*.17);ctx.lineTo(x,25-Math.abs(x)*.23);ctx.stroke();}
+  ctx.strokeStyle='#c2b292';ctx.beginPath();ctx.moveTo(-11,1);ctx.lineTo(-11,16);ctx.stroke();
+ }else{ctx.fillStyle='#615b49';ctx.fillRect(-10,0,20,2);ctx.strokeStyle='#a4875f';ctx.lineWidth=2.5;for(const x of [-10,10]){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,18);ctx.stroke();}ctx.beginPath();ctx.moveTo(-11,17);ctx.lineTo(11,17);ctx.moveTo(-9,3);ctx.lineTo(9,14);ctx.moveTo(-9,14);ctx.lineTo(9,3);ctx.stroke();}
+ ctx.restore();if(!complete&&first){ctx.save();ctx.fillStyle='#493f30';ctx.fillRect(sx-13,sy-15,26,4);ctx.fillStyle=b.sitePaused?'#9b9585':'#d0af71';ctx.fillRect(sx-13,sy-15,26*b.progress,4);ctx.restore();}
+};
+G.drawTunnelGuide=function(ctx,start,end,valid){
+ const a=G.T2S(start.x,start.y),b=G.T2S(end.x,end.y);ctx.save();ctx.strokeStyle=valid?'rgba(220,188,124,.8)':'rgba(203,121,92,.9)';ctx.lineWidth=1.2/G.cam.z;ctx.setLineDash([5/G.cam.z,4/G.cam.z]);ctx.beginPath();ctx.moveTo(a[0],a[1]+16);ctx.lineTo(b[0],b[1]+16);ctx.stroke();ctx.setLineDash([]);ctx.font='10px sans-serif';ctx.textAlign='center';ctx.fillStyle='#edddb5';ctx.fillText('A',a[0],a[1]+29);ctx.fillText('B',b[0],b[1]+29);ctx.restore();
 };

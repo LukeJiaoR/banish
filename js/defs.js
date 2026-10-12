@@ -203,6 +203,10 @@ G.BDEF = {
     cost: { wood: 4, stone: 1 }, buildWork: 3, jobs: 0, passable: true,
     desc: '选两岸陆地端点，自动吸附直线。每格4木1石、3工时；工人从可达岸边建造，完工前不可通行。最多24格。桥上有人或没有替代跨岸通路时不能拆除。',
   },
+  tunnel: {
+    id:'tunnel',name:'隧道',icon:'🚇',w:1,h:1,cost:{stone:4},buildWork:3,jobs:0,passable:true,
+    desc:'两个清场陆地洞口夹连续山体，只沿水平或竖直轴线。每格4石材、3本作工时（含两端）；首洞口实运施工，完工后以土路速度穿山。洞内有人、留货或无替代通路时不能拆。',
+  },
   road: {
     id: 'road', name: '土路', icon: '🛣️', w: 1, h: 1,
     cost: {}, buildWork: 0, jobs: 0, passable: true, road: true,

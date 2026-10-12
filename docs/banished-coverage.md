@@ -66,7 +66,7 @@
 | L5 专营商人、同人订货与自动购买 | 有适配简化 | [模拟][sim] `orderMerchantGoods`、`arriveMerchant`、`setAutoTrade`、`runArrivalAutoTrade`；[存档][main] `merchantOrders`、`autoTrade`、`autoTradeLast`。[订货说明][orders-doc]、[自动购买说明][auto-doc] | 已有差异目录/拒收、同商人回访履约、订货溢价及每船单规则自动购买。缺多条优先级、混合付款、离港自动购买和循环订单，但这不等于“自动贸易缺失”。[Trade](https://banished-wiki.com/wiki/Trade)；Wiki 未完整说明自动购买选项，不能凭该页推断完整规格。 |
 | L6 全镇生产限额 | 已交付 | [模拟][sim] `productionGoalOf`、`setProductionGoal`、`effectiveProductionGoal`、`nextGoalPause`、`productionOutputsOf`；[界面][ui] 资源目标窗口；[存档][main] `productionGoals` / `productionPaused`。 | 食物、原料、燃料、工具、衣物、草药、酒等现有资源均有目标；保留本屋工具/柴火目标、已接批次、农田当季承诺和恢复线。限额不是硬仓容，也不保证存活。无需新增第二套“资源限制”。[Achievement Guide：库存目标与生产上限](https://banished-wiki.com/wiki/Tutorials/Achievement_Guide)、[实现说明][goals-doc] |
 | L7 土路、石路与跨水木桥 | 有适配简化 | [地图][map] `planRoad`、`planBridge`、`bridgeRemovalStatus`、`surfaceSpeed`；[定义][defs] 三种交通设施；[主程序][main] 规划确认、桥施工与路面存档。[交通说明][transport-doc] | 免费土路、石路付石升级、桥真实岸边施工后通行都已做。路速、24 格桥长和保守拆桥保护适配；道路铺设本身不是完整施工工序。**道路桥梁不是缺失项**。[Road](https://banished-wiki.com/wiki/Road)、[Bridges](https://banished-wiki.com/wiki/Bridges) |
-| L8 穿山隧道 | 真实缺失 | [定义][defs] 无 tunnel；[界面][ui] 道路分类只有 `road` / `stoneroad` / `bridge`；[地图][map] `tileBlocked` 无山体高度/隧道覆盖规则；[存档][main] 无隧道实体。 | 原版隧道穿越山地。当前首先缺真正的山地障碍，孤立加一个隧道建筑只会是装饰；应与 D2 的山地选址、两端入口和通行一起做，而非重写已完成道路桥梁。[Tunnel](https://banished-wiki.com/wiki/Tunnel) |
+| L8 穿山隧道 | 有适配简化（0.3.77 增量） | [地图](../js/map.js) `planTunnel`、`walkEdgeAllowed`、泥路时间代价；[模拟](../js/sim.js) 首洞口实运施工、唯一通路/人货拆除保护；[存档](../js/main.js) 权威山体与隧道几何校验；[说明](tunnels.md)、[#92](https://github.com/LukeJiaoR/banish/issues/92)。 | 居民与实货只能沿完工轴线穿山，不能侧入/斜入或隔墙取料。每格4石来自Wiki，3劳动映射本作工时；二值山体、单端施工和总长含两端为明确适配。鹿的洞内通行尚未扩展，不称完整复刻。[Tunnel](https://banished-wiki.com/wiki/Tunnel) |
 
 ## 五、服务与城镇发展（5 项）
 
@@ -83,7 +83,7 @@
 | 编号 / 系统 | 状态 | 真实实现与源码证据 | 相对原版的差异 / 剩余缺口及依据 |
 | --- | --- | --- | --- |
 | D1 玩家地图种子与开局设置 | 有适配简化 | 0.3.68的[主程序](../js/main.js) `startConfigQuote` / `prepareNewGame` / `confirmNewGame`、[预设](../js/defs.js) `START_PRESETS` 和[界面](../js/ui.js) `showNewGameSettings` 支持查看/复用/输入种子（含0）、现行五家庭与无种子四家庭；两阶段最终确认、原子生成、旧档未知配置保全。困难小麦需真实贸易买种后播种，见[说明](start-settings.md)。 | 家庭结构依Wiki，库存与48日年为本作适配；尚无简单六家庭预建村、随机初始种子/牲畜，现行五家庭不是原版中等完整参数。地图类型/气候仍见D2。[Map Seeds](https://banished-wiki.com/wiki/Map_Seeds)、[Difficulty Levels](https://www.banished-wiki.com/wiki/Tutorials/Getting_Started_Guide#Difficulty_Levels) |
-| D2 山地、地图类型/尺寸与气候 | 有适配简化（0.3.75 增量） | [地图](../js/map.js) `genMountainWorld`、`mountainStartReport`、山体阻路/阻建；[新局与存档](../js/main.js) 地形选择和根v2完整地形恢复；[说明](mountain-start.md)、[#85](https://github.com/LukeJiaoR/banish/issues/85)。实际车/人落位后证明住房、原料、成熟食物林和水岸可达，旧v1不变。 | 原地形/山地可选，41×37保底谷地与山脊视觉高度为本作适配，隧道仍另片；小中大地图、温和/严酷气候与真实气温/霜期仍缺，不用新标签冒充完成。[Hard Difficulty：Map Settings](https://banished-wiki.com/wiki/Tutorials/First_Year_on_Hard_Difficulty#Map_Settings) |
+| D2 山地、地图类型/尺寸与气候 | 有适配简化（0.3.75 增量） | [地图](../js/map.js) `genMountainWorld`、`mountainStartReport`、山体阻路/阻建；[新局与存档](../js/main.js) 地形选择和根v2完整地形恢复；[说明](mountain-start.md)、[#85](https://github.com/LukeJiaoR/banish/issues/85)。实际车/人落位后证明住房、原料、成熟食物林和水岸可达，旧v1不变。 | 原地形/山地可选，41×37保底谷地与山脊视觉高度为本作适配，0.3.77已接单端隧道；小中大地图、温和/严酷气候与真实气温/霜期仍缺，不用新标签冒充完成。[Hard Difficulty：Map Settings](https://banished-wiki.com/wiki/Tutorials/First_Year_on_Hard_Difficulty#Map_Settings) |
 | D3 住房火灾、水井与真实扑救 | 有适配简化 | [火灾][fire] `setFireDisasters`、`igniteHouse`、`assignFireRescuers`、`fireWaterSpot`、`completeFirefighting`、`finishHouseFire`；[存档][main] `houseFire` / `ruinFrom`。有烟警、迁出、提水、蔓延、烧毁与付费重建。 | 默认关闭；只覆盖独栋住房，至多有限邻屋、无直接火灾死亡，非原版全城建筑火灾。水井供扑救，不制造可交易“水”。已足以产生预备住房/消防路线选择，不优先扩更多火灾条款。[Well](https://banished-wiki.com/wiki/Well)、[Disasters](https://banished-wiki.com/wiki/Disasters) |
 | D4 农田虫害、抢收与轮作 | 有适配简化 | [模拟][sim] `setFarmPests`、`advanceFarmPests`、`farmPestSummary`、`beginEarlyHarvest`；[存档][main] `farmPests`、`pestInfestation`、`lastPestCrop`。选择启用后，未收作物会损失，换作物影响复发。 | 核心应对已做，概率/宽限/损失批次为适配；不能从“已有农田虫害”推断果园也感染。Wiki 明确支持抢收和改种，但同页已澄清土壤退化未实现，不应开发伪原版“强制肥力耗尽”。[Farming / Infestation](https://banished-wiki.com/wiki/Farming#Infestation) |
 | D5 牧场疫病与整群搬空 | 有适配简化（0.3.65 增量） | [Issue #67](https://github.com/LukeJiaoR/banish/issues/67)；[本片模拟](../js/sim.js) `advancePasturePests` / `emptyPasture`、[规则](pasture-pests.md)。从0.3.64的繁殖/产物/分群扩展为明确确认的可选疫病和独立整群搬空，最后1–2头也可保种；旧村默认关闭。 | 12日宽限、2日预警、每天1死、全镇最多1场为适配，搬空清疫；原场已产物/携货与繁殖进度守恒。动物仍按群体直接安置，不是逐头赶畜；不接人类诊所或无依据邻场传播。交付条件见顶部合并口径。[Pasture](https://banished-wiki.com/wiki/Pasture) |
@@ -117,7 +117,7 @@
 
 **已核可见问题：**人物劳作仍按任务固定挥工具或抱筐单帧，仅做上下轻动；这是已有反馈所述机械感的真实来源。后续若补帧，应沿原提示词锁同一角色、现17像素显示高、脚点和原透视，区分工具动作/采收动作；不重绘整套人物，也不把未复现的布局朝向问题先当bug修。
 
-**真实玩法缺口仍保留：**其余作物/果树目录、逐仓实物库存、隧道、地图尺寸/气候选择。0.3.75已按独立票接入可选山地与存档安全，详见[山地规则](mountain-start.md)。不可把它们一口气扩成框架；气候需要真实霜期/冷伤/取暖差异与旧档保全，隧道下一片复用真实山体，仍需单端建材运输、沿轴边级通行与唯一通路拆除保护。新预设标签没有这些规则就没有玩家价值。
+**真实玩法缺口仍保留：**其余作物/果树目录、逐仓实物库存、鹿的隧道通行、地图尺寸/气候选择。0.3.75已按独立票接入可选山地与存档安全，详见[山地规则](mountain-start.md)。不可把它们一口气扩成框架；气候需要真实霜期/冷伤/取暖差异与旧档保全，0.3.77已接单端建材运输、沿轴边级通行与唯一通路拆除保护，保留鹿群通行等明确差异。新预设标签没有这些规则就没有玩家价值。
 
 **建材实际配送已于0.3.71交付**，范围见 [#79](https://github.com/LukeJiaoR/banish/issues/79) 与 [建材实运](construction-delivery.md)：原 0.3.70 仅在放置时全额扣库存，没有工人取料到场；本片补真实运入并守住旧已付工地合同，仍不扩成逐仓库存。
 
@@ -133,7 +133,7 @@
 
 - **已交付的重点不再重排开发：**市场家庭补给、衣服穿戴/配送、个人工具、贸易订货与自动购买、森林/渔场约束、矿点耗尽、学校到课、礼拜堂、鸡牧场和半群扩场。可在真实试玩发现具体问题时另建修复票。
 - **人口寿命不是缺失：**当前每历年长 1 岁导致代际跨度长，是实质适配；Wiki `Citizens` 同时写年龄倍率和不相符的季节换算。可单独核实后做可解释的节奏选择，但不在新增牧场/果树时暗改老村年龄、学校毕业或生育，避免把整个经济重新调平。
-- **保留真实缺口，但先解依赖：**隧道需要山地；真实主河商船需要水路拓扑；逐仓本地库存会广泛影响现有工业、贸易和家庭配送。它们有价值，但应拆成有玩家收益的独立票，不能为“原版一模一样”一次性推翻可玩系统。
+- **保留真实缺口，但先解依赖：**居民隧道及山地已接入，鹿群通行仍有差异；真实主河商船需要水路拓扑；逐仓本地库存会广泛影响现有工业、贸易和家庭配送。它们有价值，但应拆成有玩家收益的独立票，不能为“原版一模一样”一次性推翻可玩系统。
 - **不要把旧概述当发布版精确规则：**[Farming](https://banished-wiki.com/wiki/Farming) 已明确澄清土壤退化没有实现；[Food](https://banished-wiki.com/wiki/Food) 的老概述与专门建筑页在产粮时序/过捕描述上不完全一致。采用对应玩法专页，并明确不确定处。住宅燃料和采集树龄的 Wiki 描述也有冲突，现有成本、产量、容量与日数一律以“本作适配”披露。
 - **每片玩法配可见美术，验证跟范围走：**新增果品、围栏、地图差异应在实际状态里看得到。复用已合格原创素材；仅对受影响闭环做代码、存档、界面与实际绘制检查。文档存在、离线图片或 DOM 测试不等于真人浏览器/手机试玩，也不等于生产部署。
 
