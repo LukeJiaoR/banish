@@ -267,15 +267,15 @@ G.ui = {
     const special = ['fell', 'quarry', 'demolish'];
     const available = t => !['burntruins', 'mineralpit'].includes(t) && (special.includes(t) || !!G.BDEF[t]);
     this.toolGroups = [
-      { id: 'homes', name: '住房', icon: '🏠', hint: '安家与过冬', tools: ['house', 'stonehouse', 'boarding'] },
-      { id: 'food', name: '食物生产', icon: '🌾', hint: '肉蛋 · 蔬果 · 主食', tools: ['gatherer', 'hunting', 'dock', 'farm', 'orchard', 'pasture'] },
-      { id: 'industry', name: '资源与加工', icon: '⚒️', hint: '木石铁煤 · 工具 · 衣物 · 酿造', tools: ['forester', 'woodcutter', 'stonequarry', 'mine', 'blacksmith', 'tailor', 'tavern'] },
-      { id: 'services', name: '城镇服务', icon: '🏘️', hint: '储运 · 市场 · 水源 · 教育 · 医疗 · 礼拜 · 迁入 · 安葬', tools: ['storage', 'stockpile', 'market', 'well', 'school', 'herbalist', 'hospital', 'chapel', 'tradingpost', 'townhall', 'cemetery'] },
-      { id: 'land', name: '道路与采运', icon: '🛣️', hint: '修路 · 采集 · 拆除', tools: ['road', 'stoneroad', 'bridge', 'fell', 'quarry', 'demolish'] },
+      { id: 'homes', name: '住房', icon: '🏠', tools: ['house', 'stonehouse', 'boarding'] },
+      { id: 'food', name: '食物生产', icon: '🌾', tools: ['gatherer', 'hunting', 'dock', 'farm', 'orchard', 'pasture'] },
+      { id: 'industry', name: '资源与加工', icon: '⚒️', tools: ['forester', 'woodcutter', 'stonequarry', 'mine', 'blacksmith', 'tailor', 'tavern'] },
+      { id: 'services', name: '城镇服务', icon: '🏘️', tools: ['storage', 'stockpile', 'market', 'well', 'school', 'herbalist', 'hospital', 'chapel', 'tradingpost', 'townhall', 'cemetery'] },
+      { id: 'land', name: '道路与采运', icon: '🛣️', tools: ['road', 'stoneroad', 'bridge', 'fell', 'quarry', 'demolish'] },
     ].map(group => ({ ...group, tools: group.tools.filter(available) })).filter(group => group.tools.length);
     const registered = new Set(this.toolGroups.flatMap(group => group.tools));
     const extra = (G.TOOLBAR || []).filter(t => available(t) && !registered.has(t));
-    if (extra.length) this.toolGroups.push({ id: 'other', name: '其他建筑', icon: '🔨', hint: '更多建造', tools: extra });
+    if (extra.length) this.toolGroups.push({ id: 'other', name: '其他建筑', icon: '🔨', tools: extra });
     this.menuCategory = null;
     this.el.toolbar.innerHTML = `
       <div class="toolbar-heading">
@@ -284,7 +284,7 @@ G.ui = {
         <button type="button" id="toolbar-cancel" class="toolbar-nav hidden" title="退出当前工具；已确认的采运任务会保留">取消工具</button>
       </div>
       <div id="toolbar-categories" class="toolbar-items" role="group" aria-label="一级功能分类">
-        ${this.toolGroups.map(group => `<button type="button" class="tb tb-category" data-category="${group.id}" aria-controls="toolbar-group-${group.id}" aria-expanded="false"><span class="ic" aria-hidden="true">${group.icon}</span><span class="lb">${group.name} ›</span><span class="cost">${group.tools.length} 项 · ${group.hint}</span></button>`).join('')}
+        ${this.toolGroups.map(group => this.toolCategoryButton(group)).join('')}
       </div>
       ${this.toolGroups.map(group => `<div id="toolbar-group-${group.id}" class="toolbar-items tool-group hidden" data-tool-group="${group.id}" role="group" aria-label="${group.name}二级操作">${group.tools.map(t => this.toolButton(t)).join('')}</div>`).join('')}
       <p id="toolbar-state" role="status" aria-live="polite">选择分类，再选择建筑或操作。</p>`;
@@ -310,6 +310,11 @@ G.ui = {
           (G.hasOpenModal && G.hasOpenModal()) || (G.isEditingTarget && G.isEditingTarget(e.target))) return;
       this.backToCategories(); e.preventDefault(); e.stopImmediatePropagation();
     }, true);
+  },
+
+  toolCategoryButton: function (group) {
+    const name=this.escHtml(group.name);
+    return `<button type="button" class="tb tb-category" data-category="${group.id}" aria-controls="toolbar-group-${group.id}" aria-expanded="false" aria-label="${name}" title="${name}"><span class="ic" aria-hidden="true">${group.icon}</span><span class="category-label"><span class="lb">${name}</span><span class="category-arrow" aria-hidden="true">›</span></span></button>`;
   },
 
   toolButton: function (t) {

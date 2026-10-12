@@ -360,8 +360,18 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 #toolbar-cancel { border-color: #ae7250; color: #ffd2b8; }
 .toolbar-items { display: flex; gap: 6px; width: 100%; max-width: 100%; overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; padding: 2px; scrollbar-width: thin; scrollbar-color: #b79b64 #302619; }
 #toolbar .tb { min-width: 88px; min-height: 72px; padding: 6px 7px; }
-#toolbar .tb-category { min-width: 126px; }
-#toolbar .tb-category .cost { font-size: 10px; }
+/* Equal top-level hit boxes; detail/cost stays in the second-level tools. */
+#toolbar .tb-category {
+  --category-card-width: 126px;
+  flex: 0 0 var(--category-card-width);
+  width: var(--category-card-width); min-width: var(--category-card-width); max-width: var(--category-card-width);
+  height: 72px; min-height: 72px; max-height: 72px;
+  box-sizing: border-box; padding: 8px 7px; gap: 5px; justify-content: center; overflow: hidden;
+}
+#toolbar .tb-category .ic { flex: 0 0 26px; width: 26px; min-width: 26px; height: 26px; line-height: 26px; font-size: 20px; text-align: center; }
+#toolbar .tb-category .category-label { display: flex; align-items: center; justify-content: center; gap: 4px; max-width: 100%; min-width: 0; height: 18px; line-height: 18px; }
+#toolbar .tb-category .lb { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#toolbar .tb-category .category-arrow { flex: none; }
 #toolbar-state { color: #c6b79a; font-size: 11px; line-height: 1.5; min-height: 17px; max-width: 730px; }
 #survival-guide { top: calc(var(--hud-height) + 10px); }
 #info { top: calc(var(--hud-height) + 10px); width: 280px; max-height: calc(100vh - var(--hud-height) - var(--toolbar-height) - 46px); }
@@ -376,8 +386,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   #speed { margin-left: 0; }
   #sys { margin-left: auto; }
   #survival-guide { width: min(420px, calc(100vw - 314px)); }
-  #toolbar .tb-category { min-width: 106px; }
-  #toolbar .tb-category .cost { max-width: 94px; white-space: normal; text-align: center; }
+  #toolbar .tb-category { --category-card-width: 106px; }
 }
 @media (max-width: 600px) {
   #topbar { padding: 6px 8px; font-size: 11px; }
@@ -394,7 +403,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   #toolbar-path { font-size: 11px; }
   .toolbar-heading { gap: 6px; }
   .toolbar-nav { min-height: 40px; padding: 5px 8px; }
-  #toolbar .tb { min-width: 86px; }
+  #toolbar .tb:not(.tb-category) { min-width: 86px; }
   #toolbar-state { max-width: calc(100vw - 30px); }
   #survival-guide { width: calc(100vw - 24px); font-size: 11px; }
   #info { width: min(300px, calc(100vw - 24px)); top: calc(var(--hud-height) + 10px); max-height: calc(100vh - var(--hud-height) - var(--toolbar-height) - 34px); }
