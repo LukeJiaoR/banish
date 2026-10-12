@@ -20,7 +20,7 @@
       <button id="btn-production-goals" title="全镇自动生产目标">资源目标</button>
       <button id="btn-save" title="保存到手动档">💾</button>
       <button id="btn-load" title="存档管理：载入 / 删除">📂</button>
-      <button id="btn-new" title="新游戏">🌱</button>
+      <button id="btn-new" title="新游戏设置 / 查看地图种子">🌱</button>
       <button id="btn-fb" title="发送试玩反馈（无需注册）">📮</button>
       <button id="btn-help" title="帮助">❓</button>
     </div>
@@ -176,6 +176,37 @@
       <h2>🕊 小镇消亡了</h2>
       <p id="over-text"></p>
       <button id="over-restart">重新开始</button>
+    </div>
+  </div>
+  <div id="new-game-settings" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="new-game-title">
+    <div class="dialog start-settings-dialog">
+      <h2 id="new-game-title">🌱 开创新家园</h2>
+      <p id="new-game-current"></p>
+      <div class="start-seed-row">
+        <label for="new-game-seed">地图种子<input id="new-game-seed" type="text" inputmode="numeric" maxlength="11" autocomplete="off" aria-describedby="new-game-seed-hint"></label>
+        <button type="button" id="new-game-random">随机种子</button>
+        <button type="button" id="new-game-reuse">复用当前种子</button>
+      </div>
+      <p id="new-game-seed-hint">整数 −2147483648 至 4294967295，0也是固定种子。同种子与开局配置重建初始村庄；不是中途存档回放。</p>
+      <div id="new-game-presets" class="start-presets" role="group" aria-label="选择开局预设">
+        <button type="button" id="new-game-preset-classic" data-start-preset="classic" aria-pressed="true"></button>
+        <button type="button" id="new-game-preset-hard" data-start-preset="hard" aria-pressed="false"></button>
+      </div>
+      <p id="new-game-summary"></p>
+      <p class="fb-hint">本片为小地图经济适配。地图大小、气候与地形类型保持现状；可选灾难仍默认关闭。</p>
+      <p id="new-game-status" class="fb-status" role="status" aria-live="polite"></p>
+      <button type="button" id="new-game-review-button">检查开局并继续</button>
+      <section id="new-game-review" class="hidden" aria-label="新村最终确认">
+        <h3>确认替换当前进度</h3>
+        <p id="new-game-confirm-summary"></p>
+        <p class="warn-txt">继续会放弃当前未保存进度，并清理当前自动档，新村之后会自动保存。手动档不会删除。若要保留此村，请先导出，并自行核对下载文件已保存。</p>
+        <button type="button" id="new-game-back">返回修改</button>
+        <button type="button" id="new-game-confirm">放弃当前进度并创建新村</button>
+      </section>
+      <div class="save-actions">
+        <button type="button" id="new-game-export">导出当前村</button>
+        <button type="button" id="new-game-close" class="plain">取消，继续当前村</button>
+      </div>
     </div>
   </div>
 </div>

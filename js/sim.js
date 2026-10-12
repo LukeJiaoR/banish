@@ -67,8 +67,9 @@ G.observeTownChallenges=function(){
   for(const key of G.TOWN_CHALLENGE_KEYS)if(facts[key].ready&&g.challenges.completed[key]===undefined)g.challenges.completed[key]=g.day;
 };
 
-G.newGameState = function () {
+G.newGameState = function (startConfig = null) {
   const g = {
+    startConfig: startConfig ? {...startConfig} : null,
     h: 6, day: 0, season: 0, year: 1,
     speed: 1, paused: false,
     res: { wood: 80, stone: 48, iron: 0, tools: 15, food: 500, meat: 0, eggs:0, vegetables: 0, apples:0, pears:0, grain: 500, leather: 0, wool: 0, clothes: 0, warmCoats: 0, herbs: 0, coal: 0, steelTools: 0, ale: 0, firewood: 50 }, // 开局（原版中难度 5 家庭，工具 15 件≈第一轮磨损周期）；存粮较原版加厚：15 人 6 天食物跑道撑不到第一座采集屋建成
@@ -80,7 +81,7 @@ G.newGameState = function () {
     over: false,
     stats: { born: 0, died: 0, deadReasons: {} },
     prevFood: 200,
-    unlocks: { orchard: false, apple:false, pear:false, cabbage:false, beans:false }, livestock: { sheep: 0, cattle: 0, chicken:0 },
+    unlocks: { wheat:true, orchard: false, apple:false, pear:false, cabbage:false, beans:false }, livestock: { sheep: 0, cattle: 0, chicken:0 },
     foodNet: 0,
     foodUrgent: false,
     warned: {},
@@ -89,6 +90,13 @@ G.newGameState = function () {
     steelToolWear: 0,
     toolWear: 0,    // 工具磨损累积器（满 1 磨掉 1 把）
   };
+  if(startConfig){
+    const preset=G.START_PRESETS[startConfig.preset];
+    if(!preset)throw new Error('未知开局预设');
+    g.res=Object.fromEntries(G.RES_KEYS.map(k=>[k,preset.stocks[k]||0]));
+    g.res.food=G.FOOD_KEYS.reduce((sum,k)=>sum+g.res[k],0);
+    g.unlocks.wheat=preset.wheat;
+  }
   g.townLedger=G.newTownLedger(g);return g;
 };
 G.game = G.newGameState();
@@ -136,7 +144,7 @@ G.endDay = function () {
 
   // ---- 农田生长 ----
   for (const b of w.buildings) {
-    if (b.type === 'farm' && b.state === 'ok' && b.sownAll && !b.earlyHarvestYield && b.growth < 1 && g.season !== 3)
+    if (b.type === 'farm' && b.state === 'ok' && G.cropUnlocked(G.farmCropOf(b)) && b.sownAll && !b.earlyHarvestYield && b.growth < 1 && g.season !== 3)
       b.growth = Math.min(1, b.growth + 1 / G.farmGrowDays(b));
   }
 
@@ -1746,6 +1754,7 @@ G.makeTask = function (b, c) {
     }
     case 'farm': {
       if (b.state !== 'ok') return null;
+      if (!G.cropUnlocked(G.farmCropOf(b))) { b.noWork=true; b.warnText='尚无此作物种子：需在贸易站购买后才能播种'; return null; }
       const P2 = P.farm;
       // 同田工人在种/收的格子不再重复认领：四人挤一格会把播种拖成十天，
       // 成熟期随 sownAll 顺延，秋收窗口不够就只能看着作物冻死
@@ -1897,7 +1906,7 @@ G.completeTask = function (c) {
 };
 
 G.resetFarm = function (b, applyChoice = G.game.season === 0) {
-  if(applyChoice)b.cropType=G.cropChoiceOf(b);
+  if(applyChoice&&G.cropUnlocked(G.cropChoiceOf(b)))b.cropType=G.cropChoiceOf(b);
   for (const f of b.farm) { f.sown = false; f.harvested = false; delete f.pestLost; }
   delete b.pestInfestation;
   b.sownAll = false; b.growth = 0; b.harvestDone = false; delete b.sowingCommitted; delete b.earlyHarvestYield;
@@ -1984,6 +1993,7 @@ G.pickMarkDonor = function (w, harvestSeason, foodJobs, needFood) {
 };
 
 G.farmHasWork = function (b) {
+  if (!G.cropUnlocked(G.farmCropOf(b))) return false;
   const season = G.game.season;
   return (!b.sownAll && (season === 0 || season === 1) && (!G.goalPaused(G.farmOutput(b)) || G.farmSeasonCommitted(b))) ||
     G.farmHarvestReady(b);
@@ -2451,7 +2461,7 @@ G.tradeIncoming=function(b,exclude=null){
 G.tradeFreeSpace=(b,exclude=null)=>Math.max(0,G.TRADE_CAPACITY-G.tradeStored(b)-G.tradeIncoming(b,exclude));
 
 G.TRADE_VALUES = {wood:2,stone:7,iron:5,tools:8,firewood:4,meat:1,eggs:2,vegetables:1,apples:1,pears:1,grain:1,leather:10,wool:5,clothes:15,warmCoats:20,herbs:4,coal:6,steelTools:10};
-G.TRADE_GOODS = {chicken:{name:'鸡',price:400,stock:4},eggs:{name:'鸡蛋',price:2,stock:200},meat:{name:'肉类',price:1,stock:200},coal:{name:'煤',price:6,stock:100},steelTools:{name:'钢工具',price:10,stock:20},sheep:{name:'羊',price:600,stock:4},cattle:{name:'牛',price:800,stock:4},orchardSeed:{name:'果树种子',price:2500,stock:1},appleSeed:{name:'苹果种子',price:2500,stock:1},pearSeed:{name:'梨种子',price:2500,stock:1},apples:{name:'苹果',price:1,stock:200},pears:{name:'梨',price:1,stock:200},cabbageSeed:{name:'卷心菜种子',price:2500,stock:1},beanSeed:{name:'早熟豆类种子',price:2500,stock:1},grain:{name:'主食',price:1,stock:400},iron:{name:'铁',price:5,stock:100},leather:{name:'皮革',price:10,stock:80}};
+G.TRADE_GOODS = {wheatSeed:{name:'小麦种子',price:2500,stock:1},chicken:{name:'鸡',price:400,stock:4},eggs:{name:'鸡蛋',price:2,stock:200},meat:{name:'肉类',price:1,stock:200},coal:{name:'煤',price:6,stock:100},steelTools:{name:'钢工具',price:10,stock:20},sheep:{name:'羊',price:600,stock:4},cattle:{name:'牛',price:800,stock:4},orchardSeed:{name:'果树种子',price:2500,stock:1},appleSeed:{name:'苹果种子',price:2500,stock:1},pearSeed:{name:'梨种子',price:2500,stock:1},apples:{name:'苹果',price:1,stock:200},pears:{name:'梨',price:1,stock:200},cabbageSeed:{name:'卷心菜种子',price:2500,stock:1},beanSeed:{name:'早熟豆类种子',price:2500,stock:1},grain:{name:'主食',price:1,stock:400},iron:{name:'铁',price:5,stock:100},leather:{name:'皮革',price:10,stock:80}};
 // Profile selection and visit timing are compact-map adaptations. Orders follow
 // the original same-merchant / pay-on-purchase / floor(1.25*price) rules.
 G.MERCHANT_CYCLE=['general','supplies','seeds'];
@@ -2459,7 +2469,7 @@ G.MERCHANT_INTERVAL=16;
 G.MERCHANTS={
   general:{id:'general',name:'河湾杂货商',goods:Object.keys(G.TRADE_GOODS),acceptsFood:true,assortment:4},
   supplies:{id:'supplies',name:'山路物资商',goods:['coal','steelTools','iron','leather'],acceptsFood:false,assortment:2},
-  seeds:{id:'seeds',name:'绿篱种子商',goods:['orchardSeed','appleSeed','pearSeed','cabbageSeed','beanSeed'],acceptsFood:false,assortment:1}
+  seeds:{id:'seeds',name:'绿篱种子商',goods:['orchardSeed','appleSeed','pearSeed','cabbageSeed','beanSeed','wheatSeed'],acceptsFood:false,assortment:1}
 };
 G.merchantProfile=b=>G.MERCHANTS[b?.merchant?.id]||G.MERCHANTS.general;
 G.merchantPrice=(b,good)=>Object.hasOwn(G.TRADE_GOODS,good)?(b?.merchant?.orderedGood===good?Math.floor(G.TRADE_GOODS[good].price*1.25):G.TRADE_GOODS[good].price):0;
@@ -3490,13 +3500,13 @@ G.tailorSummary=function(b){
 /* Crop diversity stays inside the three existing food classes. Selection is
  * next-season intent; a started field and its cargo keep the actual crop. */
 G.CROPS={wheat:{name:'小麦',output:'grain',growDays:24,perTile:14,sprite:'crop'},cabbage:{name:'卷心菜',output:'vegetables',growDays:24,perTile:14,sprite:'cabbage'},beans:{name:'早熟豆类',output:'vegetables',growDays:12,perTile:10,sprite:'bean',summerHarvest:true}};
-G.seedUnlockKey=good=>good==='orchardSeed'?'orchard':good==='appleSeed'?'apple':good==='pearSeed'?'pear':good==='cabbageSeed'?'cabbage':good==='beanSeed'?'beans':null;
+G.seedUnlockKey=good=>good==='wheatSeed'?'wheat':good==='orchardSeed'?'orchard':good==='appleSeed'?'apple':good==='pearSeed'?'pear':good==='cabbageSeed'?'cabbage':good==='beanSeed'?'beans':null;
 G.seedTradeReason=function(good,qty){
   const key=G.seedUnlockKey(good);if(!key)return '';
-  if(G.game.unlocks[key])return `${G.TRADE_GOODS[good].name}已永久解锁，无需重复购买`;
+  if(key==='wheat'?G.cropUnlocked('wheat'):G.game.unlocks[key])return `${G.TRADE_GOODS[good].name}已永久解锁，无需重复购买`;
   return qty!==1?'种子只需购买1份，永久解锁所有对应农田或果园':'';
 };
-G.cropUnlocked=type=>typeof type==='string'&&Object.hasOwn(G.CROPS,type)&&(type==='wheat'||G.game.unlocks[type]===true);
+G.cropUnlocked=(type,g=G.game)=>typeof type==='string'&&Object.hasOwn(G.CROPS,type)&&(type==='wheat'?g.unlocks?.wheat!==false:g.unlocks?.[type]===true);
 G.farmCropOf=b=>typeof b.cropType==='string'&&Object.hasOwn(G.CROPS,b.cropType)?b.cropType:'wheat';
 G.cropChoiceOf=b=>typeof b.cropChoice==='string'&&Object.hasOwn(G.CROPS,b.cropChoice)?b.cropChoice:'wheat';
 G.farmOutput=b=>G.CROPS[G.farmCropOf(b)].output;
@@ -3506,10 +3516,11 @@ G.farmMatureSeason=b=>G.game.season===2||(G.game.season===1&&G.CROPS[G.farmCropO
 /* Early harvest fixes this season's reduced base yield. It never grants food
  * directly; normal tile work, tools and hauling still produce each unit. */
 G.farmHarvestBase=b=>b.earlyHarvestYield||G.farmBaseYield(b);
-G.farmHarvestReady=b=>!!(b&&b.type==='farm'&&b.state==='ok'&&b.sownAll&&!b.harvestDone&&G.game.season!==3&&
+G.farmHarvestReady=b=>!!(b&&b.type==='farm'&&b.state==='ok'&&G.cropUnlocked(G.farmCropOf(b))&&b.sownAll&&!b.harvestDone&&G.game.season!==3&&
   (b.earlyHarvestYield||(G.farmMatureSeason(b)&&b.growth>=1)));
 G.earlyHarvestQuote=function(b){
   if(!b||G.world.bmap[b.id]!==b||b.type!=='farm'||b.state!=='ok')return {ok:false,reason:'农田尚不可用'};
+  if(!G.cropUnlocked(G.farmCropOf(b)))return {ok:false,reason:'尚无此作物种子'};
   if(G.game.season===3)return {ok:false,reason:'冬季休耕，不能抢收'};
   if(b.harvestDone)return {ok:false,reason:'本季已收完，下一春才能再播种'};
   if(b.earlyHarvestYield)return {ok:false,reason:`本季已确认抢收，基础每格${b.earlyHarvestYield}；等农夫实际收割送仓`};
@@ -3533,7 +3544,7 @@ G.beginEarlyHarvest=function(b,key){
 };
 G.farmTaskCurrent=function(t){
   const b=t&&t.b,g=G.game;
-  if(!b||G.world.bmap[b.id]!==b||b.type!=='farm'||b.state!=='ok'||!b.farm[t.ti]||
+  if(!b||G.world.bmap[b.id]!==b||b.type!=='farm'||b.state!=='ok'||!G.cropUnlocked(G.farmCropOf(b))||!b.farm[t.ti]||
     (t.crop&&t.crop!==G.farmCropOf(b))||(t.cropYear!==undefined&&t.cropYear!==g.year))return false;
   return t.kind==='sow'?(g.season===0||g.season===1):t.kind==='harvest'&&G.farmHarvestReady(b);
 };
@@ -3610,10 +3621,10 @@ G.advanceFarmPests=function(){
 G.farmSummary=function(b){
   const crop=G.farmCropOf(b),choice=G.cropChoiceOf(b),committed=G.farmSeasonCommitted(b),g=G.game;
   const sown=b.farm.filter(f=>f.sown).length,harvested=b.farm.filter(f=>f.harvested&&!f.pestLost).length;
-  let status=g.season===3?'冬季休耕，等待下一春':b.harvestDone?(b.farm.some(f=>f.pestLost)?'本季已结束（含虫害损失）':'本季收获完成'):!b.sownAll?
+  let status=!G.cropUnlocked(crop)?'尚无此作物种子：需在贸易站购买后才能播种':g.season===3?'冬季休耕，等待下一春':b.harvestDone?(b.farm.some(f=>f.pestLost)?'本季已结束（含虫害损失）':'本季收获完成'):!b.sownAll?
     (g.season===2?'秋季已过播种窗口':G.goalPaused(G.farmOutput(b))&&!committed?'目标已达，暂停新季播种':`播种 ${sown}/${b.farm.length}`):
     b.earlyHarvestYield?`抢收 ${harvested}/${b.farm.length}（本季基础每格${b.earlyHarvestYield}）`:b.growth<1?`生长中 ${Math.floor(b.growth*100)}%`:G.farmMatureSeason(b)?`${g.season===1?'夏收':'秋收'} ${harvested}/${b.farm.length}`:'作物成熟，等待秋季';
-  const reason=committed?'本季已开始：只改下一春，不改变已接任务、在田作物或在途收获':
+  const reason=!G.cropUnlocked(crop)?'空田保留作物占位，不会自动播种；购买种子永久解锁后再种植':committed?'本季已开始：只改下一春，不改变已接任务、在田作物或在途收获':
     g.season===0||g.season===1?'空田尚未开始：已解锁作物可用于本季播种':'当前不能播种：选择留待下一春';
   return {crop,choice,output:G.CROPS[crop].output,choiceOutput:G.CROPS[choice].output,pending:crop!==choice,committed,
     unlocked:Object.fromEntries(Object.keys(G.CROPS).map(k=>[k,G.cropUnlocked(k)])),growDays:G.farmGrowDays(b),fullPerTile:G.farmBaseYield(b),summerHarvest:G.CROPS[crop].summerHarvest===true,status,reason,growth:b.growth,sown,harvested,total:b.farm.length,

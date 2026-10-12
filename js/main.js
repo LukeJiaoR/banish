@@ -14,11 +14,12 @@ G.autosaveBlocked = false;
 G.RECOVERY_SAVE_KEY = G.AUTOSAVE_KEY + '_recovery';
 
 G.topModal = function () {
-  // Overlay order matches the DOM stacking order (all use the same z-index).
-  return ['over', 'fb', 'errs', 'saves', 'production-goals', 'help'].map(id => document.getElementById(id))
+  // Settings sit above game-over; remaining dialogs follow their DOM stacking order.
+  return ['new-game-settings', 'over', 'fb', 'errs', 'saves', 'production-goals', 'help'].map(id => document.getElementById(id))
     .find(el => el && !el.classList.contains('hidden')) || null;
 };
 G.hasOpenModal = function () { return !!G.topModal(); };
+G.newGameSettingsOpen = function () { const el=typeof document==='undefined'?null:document.getElementById('new-game-settings');return !!el&&!el.classList.contains('hidden'); };
 G.isEditingTarget = function (target) {
   if (!target) return false;
   return target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName || '') ||
@@ -31,64 +32,102 @@ G.isInputTarget = function (target) {
 };
 
 /* ---------- 新游戏 ---------- */
+/* Pure draft validation: blank input is not a seed. Only the settings dialog
+ * chooses a random draft; zero and signed historical seeds remain explicit. */
+G.startConfigQuote = function (input) {
+  const fail=reason=>({ok:false,reason});
+  if(!input||typeof input!=='object'||Array.isArray(input))return fail('请选择开局设置');
+  if(input.v!==undefined&&input.v!==1)return fail('开局设置版本不受支持');
+  const preset=input.preset===undefined?'classic':input.preset;
+  if(typeof preset!=='string'||!Object.hasOwn(G.START_PRESETS,preset))return fail('请选择经典或困难开局');
+  let seed=input.seed;
+  if(typeof seed==='string'){
+    if(!/^[+-]?\d+$/.test(seed.trim()))return fail('地图种子须为整数（-2147483648 至 4294967295）');
+    seed=Number(seed.trim());
+  }
+  if(!Number.isInteger(seed)||seed < -0x80000000||seed > 0xffffffff)return fail('地图种子须为整数（-2147483648 至 4294967295）');
+  const config={v:1,preset,seed},p=G.START_PRESETS[preset],families=p.kidPlan.length,children=p.kidPlan.reduce((n,k)=>n+k,0);
+  const resources=Object.fromEntries(G.RES_KEYS.map(k=>[k,p.stocks[k]||0]));resources.food=G.FOOD_KEYS.reduce((n,k)=>n+resources[k],0);
+  return {ok:true,config,key:JSON.stringify(config),presetSummary:{name:p.name,families,population:families*2+children,adults:families*2,children,resources,
+    unlockedSeeds:p.wheat?['wheat']:[],seedNote:p.wheat?'已有小麦种子；其他作物与果树种子须贸易购买':'没有作物或果树种子，也没有牲畜；种子须贸易购买，永久解锁',
+    equipmentNote:'衣物库存0、无预穿衣；工具默认共用池，寿命规则沿用现有系统',adaptationNote:'家庭数参考原版难度；人口组成与库存数量为本作适配'}};
+};
+
+/* Build with the ordinary world/building/citizen code, but keep its temporary
+ * globals isolated until the cart and every family have succeeded. Nothing in
+ * this phase clears saves, invokes UI or consumes the running town's RNG/IDs. */
+G.prepareNewGame = function (config) {
+  const quote=G.startConfigQuote(config);
+  if(!quote.ok)throw new Error(quote.reason);
+  const old={world:G.world,game:G.game,rng:G.rng,nextId:G.nextId,setUid:G.setUid};
+  let nextUid=1;
+  try {
+    G.nextId=()=>nextUid++;G.setUid=value=>{nextUid=value;};
+    G.rng=G.makeRng(quote.config.seed ^ 0x51f15e);
+    G.game=G.newGameState(quote.config);
+    G.world=null;
+    G.world=G.genWorld(quote.config.seed);
+    const w=G.world,s=w.start,kidPlan=G.START_PRESETS[quote.config.preset].kidPlan;
+    if(w.seed!==quote.config.seed||!s||!Number.isInteger(s.x)||!Number.isInteger(s.y))throw new Error('起始地图数据无效');
+    const storage=G.addBuilding('storage',s.x-1,s.y-1,{instant:true,free:true});
+    if(!storage.ok)throw new Error('起始储物车放置失败：'+storage.reason);
+    for(let f=0;f<kidPlan.length;f++){
+      const ang=(f/kidPlan.length)*Math.PI*2,hx=s.x+Math.round(Math.cos(ang)*2),hy=s.y+Math.round(Math.sin(ang)*2);
+      const m=G.spawnCitizen({x:hx,y:hy,sex:'m',age:G.ri(19,38)});
+      const fm=G.spawnCitizen({x:hx,y:hy,sex:'f',age:G.ri(18,36)});
+      const fam={id:G.nextId(),members:[m.id,fm.id],houseId:null,coupleIds:[m.id,fm.id]};
+      m.partnerId=fm.id;fm.partnerId=m.id;m.familyId=fam.id;fm.familyId=fam.id;w.families.push(fam);
+      for(let k=0;k<kidPlan[f];k++){
+        const kid=G.spawnCitizen({x:hx,y:hy,age:G.ri(2,9),adult:false,familyId:fam.id});
+        kid.parentIds=[m.id,fm.id];fam.members.push(kid.id);
+      }
+    }
+    if(G.normalizeFamilyRelations)G.normalizeFamilyRelations(w);
+    G.scheduleJobs();
+    if(w.buildings.length!==1||w.buildings[0]!==storage.b||w.citizens.length!==quote.presetSummary.population||w.families.length!==kidPlan.length||
+      w.families.some((f,i)=>f.members.length!==kidPlan[i]+2||f.members.some(id=>w.cmap[id]?.familyId!==f.id)))throw new Error('起始家庭数据无效');
+    return {world:w,game:G.game,rng:G.rng,nextUid,config:quote.config};
+  } finally {
+    G.world=old.world;G.game=old.game;G.rng=old.rng;G.nextId=old.nextId;G.setUid=old.setUid;
+  }
+};
+
 G.newGame = function (seed, options) {
-  options = options || {};
-  G.autosaveBlocked = !!options.preserveSaves;
-  seed = seed || ((Math.random() * 0xffffffff) >>> 0);
-  G.rng = G.makeRng(seed ^ 0x51f15e);
-  G.world = G.genWorld(seed);
-  // 原版「中等」难度开局：5 个家庭（无房），一辆储物车（仓库）
-  // 资源：木 80 / 石 48 / 食 500 / 柴 50 / 工具 15（≈第一轮磨损周期，之后靠铁匠铺）
-  G.game = G.newGameState();
-  G.sel = null;
-  G.tool = null; G.cancelRoadPlan(); G.cancelHarvestPlan(); G.cancelFarmPlan(); G.cancelPasturePlan();
-  G.smoke = [];
-  G.flakes = null;
-  if (!options.preserveSaves) {
-    try { localStorage.removeItem(G.AUTOSAVE_KEY); } catch (e) { G.ui.toast('无法清理本机旧自动档：' + e.message, 'warn'); }
+  options=options||{};
+  const quote=G.startConfigQuote({preset:options.preset,seed:seed===undefined?((Math.random()*0x100000000)>>>0):seed});
+  if(!quote.ok)return quote;
+  let candidate;
+  try {candidate=G.prepareNewGame(quote.config);}catch(e){return {ok:false,reason:'新局生成失败：'+e.message};}
+  G.world=candidate.world;G.game=candidate.game;G.rng=candidate.rng;G.setUid(candidate.nextUid);
+  G.autosaveBlocked=!!options.preserveSaves;
+  G.sel=null;G.tool=null;G.cancelRoadPlan();G.cancelHarvestPlan();G.cancelFarmPlan();G.cancelPasturePlan();
+  G.smoke=[];G.flakes=null;G.keys={};
+  if(!options.preserveSaves){
+    try {localStorage.removeItem(G.AUTOSAVE_KEY);}catch(e){G.ui.toast('无法清理本机旧自动档：'+e.message,'warn');}
     G.deleteServerSaveQuiet('autosave');
   }
-  G.ui.hideInfo();
-  G.ui.setToolActive();
-  document.getElementById('over').classList.add('hidden');
-
-  const s = G.world.start;
-  const initialStorage = G.addBuilding('storage', s.x - 1, s.y - 1, { instant: true, free: true });
-  if (!initialStorage.ok) throw new Error('起始储物车放置失败：' + initialStorage.reason);
-
-  // 5 个家庭（原版中难度）：2 名成人 + 若干孩子，开局全部无家可归，入冬前必须盖房
-  let kidPlan = [2, 2, 1, 0, 0];
-  for (let f = 0; f < 5; f++) {
-    const ang = (f / 5) * Math.PI * 2;
-    const hx = s.x + Math.round(Math.cos(ang) * 2), hy = s.y + Math.round(Math.sin(ang) * 2);
-    const m = G.spawnCitizen({ x: hx, y: hy, sex: 'm', age: G.ri(19, 38) });
-    const fm = G.spawnCitizen({ x: hx, y: hy, sex: 'f', age: G.ri(18, 36) });
-    const fam = { id: G.nextId(), members: [m.id, fm.id], houseId: null, coupleIds: [m.id, fm.id] };
-    m.partnerId = fm.id; fm.partnerId = m.id;
-    m.familyId = fam.id; fm.familyId = fam.id;
-    G.world.families.push(fam);
-    for (let k = 0; k < kidPlan[f]; k++) {
-      const kid = G.spawnCitizen({ x: hx, y: hy, age: G.ri(2, 9), adult: false, familyId: fam.id });
-      kid.parentIds = [m.id, fm.id];
-      fam.members.push(kid.id);
-    }
-  }
-
-  if (G.normalizeFamilyRelations) G.normalizeFamilyRelations(G.world);
-
-  // 相机对准镇址
-  const [sx, sy] = G.T2S(s.x, s.y);
-  G.cam.x = window.innerWidth / 2 - sx * G.cam.z;
-  G.cam.y = window.innerHeight / 2 - sy * G.cam.z;
-  G.needGround = true;
-  G.groundDirty.clear();
-
-  G.ui.toast('归园 · 放逐小镇复刻原型（原版数值）', 'good');
-  G.ui.toast('先保食物：把采集小屋建在成熟森林旁，再补住房与柴火；别一口气盖满五间木屋耗光材料', 'warn');
-  G.ui.toast('岩石给石头、锈色铁矿给铁 · 入冬前备好柴火（木屋每年约 30，石屋省一半）', 'info');
-  G.scheduleJobs();
+  G.ui.hideInfo();G.ui.setToolActive();document.getElementById('over').classList.add('hidden');
+  const s=G.world.start,[sx,sy]=G.T2S(s.x,s.y);
+  G.cam.x=window.innerWidth/2-sx*G.cam.z;G.cam.y=window.innerHeight/2-sy*G.cam.z;
+  G.needGround=true;G.groundDirty.clear();
+  G.ui.toast('归园 · '+quote.presetSummary.name,'good');
+  G.ui.toast(quote.config.preset==='hard'?'无种子困难开局：先采集食物、采伐建材，再补住房与柴火；农田须买到种子才能播种':'先保食物：把采集小屋建在成熟森林旁，再补住房与柴火；别一口气盖满五间木屋耗光材料','warn');
+  G.ui.toast('岩石给石头、锈色铁矿给铁 · 入冬前备好柴火（木屋每年约 30，石屋省一半）','info');
   G.ui.refreshHUD();
-  if (!G._hasShownHelp && G.ui.toggleHelp) { G._hasShownHelp = true; G.ui.toggleHelp(true); }
+  if(!G._hasShownHelp&&G.ui.toggleHelp){G._hasShownHelp=true;G.ui.toggleHelp(true);}
+  return {ok:true,config:{...candidate.config}};
+};
+
+/* The dialog owns its current draft. Recheck its town identity and reviewed
+ * quote at the final boundary; unrelated dialogs can never start a new town. */
+G.confirmNewGame = function (request) {
+  if(!request||request.world!==G.world||request.game!==G.game)return {ok:false,reason:'当前村庄已改变，请重新打开开局设置'};
+  const q=G.startConfigQuote(request.config);
+  if(!q.ok)return q;
+  if(request.key!==q.key)return {ok:false,reason:'开局设置已改变，请重新确认'};
+  const visible=id=>{const el=document.getElementById(id);return el&&!el.classList.contains('hidden');};
+  if(!visible('new-game-settings')||['fb','errs','saves','production-goals','help'].some(visible))return {ok:false,reason:'请先关闭其他窗口，再确认开局设置'};
+  return G.newGame(q.config.seed,{preset:q.config.preset});
 };
 
 /* ---------- 存档 ---------- */
@@ -100,7 +139,7 @@ G.serializeGame = function () {
   return {
     v: 1, seed: w.seed, N: w.N, mapVersion: w.mapVersion || 0, // N：地图尺寸（旧档跨尺寸迁移裸索引用）
     game: {
-      v: G.VERSION,
+      v: G.VERSION, startConfig:g.startConfig ? {...g.startConfig} : null,
       h: g.h, day: g.day, season: g.season, year: g.year,
       res: g.res, stats: g.stats, prevFood: g.prevFood, foodNet: g.foodNet, foodUrgent: g.foodUrgent, warned: g.warned,
       supplyMode:g.supplyMode,clothingSupply:g.clothingSupply,supplyStartedDay:g.supplyStartedDay,supplyUsed:g.supplyUsed,supplyLost:g.supplyLost,
@@ -148,7 +187,7 @@ G.serializeGame = function () {
 
 G.saveGame = function (key, silent) {
   key = key || G.SAVE_KEY;
-  if (key === G.AUTOSAVE_KEY && G.autosaveBlocked) return false;
+  if (key === G.AUTOSAVE_KEY && (G.autosaveBlocked||G.newGameSettingsOpen())) return false;
   try {
     const data = G.serializeGame();
     data.savedAt = Date.now();
@@ -161,7 +200,7 @@ G.saveGame = function (key, silent) {
 
 /* 自动存档（换季 / 离开页面时调用，启动时自动恢复） */
 G.autosave = function () {
-  if (G.world && !G.game.over && !G.autosaveBlocked) {
+  if (G.world && !G.game.over && !G.autosaveBlocked && !G.newGameSettingsOpen()) {
     G.saveGame(G.AUTOSAVE_KEY, true);
     G.saveToServer('autosave', true).catch(() => {}); // 自动档镜像到服务器；不可用时静默跳过
   }
@@ -258,6 +297,13 @@ G.prepareSaveData = function (d) {
   integer(d.seed, '地图种子', -0x80000000, 0xffffffff);
   const oldN = d.N === undefined ? G.MAP : integer(d.N, '地图尺寸', 1, 4096);
   const gd = record(d.game, '游戏状态'), g = G.newGameState();
+  if(gd.startConfig!==undefined&&gd.startConfig!==null){
+    const config=record(gd.startConfig,'开局设置');
+    if(config.v!==1||typeof config.preset!=='string'||typeof config.seed!=='number'||Object.keys(config).some(k=>!['v','preset','seed'].includes(k)))bad('开局设置');
+    const q=G.startConfigQuote(config);if(!q.ok||q.config.seed!==d.seed)bad('开局设置');
+    g.startConfig={...q.config};
+    if(typeof gd.unlocks?.wheat!=='boolean')bad('新开局须保留小麦种子解锁状态');
+  }
   g.h = number(gd.h, '小时', 0, G.DAY_H); if (g.h === G.DAY_H) bad('小时');
   g.day = integer(gd.day, '天数'); g.season = integer(gd.season, '季节', 0, 3); g.year = integer(gd.year, '年份', 1);
   record(gd.res, '资源');
@@ -268,7 +314,7 @@ G.prepareSaveData = function (d) {
   const hasFoodClasses = G.FOOD_KEYS.some(k => gd.res[k] !== undefined);
   if (hasFoodClasses && Math.abs(G.FOOD_KEYS.reduce((n,k) => n + g.res[k], 0) - g.res.food) > 0.00001) bad('食物分类合计');
   if (!hasFoodClasses) g.res.grain = g.res.food; // legacy stock is preserved once
-  if (gd.unlocks !== undefined) {record(gd.unlocks,'产业解锁');if(typeof gd.unlocks.orchard !== 'boolean')bad('果树种子解锁');for(const key of ['cabbage','beans','apple','pear'])if(gd.unlocks[key]!==undefined&&typeof gd.unlocks[key]!=='boolean')bad('农田种子解锁');g.unlocks={orchard:gd.unlocks.orchard,cabbage:gd.unlocks.cabbage===true,beans:gd.unlocks.beans===true,apple:gd.unlocks.apple===true,pear:gd.unlocks.pear===true};}
+  if (gd.unlocks !== undefined) {record(gd.unlocks,'产业解锁');if(typeof gd.unlocks.orchard !== 'boolean')bad('果树种子解锁');for(const key of ['wheat','cabbage','beans','apple','pear'])if(gd.unlocks[key]!==undefined&&typeof gd.unlocks[key]!=='boolean')bad('农田种子解锁');g.unlocks={wheat:gd.unlocks.wheat!==false,orchard:gd.unlocks.orchard,cabbage:gd.unlocks.cabbage===true,beans:gd.unlocks.beans===true,apple:gd.unlocks.apple===true,pear:gd.unlocks.pear===true};}
   if (gd.livestock !== undefined) {record(gd.livestock,'待安置牲畜');g.livestock={sheep:integer(gd.livestock.sheep,'待安置羊',0,1000000),cattle:gd.livestock.cattle===undefined?0:integer(gd.livestock.cattle,'待安置牛',0,1000000),chicken:gd.livestock.chicken===undefined?0:integer(gd.livestock.chicken,'待安置鸡',0,1000000)};}
   if(gd.fishingRules!==undefined&&!['classic','shared'].includes(gd.fishingRules))bad('渔场规则');
   g.fishingRules=gd.fishingRules===undefined?'classic':gd.fishingRules;
@@ -602,7 +648,8 @@ G.prepareSaveData = function (d) {
       if(bd.farmSize!==undefined)b.farmSize=[...bd.farmSize];
       b.cropType=bd.cropType===undefined?'wheat':bd.cropType;b.cropChoice=bd.cropChoice===undefined?b.cropType:bd.cropChoice;
       if(typeof b.cropType!=='string'||typeof b.cropChoice!=='string'||!Object.hasOwn(G.CROPS,b.cropType)||!Object.hasOwn(G.CROPS,b.cropChoice))bad('农田作物种类');
-      if([b.cropType,b.cropChoice].some(k=>k!=='wheat'&&!g.unlocks[k]))bad('农田作物种子未解锁');
+      if([b.cropType,b.cropChoice].some(k=>k!=='wheat'&&!G.cropUnlocked(k,g)))bad('农田作物种子未解锁');
+      if(!G.cropUnlocked(b.cropChoice,g)&&b.cropChoice!==b.cropType)bad('下一季作物种子未解锁');
       if (!Array.isArray(bd.farm) || bd.farm.length !== b.w * b.h) bad('农田格数');
       b.farm = bd.farm.map((row, k) => {
         if (!Array.isArray(row) || ![2,3].includes(row.length) || !row.every(v => v === 0 || v === 1 || v === false || v === true)) bad('农田状态');
@@ -617,6 +664,8 @@ G.prepareSaveData = function (d) {
       if (bd.sowingCommitted !== undefined && typeof bd.sowingCommitted !== 'boolean') bad('农田本季承诺');
       if (bd.sowingCommitted === true) b.sowingCommitted = true;
       b.growth = bd.growth === undefined ? 0 : number(bd.growth, '农田生长', 0, 1);
+      // A locked wheat label is an empty-field placeholder, never a crop grant.
+      if(!G.cropUnlocked(b.cropType,g)&&(b.farm.some(f=>f.sown||f.harvested)||b.sownAll||b.harvestDone||b.sowingCommitted||b.growth||b.pestInfestation||bd.earlyHarvestYield!==undefined))bad('未解锁作物不能已有播种或收获');
       if(bd.earlyHarvestYield!==undefined){
         b.earlyHarvestYield=integer(bd.earlyHarvestYield,'抢收基础产量',1,G.farmBaseYield(b));
         if(b.state!=='ok'||!b.sownAll||!b.farm.every(f=>f.sown)||b.earlyHarvestYield!==Math.floor(G.farmBaseYield(b)*b.growth+1e-9))bad('抢收农田状态');
@@ -802,6 +851,7 @@ G.saveToServer = function (name, silent) {
   if (!G.world || !G.game) return Promise.reject(new Error('当前没有对局'));
   name = String(name || '').trim();
   if (!name) return Promise.reject(new Error('请先填写存档名'));
+  if(name==='autosave'&&G.newGameSettingsOpen())return Promise.resolve(false);
   const body = JSON.stringify({ name, data: G.serializeGame() });
   return fetch('/api/saves', {
     method: 'POST',
@@ -1359,7 +1409,8 @@ G.init = function () {
     const visible = id => { const el = document.getElementById(id); return el && !el.classList.contains('hidden'); };
     // Escape dismisses the front dialog even if its text field owns focus.
     if (e.key === 'Escape' && !e.repeat) {
-      if (visible('over')) return;
+      if (visible('new-game-settings')) G.ui.closeNewGameSettings();
+      else if (visible('over')) return;
       else if (visible('fb')) G.feedback.close();
       else if (visible('errs')) G.ui.closeErrs();
       else if (visible('saves')) G.ui.closeSaves();
