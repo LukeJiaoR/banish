@@ -18,12 +18,13 @@ function fbm(seed, x, y) {
        + 0.15 * vnoise(seed + 202, x / 6, y / 6);
 }
 
-/* 生成新世界 */
-G.genWorld = function (seed, options) {
-  const starterResources = !options || options.starterResources !== false;
+/* Empty allocation is shared by generation and authoritative terrain loads.
+ * It consumes no RNG/IDs and never repairs or populates a saved village. */
+G.emptyWorld = function (seed, mapVersion = 0) {
   const N = G.MAP;
-  const w = {
-    seed, N, mapVersion: starterResources ? 1 : 0,
+  return {
+    seed, N, mapVersion,
+    mountain: new Uint8Array(N * N),
     water: new Uint8Array(N * N),
     rock: new Uint8Array(N * N),
     rockCleared: [],
@@ -41,6 +42,20 @@ G.genWorld = function (seed, options) {
     markedRocks: new Set(), // 「采石采铁」工具标记的岩石/铁矿（散工来清除入库）
     start: { x: N >> 1, y: N >> 1 },
   };
+};
+G.isMountain = (w, x, y) => x >= 0 && y >= 0 && x < w.N && y < w.N && !!w.mountain?.[y * w.N + x];
+
+/* Versions 0/1 retain their original algorithm, ordering, start and iron. */
+G.genWorld = function (seed, options) {
+  if (options?.terrain === 'mountain') {
+    if (options.mapVersion !== undefined && options.mapVersion !== 2) throw new Error('山地生成版本不受支持');
+    return G.genMountainWorld(seed);
+  }
+  if (options?.terrain !== undefined && options.terrain !== 'classic') throw new Error('地形类型不受支持');
+  if(options?.mapVersion!==undefined&&![0,1].includes(options.mapVersion))throw new Error('现行地形生成版本不受支持');
+  if(options?.mapVersion!==undefined&&options.starterResources!==undefined&&options.starterResources!==(options.mapVersion===1))throw new Error('地形版本与启动资源设置冲突');
+  const starterResources = options?.mapVersion!==undefined?options.mapVersion===1:!options || options.starterResources !== false;
+  const N = G.MAP, w = G.emptyWorld(seed, starterResources ? 1 : 0);
 
   // 高度场 → 水体
   const hmap = new Float32Array(N * N);
@@ -137,11 +152,141 @@ G.genWorld = function (seed, options) {
   return w;
 };
 
+/* Mountain v2 is an explicit small-map adaptation, never applied to old maps.
+ * A seed-ranked 41×37 starter valley has clear future sites, a 7×10 pond and
+ * separate, physically harvestable deposits/forest. Nothing enters inventory.
+ * These are candidate sites, not free buildings or permanently reserved land. */
+G.mountainStartLayout = function (s) {
+  const rows=[['house',-9,4],['house',-5,4],['house',-1,4],['house',3,4],['house',7,4],
+    ['gatherer',-8,-4],['forester',4,-9],['woodcutter',3,-4],['blacksmith',-3,-8],
+    ['dock',12,0],['mine',-13,9],['stonequarry',-8,10]];
+  return rows.map(([type,x,y])=>({type,x:s.x+x,y:s.y+y,w:G.BDEF[type].w,h:G.BDEF[type].h}));
+};
+G.mountainStartBudget = function (preset = 'hard') {
+  const gross={wood:0,stone:0,iron:0};
+  for(const p of G.mountainStartLayout({x:0,y:0}))for(const [k,n]of Object.entries(G.BDEF[p.type].cost))gross[k]=(gross[k]||0)+n;
+  // Conservative uneducated output: full five-home annual fuel, then one full
+  // 30-tool refill. Existing fuel/tools are not double-counted as construction.
+  gross.wood+=Math.ceil(5*G.BDEF.house.warmWoodPerYear*G.PROD.woodcutter.logsIn/G.PROD.woodcutter.firewoodOut);
+  const batches=Math.ceil(G.PROD.blacksmith.toolLimit/G.PROD.blacksmith.toolsOut);
+  for(const item of G.PROD.blacksmith.consume)gross[item.type]+=batches*item.qty;
+  const stocks=G.START_PRESETS[preset]?.stocks;
+  if(!stocks)throw new Error('开局预设无效');
+  return {gross,required:Object.fromEntries(Object.entries(gross).map(([k,n])=>[k,Math.max(0,n-(stocks[k]||0))])),retainedMature:G.PROD.gatherer.fullForest};
+};
+G.genMountainWorld = function (seed) {
+  const w=G.emptyWorld(seed,2),N=w.N;
+  for(let y=0;y<N;y++)for(let x=0;x<N;x++){
+    const i=y*N+x,h=fbm(seed,x,y);
+    w.water[i]=h<.34?1:h<.375?2:0;
+    if(!w.water[i]&&fbm(seed+1901,x,y)>.56)w.mountain[i]=1;
+  }
+  // Fixed bounded ordering; no hidden seed retry or running-village random call.
+  const candidates=[];
+  for(let y=32;y<=96;y+=16)for(let x=32;x<=96;x+=16){
+    if(x+20>=N||y+18>=N)continue;
+    let alteration=0;
+    for(let yy=y-18;yy<=y+18;yy++)for(let xx=x-20;xx<=x+20;xx++)alteration+=(w.water[yy*N+xx]?3:0)+w.mountain[yy*N+xx];
+    candidates.push({x,y,alteration,rank:G.h2(seed^0x319ef,x,y)});
+  }
+  candidates.sort((a,b)=>a.alteration-b.alteration||a.rank-b.rank||a.y-b.y||a.x-b.x);
+  if(!candidates.length)throw new Error('地图没有足够大的山谷镇址');
+  const s=w.start={x:candidates[0].x,y:candidates[0].y},layout=G.mountainStartLayout(s);
+  const inside=(x,y)=>Math.abs(x-s.x)<=20&&Math.abs(y-s.y)<=18;
+  const cart={x:s.x-1,y:s.y-1,w:3,h:3};
+  const reserved=(x,y)=>[cart,...layout].some(p=>x>=p.x-1&&x<=p.x+p.w&&y>=p.y-1&&y<=p.y+p.h);
+  for(let y=s.y-18;y<=s.y+18;y++)for(let x=s.x-20;x<=s.x+20;x++){const i=y*N+x;w.water[i]=0;w.mountain[i]=0;}
+  for(let y=s.y-4;y<=s.y+5;y++)for(let x=s.x+14;x<=s.x+20;x++)w.water[y*N+x]=1;
+  for(let y=0;y<N;y++)for(let x=0;x<N;x++){
+    const i=y*N+x;if(w.water[i]||w.mountain[i])continue;
+    if(!inside(x,y)&&fbm(seed+555,x,y)>.715)w.rock[i]=fbm(seed+888,x,y)>.65?2:1;
+    if(!reserved(x,y)&&fbm(seed+777,x,y)>.52&&G.h2(seed+13,x,y)<.62)G.addTree(w,x,y,-(G.h2(seed+29,x,y)*300|0));
+  }
+  const hut=layout.find(p=>p.type==='gatherer'),R=G.PROD.gatherer.radius;
+  const foodGrove=(x,y)=>Math.abs(x-hut.x)<=R&&Math.abs(y-hut.y)<=R;
+  const cells=[];
+  for(let y=s.y-18;y<=s.y+18;y++)for(let x=s.x-20;x<=s.x+20;x++)if(!w.water[y*N+x]&&!reserved(x,y))cells.push({x,y,i:y*N+x,d:G.d2(x,y,s.x,s.y),rank:G.h2(seed+4729,x,y)});
+  const food=cells.filter(p=>foodGrove(p.x,p.y)).sort((a,b)=>a.rank-b.rank||a.i-b.i);
+  const budget=G.mountainStartBudget('hard');
+  if(food.length<budget.retainedMature+8)throw new Error('山谷成熟食物林空间不足');
+  for(const p of food.slice(0,budget.retainedMature+8)){
+    G.addTree(w,p.x,p.y,-G.TREE_MATURE-1);
+    w.trees[w.treeIdx[p.i]].b=-G.TREE_MATURE-1;
+  }
+  const materials=cells.filter(p=>!foodGrove(p.x,p.y)).sort((a,b)=>a.d-b.d||a.rank-b.rank||a.i-b.i);
+  let at=0;
+  // Deposits nearest the cart are separate stone/iron. Timber follows outside
+  // the entire food grove, so meeting the wood budget cannot consume its food.
+  for(const [kind,amount,yieldPerTile]of [[1,budget.required.stone,G.ROCK_STONE],[2,budget.required.iron,G.ROCK_IRON]]){
+    for(let n=0;n<Math.ceil(amount/yieldPerTile);n++){
+      const p=materials[at++];if(!p)throw new Error('山谷矿物空间不足');
+      G.removeTree(w,p.x,p.y);w.rock[p.i]=kind;
+    }
+  }
+  const logs=Math.ceil(budget.required.wood/G.PROD.forester.logsYield);
+  for(let n=0;n<logs;n++){
+    const p=materials[at++];if(!p)throw new Error('山谷木材空间不足');
+    G.addTree(w,p.x,p.y,-G.TREE_MATURE-1);w.trees[w.treeIdx[p.i]].b=-G.TREE_MATURE-1;
+  }
+  return w;
+};
+
+/* Exact component proof after the real solid cart and births exist. Four-way
+ * connectivity is equivalent to the walker's eight-way no-corner graph. No
+ * blocked-target fallback, nearest substitute, or optimistic radius count. */
+G.mountainStartReport = function (w, preset) {
+  const fail=reason=>({ok:false,reason}),s=w.start,plots=G.mountainStartLayout(s),budget=G.mountainStartBudget(preset);
+  const cart=w.buildings.find(b=>b.type==='storage'&&b.state==='ok'&&b.x===s.x-1&&b.y===s.y-1&&b.w===3&&b.h===3);
+  if(!cart||!w.citizens.length)return fail('起始仓库或居民缺失');
+  const shadow={...w,bgrid:w.bgrid.slice(),bmap:{...w.bmap},buildings:w.buildings.slice()};
+  let virtualId=Math.max(0,...w.buildings.map(b=>b.id))+1;
+  for(const p of plots){
+    const check=G.canPlace(shadow,p.type,p.x,p.y);if(!check.ok)return fail('起始可用建筑用地不足：'+check.reason);
+    const b={...p,id:virtualId++,state:'ok'};shadow.bmap[b.id]=b;shadow.buildings.push(b);
+    for(let y=p.y;y<p.y+p.h;y++)for(let x=p.x;x<p.x+p.w;x++){
+      if(w.treeIdx[y*w.N+x]>=0)return fail('起始建筑用地需先清林');
+      shadow.bgrid[y*w.N+x]=b.id;
+    }
+  }
+  const N=w.N,seen=new Uint8Array(N*N),distance=new Int16Array(N*N).fill(-1),queue=[];
+  const first=w.citizens[0],sx=Math.round(first.x),sy=Math.round(first.y);
+  if(G.tileBlocked(shadow,sx,sy))return fail('居民出生在不可通行地格');
+  const root=sy*N+sx;seen[root]=1;distance[root]=0;queue.push(root);
+  for(let head=0;head<queue.length;head++){
+    const i=queue[head],x=i%N,y=Math.floor(i/N);
+    for(const[dx,dy]of [[1,0],[0,1],[-1,0],[0,-1]]){
+      const nx=x+dx,ny=y+dy,ni=ny*N+nx;
+      if(nx<0||ny<0||nx>=N||ny>=N||seen[ni]||G.tileBlocked(shadow,nx,ny))continue;
+      seen[ni]=1;distance[ni]=distance[i]+1;queue.push(ni);
+    }
+  }
+  const reachable=(x,y)=>x>=0&&y>=0&&x<N&&y<N&&!!seen[y*N+x];
+  if(w.citizens.some(c=>!reachable(Math.round(c.x),Math.round(c.y))))return fail('起始居民被地形或仓库隔断');
+  const doors=b=>{const a=[];for(let y=b.y-1;y<=b.y+b.h;y++)for(let x=b.x-1;x<=b.x+b.w;x++)if((x<b.x||x>=b.x+b.w||y<b.y||y>=b.y+b.h)&&!G.tileBlocked(shadow,x,y))a.push({x,y});return a;};
+  const cartDoors=doors(cart);if(!cartDoors.length||cartDoors.some(p=>!reachable(p.x,p.y)))return fail('仓库入口被隔断');
+  for(const p of plots)if(!doors(p).some(d=>reachable(d.x,d.y)))return fail('起始建筑施工入口不可达');
+  const hut=plots.find(p=>p.type==='gatherer'),R=G.PROD.gatherer.radius;
+  const foodGrove=(x,y)=>Math.abs(x-hut.x)<=R&&Math.abs(y-hut.y)<=R;
+  let retainedMature=0,timberTrees=0,stoneTiles=0,ironTiles=0,shoreTiles=0;
+  for(let i=0;i<N*N;i++)if(seen[i]&&distance[i]<=48){
+    const x=i%N,y=Math.floor(i/N),t=w.treeIdx[i]>=0?w.trees[w.treeIdx[i]]:null;
+    if(t&&t.b<=-G.TREE_MATURE){if(foodGrove(x,y))retainedMature++;else timberTrees++;}
+    if(w.rock[i]===1)stoneTiles++;else if(w.rock[i]===2)ironTiles++;
+    if([[1,0],[0,1],[-1,0],[0,-1]].some(([dx,dy])=>x+dx>=0&&y+dy>=0&&x+dx<N&&y+dy<N&&w.water[(y+dy)*N+x+dx]===1))shoreTiles++;
+  }
+  const resources={wood:timberTrees*G.PROD.forester.logsYield,stone:stoneTiles*G.ROCK_STONE,iron:ironTiles*G.ROCK_IRON};
+  if(retainedMature<budget.retainedMature)return fail('须保留可达成熟食物林，不能与建材木重算');
+  for(const k of ['wood','stone','iron'])if(resources[k]<budget.required[k])return fail('可达启动'+G.RES[k].name+'不足');
+  if(!shoreTiles)return fail('起始岸边不可达');
+  return {ok:true,mountainTiles:w.mountain.reduce((n,v)=>n+Number(!!v),0),housingPlots:plots.filter(p=>p.type==='house').length,
+    plots,resources,budget,retainedMature,shoreTiles,warehouseDoors:cartDoors.length,reachableCitizens:w.citizens.length};
+};
+
 /* ---------- 树 ---------- */
 G.addTree = function (w, x, y, born) {
   if (x < 0 || y < 0 || x >= w.N || y >= w.N) return;
   const i = y * w.N + x;
-  if (w.water[i] || w.rock[i] || w.treeIdx[i] >= 0 || w.bgrid[i] >= 0) return;
+  if (G.isMountain(w, x, y) || w.water[i] || w.rock[i] || w.treeIdx[i] >= 0 || w.bgrid[i] >= 0) return;
   w.trees.push({ i, x, y, b: born !== undefined ? born : G.game ? G.game.day : 0 });
   w.treeIdx[i] = w.trees.length - 1;
 };
@@ -307,7 +452,7 @@ G.areaLand = function (w, x, y, ww, hh) {
   for (let j = y; j < y + hh; j++)
     for (let i = x; i < x + ww; i++) {
       if (i < 0 || j < 0 || i >= w.N || j >= w.N) return false;
-      if (w.water[j * w.N + i]) return false;
+      if (w.water[j * w.N + i] || G.isMountain(w, i, j)) return false;
     }
   return true;
 };
@@ -316,6 +461,7 @@ G.areaLand = function (w, x, y, ww, hh) {
 G.tileBlocked = function (w, x, y) {
   if (x < 0 || y < 0 || x >= w.N || y >= w.N) return true;
   const i = y * w.N + x;
+  if (G.isMountain(w, x, y)) return true;
   const bridge = G.bridgeAt(w, x, y);
   if (bridge) return bridge.state !== 'ok';
   if (w.water[i] === 1) return true;
@@ -335,6 +481,7 @@ G.onRoad = function (w, x, y) {
 // conservative road-speed lower bound rather than guessing a cached count.
 G.bumpNavigation = function (w) { w.navigationRevision = (w.navigationRevision || 0) + 1; };
 G.setRoad = function (w, x, y, present) {
+  if (x < 0 || y < 0 || x >= w.N || y >= w.N || present && G.isMountain(w, x, y)) return;
   const i = y * w.N + x, next = present === 2 ? 2 : present ? 1 : 0, previous = w.road[i] || 0;
   if (next === previous) return;
   w.road[i] = next;
@@ -408,6 +555,7 @@ G.findPathToAny = function (w, x, y, targets) {
 
 G.findPath = function (w, sx, sy, tx, ty, destinations = null) {
   sx |= 0; sy |= 0; tx |= 0; ty |= 0;
+  if(G.isMountain(w,sx,sy))return null;
   let goals = null, bounds = null;
   if (destinations) {
     const valid = destinations.filter(p => Number.isInteger(p.x) && Number.isInteger(p.y) && !G.tileBlocked(w, p.x, p.y));
@@ -529,7 +677,7 @@ G.nearestPlantSpot = function (w, cx, cy, r, claimed, reachable) {
         const x = cx + dx, y = cy + dy;
         if (x < 0 || y < 0 || x >= w.N || y >= w.N) continue;
         const i = y * w.N + x;
-        if (w.water[i] || w.rock[i] || w.road[i] || w.treeIdx[i] >= 0 || w.bgrid[i] >= 0) continue;
+        if (G.isMountain(w, x, y) || w.water[i] || w.rock[i] || w.road[i] || w.treeIdx[i] >= 0 || w.bgrid[i] >= 0) continue;
         if (claimed && claimed.has(i)) continue;
         if (reachable && !reachable(x, y)) continue;
         return { x, y };
@@ -615,6 +763,7 @@ G.canPlace = function (w, type, ox, oy, fieldSize) {
   for (let j = oy; j < oy + def.h; j++)
     for (let i = ox; i < ox + def.w; i++) {
       const t = j * N + i;
+      if (G.isMountain(w, i, j)) return { ok: false, reason: '不能建在山体上；请沿山谷选址' };
       if (w.water[t] === 1) return { ok: false, reason: '不能建在水上' };
       if (w.rock[t]) return { ok: false, reason: '地面有岩石，需先用采石采铁工具标记清除' };
       if (w.bgrid[t] >= 0) return { ok: false, reason: '与其他建筑重叠' };
@@ -646,7 +795,7 @@ G.canPlace = function (w, type, ox, oy, fieldSize) {
 G.canPlaceRoad = function (w, x, y) {
   if (x < 0 || y < 0 || x >= w.N || y >= w.N) return false;
   const i = y * w.N + x;
-  if (w.water[i] === 1 || w.rock[i] || w.bgrid[i] >= 0 || w.road[i]) return false;
+  if (G.isMountain(w, x, y) || w.water[i] === 1 || w.rock[i] || w.bgrid[i] >= 0 || w.road[i]) return false;
   return true;
 };
 
@@ -657,7 +806,7 @@ G.planRoad = function (w, start, end, options) {
   const N = w.N, valid = p => p && Number.isInteger(p.x) && Number.isInteger(p.y) && p.x >= 0 && p.y >= 0 && p.x < N && p.y < N;
   if (!valid(start) || !valid(end)) return { ok: false, reason: '起终点必须在地图内' };
   const usable = (x, y) => x >= 0 && y >= 0 && x < N && y < N &&
-    w.water[y * N + x] !== 1 && !w.rock[y * N + x] && w.bgrid[y * N + x] < 0;
+    !G.isMountain(w, x, y) && w.water[y * N + x] !== 1 && !w.rock[y * N + x] && w.bgrid[y * N + x] < 0;
   if (!usable(start.x, start.y)) return { ok: false, reason: '起点被水面、建筑或矿石挡住' };
   if (!usable(end.x, end.y)) return { ok: false, reason: '终点被水面、建筑或矿石挡住' };
   const distance = (x, y, p) => Math.abs(x - p.x) + Math.abs(y - p.y);
@@ -758,6 +907,7 @@ G.planBridge = function(w,start,end,options={}) {
   const dx=Math.sign(end.x-start.x),dy=Math.sign(end.y-start.y),path=[];
   for(let n=0;n<length;n++){
     const p={x:start.x+dx*n,y:start.y+dy*n},i=p.y*w.N+p.x,bank=n===0||n===length-1;
+    if(G.isMountain(w,p.x,p.y))return {ok:false,reason:'木桥不能穿过山体或以山体作桥头'};
     if(bank?w.water[i]===1:w.water[i]!==1)return {ok:false,reason:bank?'桥头必须落在陆地；请在对岸选择端点':'两岸之间必须连续水面，不能穿陆地或转弯'};
     if(w.rock[i]||w.treeIdx[i]>=0)return {ok:false,reason:'桥头需先清除树木或矿石，再重新预览'};
     if(w.bgrid[i]>=0&&w.bgrid[i]!==options.ignoreId)return {ok:false,reason:'桥线被已有建筑或桥工地占用'};
@@ -782,6 +932,6 @@ G.bridgeRemovalStatus = function(w,b) {
 G.bridgeStartStatus = function(w,p) {
   if(!p||p.x<0||p.y<0||p.x>=w.N||p.y>=w.N)return {ok:false,reason:'桥头必须在地图内'};
   const i=p.y*w.N+p.x;
-  if(w.water[i]===1||w.rock[i]||w.treeIdx[i]>=0||w.bgrid[i]>=0)return {ok:false,reason:'请选择已清场且无建筑的陆地桥头'};
+  if(G.isMountain(w,p.x,p.y)||w.water[i]===1||w.rock[i]||w.treeIdx[i]>=0||w.bgrid[i]>=0)return {ok:false,reason:'请选择已清场且无建筑的陆地桥头'};
   return {ok:true,path:[p]};
 };

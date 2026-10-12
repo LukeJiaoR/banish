@@ -15,6 +15,8 @@ G.START_PRESETS = Object.freeze({
   hard: Object.freeze({name:'困难（无种子）',kidPlan:Object.freeze([2,2,1,0]),stocks:Object.freeze({grain:400,firewood:40,tools:12}),wheat:false}),
 });
 
+G.START_TERRAINS = Object.freeze({classic: Object.freeze({name:'现行地形',mapVersion:1}), mountain: Object.freeze({name:'山地山谷',mapVersion:2})});
+
 /* 建筑（w/h 为占地格数；cost 为建造消耗；buildWork 为建造所需工时（游戏小时））
  * jobs: 工作岗位数；passable: 建成后是否可通行
  * warmWoodPerYear: 每年取暖柴火（原版：木屋 ≈30，石屋省一半 ≈15）

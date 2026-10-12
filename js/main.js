@@ -37,7 +37,10 @@ G.isInputTarget = function (target) {
 G.startConfigQuote = function (input) {
   const fail=reason=>({ok:false,reason});
   if(!input||typeof input!=='object'||Array.isArray(input))return fail('请选择开局设置');
-  if(input.v!==undefined&&input.v!==1)return fail('开局设置版本不受支持');
+  const terrain=input.terrain===undefined?'classic':input.terrain;
+  if(typeof terrain!=='string'||!Object.hasOwn(G.START_TERRAINS,terrain))return fail('请选择现行地形或山地山谷');
+  const version=terrain==='mountain'?2:1;
+  if(input.v!==undefined&&input.v!==version)return fail('开局设置版本不受支持');
   const preset=input.preset===undefined?'classic':input.preset;
   if(typeof preset!=='string'||!Object.hasOwn(G.START_PRESETS,preset))return fail('请选择经典或困难开局');
   let seed=input.seed;
@@ -46,9 +49,10 @@ G.startConfigQuote = function (input) {
     seed=Number(seed.trim());
   }
   if(!Number.isInteger(seed)||seed < -0x80000000||seed > 0xffffffff)return fail('地图种子须为整数（-2147483648 至 4294967295）');
-  const config={v:1,preset,seed},p=G.START_PRESETS[preset],families=p.kidPlan.length,children=p.kidPlan.reduce((n,k)=>n+k,0);
+  const config=terrain==='mountain'?{v:2,preset,seed,terrain}:{v:1,preset,seed},p=G.START_PRESETS[preset],families=p.kidPlan.length,children=p.kidPlan.reduce((n,k)=>n+k,0);
   const resources=Object.fromEntries(G.RES_KEYS.map(k=>[k,p.stocks[k]||0]));resources.food=G.FOOD_KEYS.reduce((n,k)=>n+resources[k],0);
-  return {ok:true,config,key:JSON.stringify(config),presetSummary:{name:p.name,families,population:families*2+children,adults:families*2,children,resources,
+  return {ok:true,config,key:JSON.stringify(config),terrainSummary:{name:G.START_TERRAINS[terrain].name,mapVersion:G.START_TERRAINS[terrain].mapVersion,
+    note:terrain==='mountain'?'41×37初始山谷为本作明确保底：有限木石铁与成熟食物林须劳动取得；山体阻路，当前尚无隧道':'沿用现行地图算法、镇址与启动铁矿'},presetSummary:{name:p.name,families,population:families*2+children,adults:families*2,children,resources,
     unlockedSeeds:p.wheat?['wheat']:[],seedNote:p.wheat?'已有小麦种子；其他作物与果树种子须贸易购买':'没有作物或果树种子，也没有牲畜；种子须贸易购买，永久解锁',
     equipmentNote:'衣物库存0、无预穿衣；工具默认共用池，寿命规则沿用现有系统',adaptationNote:'家庭数参考原版难度；人口组成与库存数量为本作适配'}};
 };
@@ -66,7 +70,7 @@ G.prepareNewGame = function (config) {
     G.rng=G.makeRng(quote.config.seed ^ 0x51f15e);
     G.game=G.newGameState(quote.config);
     G.world=null;
-    G.world=G.genWorld(quote.config.seed);
+    G.world=G.genWorld(quote.config.seed,quote.config.terrain==='mountain'?{terrain:'mountain',mapVersion:2}:undefined);
     const w=G.world,s=w.start,kidPlan=G.START_PRESETS[quote.config.preset].kidPlan;
     if(w.seed!==quote.config.seed||!s||!Number.isInteger(s.x)||!Number.isInteger(s.y))throw new Error('起始地图数据无效');
     const storage=G.addBuilding('storage',s.x-1,s.y-1,{instant:true,free:true});
@@ -82,6 +86,11 @@ G.prepareNewGame = function (config) {
         kid.parentIds=[m.id,fm.id];fam.members.push(kid.id);
       }
     }
+    if(w.mapVersion===2){
+      const report=G.mountainStartReport(w,quote.config.preset);
+      if(!report.ok)throw new Error(report.reason);
+      w.startReport=report;
+    }
     if(G.normalizeFamilyRelations)G.normalizeFamilyRelations(w);
     G.initializeDeer(w,G.game);
     G.scheduleJobs();
@@ -95,7 +104,7 @@ G.prepareNewGame = function (config) {
 
 G.newGame = function (seed, options) {
   options=options||{};
-  const quote=G.startConfigQuote({preset:options.preset,seed:seed===undefined?((Math.random()*0x100000000)>>>0):seed});
+  const quote=G.startConfigQuote({preset:options.preset,terrain:options.terrain,seed:seed===undefined?((Math.random()*0x100000000)>>>0):seed});
   if(!quote.ok)return quote;
   let candidate;
   try {candidate=G.prepareNewGame(quote.config);}catch(e){return {ok:false,reason:'新局生成失败：'+e.message};}
@@ -128,7 +137,7 @@ G.confirmNewGame = function (request) {
   if(request.key!==q.key)return {ok:false,reason:'开局设置已改变，请重新确认'};
   const visible=id=>{const el=document.getElementById(id);return el&&!el.classList.contains('hidden');};
   if(!visible('new-game-settings')||['fb','errs','saves','production-goals','help'].some(visible))return {ok:false,reason:'请先关闭其他窗口，再确认开局设置'};
-  return G.newGame(q.config.seed,{preset:q.config.preset});
+  return G.newGame(q.config.seed,{preset:q.config.preset,terrain:q.config.terrain});
 };
 
 /* ---------- 存档 ---------- */
@@ -142,7 +151,8 @@ G.serializeGame = function () {
   if(deerWorld.deer===undefined)G.initializeDeer(deerWorld,g);
   G.reconcileDeerHabitat(deerWorld,g);
   return {
-    v: 1, seed: w.seed, N: w.N, mapVersion: w.mapVersion || 0, // N：地图尺寸（旧档跨尺寸迁移裸索引用）
+    v: w.mapVersion===2?2:1, seed: w.seed, N: w.N, mapVersion: w.mapVersion || 0, // N：地图尺寸（旧档跨尺寸迁移裸索引用）
+    ...(w.mapVersion===2?{terrain:{water:Array.from(w.water),rock:Array.from(w.rock),mountain:Array.from(w.mountain),start:{...w.start}}}:{}),
     game: {
       v: G.VERSION, startConfig:g.startConfig ? {...g.startConfig} : null,
       h: g.h, day: g.day, season: g.season, year: g.year,
@@ -306,17 +316,23 @@ G.prepareSaveData = function (d) {
     if(G.supplySum(stock)>limit+1e-6)bad(field+'容量');return stock;
   };
   record(d, '根对象');
-  if (d.v !== undefined && d.v !== 1) bad('版本不受支持');
+  if (d.v !== undefined && d.v !== 1 && d.v !== 2) bad('版本不受支持');
+  const authoritative=d.v===2;
+  if(authoritative?d.mapVersion!==2:d.mapVersion!==undefined&&d.mapVersion!==0&&d.mapVersion!==1)bad('地图生成版本不受支持');
+  if(!authoritative&&d.terrain!==undefined)bad('旧版本不能携带新地形');
   integer(d.seed, '地图种子', -0x80000000, 0xffffffff);
   const oldN = d.N === undefined ? G.MAP : integer(d.N, '地图尺寸', 1, 4096);
+  if(authoritative&&d.N!==G.MAP)bad('权威地形尺寸须为'+G.MAP);
   const gd = record(d.game, '游戏状态'), g = G.newGameState();
   if(gd.startConfig!==undefined&&gd.startConfig!==null){
     const config=record(gd.startConfig,'开局设置');
-    if(config.v!==1||typeof config.preset!=='string'||typeof config.seed!=='number'||Object.keys(config).some(k=>!['v','preset','seed'].includes(k)))bad('开局设置');
+    const keys=authoritative?['v','preset','seed','terrain']:['v','preset','seed'];
+    if(config.v!==(authoritative?2:1)||typeof config.preset!=='string'||typeof config.seed!=='number'||Object.keys(config).length!==keys.length||Object.keys(config).some(k=>!keys.includes(k))||authoritative&&config.terrain!=='mountain')bad('开局设置');
     const q=G.startConfigQuote(config);if(!q.ok||q.config.seed!==d.seed)bad('开局设置');
     g.startConfig={...q.config};
     if(typeof gd.unlocks?.wheat!=='boolean')bad('新开局须保留小麦种子解锁状态');
   }
+  if(authoritative&&!g.startConfig)bad('山地开局来源缺失');
   g.h = number(gd.h, '小时', 0, G.DAY_H); if (g.h === G.DAY_H) bad('小时');
   g.day = integer(gd.day, '天数'); g.season = integer(gd.season, '季节', 0, 3); g.year = integer(gd.year, '年份', 1);
   const currentConstruction=gd.constructionVersion!==undefined;
@@ -450,7 +466,20 @@ G.prepareSaveData = function (d) {
   g.paused = !!(G.game && G.game.paused) || G.hasOpenModal();
   g.speed = G.game && [1, 2, 5].includes(G.game.speed) ? G.game.speed : 1;
 
-  const w = G.genWorld(d.seed, { starterResources: d.mapVersion >= 1 });
+  const w = authoritative ? G.emptyWorld(d.seed,2) : G.genWorld(d.seed, { starterResources: d.mapVersion >= 1 });
+  if(authoritative){
+    const terrain=record(d.terrain,'权威地形'),keys=['water','rock','mountain','start'];
+    if(Object.keys(terrain).length!==keys.length||Object.keys(terrain).some(k=>!keys.includes(k)))bad('权威地形字段');
+    for(const k of ['water','rock','mountain']){
+      const values=array(terrain[k],'地形 '+k);if(values.length!==w.N*w.N)bad('地形格数 '+k);
+      for(let i=0;i<values.length;i++)w[k][i]=integer(values[i],'地形值 '+k,0,k==='mountain'?1:2);
+    }
+    for(let i=0;i<w.N*w.N;i++)if(w.mountain[i]&&(w.water[i]||w.rock[i])||w.water[i]&&w.rock[i])bad('山水矿地形重叠');
+    const start=record(terrain.start,'起始位置');
+    if(Object.keys(start).length!==2||Object.keys(start).some(k=>!['x','y'].includes(k)))bad('起始位置字段');
+    w.start={x:integer(start.x,'起点 x',0,w.N-1),y:integer(start.y,'起点 y',0,w.N-1)};
+    const i=w.start.y*w.N+w.start.x;if(w.water[i]||w.rock[i]||w.mountain[i])bad('起始位置地形');
+  }
   const gridIndex = (i, field) => {
     integer(i, field, 0, oldN * oldN - 1);
     const x = i % oldN, y = Math.floor(i / oldN);
@@ -465,17 +494,20 @@ G.prepareSaveData = function (d) {
     if (x >= w.N || y >= w.N) continue;
     const i = y * w.N + x;
     if (w.treeIdx[i] >= 0) bad('重复树木');
+    if(authoritative&&(row[0]!==i||w.water[i]||w.rock[i]||w.mountain[i]))bad('树木索引或地形冲突');
     w.treeIdx[i] = w.trees.length; w.trees.push({ i, x, y, b: born });
   }
+  if(authoritative)array(d.rockCleared,'已清理岩石');
   for (const i of optionalArray(d.rockCleared, '已清理岩石')) {
     const t = gridIndex(i, '岩石索引'); if (t === null) continue;
+    if(authoritative&&(w.rock[t]||w.water[t]||w.mountain[t]||w.rockCleared.includes(t)))bad('已清理岩石与权威地形冲突');
     if (!w.rockCleared.includes(t)) w.rockCleared.push(t);
     w.rock[t] = 0;
   }
-  for (const i of optionalArray(d.marked, '砍伐标记')) { const t = gridIndex(i, '砍伐索引'); if (t !== null) w.marked.add(t); }
-  for (const i of optionalArray(d.markedRocks, '采矿标记')) { const t = gridIndex(i, '采矿索引'); if (t !== null && w.rock[t]) w.markedRocks.add(t); }
-  for (const i of optionalArray(d.roads, '道路')) { const t = gridIndex(i, '道路索引'); if (t !== null) G.setRoad(w, t % w.N, Math.floor(t / w.N), true); }
-  for (const i of optionalArray(d.stoneRoads, '石路')) { const t = gridIndex(i, '石路索引'); if (t !== null) { if(w.water[t]===1) bad('水上石路'); G.setRoad(w,t%w.N,Math.floor(t/w.N),2); } }
+  for (const i of optionalArray(d.marked, '砍伐标记')) { const t = gridIndex(i, '砍伐索引'); if(authoritative&&(w.treeIdx[t]<0||w.marked.has(t)))bad('砍伐标记与地形冲突'); if (t !== null) w.marked.add(t); }
+  for (const i of optionalArray(d.markedRocks, '采矿标记')) { const t = gridIndex(i, '采矿索引'); if(authoritative&&(!w.rock[t]||w.markedRocks.has(t)))bad('采矿标记与地形冲突'); if (t !== null && w.rock[t]) w.markedRocks.add(t); }
+  for (const i of optionalArray(d.roads, '道路')) { const t = gridIndex(i, '道路索引'); if(authoritative&&(w.mountain[t]||w.rock[t]||w.water[t]===1||w.road[t]))bad('道路与地形冲突'); if (t !== null) G.setRoad(w, t % w.N, Math.floor(t / w.N), true); }
+  for (const i of optionalArray(d.stoneRoads, '石路')) { const t = gridIndex(i, '石路索引'); if (t !== null) { if(w.water[t]===1) bad('水上石路'); if(authoritative&&w.road[t]!==1)bad('石路须属于道路且不能重复'); G.setRoad(w,t%w.N,Math.floor(t/w.N),2); } }
 
   const used = new Set(),graveIds=new Set(),graveSources=new Map(),graveSourceSlots=new Set(); let usedMax = 0;
   const readGrave=function(raw,source,requireIdentity){
@@ -768,6 +800,7 @@ G.prepareSaveData = function (d) {
     }
     for (let yy = y; yy < y + b.h; yy++) for (let xx = x; xx < x + b.w; xx++) {
       const i = yy * w.N + xx; if (w.bgrid[i] >= 0) bad('建筑重叠');
+      if(authoritative&&(w.mountain[i]||w.rock[i]||b.type!=='bridge'&&w.water[i]===1||b.state==='ok'&&w.treeIdx[i]>=0))bad('建筑与权威地形冲突');
       if((b.cemeterySize||b.type==='graveremnant')&&(w.water[i]===1||w.rock[i]||(b.state==='ok'&&w.treeIdx[i]>=0)))bad('墓园占地未清理或在水上');
       if(b.orchardSize&&(w.water[i]===1||w.rock[i]||(b.state==='ok'&&w.treeIdx[i]>=0)))bad('面积果园占地未清理或在水上');
       if(b.pastureSize&&(w.water[i]===1||w.rock[i]||(b.state==='ok'&&w.treeIdx[i]>=0)))bad('面积牧场占地未清理或在水上');
@@ -788,6 +821,7 @@ G.prepareSaveData = function (d) {
         homeX:integer(row.homeX,'鹿群栖息地 x',0,w.N-1),homeY:integer(row.homeY,'鹿群栖息地 y',0,w.N-1),
         returnDay:row.returnDay===null?null:number(row.returnDay,'鹿群回归日期',0,G.huntingNow(g)+G.HUNTING.replenishDays),
         moveDay:integer(row.moveDay,'鹿群下次移动日',0,g.day+G.HUNTING.moveDays),generation:integer(row.generation,'鹿群代次',0)};
+      if(authoritative&&(G.isMountain(w,deer.x,deer.y)||G.isMountain(w,deer.homeX,deer.homeY)))bad('鹿群位置或旧栖地与山体冲突');
       if(seen.has(deer.id))bad('重复鹿群 ID');seen.add(deer.id);
       if(Math.abs(deer.x-deer.homeX)>G.HUNTING.roamRadius||Math.abs(deer.y-deer.homeY)>G.HUNTING.roamRadius)bad('鹿群越出本地栖息地');
       if(deer.returnDay===null){
@@ -925,6 +959,10 @@ G.prepareSaveData = function (d) {
     if(![[1,1],[2,2],[3,3],[4,3]].some(([x,y])=>x===width&&y===height))bad('散落物资原占地'); // citizen/camp, house, market, boarding
     return {id:uniqueId(row.id,'散落物资 ID'),type:'supplycache',state:'ok',x:integer(row.x,'散落物资 x',0,Math.min(oldN,w.N)-width),y:integer(row.y,'散落物资 y',0,Math.min(oldN,w.N)-height),w:width,h:height,supplyStock:supplyStock(row.supplyStock,'散落生活库存',G.SUPPLY.homeCap)};
   });
+  // Loose goods can remain on rock or on water after a bridge is removed.
+  // Preserve their finite ownership; only impossible static mountain overlap fails.
+  if(authoritative)for(const p of [...w.supplyCaches,...w.families.map(f=>f.supplyCamp).filter(Boolean)])
+    for(let y=p.y;y<p.y+p.h;y++)for(let x=p.x;x<p.x+p.w;x++)if(G.isMountain(w,x,y))bad('散落或临时物资与山体冲突');
   for(const f of w.families)if(f.houseId!==null&&(w.bmap[f.houseId]?.houseFire||w.bmap[f.houseId]?.type==='burntruins'))bad('火情住房不能入住');
   for(const c of w.citizens)if(c.job!==null&&['well','burntruins'].includes(w.bmap[c.job]?.type))bad('无岗位消防设施');
   if(g.nomads.offer){const h=w.bmap[g.nomads.offer.hallId];if(!h||h.type!=='townhall'||h.state!=='ok')bad('来访申请市政厅失效');}
@@ -953,6 +991,7 @@ G.prepareSaveData = function (d) {
   for (const c of w.citizens) {
     const cx = Math.round(c.x), cy = Math.round(c.y);
     if (G.tileBlocked(w, cx, cy)) {
+      if(authoritative)bad('市民位于不可通行地格');
       const spot = G.nearestWalkable(w, cx, cy, 8);
       if (spot) { c.x = spot.x; c.y = spot.y; c.camped = false; }
     }
@@ -1307,7 +1346,7 @@ G.roadPlanStatus = function () {
   const trees = [], added = [];
   for (const p of plan.result.path) {
     const i = p.y * w.N + p.x;
-    if (w.water[i] === 1 || w.rock[i] || w.bgrid[i] >= 0) return { ok: false, reason: '路线已被新障碍阻断，请重新选择起终点' };
+    if (G.isMountain(w,p.x,p.y) || w.water[i] === 1 || w.rock[i] || w.bgrid[i] >= 0) return { ok: false, reason: '路线已被新障碍阻断，请重新选择起终点' };
     if (w.treeIdx[i] >= 0) { trees.push(p); if (!w.marked.has(i)) added.push(p); }
   }
   if (w.marked.size + added.length > 300) return { ok: false, reason: '清树标记将超过300处，请等待现有任务完成或取消多余标记' };
@@ -1466,16 +1505,16 @@ G.init = function () {
     dragging = true; dragBtn = e.button; dragMoved = 0;
     lastX = pressX = p.x; lastY = pressY = p.y;
     roadMouse = null;farmMouse=null;pastureMouse=null;orchardMouse=null;cemeteryMouse=null;
-    if(e.button===0&&G.isFarmPlanning()){const t=G.screenToTile(p.x,p.y);farmMouse={start:G.farmPoint(t.tx,t.ty),world:G.world,generation:G.farmGestureVersion};}
-    if(e.button===0&&G.isPasturePlanning()){const t=G.screenToTile(p.x,p.y);pastureMouse={start:G.farmPoint(t.tx,t.ty),world:G.world,generation:G.pastureGestureVersion};}
-    if(e.button===0&&G.isOrchardPlanning()){const t=G.screenToTile(p.x,p.y);orchardMouse={start:G.farmPoint(t.tx,t.ty),world:G.world,generation:G.orchardGestureVersion};}
-    if(e.button===0&&G.isCemeteryPlanning()){const t=G.screenToTile(p.x,p.y);cemeteryMouse={start:G.farmPoint(t.tx,t.ty),world:G.world,generation:G.cemeteryGestureVersion};}
+    if(e.button===0&&G.isFarmPlanning()){const t=G.screenToMapTile(p.x,p.y);farmMouse={start:G.farmPoint(t.tx,t.ty),world:G.world,generation:G.farmGestureVersion};}
+    if(e.button===0&&G.isPasturePlanning()){const t=G.screenToMapTile(p.x,p.y);pastureMouse={start:G.farmPoint(t.tx,t.ty),world:G.world,generation:G.pastureGestureVersion};}
+    if(e.button===0&&G.isOrchardPlanning()){const t=G.screenToMapTile(p.x,p.y);orchardMouse={start:G.farmPoint(t.tx,t.ty),world:G.world,generation:G.orchardGestureVersion};}
+    if(e.button===0&&G.isCemeteryPlanning()){const t=G.screenToMapTile(p.x,p.y);cemeteryMouse={start:G.farmPoint(t.tx,t.ty),world:G.world,generation:G.cemeteryGestureVersion};}
     if (e.button === 0 && G.tool && G.tool.kind === 'road') {
-      const t = G.screenToTile(p.x, p.y);
+      const t = G.screenToMapTile(p.x, p.y);
       roadMouse = { start: { x: Math.floor(t.tx), y: Math.floor(t.ty) }, world: G.world, generation: G.roadGestureVersion };
     }
     if (e.button === 0 && G.tool && ['fell', 'quarry'].includes(G.tool.kind)) {
-      const t = G.screenToTile(p.x, p.y);
+      const t = G.screenToMapTile(p.x, p.y);
       G.beginHarvestRange(t.tx, t.ty);
     }
   });
@@ -1483,7 +1522,7 @@ G.init = function () {
   window.addEventListener('mousemove', e => {
     if (G.hasOpenModal() || onPlacementPanel(e)) { resetInput(); return; }
     const p = toLocal(e);
-    const t = G.screenToTile(p.x, p.y);
+    const t = G.screenToMapTile(p.x, p.y);
     G.hover = { tx: Math.floor(t.tx), ty: Math.floor(t.ty) };
     if (!dragging) return;
     const dx = p.x - lastX, dy = p.y - lastY;
@@ -1514,7 +1553,7 @@ G.init = function () {
     if (!dragging) return;
     dragging = false;
     const p = toLocal(e);
-    const t = G.screenToTile(p.x, p.y);
+    const t = G.screenToMapTile(p.x, p.y);
     const tx = Math.floor(t.tx), ty = Math.floor(t.ty);
     dragMoved = Math.max(dragMoved, Math.abs(p.x - pressX) + Math.abs(p.y - pressY));
     if(e.button===0&&G.isFarmPlanning()){const gesture=farmMouse;farmMouse=null;G.farmDrag=null;if(!gesture||gesture.world!==G.world||gesture.generation!==G.farmGestureVersion)return;if(dragMoved>4){G.farmPlan=null;G.selectFarmCorner(gesture.start.x,gesture.start.y);G.selectFarmCorner(tx,ty);}else G.selectFarmCorner(tx,ty);return;}
@@ -1555,16 +1594,16 @@ G.init = function () {
 
   G.cv.addEventListener('touchstart',e=>{if(!G.isFarmPlanning())return;e.preventDefault();resetInput();farmTouch=!G.hasOpenModal()&&e.touches.length===1?{x:e.touches[0].clientX,y:e.touches[0].clientY,world:G.world,generation:G.farmGestureVersion}:null;},{passive:false});
   G.cv.addEventListener('touchmove',e=>{if(!G.isFarmPlanning())return;e.preventDefault();if(!farmTouch||e.touches.length!==1||Math.abs(e.touches[0].clientX-farmTouch.x)+Math.abs(e.touches[0].clientY-farmTouch.y)>10)farmTouch=null;},{passive:false});
-  G.cv.addEventListener('touchend',e=>{if(!G.isFarmPlanning()){farmTouch=null;return;}e.preventDefault();if(farmTouch&&farmTouch.world===G.world&&farmTouch.generation===G.farmGestureVersion&&e.changedTouches.length===1&&!G.hasOpenModal()){const p=toLocal(e.changedTouches[0]),t=G.screenToTile(p.x,p.y);G.selectFarmCorner(t.tx,t.ty);}farmTouch=null;},{passive:false});
+  G.cv.addEventListener('touchend',e=>{if(!G.isFarmPlanning()){farmTouch=null;return;}e.preventDefault();if(farmTouch&&farmTouch.world===G.world&&farmTouch.generation===G.farmGestureVersion&&e.changedTouches.length===1&&!G.hasOpenModal()){const p=toLocal(e.changedTouches[0]),t=G.screenToMapTile(p.x,p.y);G.selectFarmCorner(t.tx,t.ty);}farmTouch=null;},{passive:false});
   G.cv.addEventListener('touchstart',e=>{if(!G.isPasturePlanning())return;e.preventDefault();resetInput();pastureTouch=!G.hasOpenModal()&&e.touches.length===1?{x:e.touches[0].clientX,y:e.touches[0].clientY,world:G.world,generation:G.pastureGestureVersion}:null;},{passive:false});
   G.cv.addEventListener('touchstart',e=>{if(!G.isOrchardPlanning())return;e.preventDefault();resetInput();orchardTouch=!G.hasOpenModal()&&e.touches.length===1?{x:e.touches[0].clientX,y:e.touches[0].clientY,world:G.world,generation:G.orchardGestureVersion}:null;},{passive:false});
   G.cv.addEventListener('touchstart',e=>{if(!G.isCemeteryPlanning())return;e.preventDefault();resetInput();cemeteryTouch=!G.hasOpenModal()&&e.touches.length===1?{x:e.touches[0].clientX,y:e.touches[0].clientY,world:G.world,generation:G.cemeteryGestureVersion}:null;},{passive:false});
   G.cv.addEventListener('touchmove',e=>{if(!G.isPasturePlanning())return;e.preventDefault();if(!pastureTouch||e.touches.length!==1||Math.abs(e.touches[0].clientX-pastureTouch.x)+Math.abs(e.touches[0].clientY-pastureTouch.y)>10)pastureTouch=null;},{passive:false});
   G.cv.addEventListener('touchmove',e=>{if(!G.isOrchardPlanning())return;e.preventDefault();if(!orchardTouch||e.touches.length!==1||Math.abs(e.touches[0].clientX-orchardTouch.x)+Math.abs(e.touches[0].clientY-orchardTouch.y)>10)orchardTouch=null;},{passive:false});
   G.cv.addEventListener('touchmove',e=>{if(!G.isCemeteryPlanning())return;e.preventDefault();if(!cemeteryTouch||e.touches.length!==1||Math.abs(e.touches[0].clientX-cemeteryTouch.x)+Math.abs(e.touches[0].clientY-cemeteryTouch.y)>10)cemeteryTouch=null;},{passive:false});
-  G.cv.addEventListener('touchend',e=>{if(!G.isPasturePlanning()){pastureTouch=null;return;}e.preventDefault();if(pastureTouch&&pastureTouch.world===G.world&&pastureTouch.generation===G.pastureGestureVersion&&e.changedTouches.length===1&&!G.hasOpenModal()){const p=toLocal(e.changedTouches[0]),t=G.screenToTile(p.x,p.y);G.selectPastureCorner(t.tx,t.ty);}pastureTouch=null;},{passive:false});
-  G.cv.addEventListener('touchend',e=>{if(!G.isOrchardPlanning()){orchardTouch=null;return;}e.preventDefault();if(orchardTouch&&orchardTouch.world===G.world&&orchardTouch.generation===G.orchardGestureVersion&&e.changedTouches.length===1&&!G.hasOpenModal()){const p=toLocal(e.changedTouches[0]),t=G.screenToTile(p.x,p.y);G.selectOrchardCorner(t.tx,t.ty);}orchardTouch=null;},{passive:false});
-  G.cv.addEventListener('touchend',e=>{if(!G.isCemeteryPlanning()){cemeteryTouch=null;return;}e.preventDefault();if(cemeteryTouch&&cemeteryTouch.world===G.world&&cemeteryTouch.generation===G.cemeteryGestureVersion&&e.changedTouches.length===1&&!G.hasOpenModal()){const p=toLocal(e.changedTouches[0]),t=G.screenToTile(p.x,p.y);G.selectCemeteryCorner(t.tx,t.ty);}cemeteryTouch=null;},{passive:false});
+  G.cv.addEventListener('touchend',e=>{if(!G.isPasturePlanning()){pastureTouch=null;return;}e.preventDefault();if(pastureTouch&&pastureTouch.world===G.world&&pastureTouch.generation===G.pastureGestureVersion&&e.changedTouches.length===1&&!G.hasOpenModal()){const p=toLocal(e.changedTouches[0]),t=G.screenToMapTile(p.x,p.y);G.selectPastureCorner(t.tx,t.ty);}pastureTouch=null;},{passive:false});
+  G.cv.addEventListener('touchend',e=>{if(!G.isOrchardPlanning()){orchardTouch=null;return;}e.preventDefault();if(orchardTouch&&orchardTouch.world===G.world&&orchardTouch.generation===G.orchardGestureVersion&&e.changedTouches.length===1&&!G.hasOpenModal()){const p=toLocal(e.changedTouches[0]),t=G.screenToMapTile(p.x,p.y);G.selectOrchardCorner(t.tx,t.ty);}orchardTouch=null;},{passive:false});
+  G.cv.addEventListener('touchend',e=>{if(!G.isCemeteryPlanning()){cemeteryTouch=null;return;}e.preventDefault();if(cemeteryTouch&&cemeteryTouch.world===G.world&&cemeteryTouch.generation===G.cemeteryGestureVersion&&e.changedTouches.length===1&&!G.hasOpenModal()){const p=toLocal(e.changedTouches[0]),t=G.screenToMapTile(p.x,p.y);G.selectCemeteryCorner(t.tx,t.ty);}cemeteryTouch=null;},{passive:false});
   const harvesting = () => G.tool && ['fell', 'quarry'].includes(G.tool.kind);
   G.cv.addEventListener('touchstart', e => {
     if (!harvesting()) return;
@@ -1580,7 +1619,7 @@ G.init = function () {
     if (!harvesting()) { harvestTouch = null; return; }
     e.preventDefault();
     if (harvestTouch && harvestTouch.world === G.world && harvestTouch.generation === G.harvestGestureVersion && !G.hasOpenModal() && e.changedTouches.length === 1) {
-      const p = toLocal(e.changedTouches[0]), t = G.screenToTile(p.x, p.y);
+      const p = toLocal(e.changedTouches[0]), t = G.screenToMapTile(p.x, p.y);
       G.selectHarvestCorner(t.tx, t.ty);
     }
     harvestTouch = null;
@@ -1601,7 +1640,7 @@ G.init = function () {
     if (!G.tool || G.tool.kind !== 'road') { roadTouch = null; return; }
     e.preventDefault();
     if (roadTouch && roadTouch.world === G.world && roadTouch.generation === G.roadGestureVersion && e.changedTouches.length === 1 && !G.hasOpenModal()) {
-      const p = toLocal(e.changedTouches[0]), t = G.screenToTile(p.x, p.y);
+      const p = toLocal(e.changedTouches[0]), t = G.screenToMapTile(p.x, p.y);
       G.selectRoadEndpoint(Math.floor(t.tx), Math.floor(t.ty));
     }
     roadTouch = null;
@@ -1718,10 +1757,12 @@ G.selectAt = function (tx, ty, p) {
     G.ui.showInfo(G.sel);
     return;
   }
+  const mountain=G.isMountain(w,tx,ty);
   // bgrid 指向已不存在的建筑（异常残留）时按空地处理
   // 找附近的市民（屏幕距离）
   let best = null, bd = 18 * 18, citizenHomes = null;
   for (const c of w.citizens) {
+    if(mountain&&c.x+c.y+.01<=tx+ty+1)continue; // Hidden behind the clicked ridge; foreground people remain selectable.
     if (c.state === 'rest' && c.camped === false && !citizenHomes && G.citizenHomeLookup) citizenHomes = G.citizenHomeLookup(w);
     if ((G.citizenIndoorHome && G.citizenIndoorHome(c, citizenHomes)) || G.inMedicalCare(c) || G.inSchool(c) || G.inChapel(c)) continue;
     const [sx, sy] = G.T2S(c.x, c.y);
@@ -1733,7 +1774,7 @@ G.selectAt = function (tx, ty, p) {
   if (best) {
     G.sel = { kind: 'c', id: best.id };
     G.ui.showInfo(G.sel);
-  } else G.ui.hideInfo();
+  } else {G.sel=null;G.ui.hideInfo();if(mountain)G.ui.toast('山体不可步行或建造，请沿山谷选址；隧道尚未接入','info');}
 };
 
 window.addEventListener('DOMContentLoaded', G.init);

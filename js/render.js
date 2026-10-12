@@ -60,6 +60,96 @@ G.diamondPath = function (ctx, sx, sy) {
   ctx.closePath();
 };
 
+/* Collision remains binary. Shared deterministic surface vertices make rounded
+ * ridges: low at the footprint edge, rising inward. No saved elevation rules. */
+G.MOUNTAIN_MAX_RISE = 88;
+G.mountainHeights = new WeakMap();
+G.mountainCornerHeight = function(w,x,y) {
+  let heights=G.mountainHeights.get(w);
+  if(!heights){heights=new Float32Array((w.N+1)*(w.N+1)).fill(NaN);G.mountainHeights.set(w,heights);}
+  const i=y*(w.N+1)+x;if(Number.isFinite(heights[i]))return heights[i];
+  let distance=5;
+  for(let yy=y-5;yy<=y+4;yy++)for(let xx=x-5;xx<=x+4;xx++)
+    if(!G.isMountain(w,xx,yy))distance=Math.min(distance,Math.hypot(xx+.5-x,yy+.5-y));
+  const inset=Math.max(0,distance-Math.SQRT1_2);
+  const ripple=9*Math.min(1,inset/2)*Math.sin(x*.32+(w.seed||0)%97)*Math.cos(y*.27+(w.seed||0)%43);
+  heights[i]=Math.max(3,Math.min(G.MOUNTAIN_MAX_RISE,3+24*Math.pow(inset,.82)+ripple));return heights[i];
+};
+G.mountainPolygons = function(w,x,y) {
+  if(!G.isMountain||!G.isMountain(w,x,y))return [];
+  const [sx,sy]=G.T2S(x,y),heights=[[x,y],[x+1,y],[x+1,y+1],[x,y+1]].map(([xx,yy])=>G.mountainCornerHeight(w,xx,yy));
+  const top=[[sx,sy-heights[0]],[sx+32,sy+16-heights[1]],[sx,sy+32-heights[2]],[sx-32,sy+16-heights[3]]];
+  const out=[];
+  if(!G.isMountain(w,x,y+1))out.push({kind:'left',points:[top[3],top[2],[sx,sy+32],[sx-32,sy+16]]});
+  if(!G.isMountain(w,x+1,y))out.push({kind:'right',points:[top[2],top[1],[sx+32,sy+16],[sx,sy+32]]});
+  out.push({kind:'topX',points:[top[0],top[1],top[2]],heights:[heights[0],heights[1],heights[2]]});
+  out.push({kind:'topY',points:[top[0],top[2],top[3]],heights:[heights[0],heights[2],heights[3]]});
+  return out;
+};
+G.mountainPolygonPath = function(ctx,points) {
+  ctx.beginPath();points.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.closePath();
+};
+G.pointInMountainPolygon = function(x,y,points) {
+  let sign=0;
+  for(let i=0;i<points.length;i++){
+    const a=points[i],b=points[(i+1)%points.length],cross=(b[0]-a[0])*(y-a[1])-(b[1]-a[1])*(x-a[0]);
+    if(Math.abs(cross)<1e-7)continue;
+    const next=Math.sign(cross);if(sign&&sign!==next)return false;sign=next;
+  }
+  return true;
+};
+/* Use for pointer actions only; camera transforms/culling retain the plane inverse. */
+G.screenToMapTile = function(sx,sy) {
+  const flat=G.screenToTile(sx,sy),w=G.world;
+  if(!w||!w.mountain)return flat;
+  const px=(sx-G.cam.x)/G.cam.z,py=(sy-G.cam.y)/G.cam.z,candidates=[];
+  for(let y=Math.floor(flat.ty)-1;y<=Math.floor(flat.ty)+3;y++)
+    for(let x=Math.floor(flat.tx)-1;x<=Math.floor(flat.tx)+3;x++)
+      if(G.isMountain(w,x,y))candidates.push({x,y,d:x+y+1});
+  candidates.sort((a,b)=>b.d-a.d||b.y-a.y||b.x-a.x);
+  for(const p of candidates)if(G.mountainPolygons(w,p.x,p.y).some(face=>G.pointInMountainPolygon(px,py,face.points)))
+    return {tx:p.x+.5,ty:p.y+.5,mountain:true};
+  return flat;
+};
+G.drawMountain = function(ctx,w,x,y) {
+  const snowy=G.game.season===3,name=snowy?'mountain_rock_snow':'mountain_rock',im=G.SPR&&G.SPR.get(name);
+  const faces=G.mountainPolygons(w,x,y),tops=faces.filter(f=>f.kind.startsWith('top'));
+  // One continuous backing prevents separately antialiased texture triangles
+  // revealing the winter ground through their shared diagonal. Exact vertices,
+  // no stroke expansion: this does not paint outside the picked footprint.
+  const backing=snowy?'#a99b83':'#a3957d';
+  if(tops.length===2){G.mountainPolygonPath(ctx,[tops[0].points[0],tops[0].points[1],tops[0].points[2],tops[1].points[2]]);ctx.fillStyle=backing;ctx.fill();}
+  for(const face of faces){
+    ctx.save();G.mountainPolygonPath(ctx,face.points);ctx.clip();
+    ctx.fillStyle=backing;ctx.fill();
+    if(face.kind.startsWith('top')){
+      if(im&&im.width&&ctx.createPattern){
+        const [t,m,n]=face.points;
+        const a=face.kind==='topX'?(m[0]-t[0])/64:(m[0]-n[0])/64;
+        const b=face.kind==='topX'?(m[1]-t[1])/64:(m[1]-n[1])/64;
+        const c=face.kind==='topX'?(n[0]-m[0])/64:(n[0]-t[0])/64;
+        const d=face.kind==='topX'?(n[1]-m[1])/64:(n[1]-t[1])/64;
+        ctx.save();ctx.transform(a,b,c,d,t[0]-a*x*64-c*y*64,t[1]-b*x*64-d*y*64);
+        ctx.fillStyle=ctx.createPattern(im,'repeat');ctx.fillRect(x*64-.5,y*64-.5,65,65);ctx.restore();
+      }
+      const h=face.heights,dx=face.kind==='topX'?h[1]-h[0]:h[1]-h[2],dy=face.kind==='topX'?h[2]-h[1]:h[2]-h[0];
+      const shade=Math.max(-.09,Math.min(.11,(dx-dy)*.0045));
+      ctx.fillStyle=shade<0?'rgba(255,248,222,'+(-shade)+')':'rgba(36,33,27,'+shade+')';ctx.fill();
+    } else {
+      const [sx,sy]=G.T2S(x,y);
+      if(im&&im.width&&ctx.createPattern){ctx.fillStyle=ctx.createPattern(im,'repeat');ctx.fillRect(sx-32,sy-G.MOUNTAIN_MAX_RISE,64,G.MOUNTAIN_MAX_RISE+32);}
+      ctx.fillStyle=face.kind==='left'?'rgba(35,34,30,.17)':'rgba(35,34,30,.34)';ctx.fill();
+    }
+    ctx.restore();
+  }
+};
+G.drawMountainHover = function(ctx,w,x,y) {
+  const faces=G.mountainPolygons(w,x,y);if(!faces.length)return false;
+  ctx.save();ctx.strokeStyle=G.tool?'rgba(238,133,100,.95)':'rgba(245,237,200,.75)';ctx.lineWidth=1.5/G.cam.z;
+  for(const face of faces){G.mountainPolygonPath(ctx,face.points);ctx.stroke();}
+  ctx.restore();return true;
+};
+
 /* ---------- 精灵辅助（assets/ 图片；任一缺失时调用方回退程序化绘制） ---------- */
 /* 以「脚点」(cx, by=底边中心) 画一张精灵，按 G.SPRITE_SIZES 或 opts.w 定尺寸。
  * 命中返回 [dw, dh]，缺失返回 null。opts.flip = 水平镜像。 */
@@ -981,7 +1071,7 @@ G.frame = function (dtReal) {
     ty0 = Math.min(ty0, c.ty); ty1 = Math.max(ty1, c.ty);
   }
   tx0 = Math.max(0, Math.floor(tx0) - 2); ty0 = Math.max(0, Math.floor(ty0) - 2);
-  tx1 = Math.min(G.world.N - 1, Math.ceil(tx1) + 2); ty1 = Math.min(G.world.N - 1, Math.ceil(ty1) + 4);
+  tx1 = Math.min(G.world.N - 1, Math.ceil(tx1) + 4); ty1 = Math.min(G.world.N - 1, Math.ceil(ty1) + 4);
 
   // All farm soil is ground, never a tall object sorted by the field's far corner.
   for (const b of w.buildings) if (b.type === 'farm') G.drawFarmGround(ctx, b, { tx0, ty0, tx1, ty1 });
@@ -1069,7 +1159,7 @@ G.frame = function (dtReal) {
       const px = sx * G.cam.z + G.cam.x, py = sy * G.cam.z + G.cam.y;
       if (px < -40 * G.cam.z || px > cv.clientWidth + 40 * G.cam.z || py < -20 * G.cam.z || py > cv.clientHeight + 20 * G.cam.z) continue;
       G.diamondPath(ctx, sx, sy);
-      ctx.fillStyle = (w.water[i] === 1 && plan.surface!=='bridge') || w.rock[i] || w.bgrid[i] >= 0 ? 'rgba(230,90,80,.6)' : w.treeIdx[i] >= 0 ? 'rgba(235,180,65,.6)' : 'rgba(120,230,140,.5)';
+      ctx.fillStyle = (w.water[i] === 1 && plan.surface!=='bridge') || (G.isMountain&&G.isMountain(w,p.x,p.y)) || w.rock[i] || w.bgrid[i] >= 0 ? 'rgba(230,90,80,.6)' : w.treeIdx[i] >= 0 ? 'rgba(235,180,65,.6)' : 'rgba(120,230,140,.5)';
       ctx.fill();
     }
   }
@@ -1078,7 +1168,7 @@ G.frame = function (dtReal) {
     const [sx, sy] = G.T2S(G.hover.tx, G.hover.ty);
     G.diamondPath(ctx, sx, sy);
     const hx = G.hover.tx, hy = G.hover.ty, hi = hy * w.N + hx;
-    ctx.fillStyle = hx >= 0 && hy >= 0 && hx < w.N && hy < w.N && w.water[hi] !== 1 && !w.rock[hi] && w.bgrid[hi] < 0 ? 'rgba(120,230,140,0.4)' : 'rgba(230,90,80,0.4)';
+    ctx.fillStyle = hx >= 0 && hy >= 0 && hx < w.N && hy < w.N && w.water[hi] !== 1 && !(G.isMountain&&G.isMountain(w,hx,hy)) && !w.rock[hi] && w.bgrid[hi] < 0 ? 'rgba(120,230,140,0.4)' : 'rgba(230,90,80,0.4)';
     ctx.fill();
   }
 
@@ -1087,6 +1177,7 @@ G.frame = function (dtReal) {
   for (let y = ty0; y <= ty1; y++)
     for (let x = tx0; x <= tx1; x++) {
       const idx = w.treeIdx[y * w.N + x];
+      if(G.isMountain&&G.isMountain(w,x,y))items.push({d:x+y+1,k:8,x,y});
       if (idx >= 0) items.push({ d: x + y, k: 0, x, y, t: w.trees[idx], marked: w.marked.has(y * w.N + x) });
       if (w.rock[y * w.N + x] && w.markedRocks && w.markedRocks.has(y * w.N + x))
         items.push({ d: x + y + 0.02, k: 3, x, y });
@@ -1138,6 +1229,7 @@ G.frame = function (dtReal) {
     else if (it.k === 5) G.drawEconomyFieldPart(ctx, it);
     else if (it.k === 6) G.drawSupplyPile(ctx,it.pile);
     else if (it.k === 7) G.drawDeer(ctx,it.deer);
+    else if (it.k === 8) G.drawMountain(ctx,w,it.x,it.y);
     else if (it.k === 1) {
       if(it.b.type==='farm')G.drawFarmPestBadge(ctx,it.b);
       if(it.b.type==='pasture')G.drawPasturePestBadge(ctx,it.b);
@@ -1163,8 +1255,10 @@ G.frame = function (dtReal) {
     } else G.drawCitizen(ctx, it.c, now, citizenHomes);
   }
 
+  // Raised mountain hit surfaces stay visible for all tools, including invalid builds.
+  const mountainHover=G.hover&&G.hover.tx>=0&&G.drawMountainHover(ctx,w,G.hover.tx,G.hover.ty);
   // 悬停瓦片
-  if (G.hover && G.hover.tx >= 0 && !G.tool) {
+  if (G.hover && G.hover.tx >= 0 && !G.tool && !mountainHover) {
     const [sx, sy] = G.T2S(G.hover.tx, G.hover.ty);
     G.diamondPath(ctx, sx, sy);
     ctx.strokeStyle = 'rgba(255,255,255,0.35)';
