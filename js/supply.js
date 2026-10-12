@@ -64,8 +64,7 @@ G.supplyBasket=function(stock,needs,cap,publicStock=false){
  // Only whole garments travel. Warm coats are preferred at actual pickup,
  // never replace a still-worn coat, and share the same finite cargo capacity.
  let coats=needs.coats||0;for(const k of ['warmCoats','clothes'])if(coats>=1){const n=Math.floor(Math.min(coats,stock[k]||0,room));if(n>0)coats-=take(k,n);}
- let food=needs.food;
- for(let pass=0;pass<3&&food>1e-8&&room>1e-8;pass++){const keys=G.FOOD_KEYS.filter(k=>(stock[k]||0)-out[k]>1e-8),part=keys.length?food/keys.length:0;if(!keys.length)break;for(const k of keys)food-=take(k,part);}
+ for(const[k,n]of Object.entries(G.foodBasket(stock,Math.min(needs.food,room))))take(k,n);
  if(G.game.season<2)fuel-=take('firewood',fuel);if(needs.coal>0)take('coal',needs.coal);
  return Object.fromEntries(Object.entries(out).filter(([,q])=>q>1e-8));
 };
@@ -201,7 +200,7 @@ G.stepSupply=function(c,dt){
 };
 G.useSupplyStock=function(stock,type,qty){stock[type]=Math.max(0,(stock[type]||0)-qty);G.game.supplyUsed[type]=(G.game.supplyUsed[type]||0)+qty;G.ledgerRecord('distributedUsed',type,qty);};
 G.eatHousehold=function(c,qty){const target=G.supplyFamilyTarget(G.familyOf(c),true);if(!target)return [];const stock=G.supplyStock(target);if(G.supplyFood(stock)+1e-8<qty)return [];
- const basket=G.supplyBasket(stock,{food:qty,firewood:0,coal:0,room:qty},qty),eaten=[];for(const[k,n]of Object.entries(basket)){G.useSupplyStock(stock,k,n);eaten.push(k);}return eaten;
+ const basket=G.supplyBasket(stock,{food:qty,firewood:0,coal:0,room:qty},qty),eaten=[];for(const[k,n]of Object.entries(basket)){G.useSupplyStock(stock,k,n);eaten.push(k);}return G.foodGroupsOf(eaten);
 };
 G.heatSuppliedHome=function(b,need){const r=G.supplyStock(b),wood=Math.min(r.firewood,need),coal=G.heatingPolicy().allowCoal?Math.min(r.coal,Math.max(0,need-wood)/G.COAL_HEAT):0;
  G.useSupplyStock(r,'firewood',wood);G.useSupplyStock(r,'coal',coal);b.lastHeating={day:G.game.day,wood,coal,need};b.unheated=wood+coal*G.COAL_HEAT+1e-8<need;

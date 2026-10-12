@@ -574,6 +574,7 @@ G.addEconomyFieldParts = function (items, b, bounds) {
     add({ kind: 'sheepShelter', x: b.x + 2.1, y: b.y + 2.1 });
     const spots = [[3.2, 1.2], [4.7, 1.6], [2.8, 2.7], [4.5, 3.1], [1.2, 3.2], [1.5, 4.7],
       [3.1, 4.8], [4.8, 4.8], [2.2, 3.9], [3.8, 4], [4, 2], [0.9, 4.2]];
+    if(G.pastureTypeOf(b)==='chicken')spots.push(...spots.map(([x,y])=>[Math.min(5.5,x+.35),Math.min(5.5,y+.35)]));
     const count = Math.min(spots.length, Math.max(0, Math.floor(b.animals || 0)));
     for (let i = 0; i < count; i++) add({ kind: G.pastureTypeOf(b), x: b.x + spots[i][0], y: b.y + spots[i][1], n: i });
   }
@@ -602,6 +603,7 @@ G.drawEconomyFieldPart = function (ctx, p) {
   if (p.kind === 'sheepShelter') {
     G.sprDraw(ctx, 'pasture', sx, sy, { w: 112 }); return;
   }
+  if(p.kind==='chicken'){G.sprDraw(ctx,'chicken',sx,sy,{w:16,flip:p.n%3===1});return;}
   if(p.kind==='cattle'){G.sprDraw(ctx,'cattle',sx,sy,{w:32,flip:p.n%3===1});return;}
   if (p.kind === 'sheep') {
     G.sprDraw(ctx, 'sheep', sx, sy, { w: 24, flip: p.n % 3 === 1 }); return;
