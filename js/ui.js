@@ -782,6 +782,7 @@ G.ui = {
     this.renderInfo();
   },
   hideInfo: function () {
+    this.resetPastureConfirmations();
     const supply = this.el.info.querySelector && this.el.info.querySelector('[data-supply-mode-panel]');
     if (supply) this.resetSupplyConfirmation(supply);
     const fishing = this.el.info.querySelector && this.el.info.querySelector('[data-fishing-panel]');
@@ -3014,6 +3015,7 @@ G.ui = {
     }
     if (b.type === 'pasture' && G.stockPasture && G.setPastureTarget) return `<section class="economy-details" data-economy="pasture">
       <p class="row" data-economy-live="animals"></p><p class="row" data-economy-live="pasture-production"></p><p class="row" data-economy-live="pasture-stock"></p><p class="desc" data-economy-live="pasture-logistics"></p>
+      ${this.pasturePestsMarkup()}
       <form id="pasture-type-form" class="economy-form"><h3>空场选择物种</h3><label for="pasture-type">羊、牛或鸡（不能混养）</label><select id="pasture-type"><option value="sheep"${G.pastureTypeOf(b)==='sheep'?' selected':''}>羊：肉、羊毛</option><option value="cattle"${G.pastureTypeOf(b)==='cattle'?' selected':''}>牛：肉、皮革</option><option value="chicken"${G.pastureTypeOf(b)==='chicken'?' selected':''}>鸡：鸡蛋、肉</option></select><button type="submit" id="pasture-type-apply">应用物种</button><p data-economy-live="pasture-switch"></p></form>
       <form id="pasture-stock-form" class="economy-form"><h3>放入已购同种牲畜</h3><p data-economy-live="sheep-bank"></p>
         <label for="pasture-stock-quantity">放入数量</label><input id="pasture-stock-quantity" type="number" min="1" max="${G.LIVESTOCK[G.pastureTypeOf(b)].cap}" step="1" value="2" inputmode="numeric"><button type="submit" id="pasture-stock">放入牧场</button></form>
@@ -3026,6 +3028,7 @@ G.ui = {
         <div class="hidden" data-pasture-split-confirm role="group" aria-label="确认牲畜分群"><p class="desc" data-pasture-split-quote></p><div class="economy-actions"><button type="button" id="pasture-split-confirm">确认分群</button><button type="button" id="pasture-split-cancel">取消</button></div></div>
         <p class="desc">满10只/头后可分出一半到同种空场。沿用按畜群数量直接安置的规则，不模拟逐头赶路；两场必须连通。保留量与工人不自动调整，新场需牧人实际照料。已产鸡蛋、未成蛋进度、羊毛、肉皮和在途货留原场。</p>
       </section>
+      ${this.pastureEmptyMarkup()}
       <p class="economy-message" data-economy-message role="status" aria-live="polite"></p>
     </section>`;
     if(b.type==='orchard')return `<section class="economy-details" data-economy="orchard">
@@ -3107,15 +3110,177 @@ G.ui = {
       onSubmit('pasture-type-form',()=>{const type=el.querySelector('#pasture-type').value;message(G.setPastureType(b,type)?`牧场物种已设为${G.LIVESTOCK[type].name}；下一次放入只接收该物种。`:G.pastureSwitchReason(b)||'物种选择无效');});
       onSubmit('pasture-stock-form', () => {
         const qty = Number(el.querySelector('#pasture-stock-quantity').value);
-        const d=G.pastureSummary(b),unit=d.type==='chicken'?'只':'头';message(G.stockPasture(b, qty, d.type) ? `已放入 ${qty} ${unit}${d.name}。` : `无法放入：请检查整数数量、待安置${d.name}数及${d.cap}${unit}容量。`);
+        const d=G.pastureSummary(b),unit=d.type==='chicken'?'只':'头';message(G.stockPasture(b, qty, d.type) ? `已放入 ${qty} ${unit}${d.name}。` : G.pasturePestSummary&&G.pasturePestSummary(b).active ? '本场正在染疫，不能继续放入牲畜；请先整群搬空到同种备用场。' : `无法放入：请检查整数数量、待安置${d.name}数及${d.cap}${unit}容量。`);
       });
       onSubmit('pasture-target-form', () => {
         const qty = Number(el.querySelector('#pasture-target-quantity').value);
         message(G.setPastureTarget(b, qty) ? `保留数量已设为 ${qty} ${G.pastureTypeOf(b)==='chicken'?'只':'头'}，超出部分由牧人屠宰。` : `请输入 2–${G.pastureSummary(b).cap} 的整数。`);
       });
       this.initPastureSplit(b);
+      this.initPasturePests(b);
+      this.initPastureEmpty(b);
     }
     this.refreshEconomyInfo(b);
+  },
+
+  resetPastureConfirmations: function () {
+    const el = this.el.info; if (!el?.querySelector) return null;
+    let focus = null;
+    for (const [kind, field, action] of [['pests', '_pestEnable', 'toggle'], ['empty', '_emptyQuote', 'start']]) {
+      const panel = el.querySelector(`[data-pasture-${kind}]`); if (!panel) continue;
+      const box = panel.querySelector(`[data-pasture-${kind}-confirm]`), start = panel.querySelector(`#pasture-${kind}-${action}`);
+      if (box?.contains(document.activeElement)) focus = start;
+      panel[field] = null; box?.classList.add('hidden'); start?.setAttribute('aria-expanded', 'false');
+    }
+    return focus;
+  },
+  pasturePestsMarkup: function () {
+    if (!G.pasturePestSummary || !G.pasturePestsToggleQuote || !G.setPasturePests) return '';
+    const p = G.PASTURE_PESTS;
+    return `<section data-pasture-pests><h3>可选牧场疫病</h3>
+      <p class="row" data-pasture-pests-status></p><p class="row" data-pasture-pests-field role="status" aria-live="polite"></p>
+      <div class="economy-actions"><button type="button" id="pasture-pests-toggle" aria-describedby="pasture-pests-note" aria-expanded="false">开启全镇牧场疫病…</button></div>
+      <p class="desc" id="pasture-pests-note">独立于农田虫害的可选全镇规则，新局和旧档默认关闭。开启后有${p.graceDays}天宽限；之后按每场每天${p.baseChance * 100}%的基础概率检查染疫，全镇最多${p.maxActive}座牧场同时染疫。感染预警${p.warningDays}天后，每天最多病死${p.lossPerDay}只/头，病死不产肉、皮或蛋。染疫活畜不能通过拆场消除，也不能继续放入新畜；整群搬空可清除源场疫病。关闭会清除活动疫病，已病死牲畜不返还。</p>
+      <div class="hidden" data-pasture-pests-confirm role="group" aria-label="确认开启全镇牧场疫病">
+        <p class="desc" data-pasture-pests-quote></p><div class="economy-actions"><button type="button" id="pasture-pests-confirm">确认全镇开启</button><button type="button" id="pasture-pests-cancel">保持关闭</button></div>
+      </div>
+    </section>`;
+  },
+  pastureEmptyMarkup: function () {
+    if (!G.pastureEmptyFacts || !G.pastureEmptyQuote || !G.emptyPasture) return '';
+    return `<section data-pasture-empty><h3>整群搬空</h3>
+      <label for="pasture-empty-target">同种备用空牧场（确认时检查通路与容量）</label><select id="pasture-empty-target"></select>
+      <p class="desc" data-pasture-empty-status></p><div class="economy-actions"><button type="button" id="pasture-empty-start" aria-expanded="false">查看整群搬空方案</button></div>
+      <div class="hidden" data-pasture-empty-confirm role="group" aria-label="确认整群搬空"><p class="desc" data-pasture-empty-quote></p><div class="economy-actions"><button type="button" id="pasture-empty-confirm">确认整群搬空</button><button type="button" id="pasture-empty-cancel">取消</button></div></div>
+      <p class="desc">有1只/头即可整群搬空；这与满10只/头才能分群是独立操作。目标须是另一座同种已建成、空置、容量足够且可达的牧场；没有合适目标时请先建同种备用场。源场归零后清除疫病，目标需重新实际照料。按畜群数量直接安置，不模拟逐头赶路；不移动已产鸡蛋、未成蛋进度、羊毛、肉皮、携货和工人。两场保留量不变，超过目标保留量时会正常屠宰。</p>
+    </section>`;
+  },
+  pastureActionValid: function (b, el, w, g, panel, selector, controls) {
+    return G.world === w && G.game === g && this.el.info === el && !el.classList.contains('hidden') &&
+      G.sel?.kind === 'b' && G.sel.id === b.id && w.bmap[b.id] === b && b.type === 'pasture' && b.state === 'ok' &&
+      el.querySelector(selector) === panel && controls.every(([id, node]) => panel.querySelector(id) === node) &&
+      !(G.hasOpenModal && G.hasOpenModal());
+  },
+  refreshPasturePests: function (b) {
+    const el = this.el.info, panel = el.querySelector('[data-pasture-pests]');
+    if (!panel || !G.pasturePestSummary) return;
+    const toggle = panel.querySelector('#pasture-pests-toggle'), box = panel.querySelector('[data-pasture-pests-confirm]');
+    const p = G.pasturePestSummary(b), pending = panel._pestEnable;
+    const set = (selector, text) => { const node = panel.querySelector(selector); if (node && node.textContent !== text) node.textContent = text; };
+    set('[data-pasture-pests-status]', p.enabled ? `全镇牧场疫病：已开启${p.graceLeft > 0 ? ` · 宽限还剩 ${p.graceLeft} 天` : ''}` : '全镇牧场疫病：已关闭');
+    set('[data-pasture-pests-field]', `本场疫病：${p.status}${p.active ? ` · 本次已病死 ${p.lost} ${G.pastureTypeOf(b) === 'chicken' ? '只' : '头'}。请用下方整群搬空；染疫活畜不能拆除或继续放入新畜。` : ''}`);
+    const demolish = el.querySelector('#info-demolish');
+    if (demolish) { demolish.disabled = !!p.active; demolish.title = p.active ? '染疫活畜不能拆除，请先整群搬空到同种备用场。' : ''; }
+    const label = p.enabled ? '关闭全镇牧场疫病' : '开启全镇牧场疫病…';
+    if (toggle.textContent !== label) toggle.textContent = label;
+    if (pending) {
+      const q = G.pasturePestsToggleQuote(true);
+      if (!panel._pestValid() || pending.settings !== G.game.pasturePests || p.enabled || !q.ok || pending.key !== q.key) {
+        const focused = box.contains(document.activeElement), valid = panel._pestValid();
+        panel._pestEnable = null; box.classList.add('hidden'); toggle.setAttribute('aria-expanded', 'false');
+        if (valid) {
+          const msg = el.querySelector('[data-economy-message]');
+          if (msg) msg.textContent = '日期、畜群或疫病设置已变，请重新查看开启风险。';
+          if (focused && toggle.focus) toggle.focus();
+        }
+      }
+    }
+  },
+  initPasturePests: function (b) {
+    const el = this.el.info, w = G.world, g = G.game, panel = el.querySelector('[data-pasture-pests]');
+    if (!panel) return;
+    const toggle = panel.querySelector('#pasture-pests-toggle'), confirm = panel.querySelector('#pasture-pests-confirm'), cancel = panel.querySelector('#pasture-pests-cancel');
+    const box = panel.querySelector('[data-pasture-pests-confirm]'), quote = panel.querySelector('[data-pasture-pests-quote]'), msg = el.querySelector('[data-economy-message]');
+    const reset = () => { panel._pestEnable = null; box.classList.add('hidden'); toggle.setAttribute('aria-expanded', 'false'); };
+    const controls = [['#pasture-pests-toggle', toggle], ['#pasture-pests-confirm', confirm], ['#pasture-pests-cancel', cancel]];
+    const valid = () => this.pastureActionValid(b, el, w, g, panel, '[data-pasture-pests]', controls);
+    panel._pestValid = valid; reset();
+    // Holding a key must not follow focus from the risk preview into confirmation.
+    for (const button of [toggle, confirm, cancel]) button.addEventListener('keydown', e => {
+      if (e.repeat && (e.key === 'Enter' || e.key === ' ')) e.preventDefault();
+    });
+    toggle.addEventListener('click', e => {
+      if (!valid() || e.detail > 1) { reset(); return; }
+      const enabled = !G.pasturePestSummary(b).enabled, q = G.pasturePestsToggleQuote(enabled);
+      reset();
+      if (!q.ok) { if (msg) msg.textContent = q.reason; return; }
+      if (!enabled) {
+        const accepted = G.setPasturePests(false, q.key, g);
+        if (msg) msg.textContent = accepted ? `已关闭全镇牧场疫病，清除${q.active}座牧场的活动疫病；已病死牲畜不返还，已有产物和携货保留。` : '设置已变，请重新查看后操作。';
+        this.refreshEconomyInfo(b); return;
+      }
+      const p = G.PASTURE_PESTS;
+      panel._pestEnable = { key: q.key, settings: g.pasturePests };
+      quote.textContent = `确认给全镇所有牧场开启疫病？先有${q.graceDays}天宽限，之后按每场每天${p.baseChance * 100}%的基础概率检查染疫，最多${p.maxActive}场同时活动。染疫预警${p.warningDays}天后每天最多病死${p.lossPerDay}只/头，病死不产肉、皮或蛋，损失不返还。需同种可达备用空场才能整群搬空消疫；目标容量须足够，保留量不自动提高，超过时会正常屠宰。这些天数、损失和上限为本作适配数值。`;
+      box.classList.remove('hidden'); toggle.setAttribute('aria-expanded', 'true'); if (confirm.focus) confirm.focus();
+    });
+    cancel.addEventListener('click', () => { reset(); if (valid() && toggle.focus) toggle.focus(); });
+    confirm.addEventListener('click', e => {
+      const pending = panel._pestEnable;
+      if (!valid() || !pending || pending.settings !== g.pasturePests || e.detail > 1) { reset(); return; }
+      const q = G.pasturePestsToggleQuote(true); reset();
+      const accepted = q.ok && q.key === pending.key && G.setPasturePests(true, pending.key, g);
+      if (msg) msg.textContent = accepted ? `已开启全镇牧场疫病，先有${q.graceDays}天宽限；请准备同种备用空场应对染疫。` : '日期、畜群或疫病设置已变，请重新查看开启风险。';
+      this.refreshEconomyInfo(b); if (toggle.focus) toggle.focus();
+    });
+  },
+  refreshPastureEmpty: function (b) {
+    const el = this.el.info, panel = el.querySelector('[data-pasture-empty]');
+    if (!panel || !G.pastureEmptyFacts) return;
+    const select = panel.querySelector('#pasture-empty-target'), start = panel.querySelector('#pasture-empty-start'), box = panel.querySelector('[data-pasture-empty-confirm]'), status = panel.querySelector('[data-pasture-empty-status]');
+    const options = this.pastureSplitOptions(b), signature = options.map(x => x.id + ':' + G.pastureTypeOf(x)).join(',');
+    if (panel._emptyOptions !== signature) {
+      const previous = select.value;
+      select.innerHTML = options.length ? options.map(x => `<option value="${x.id}">牧场 #${x.id}（${x.x},${x.y}）</option>`).join('') : '<option value="">没有同种已建成空场</option>';
+      select.value = options.some(x => String(x.id) === previous) ? previous : options.length ? String(options[0].id) : '';
+      panel._emptyOptions = signature;
+    }
+    const target = G.world.bmap[Number(select.value)], q = G.pastureEmptyFacts(b, target), unit = G.pastureTypeOf(b) === 'chicken' ? '只' : '头';
+    start.disabled = !q.ok;
+    const text = q.ok ? `本场${q.qty}${unit}全部搬出，源场留下0${unit}并清除疫病。目标保留${q.targetTarget}${unit}，超过时会正常屠宰；查看和确认时检查通路。` : `${q.reason}。${b.animals > 0 ? '请准备同种已建成、容量足够且可达的备用空场。' : ''}`;
+    if (status.textContent !== text) status.textContent = text;
+    const pending = panel._emptyQuote;
+    if (pending && (!panel._emptyValid() || pending.target !== target || !q.ok || pending.key !== q.key)) {
+      const focused = box.contains(document.activeElement), valid = panel._emptyValid();
+      panel._emptyQuote = null; box.classList.add('hidden'); start.setAttribute('aria-expanded', 'false');
+      if (valid) {
+        const msg = el.querySelector('[data-economy-message]');
+        if (msg) msg.textContent = '畜群、日期、疫病或通路已变，请重新查看整群搬空方案。';
+        const focus = q.ok ? start : el.querySelector('#info-close'); if (focused && focus?.focus) focus.focus();
+      }
+    }
+  },
+  initPastureEmpty: function (b) {
+    const el = this.el.info, w = G.world, g = G.game, panel = el.querySelector('[data-pasture-empty]');
+    if (!panel) return;
+    const select = panel.querySelector('#pasture-empty-target'), start = panel.querySelector('#pasture-empty-start'), confirm = panel.querySelector('#pasture-empty-confirm'), cancel = panel.querySelector('#pasture-empty-cancel');
+    const box = panel.querySelector('[data-pasture-empty-confirm]'), quote = panel.querySelector('[data-pasture-empty-quote]'), msg = el.querySelector('[data-economy-message]');
+    const reset = () => { panel._emptyQuote = null; box.classList.add('hidden'); start.setAttribute('aria-expanded', 'false'); };
+    const controls = [['#pasture-empty-target', select], ['#pasture-empty-start', start], ['#pasture-empty-confirm', confirm], ['#pasture-empty-cancel', cancel]];
+    const valid = () => this.pastureActionValid(b, el, w, g, panel, '[data-pasture-empty]', controls);
+    panel._emptyValid = valid; reset();
+    for (const button of [start, confirm, cancel]) button.addEventListener('keydown', e => {
+      if (e.repeat && (e.key === 'Enter' || e.key === ' ')) e.preventDefault();
+    });
+    select.addEventListener('change', () => { reset(); if (valid()) this.refreshPastureEmpty(b); });
+    start.addEventListener('click', e => {
+      if (!valid() || e.detail > 1) { reset(); return; }
+      const target = w.bmap[Number(select.value)], q = G.pastureEmptyQuote(b, target); reset();
+      if (!q.ok) { if (msg) msg.textContent = `${q.reason}；请准备同种已建成、容量足够且可达的备用空场。`; return; }
+      const unit = q.type === 'chicken' ? '只' : '头'; panel._emptyQuote = { key: q.key, target };
+      quote.textContent = `将全部${q.qty}${unit}${G.LIVESTOCK[q.type].name}直接安置到牧场 #${target.id}（${target.x},${target.y}），本场归零并清除疫病；不模拟逐头赶路。总数量不增加，繁殖进度守恒。目标保留量仍为${q.targetTarget}${unit}${q.qty > q.targetTarget ? `，搬入后超出${q.qty - q.targetTarget}${unit}，会由牧人正常屠宰` : '，以后超额仍会正常屠宰'}；需重新实际照料。已产鸡蛋、未成蛋进度、羊毛、肉皮、携货和工人均不随畜群搬移，携货继续沿原任务送仓。`;
+      box.classList.remove('hidden'); start.setAttribute('aria-expanded', 'true'); if (confirm.focus) confirm.focus();
+    });
+    cancel.addEventListener('click', () => { reset(); if (valid() && start.focus) start.focus(); });
+    confirm.addEventListener('click', e => {
+      const pending = panel._emptyQuote;
+      if (!valid() || !pending || e.detail > 1) { reset(); return; }
+      const target = w.bmap[Number(select.value)], q = G.pastureEmptyQuote(b, target); reset();
+      const result = pending.target === target && q.ok && pending.key === q.key ? G.emptyPasture(b, target, pending.key) : { ok: false, reason: '畜群、日期、疫病或通路已变，请重新查看整群搬空方案。' };
+      if (msg) msg.textContent = result.ok ? `已将全部${result.qty}${result.type === 'chicken' ? '只' : '头'}${G.LIVESTOCK[result.type].name}搬入牧场 #${target.id}，源场归零并清除疫病；请检查目标保留量与用工，已有产物和携货不随畜群搬移。` : result.reason;
+      this.refreshEconomyInfo(b);
+      const focus = start.disabled ? el.querySelector('#info-close') : start; if (focus?.focus) focus.focus();
+    });
   },
 
   pastureSplitOptions:function(b){return G.world.buildings.filter(x=>x!==b&&x.type==='pasture'&&x.state==='ok'&&G.pastureTypeOf(x)===G.pastureTypeOf(b)&&!(x.animals>0));},
@@ -3343,10 +3508,12 @@ G.ui = {
       set('[data-economy-live="pasture-switch"]', d.switchReason||`当前${d.name}场；空场且原任务与产物已清空时可改种类。`);
       set('[data-economy-live="pasture-rule"]', d.rule);
       set('[data-economy-live="pasture-target-range"]', `保留 2–${d.cap} ${unit}（已有设置 ${d.target}）`);
-      el.querySelector('#pasture-stock').disabled=d.bank<=0||d.animals>=d.cap;
+      el.querySelector('#pasture-stock').disabled=d.bank<=0||d.animals>=d.cap||!!(G.pasturePestSummary&&G.pasturePestSummary(b).active);
       el.querySelector('#pasture-type-apply').disabled=!!d.switchReason;
       el.querySelector('#pasture-stock-quantity').max=String(d.cap);el.querySelector('#pasture-target-quantity').max=String(d.cap);
       this.refreshPastureSplit(b);
+      this.refreshPasturePests(b);
+      this.refreshPastureEmpty(b);
       const output=el.querySelector('[data-pasture-output]');if(output){const html='产出：'+G.productionOutputsOf(b).filter(k=>k!=='food').map(k=>`${this.resourceIcon(k)}${G.RES[k].name}`).join(' · ');if(output.innerHTML!==html)output.innerHTML=html;}
     } else {
       const d=G.orchardSummary(b),unlocked=G.game.unlocks?.orchard;
@@ -3462,8 +3629,9 @@ G.ui = {
     if (supplyPanel) { this.resetSupplyConfirmation(supplyPanel, '确认已取消，请关闭弹窗后重新预览。'); this.resetClothingConfirmation(supplyPanel, '确认已取消，请关闭弹窗后重新预览。'); this.resetToolModeConfirmation(supplyPanel, '确认已取消，请关闭弹窗后重新预览。'); }
     const mineralPanel = this.el.info && this.el.info.querySelector && this.el.info.querySelector('[data-mineral-removal-panel]');
     if (mineralPanel) this.resetMineralRemoval(mineralPanel, '拆除确认已取消，请关闭弹窗后重新查看。');
+    const pastureFocus = this.resetPastureConfirmations();
     this._dialogFocus = this._dialogFocus || {};
-    this._dialogFocus[id] = document.activeElement;
+    this._dialogFocus[id] = pastureFocus || document.activeElement;
     if (el.setAttribute) { el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true'); }
     const first = el.querySelector && el.querySelector('textarea, input:not([type="file"]), button:not([disabled]), select, [tabindex="0"]');
     if (first && first.focus) first.focus();

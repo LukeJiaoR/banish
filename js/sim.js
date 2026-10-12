@@ -74,7 +74,7 @@ G.newGameState = function () {
     res: { wood: 80, stone: 48, iron: 0, tools: 15, food: 500, meat: 0, eggs:0, vegetables: 0, grain: 500, leather: 0, wool: 0, clothes: 0, warmCoats: 0, herbs: 0, coal: 0, steelTools: 0, ale: 0, firewood: 50 }, // 开局（原版中难度 5 家庭，工具 15 件≈第一轮磨损周期）；存粮较原版加厚：15 人 6 天食物跑道撑不到第一座采集屋建成
     heating:{allowCoal:false,coalReserve:20}, fishingRules:'shared', supplyMode:'automatic',clothingSupply:false,toolMode:'pooled',toolRemainders:{tools:0,steelTools:0},
     fireDisasters:{enabled:false,startedDay:null,graceUntil:0,lastDay:-1,nextIgnitionDay:0,serial:0,incidentHomes:[]},
-    healthStartDay: 0, farmPests:{enabled:false,graceUntil:0,lastDay:-1}, challenges:{v:1,completed:{}},
+    healthStartDay: 0, farmPests:{enabled:false,graceUntil:0,lastDay:-1}, pasturePests:{enabled:false,graceUntil:0,lastDay:-1}, challenges:{v:1,completed:{}},
     nomads: {nextDay:G.YEAR_DAYS,serial:0,offer:null,accepted:0,declined:0},
     schedT: 1,
     over: false,
@@ -130,6 +130,7 @@ G.endDay = function () {
   g.year = Math.floor(g.day / G.YEAR_DAYS) + 1;
   if (g.season !== oldSeason) G.onSeasonChange(oldSeason, g.season);
 
+  G.advancePasturePests();
   G.advanceTownEconomy();
   G.advanceNomads();
 
@@ -1706,7 +1707,7 @@ G.makeTask = function (b, c) {
     case 'tradingpost': return G.makeTradeTask(b,c);
     case 'pasture': {
       G.ensureEconomyBuilding(b);
-      if (!b.animals&&!G.pastureHasProducts(b)) { b.noWork=true; b.warnText='需贸易购买牲畜并放入同种牧场'; return null; }
+      if (!b.animals&&!G.pastureHasProducts(b)&&!(b.woolReady>=1)) { b.noWork=true; b.warnText='需贸易购买牲畜并放入同种牧场'; return null; }
       const spot=G.workSpot(w,b,c.x,c.y); if(!spot)return null;
       return G.withTaskRoute({kind:'work',b,tx:spot.x,ty:spot.y,work:G.taskWork(c,8),workLeft:0,economy:'pasture',pastureType:G.pastureTypeOf(b)},spot.route);
     }
@@ -1995,7 +1996,7 @@ G.jobCanProduce = function (b) {
   if (b.type === 'dock') return G.fishingWaterSummary(b).catch>0;
   if (b.type === 'woodcutter') return r.wood >= p.woodcutter.logsIn;
   if (b.type === 'tradingpost') return G.tradeHasWork(b);
-  if (b.type === 'pasture') return (b.animals || 0)>0||G.pastureHasProducts(b);
+  if (b.type === 'pasture') return (b.animals || 0)>0||G.pastureHasProducts(b)||b.woolReady>=1;
   if (b.type === 'orchard') return G.orchardHasWork(b);
   if (b.type === 'tailor') return G.tailorProductionStatus(b).ok;
   if (b.type === 'blacksmith') return G.blacksmithRecipe(b).every(c => r[c.type] >= c.qty);
@@ -2364,7 +2365,8 @@ G.removeBuilding = function (b, confirmationKey) {
   if(b.type==='townhall'&&G.game.nomads.offer?.hallId===b.id)G.game.nomads.offer=null;
   if (b.type === 'bridge') { const check=G.bridgeRemovalStatus(w,b); if(!check.ok){G.ui.toast(check.reason,'warn');return;} }
   if (b.type === 'tradingpost' && Object.values(b.tradeInventory || {}).some(q => q > 0)) { G.ui.toast('先把待售目标设0，搬空贸易库存再拆除','warn'); return; }
-  if(b.type==='pasture'&&G.pastureHasProducts(b)){G.ui.toast('牧场还有已屠宰产物，请先搬空再拆除','warn');return;}
+  if(b.type==='pasture'&&b.animals>0&&b.pastureInfestation){G.ui.toast('染疫牧场仍有活畜，请先整群搬到同种空场，不能拆除回收绕过疫情','warn');return false;}
+  if(b.type==='pasture'&&(G.pastureHasProducts(b)||b.woolReady>=1)){G.ui.toast('牧场还有待送产物或整单位羊毛，请先搬空再拆除','warn');return false;}
   if (b.type === 'pasture' && b.animals) { const type=G.pastureTypeOf(b);G.game.livestock[type]=(G.game.livestock[type]||0)+b.animals; b.animals = 0; }
   if (b.type === 'storage') {
     const left = w.buildings.filter(x => x.type === 'storage').length;
@@ -2603,7 +2605,7 @@ G.pastureTypeOf=b=>G.isLivestockType(b?.animalType)?b.animalType:'sheep';
 G.pastureHasProducts=b=>Object.values(b.pastureProducts||{}).some(q=>q>0);
 G.pastureSwitchReason=function(b){
   if(b.animals>0)return '已有牲畜，禁止混养或转换物种';
-  if(G.pastureHasProducts(b)||b.woolReady>0)return '先搬空待送产物或剪完羊毛';
+  if(G.pastureHasProducts(b)||b.woolReady>=1)return '先搬空待送产物或剪完羊毛';
   if(G.world.citizens.some(c=>!c.dead&&(c.carry?.pastureId===b.id||[c.task,c.pausedTask].some(t=>t?.economy==='pasture'&&t.b===b))))return '原物种任务或产物仍在途中，完成后再切换';
   return '';
 };
@@ -2611,10 +2613,11 @@ G.setPastureType=function(b,type){
   if(!b||G.world.bmap[b.id]!==b||b.type!=='pasture'||b.state!=='ok'||!G.isLivestockType(type))return false;
   G.ensureEconomyBuilding(b);if(type===G.pastureTypeOf(b))return true;
   if(G.pastureSwitchReason(b))return false;
-  b.animalType=type;b.animalGrowth=0;delete b.eggProgress;delete b.eggDay;delete b.pastureProducts.eggs;b.animalTarget=Math.min(b.animalTarget||8,G.LIVESTOCK[type].cap);G.game.schedT=0;return true;
+  b.animalType=type;b.animalGrowth=0;b.woolReady=0;delete b.pastureInfestation;delete b.eggProgress;delete b.eggDay;delete b.pastureProducts.eggs;b.animalTarget=Math.min(b.animalTarget||8,G.LIVESTOCK[type].cap);G.game.schedT=0;return true;
 };
 G.stockPasture = function(b,qty,type=G.pastureTypeOf(b)){
   if(!b||G.world.bmap[b.id]!==b||b.type!=='pasture'||b.state!=='ok'||!Number.isInteger(qty)||qty<=0||!G.isLivestockType(type)||type!==G.pastureTypeOf(b))return false;
+  if(b.pastureInfestation)return false;
   G.ensureEconomyBuilding(b);if(qty>(G.game.livestock[type]||0)||b.animals+qty>G.LIVESTOCK[type].cap)return false;
   G.game.livestock[type]-=qty;b.animals+=qty;G.game.schedT=0;return true;
 };
@@ -2651,6 +2654,83 @@ G.splitPasture=function(source,target,key){
   delete target.tendedDay;
   source.noWork=target.noWork=false;source.warnText=target.warnText='';G.game.schedT=0;
   return {ok:true,qty:q.qty,type:q.type};
+};
+/* Empty is distinct from the >=10 split: the last breeding pair (or single
+ * survivor) can escape. Existing products, workers and cargo stay at source. */
+G.pastureEmptyFacts=function(source,target){
+  const w=G.world,live=b=>b&&w.bmap[b.id]===b&&b.type==='pasture'&&b.state==='ok';
+  if(!live(source))return {ok:false,reason:'源牧场尚不可用'};
+  const type=G.pastureTypeOf(source),count=source.animals||0;
+  if(count<1)return {ok:false,reason:'源牧场已没有活畜，无需搬空'};
+  if(!live(target)||target===source)return {ok:false,reason:'请选择另一座已建成的同种空牧场'};
+  if(G.pastureTypeOf(target)!==type)return {ok:false,reason:'目标物种不同，请先在空场设置为同种牲畜'};
+  if(target.animals>0)return {ok:false,reason:'整群搬空目标必须是空牧场'};
+  if(target.pastureInfestation)return {ok:false,reason:'目标牧场仍有疫情，不能接收牲畜'};
+  const pending=G.pastureSwitchReason(target);if(pending)return {ok:false,reason:'目标仍有旧产物或任务：'+pending};
+  if(count>G.LIVESTOCK[type].cap)return {ok:false,reason:'目标容量不足，不能整群搬入'};
+  const fromGrowth=source.animalGrowth||0,toGrowth=target.animalGrowth||0,sourceTarget=source.animalTarget||8,targetTarget=target.animalTarget||8;
+  return {ok:true,type,qty:count,left:0,sourceCount:count,fromGrowth,toGrowth,sourceTarget,targetTarget,
+    key:JSON.stringify([source.id,target.id,type,count,fromGrowth,toGrowth,sourceTarget,targetTarget,G.game.day,w.navigationRevision||0,
+      G.game.pasturePests,source.pastureInfestation||null,target.pastureInfestation||null])};
+};
+G.pastureEmptyQuote=function(source,target){
+  const q=G.pastureEmptyFacts(source,target);if(!q.ok)return q;
+  const x=source.x+Math.floor(source.w/2),y=source.y+Math.floor(source.h/2);
+  if(G.tileBlocked(G.world,x,y)||!G.workSpot(G.world,target,x,y))return {ok:false,reason:'两座牧场之间没有可达通路，请先修通道路或完成桥梁'};
+  return q;
+};
+G.emptyPasture=function(source,target,key){
+  const q=G.pastureEmptyQuote(source,target);if(!q.ok)return q;
+  if(typeof key!=='string'||key!==q.key)return {ok:false,reason:'畜群、疫情、日期或通路已变，请重新查看并确认搬空'};
+  const totalGrowth=q.fromGrowth+q.toGrowth;
+  target.animalGrowth=Math.min(1,totalGrowth);source.animalGrowth=Math.max(0,totalGrowth-target.animalGrowth);
+  source.animals=0;target.animals=q.qty;delete source.pastureInfestation;delete target.tendedDay;
+  source.noWork=target.noWork=false;source.warnText=target.warnText='';G.game.schedT=0;
+  return {ok:true,qty:q.qty,type:q.type};
+};
+/* Optional livestock-only disease. Daily rates, grace and the one-pen cap are
+ * small-map adaptations. There is no invented proximity/spread mechanic. */
+G.PASTURE_PESTS={graceDays:12,warningDays:2,lossPerDay:1,baseChance:.012,maxActive:1};
+G.pasturePestActive=b=>!!(b&&b.type==='pasture'&&b.state==='ok'&&b.animals>0&&b.pastureInfestation);
+G.pasturePestsToggleQuote=function(enabled){
+  if(typeof enabled!=='boolean')return {ok:false,reason:'请选择开启或关闭牧场疫病'};
+  const p=G.game.pasturePests,active=G.world.buildings.filter(G.pasturePestActive);
+  return {ok:true,reason:'',active:active.length,graceDays:enabled?G.PASTURE_PESTS.graceDays:0,
+    key:JSON.stringify([enabled,G.game.day,p,G.world.buildings.filter(b=>b.type==='pasture').map(b=>[b.id,b.state,G.pastureTypeOf(b),b.animals||0,b.pastureInfestation||null])])};
+};
+G.setPasturePests=function(enabled,key,expectedGame=G.game){
+  if(expectedGame!==G.game)return false;
+  const q=G.pasturePestsToggleQuote(enabled);if(!q.ok||typeof key!=='string'||key!==q.key)return false;
+  const p=G.game.pasturePests;if(p.enabled===enabled)return true;
+  p.enabled=enabled;p.lastDay=G.game.day;p.graceUntil=enabled?G.game.day+G.PASTURE_PESTS.graceDays:0;
+  if(!enabled)for(const b of G.world.buildings)if(b.type==='pasture')delete b.pastureInfestation;
+  G.game.schedT=0;return true;
+};
+G.pasturePestSummary=function(b){
+  const p=G.game.pasturePests||{enabled:false,graceUntil:0},active=G.pasturePestActive(b),graceLeft=Math.max(0,p.graceUntil-G.game.day);
+  const warningLeft=active?Math.max(0,b.pastureInfestation.startedDay+G.PASTURE_PESTS.warningDays-G.game.day):0;
+  return {enabled:p.enabled,graceLeft,active,warningLeft,lost:active?b.pastureInfestation.lost:0,
+    status:!p.enabled?'牧场疫病关闭':active?(warningLeft?`染疫预警：${warningLeft}天后开始病死，请整群搬空保种`:`染疫中：每天病死1${G.pastureTypeOf(b)==='chicken'?'只':'头'}，请尽快整群搬空保种`):graceLeft?`牧场疫病宽限期：还有${graceLeft}天`:'暂无牧场疫情；准备同种空场可搬空保种'};
+};
+G.advancePasturePests=function(){
+  const g=G.game,p=g.pasturePests,rule=G.PASTURE_PESTS;
+  if(!p||p.lastDay>=g.day)return;p.lastDay=g.day;
+  if(!p.enabled)return; // Disabled mode must not consume a random draw.
+  const pens=G.world.buildings.filter(b=>b.type==='pasture'&&b.state==='ok');
+  for(const b of pens){
+    if(!b.pastureInfestation)continue;
+    if(!b.animals){delete b.pastureInfestation;continue;}
+    if(g.day<b.pastureInfestation.startedDay+rule.warningDays)continue;
+    const loss=Math.min(b.animals,rule.lossPerDay);b.animals-=loss;b.pastureInfestation.lost+=loss;
+    // Death is not slaughter: do not record meat/leather/eggs or touch cargo.
+    if(!b.animals)delete b.pastureInfestation;
+  }
+  if(g.day<p.graceUntil||pens.filter(G.pasturePestActive).length>=rule.maxActive)return;
+  for(const b of pens){
+    if(!(b.animals>0)||b.pastureInfestation||!G.chance(rule.baseChance))continue;
+    b.pastureInfestation={animalType:G.pastureTypeOf(b),startedDay:g.day,lost:0};
+    G.ui.toast(`⚠ ${G.LIVESTOCK[G.pastureTypeOf(b)].name}牧场染疫：2天后每天病死1${G.pastureTypeOf(b)==='chicken'?'只':'头'}，病死不产物。可整群搬到同种空场保种。`,'warn');break;
+  }
 };
 G.setPastureTarget = function(b,qty){if(!b||G.world.bmap[b.id]!==b||b.type!=='pasture'||b.state!=='ok'||!Number.isInteger(qty)||qty<2||qty>G.LIVESTOCK[G.pastureTypeOf(b)].cap)return false;b.animalTarget=qty;return true;};
 G.pastureTaskCurrent=(c,t)=>!!(t?.economy==='pasture'&&t.b?.type==='pasture'&&G.world.bmap[t.b.id]===t.b&&t.b.state==='ok'&&c.job===t.b.id&&(!t.pastureType||t.pastureType===G.pastureTypeOf(t.b)));

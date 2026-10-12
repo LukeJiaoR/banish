@@ -104,7 +104,7 @@ G.serializeGame = function () {
       h: g.h, day: g.day, season: g.season, year: g.year,
       res: g.res, stats: g.stats, prevFood: g.prevFood, foodNet: g.foodNet, foodUrgent: g.foodUrgent, warned: g.warned,
       supplyMode:g.supplyMode,clothingSupply:g.clothingSupply,supplyStartedDay:g.supplyStartedDay,supplyUsed:g.supplyUsed,supplyLost:g.supplyLost,
-      heating:g.heating, fishingRules:g.fishingRules, fireDisasters:g.fireDisasters, farmPests:g.farmPests, townLedger:g.townLedger, challenges:g.challenges, hist: g.hist, buildLog: g.buildLog, toolMode:g.toolMode,toolRemainders:g.toolRemainders,toolWear: g.toolWear, steelToolWear: g.steelToolWear, healthStartDay: g.healthStartDay, nomads:g.nomads, unlocks: g.unlocks, livestock: g.livestock,
+      heating:g.heating, fishingRules:g.fishingRules, fireDisasters:g.fireDisasters, farmPests:g.farmPests, pasturePests:g.pasturePests, townLedger:g.townLedger, challenges:g.challenges, hist: g.hist, buildLog: g.buildLog, toolMode:g.toolMode,toolRemainders:g.toolRemainders,toolWear: g.toolWear, steelToolWear: g.steelToolWear, healthStartDay: g.healthStartDay, nomads:g.nomads, unlocks: g.unlocks, livestock: g.livestock,
       productionGoals: g.productionGoals && { ...g.productionGoals }, productionPaused: g.productionPaused && { ...g.productionPaused },
     },
     roads: Array.from(w.road).flatMap((road, i) => road ? [i] : []),
@@ -127,7 +127,7 @@ G.serializeGame = function () {
       sowingCommitted: b.sowingCommitted, pestInfestation:b.pestInfestation, lastPestCrop:b.lastPestCrop, earlyHarvestYield:b.earlyHarvestYield, productionPaused: b.productionPaused,
       tradeInventory: b.tradeInventory, tradeTargets: b.tradeTargets, merchant: b.merchant, nextMerchantDay: b.nextMerchantDay, merchantVisits:b.merchantVisits, merchantOrders:b.merchantOrders, autoTrade:b.autoTrade, autoTradeLast:b.autoTradeLast,
       supplyStock:b.supplyStock,lastHeating:b.lastHeating, unheated:b.unheated, graves:b.graves,
-      animalType:b.animalType, pastureProducts:b.pastureProducts, animals: b.animals, animalGrowth: b.animalGrowth, animalTarget: b.animalTarget, woolReady: b.woolReady, eggProgress:b.eggProgress, eggDay:b.eggDay,
+      animalType:b.animalType, pastureInfestation:b.pastureInfestation, pastureProducts:b.pastureProducts, animals: b.animals, animalGrowth: b.animalGrowth, animalTarget: b.animalTarget, woolReady: b.woolReady, eggProgress:b.eggProgress, eggDay:b.eggDay,
       orchardAge: b.orchardAge, orchardYield: b.orchardYield, orchardSeason: b.orchardSeason, tendedDay: b.tendedDay,
       orchardTrees:b.orchardTrees?b.orchardTrees.map(t=>({...t})):undefined,orchardDay:b.orchardDay,orchardReplant:b.orchardReplant,orchardWarnYear:b.orchardWarnYear,
     })),
@@ -282,6 +282,11 @@ G.prepareSaveData = function (d) {
   }
   if(gd.farmPests!==undefined){const p=record(gd.farmPests,'农田虫害设置');if(typeof p.enabled!=='boolean')bad('农田虫害开关');
     g.farmPests={enabled:p.enabled,graceUntil:integer(p.graceUntil,'虫害宽限日',0,g.day+G.FARM_PESTS.graceDays),lastDay:integer(p.lastDay,'虫害结算日',-1,g.day)};
+  }
+  if(gd.pasturePests!==undefined){const p=record(gd.pasturePests,'牧场疫病设置');if(typeof p.enabled!=='boolean')bad('牧场疫病开关');
+    const graceUntil=integer(p.graceUntil,'牧场疫病宽限日',0,g.day+G.PASTURE_PESTS.graceDays),lastDay=integer(p.lastDay,'牧场疫病结算日',-1,g.day);
+    if(!p.enabled&&graceUntil!==0)bad('关闭牧场疫病带宽限记录');
+    g.pasturePests={enabled:p.enabled,graceUntil,lastDay};
   }
   if(gd.challenges!==undefined){
     const q=record(gd.challenges,'发展挑战');if(q.v!==1)bad('发展挑战版本');const completed=record(q.completed,'挑战确认日');
@@ -516,6 +521,7 @@ G.prepareSaveData = function (d) {
         if(typeof r.name!=='string'||r.name.length>80)bad('墓碑姓名');const deathDay=integer(r.deathDay,'安葬日期',0,g.day),expiresDay=integer(r.expiresDay,'墓位到期日',deathDay);
         if(expiresDay!==deathDay+G.MEMORIAL.graveDays)bad('墓位期限');return {slot,name:r.name,deathDay,expiresDay};});
     }else if(bd.graves!==undefined)bad('非墓园墓位');
+    if(bd.pastureInfestation!==undefined&&bd.type!=='pasture')bad('非牧场疫病记录');
     if((bd.eggProgress!==undefined||bd.eggDay!==undefined)&&bd.type!=='pasture')bad('非牧场产蛋记录');
     if(bd.type==='pasture'){
       if(bd.animalType!==undefined&&!G.isLivestockType(bd.animalType))bad('牧场物种');
@@ -527,6 +533,11 @@ G.prepareSaveData = function (d) {
       b.woolReady=bd.woolReady===undefined?0:number(bd.woolReady,'待剪羊毛',0,b.animalType==='sheep'?48:0);
       if(b.animalType==='chicken'){b.pastureProducts.eggs=b.pastureProducts.eggs||0;b.eggProgress=bd.eggProgress===undefined?0:number(bd.eggProgress,'鸡蛋未成枚进度',0,1);if(b.eggProgress>=1)bad('鸡蛋未成枚进度');b.eggDay=bd.eggDay===undefined?g.day:integer(bd.eggDay,'鸡蛋结算日',0,g.day);}
       else if(bd.eggProgress!==undefined||bd.eggDay!==undefined)bad('非鸡牧场产蛋记录');
+      if(bd.pastureInfestation!==undefined){const p=record(bd.pastureInfestation,'牧场疫情');
+        if(!g.pasturePests.enabled||b.state!=='ok'||b.animals<1||p.animalType!==b.animalType)bad('牧场疫情状态');
+        const startedDay=integer(p.startedDay,'牧场疫情发现日',g.pasturePests.graceUntil,g.pasturePests.lastDay);
+        b.pastureInfestation={animalType:p.animalType,startedDay,lost:integer(p.lost,'牧场病死数量',0,Math.max(0,g.pasturePests.lastDay-startedDay-G.PASTURE_PESTS.warningDays+1)*G.PASTURE_PESTS.lossPerDay)};
+      }
     }
     if(['orchardTrees','orchardDay','orchardReplant','orchardWarnYear'].some(k=>bd[k]!==undefined)&&bd.type!=='orchard')bad('果园树株字段');
     if(bd.type==='orchard'){
@@ -595,6 +606,9 @@ G.prepareSaveData = function (d) {
     }
     w.buildings.push(b); w.bmap[b.id] = b;
   }
+  if(w.buildings.filter(b=>b.pastureInfestation).length>G.PASTURE_PESTS.maxActive)bad('牧场疫情上限');
+  // Loading is not a daily mortality event; old settlement timestamps never replay.
+  if(g.pasturePests.enabled)g.pasturePests.lastDay=g.day;
   w.families = families.map(fd => {
     record(fd, '家庭记录');
     const f={ id: uniqueId(fd.id, '家庭 ID'), members: ids(fd.members, '家庭成员'), houseId: nullableId(fd.houseId, '住房'),

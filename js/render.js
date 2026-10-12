@@ -380,6 +380,7 @@ G.drawBuilding = function (ctx, b, time) {
     G.addEconomyFieldParts(parts, b);
     parts.sort((a, c) => a.d - c.d);
     for (const part of parts) G.drawEconomyFieldPart(ctx, part, time);
+    if (b.type === 'pasture') G.drawPasturePestBadge(ctx, b);
     return;
   }
 
@@ -508,6 +509,18 @@ G.drawFarmPestBadge=function(ctx,b){
   ctx.fillStyle='#514131';ctx.beginPath();ctx.ellipse(0,0,3.5,5,0,0,Math.PI*2);ctx.fill();
   for(const side of [-1,1])for(const dy of [-3,0,3]){ctx.beginPath();ctx.moveTo(side*3,dy);ctx.lineTo(side*7,dy-2);ctx.stroke();}
   ctx.beginPath();ctx.arc(0,-6,2,0,Math.PI*2);ctx.fill();ctx.restore();
+};
+// Native warning seal, matching the farm badge palette without replacing herd art.
+// The summary is read-only: drawing cannot create or advance an infestation.
+G.drawPasturePestBadge=function(ctx,b){
+  if(!b||b.type!=='pasture'||b.state!=='ok'||!G.pasturePestSummary)return;
+  const p=G.pasturePestSummary(b);if(!p.enabled||!p.active)return;
+  const [x,y]=G.T2S(b.x+b.w/2,b.y+b.h);
+  ctx.save();ctx.translate(x,y+12);ctx.beginPath();ctx.arc(0,0,12,0,Math.PI*2);
+  ctx.fillStyle=p.warningLeft>0?'#c0a369':'#ad7553';ctx.fill();ctx.strokeStyle='#554332';ctx.lineWidth=1.5;ctx.stroke();
+  ctx.beginPath();ctx.moveTo(0,-8);ctx.lineTo(8,6);ctx.lineTo(-8,6);ctx.closePath();ctx.stroke();
+  ctx.strokeStyle='#514131';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(0,-3);ctx.lineTo(0,1);ctx.stroke();
+  ctx.fillStyle='#514131';ctx.beginPath();ctx.arc(0,4,1,0,Math.PI*2);ctx.fill();ctx.restore();
 };
 G.drawFarmCrop = function (ctx, b, f) {
   const [sx, sy] = G.T2S(f.x, f.y);
@@ -1027,6 +1040,7 @@ G.frame = function (dtReal) {
     else if (it.k === 6) G.drawSupplyPile(ctx,it.pile);
     else if (it.k === 1) {
       if(it.b.type==='farm')G.drawFarmPestBadge(ctx,it.b);
+      if(it.b.type==='pasture')G.drawPasturePestBadge(ctx,it.b);
       // Farm ground/crops were split above; keep its building-level badges.
       if (it.b.type !== 'farm' && !(it.b.state === 'ok' && (it.b.type === 'pasture' || it.b.type === 'orchard' || it.b.type === 'cemetery')))
         G.drawBuilding(ctx, it.b, now);
