@@ -1,0 +1,13 @@
+Independent source-pixel review, 2026-10-13
+
+Both original textures, both candidates and the original house were visually inspected.
+
+Recommendation: retain only as a dedicated Draft PR. Do not switch the runtime assets or merge.
+
+Grass: modest softening only. Fine texture and contrast are lower, but realistic grass filaments and broad mottled patches remain; it does not match the house's more simplified hand-painted shapes. The candidate is slightly darker/yellower.
+
+Water: source-scale improvement is clearer, with fewer bright fragmented highlights and calmer, more uniform blue. Dense directional ripples remain, so game-scale crowding and repetition are unverified.
+
+Neither material is accepted as seamless. Grass top/bottom RGB mean edge jump is 10.09/255 versus original 9.11, while the candidate internal vertical adjacent-pixel mean is 5.69. Water left/right edge jump is 6.19 versus its internal horizontal mean 2.61. These are risk signals, not proof that a seam is visible in-game.
+
+No game screenshot or game-scale A/B was available. Inspect repeated tiles and actual camera scale before enabling either candidate.

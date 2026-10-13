@@ -1,0 +1,25 @@
+{
+  "scope": "Static PNG checks only; no browser/game A/B acceptance",
+  "results": [
+    {
+      "name": "meadow-summer-candidate.png",
+      "width": 512,
+      "height": 512,
+      "opaque": true,
+      "adjacentMeanX": 5.866820572407045,
+      "adjacentMeanY": 5.69249811439987,
+      "edgeMeanX": 11.4921875,
+      "edgeMeanY": 10.087890625
+    },
+    {
+      "name": "water-open-candidate.png",
+      "width": 512,
+      "height": 512,
+      "opaque": true,
+      "adjacentMeanX": 2.610275756278539,
+      "adjacentMeanY": 6.930845615215264,
+      "edgeMeanX": 6.193359375,
+      "edgeMeanY": 6.826171875
+    }
+  ]
+}
