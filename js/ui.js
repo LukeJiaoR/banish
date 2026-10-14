@@ -4580,7 +4580,7 @@ G.ui = {
     for(const terrain of ['classic','mountain'])document.getElementById('new-game-terrain-'+terrain)?.setAttribute('aria-pressed',String(s.terrain===terrain));
     for(const size of G.MAP_SIZES)document.getElementById('new-game-size-'+size)?.setAttribute('aria-pressed',String(s.mapSize===size));
     const terrainName=s.terrain==='mountain'?'山地（开局保障谷地）':'原地形';
-    const terrainNote=s.terrain==='mountain'?'山体通常不能步行或建造；可在道路分类规划直线隧道，实运施工完工后通行。开局谷地保障住房用地、可达水岸与有限原料，仍需自行采运施工；没有额外库存或住房。128格山地使用 v2 地形存档，192格使用 v3；旧版本不能读取相应新格式。':'原地图生成与开局规则保持。';
+    const terrainNote=s.terrain==='mountain'?'山体通常不能步行或建造；可在道路分类规划直线隧道，实运施工完工后通行。开局谷地保障住房用地、可达水岸与有限原料，仍需自行采运施工；没有额外库存或住房。128格山地使用 v2 地形存档，192格使用 v3；旧版本不能读取相应新格式。':'原地形与镇址保持；新村附近分别保证至少3处可达石头和3处铁矿，工人仍须采运。新经典村使用v4地形存档，旧程序不能读取；已存村庄不补矿。';
     const q=G.startConfigQuote({seed:seed.value,preset:s.preset,terrain:s.terrain,mapSize:s.mapSize}),summary=document.getElementById('new-game-summary');
     if(q.ok){const p=q.presetSummary;summary.textContent=`新村预览：种子 ${q.config.seed} · ${p.name} · ${terrainName} · ${q.mapSizeSummary.name}\n${q.mapSizeSummary.note}\n${p.families}家庭 / ${p.population}人（${p.adults}成人、${p.children}儿童）；仅有储物车，住房需自行建设\n${['wood','stone','iron','food','firewood','tools'].map(k=>`${G.RES[k].name} ${p.resources[k]}`).join(' · ')}\n${p.seedNote}\n${p.equipmentNote} ${p.adaptationNote}\n${terrainNote}`;}
     else summary.textContent=q.reason;

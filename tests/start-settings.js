@@ -108,8 +108,8 @@ test('malformed new configs and omitted/invalid wheat flags reject atomically',(
   }
 });
 test('legacy missing config stays unknown; old wheat stays unlocked without granting resources or choosing a preset',()=>{
-  const {G}=fresh(),d=saved(G);delete d.game.startConfig;delete d.game.unlocks.wheat;G.applySaveData(d);
-  assert.equal(G.game.startConfig,null);assert.equal(G.game.unlocks.wheat,true);assert.deepEqual(copy(G.game.res),d.game.res);assert.equal(G.world.citizens.length,13);
+  const {G}=fresh(),d=copy(JSON.parse(fs.readFileSync(path.join(ROOT,'tests/fixtures/mountain-v0.3.73.json'),'utf8')).save);delete d.game.startConfig;delete d.game.unlocks.wheat;G.applySaveData(d);
+  assert.equal(G.game.startConfig,null);assert.equal(G.game.unlocks.wheat,true);assert.deepEqual(copy(G.game.res),d.game.res);assert.equal(G.world.citizens.length,d.citizens.length);
   G.applySaveData(saved(G));assert.equal(G.game.startConfig,null);assert.deepEqual(copy(G.game.res),d.game.res);
   delete G.game.unlocks.wheat;assert(G.cropUnlocked('wheat'));assert.match(G.seedTradeReason('wheatSeed',1),/已永久解锁/);
 });

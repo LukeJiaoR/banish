@@ -152,6 +152,44 @@ G.genWorld = function (seed, options) {
   return w;
 };
 
+/* New classic starts only, after the real cart and citizens exist. Historical
+ * generators 0/1 above remain byte-for-byte intact for legacy save reconstruction.
+ * Use existing time-optimal routing; mineral tiles do not obstruct walking.
+ * Plan every missing deposit first, then commit together, without replacing
+ * either mineral, removing trees, changing water or giving inventory. */
+G.ensureClassicStarterMinerals = function (w) {
+  const fail=reason=>({ok:false,reason}),s=w.start,N=w.N;
+  const cart=w.buildings.find(b=>b.type==='storage'&&b.state==='ok'&&b.x===s.x-1&&b.y===s.y-1);
+  const origin=w.citizens.find(c=>c.adult&&!G.tileBlocked(w,Math.round(c.x),Math.round(c.y)));
+  if(!cart||!origin)return fail('起始仓库或可工作的居民缺失');
+  if(!G.workSpot(w,cart,origin.x,origin.y))return fail('起始居民无法到达仓库入口');
+  const candidates=[];
+  for(let y=Math.max(0,s.y-14);y<=Math.min(N-1,s.y+14);y++)for(let x=Math.max(0,s.x-14);x<=Math.min(N-1,s.x+14);x++){
+    const i=y*N+x,d=G.d2(x,y,s.x,s.y);
+    if(d<36||d>196||w.water[i]||w.mountain[i]||w.treeIdx[i]>=0||w.bgrid[i]>=0)continue;
+    candidates.push({x,y,i});
+  }
+  const selected=new Set(),additions=[],resources={stone:[],iron:[]};
+  for(const [kind,name]of [[1,'stone'],[2,'iron']]){
+    let natural=candidates.filter(p=>w.rock[p.i]===kind);
+    while(resources[name].length<3&&natural.length){
+      const route=G.findPathToAny(w,origin.x,origin.y,natural);
+      if(!route||route.eta>12)break;
+      const p=route.target;resources[name].push({x:p.x,y:p.y,eta:route.eta});selected.add(p.i);
+      natural=natural.filter(q=>q.i!==p.i);
+    }
+    while(resources[name].length<3){
+      const empty=candidates.filter(p=>!w.rock[p.i]&&!selected.has(p.i));
+      const route=G.findPathToAny(w,origin.x,origin.y,empty);
+      if(!route||route.eta>12)return fail('附近没有足够的可达空地安置独立石头和铁矿；请换种子，当前村庄不变');
+      const p=route.target;selected.add(p.i);additions.push({i:p.i,kind});resources[name].push({x:p.x,y:p.y,eta:route.eta});
+    }
+  }
+  for(const p of additions)w.rock[p.i]=p.kind;
+  return {ok:true,resources,addedStone:additions.filter(p=>p.kind===1).length,addedIron:additions.filter(p=>p.kind===2).length,
+    radius:14,minimumPerKind:3,maxBaseTravelHours:12,origin:{x:origin.x,y:origin.y}};
+};
+
 /* Mountain v2 is an explicit small-map adaptation, never applied to old maps.
  * A seed-ranked 41×37 starter valley has clear future sites, a 7×10 pond and
  * separate, physically harvestable deposits/forest. Nothing enters inventory.

@@ -144,7 +144,8 @@ for (const N of [128, 192, 256]) for (const z of [.25, .35, .55, 1, 2]) {
 {
   const h = harness(), G = h.G;
   G.MAP = 128; G.newGame(65); G.buildGround();
-  const save = JSON.parse(JSON.stringify(G.serializeGame()));
+  // Preserve the historical migration probe using a genuine pre-authoritative save.
+  const save = JSON.parse(fs.readFileSync(path.join(root,'tests/fixtures/mountain-v0.3.73.json'),'utf8')).save;
   for (const N of [192, 256, 128]) {
     G.MAP = N; G.applySaveData(save); h.reset(); G.buildGround();
     assert.equal(G.world.N, N); full(h, N); bounded(G);
