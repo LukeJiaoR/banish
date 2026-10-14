@@ -53,8 +53,8 @@ G.startConfigQuote = function (input) {
   if(!Number.isInteger(seed)||seed < -0x80000000||seed > 0xffffffff)return fail('地图种子须为整数（-2147483648 至 4294967295）');
   const config=mapSize===192?{v:3,preset,seed,terrain,mapSize}:terrain==='mountain'?{v:2,preset,seed,terrain}:{v:1,preset,seed},p=G.START_PRESETS[preset],families=p.kidPlan.length,children=p.kidPlan.reduce((n,k)=>n+k,0);
   const resources=Object.fromEntries(G.RES_KEYS.map(k=>[k,p.stocks[k]||0]));resources.food=G.FOOD_KEYS.reduce((n,k)=>n+resources[k],0);
-  return {ok:true,config,key:JSON.stringify(config),mapSizeSummary:{size:mapSize,name:mapSize+'×'+mapSize,note:mapSize===192?'面积为默认的2.25倍；同等开局库存与资源密度，远处资源须实际采运。采用v3存档，旧版不能读取；手机性能尚未实测。':'默认尺寸，保留原有开局与存档规则'},terrainSummary:{name:G.START_TERRAINS[terrain].name,mapVersion:G.START_TERRAINS[terrain].mapVersion,
-    note:terrain==='mountain'?'41×37初始山谷为本作明确保底：有限木石铁与成熟食物林须劳动取得；山体阻路；可从陆地洞口规划隧道，实运建成后才通行':'沿用现行地图算法、镇址与启动铁矿'},presetSummary:{name:p.name,families,population:families*2+children,adults:families*2,children,resources,
+  return {ok:true,config,key:JSON.stringify(config),mapSizeSummary:{size:mapSize,name:mapSize+'×'+mapSize,note:mapSize===192?'面积为默认的2.25倍；同等开局库存与资源密度，远处资源须实际采运。采用权威地形存档（山地v3／新经典v4），旧版不能读取；手机性能尚未实测。':'默认尺寸与开局库存不变；新经典村使用v4地形存档，旧程序不能读取；已有村庄不补矿'},terrainSummary:{name:G.START_TERRAINS[terrain].name,mapVersion:terrain==='mountain'?2:3,
+    note:terrain==='mountain'?'41×37初始山谷为本作明确保底：有限木石铁与成熟食物林须劳动取得；山体阻路；可从陆地洞口规划隧道，实运建成后才通行':'沿用原地形与镇址；初始仓库落位后分别保证附近可达石头和铁矿，仍须实际采运'},presetSummary:{name:p.name,families,population:families*2+children,adults:families*2,children,resources,
     unlockedSeeds:p.wheat?['wheat']:[],seedNote:p.wheat?'已有小麦种子；其他作物与果树种子须贸易购买':'没有作物或果树种子，也没有牲畜；种子须贸易购买，永久解锁',
     equipmentNote:'衣物库存0、无预穿衣；工具默认共用池，寿命规则沿用现有系统',adaptationNote:'家庭数参考原版难度；人口组成与库存数量为本作适配'}};
 };
@@ -72,7 +72,7 @@ G.prepareNewGame = function (config) {
     G.rng=G.makeRng(quote.config.seed ^ 0x51f15e);
     G.game=G.newGameState(quote.config);
     G.world=null;
-    G.world=G.genWorld(quote.config.seed,{terrain:quote.config.terrain||'classic',mapVersion:quote.config.terrain==='mountain'?2:1,mapSize:quote.mapSizeSummary.size});
+    G.world=G.genWorld(quote.config.seed,{terrain:quote.config.terrain||'classic',mapVersion:quote.config.terrain==='mountain'?2:0,mapSize:quote.mapSizeSummary.size});
     const w=G.world,s=w.start,kidPlan=G.START_PRESETS[quote.config.preset].kidPlan;
     if(w.seed!==quote.config.seed||!s||!Number.isInteger(s.x)||!Number.isInteger(s.y))throw new Error('起始地图数据无效');
     const storage=G.addBuilding('storage',s.x-1,s.y-1,{instant:true,free:true});
@@ -87,6 +87,11 @@ G.prepareNewGame = function (config) {
         const kid=G.spawnCitizen({x:hx,y:hy,age:G.ri(2,9),adult:false,familyId:fam.id});
         kid.parentIds=[m.id,fm.id];fam.members.push(kid.id);
       }
+    }
+    if(quote.config.terrain!=='mountain'){
+      const report=G.ensureClassicStarterMinerals(w);
+      if(!report.ok)throw new Error(report.reason);
+      w.mapVersion=3;w.startReport=report;
     }
     if(w.mapVersion===2){
       const report=G.mountainStartReport(w,quote.config.preset);
@@ -153,8 +158,8 @@ G.serializeGame = function () {
   if(deerWorld.deer===undefined)G.initializeDeer(deerWorld,g);
   G.reconcileDeerHabitat(deerWorld,g);
   return {
-    v: w.N===192?3:w.mapVersion===2?2:1, seed: w.seed, N: w.N, mapVersion: w.mapVersion || 0, // N：地图尺寸（旧档跨尺寸迁移裸索引用）
-    ...(w.mapVersion===2||w.N===192?{terrain:{water:Array.from(w.water),rock:Array.from(w.rock),mountain:Array.from(w.mountain),start:{...w.start}}}:{}),
+    v: w.mapVersion===3?4:w.N===192?3:w.mapVersion===2?2:1, seed: w.seed, N: w.N, mapVersion: w.mapVersion || 0, // N：地图尺寸（旧档跨尺寸迁移裸索引用）
+    ...(w.mapVersion===2||w.mapVersion===3||w.N===192?{terrain:{water:Array.from(w.water),rock:Array.from(w.rock),mountain:Array.from(w.mountain),start:{...w.start}}}:{}),
     game: {
       v: G.VERSION, startConfig:g.startConfig ? {...g.startConfig} : null,
       h: g.h, day: g.day, season: g.season, year: g.year,
@@ -320,9 +325,9 @@ G.prepareSaveData = function (d) {
     if(G.supplySum(stock)>limit+1e-6)bad(field+'容量');return stock;
   };
   record(d, '根对象');
-  if (d.v !== undefined && ![1,2,3].includes(d.v)) bad('版本不受支持');
-  const expanded=d.v===3,authoritative=d.v===2||expanded;
-  if(expanded?![1,2].includes(d.mapVersion):authoritative?d.mapVersion!==2:d.mapVersion!==undefined&&d.mapVersion!==0&&d.mapVersion!==1)bad('地图生成版本不受支持');
+  if (d.v !== undefined && ![1,2,3,4].includes(d.v)) bad('版本不受支持');
+  const mineralStart=d.v===4,expanded=d.v===3||mineralStart&&d.N===192,authoritative=d.v===2||expanded||mineralStart;
+  if(mineralStart?d.mapVersion!==3:expanded?![1,2].includes(d.mapVersion):authoritative?d.mapVersion!==2:d.mapVersion!==undefined&&d.mapVersion!==0&&d.mapVersion!==1)bad('地图生成版本不受支持');
   if(!authoritative&&d.terrain!==undefined)bad('旧版本不能携带新地形');
   integer(d.seed, '地图种子', -0x80000000, 0xffffffff);
   const oldN = d.N === undefined ? G.MAP : integer(d.N, '地图尺寸', 1, 4096);
@@ -330,13 +335,14 @@ G.prepareSaveData = function (d) {
   const gd = record(d.game, '游戏状态'), g = G.newGameState();
   if(gd.startConfig!==undefined&&gd.startConfig!==null){
     const config=record(gd.startConfig,'开局设置');
-    const keys=expanded?['v','preset','seed','terrain','mapSize']:authoritative?['v','preset','seed','terrain']:['v','preset','seed'];
-    if(config.v!==(expanded?3:authoritative?2:1)||typeof config.preset!=='string'||typeof config.seed!=='number'||Object.keys(config).length!==keys.length||Object.keys(config).some(k=>!keys.includes(k))||authoritative&&config.terrain!==(d.mapVersion===2?'mountain':'classic')||expanded&&config.mapSize!==d.N)bad('开局设置');
+    const mountain=d.mapVersion===2,configVersion=expanded?3:mountain?2:1;
+    const keys=expanded?['v','preset','seed','terrain','mapSize']:mountain?['v','preset','seed','terrain']:['v','preset','seed'];
+    if(config.v!==configVersion||typeof config.preset!=='string'||typeof config.seed!=='number'||Object.keys(config).length!==keys.length||Object.keys(config).some(k=>!keys.includes(k))||(expanded||mountain)&&config.terrain!==(mountain?'mountain':'classic')||expanded&&config.mapSize!==d.N)bad('开局设置');
     const q=G.startConfigQuote(config);if(!q.ok||q.config.seed!==d.seed)bad('开局设置');
     g.startConfig={...q.config};
     if(typeof gd.unlocks?.wheat!=='boolean')bad('新开局须保留小麦种子解锁状态');
   }
-  if(authoritative&&!g.startConfig)bad('山地开局来源缺失');
+  if(authoritative&&!g.startConfig)bad('权威地形开局来源缺失');
   g.h = number(gd.h, '小时', 0, G.DAY_H); if (g.h === G.DAY_H) bad('小时');
   g.day = integer(gd.day, '天数'); g.season = integer(gd.season, '季节', 0, 3); g.year = integer(gd.year, '年份', 1);
   const currentConstruction=gd.constructionVersion!==undefined;
@@ -485,7 +491,7 @@ G.prepareSaveData = function (d) {
   g.paused = legacyPhysicalMeals || !!(G.game && G.game.paused) || G.hasOpenModal();
   g.speed = G.game && [1, 2, 5].includes(G.game.speed) ? G.game.speed : 1;
 
-  const w = authoritative ? G.emptyWorld(d.seed,d.mapVersion,expanded?192:128) : G.genWorld(d.seed, { starterResources: d.mapVersion >= 1 });
+  const w = authoritative ? G.emptyWorld(d.seed,d.mapVersion,d.N) : G.genWorld(d.seed, { starterResources: d.mapVersion >= 1 });
   if(authoritative){
     const terrain=record(d.terrain,'权威地形'),keys=['water','rock','mountain','start'];
     if(Object.keys(terrain).length!==keys.length||Object.keys(terrain).some(k=>!keys.includes(k)))bad('权威地形字段');

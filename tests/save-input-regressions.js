@@ -64,7 +64,8 @@ test('roads survive save and load at the same tile coordinates', () => {
   assert.deepEqual(roadCoords(G.world), [[7, 5], [7, 6]]);
 });
 test('road and mark indices remap across sizes without wrapping outside rows', () => {
-  const { G } = fixture(); const d = snapshot(G);
+  const { G } = fixture();
+  const d = JSON.parse(fs.readFileSync(path.join(__dirname,'fixtures/starter-minerals-pr99.json'),'utf8')).save;
   d.N = 256; d.roads = [5 * 256 + 7, 5 * 256 + 129, 150 * 256 + 7];
   d.marked = [4 * 256 + 8, 4 * 256 + 129]; d.rockCleared = [3 * 256 + 9, 3 * 256 + 129];
   G.applySaveData(d);
@@ -73,7 +74,8 @@ test('road and mark indices remap across sizes without wrapping outside rows', (
   assert.deepEqual(Array.from(G.world.rockCleared), [3 * G.world.N + 9]);
 });
 test('76-tile saves expand to the current map without shifting roads', () => {
-  const { G } = fixture(); const d = snapshot(G);
+  const { G } = fixture();
+  const d = JSON.parse(fs.readFileSync(path.join(__dirname,'fixtures/starter-minerals-pr99.json'),'utf8')).save;
   // This fixture predates wildlife; do not retain current deer on its replaced map.
   delete d.deer; delete d.game.huntingLost;
   for (const b of d.buildings) delete b.huntingReadyDay;

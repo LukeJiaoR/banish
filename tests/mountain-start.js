@@ -21,7 +21,7 @@ test('explicit terrain config owns its version, classic canonical v1 remains unc
  for(const input of [{terrain:'volcano'},{terrain:1},{terrain:null},{v:1,terrain:'mountain'},{v:2},{v:2,terrain:'classic'},{v:3,terrain:'mountain'}])assert(!G.startConfigQuote({seed:0,preset:'hard',...input}).ok);
  assert.throws(()=>G.genWorld(1,{terrain:'mountain',mapVersion:1}));assert.throws(()=>G.genWorld(1,{mapVersion:2}));assert.throws(()=>G.genWorld(1,{mapVersion:0,starterResources:true}));
  assert.equal(G.genWorld(1,{mapVersion:0}).mapVersion,0);assert.equal(G.genWorld(1,{mapVersion:1}).mapVersion,1);
- assert(G.newGame(1).ok);assert.equal(G.game.startConfig.v,1);assert.equal(G.serializeGame().v,1);assert.equal(G.world.mountain.reduce((a,b)=>a+b,0),0);
+ assert(G.newGame(1).ok);assert.equal(G.game.startConfig.v,1);assert.equal(G.serializeGame().v,4);assert.equal(G.world.mountain.reduce((a,b)=>a+b,0),0);
 });
 
 test('both presets and fixed/boundary seeds repeat whole initial snapshots without ambient RNG',()=>{
