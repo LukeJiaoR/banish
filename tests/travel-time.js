@@ -62,8 +62,17 @@ test('new diagonal corner is not cut, including a fractional starting position',
 });
 test('unreachable new wall retains cargo and task with bounded retry; opening it resumes',()=>{
  const G=fresh(12),w=G.world,store=building(G,10,4,2,2);store.type='storage';const c=citizen(G,{x:2,y:5},G.findPath(w,2,5,9,5));c.state='haul';c.task=null;c.haulTo=store.id;c.carry={type:'stone',qty:9};for(let y=0;y<12;y++)building(G,3,y);
- let calls=0;const path=G.findPath;G.findPath=(...args)=>{calls++;return path(...args);};for(let n=0;n<100;n++)G.stepCitizen(c,.01);
- assert(calls<=1);assert.equal(c.x,2);assert.equal(c.carry.qty,9);assert.equal(c.task,null);assert.equal(c.state,'waitStorage');assert.equal(G.mineralDeliveryBlocked(c),true);w.bgrid[5*12+3]=-1;
+ let calls=0;const path=G.findPath;G.findPath=(...args)=>{calls++;return path(...args);};
+ // First try the old door, then all compatible warehouse doors. Neither
+ // attempt may repeat every frame while the two-hour retry timer is pending.
+ G.stepCitizen(c,.01);assert.equal(calls,2);
+ for(let n=0;n<100;n++)G.stepCitizen(c,.01);assert.equal(calls,2);
+ assert(c.wanderT>0);
+ // Crossing the retry deadline performs one fresh multi-door search, not
+ // another per-frame loop, while retaining the same nine units of stone.
+ for(let n=0;n<110;n++)G.stepCitizen(c,.01);assert.equal(calls,3);
+ for(let n=0;n<50;n++)G.stepCitizen(c,.01);assert.equal(calls,3);
+ assert.equal(c.x,2);assert.equal(c.carry.qty,9);assert.equal(c.task,null);assert.equal(c.state,'waitStorage');assert.equal(G.mineralDeliveryBlocked(c),true);w.bgrid[5*12+3]=-1;
  for(let n=0;n<30&&c.x===2;n++)G.stepCitizen(c,.1);assert(c.x>2);assert.equal(c.carry.qty,9);
 });
 test('ordinary path execution does not start per-frame searches',()=>{const G=fresh(),c=citizen(G,{x:2,y:5},G.findPath(G.world,2,5,10,5));let calls=0;G.findPath=()=>{calls++;throw Error('unexpected path search');};for(let n=0;n<10;n++)G.stepCitizen(c,.01);assert.equal(calls,0);});

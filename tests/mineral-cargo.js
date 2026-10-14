@@ -115,6 +115,9 @@ test('full mineral markers neither reserve nor pull the only food worker', () =>
   G.game.res.stone=500;G.game.res.food=0;
   G.world.rock[61]=1;G.world.markedRocks.add(61);
   const dock=building('dock',10,10,2,2),c=citizen();
+  // Shared-water fishing is the current default: this food job must have
+  // real fishable water before checking that mineral marks do not steal it.
+  waterForDock();assert(G.fishingWaterSummary(dock).catch>0);
   G.scheduleJobs();assert.equal(c.job,dock.id);assert.equal(dock.workers.length,1);
   assert.equal(G.world.markReachability.count,0);assert.equal(G.world.markReachability.storageBlocked,1);
   const task=c.task;G.scheduleJobs();assert.equal(c.job,dock.id);assert.equal(c.task,task);
@@ -131,6 +134,9 @@ test('canceling marks leaves completed cargo intact and prevents more mining', (
 test('job changes keep cargo and cannot start construction until delivery', () => {
   building('storage');G.game.res.stone=500;
   const dock=building('dock',10,10,2,2),site=building('house',20,20,2,2);site.state='site';site.workLeft=site.totalWork=30;
+  // A ready, prepaid site isolates cargo ownership from material fetching.
+  site.construction=G.newConstruction(G.BDEF.house.cost,G.BDEF.house.cost);
+  assert(G.constructionReady(site));
   const c=citizen();c.job=dock.id;dock.workers=[c.id];c.carry={type:'stone',qty:9};G.startHaul(c);
   G.releaseWorker(c);assert.equal(c.carry.qty,9);assert.equal(c.job,null);
   G.assignWorker(site,c);assert.equal(c.carry.qty,9);assert.equal(c.task,null);assert.equal(c.job,site.id);
@@ -195,7 +201,7 @@ test('blocked stone carrier does not satisfy labour reservation for a reachable 
   assert.equal(G.world.citizens.filter(c=>c.task?.kind==='clearrock').length,1);assert.equal(dock.workers.length,2);assert.equal(carrier.carry.qty,9);assert.equal(carrier.job,null);
 });
 for(const kind of ['dock','house'])test(`blocked cargo frees an empty ${kind} job slot without discarding cargo`, () => {
-  building('storage');const b=building(kind,10,10,2,2);if(kind==='dock')waterForDock();else{b.state='site';b.totalWork=b.workLeft=30;}
+  building('storage');const b=building(kind,10,10,2,2);if(kind==='dock')waterForDock();else{b.state='site';b.totalWork=b.workLeft=30;b.construction=G.newConstruction(G.BDEF.house.cost,G.BDEF.house.cost);assert(G.constructionReady(b));}
   G.game.res.stone=500;const carrier=citizen();carrier.carry={type:'stone',qty:9};G.startHaul(carrier);G.assignWorker(b,carrier);
   const cap=kind==='dock'?2:4;for(let n=0;n<cap-1;n++)G.assignWorker(b,citizen(9,10));const free=citizen(8,10);G.scheduleJobs();
   assert.equal(carrier.job,null);assert.equal(carrier.carry.qty,9);assert(!b.workers.includes(carrier.id));assert.equal(free.job,b.id);assert.equal(b.workers.length,cap);
