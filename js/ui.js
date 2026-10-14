@@ -1089,6 +1089,7 @@ G.ui = {
     this.renderInfo();
   },
   hideInfo: function () {
+    this._buildingDetailTab = 'overview';
     this.resetPastureConfirmations();
     const supply = this.el.info.querySelector && this.el.info.querySelector('[data-supply-mode-panel]');
     if (supply) this.resetSupplyConfirmation(supply);
@@ -2189,9 +2190,10 @@ G.ui = {
   townHallInfoMarkup: function (b, facts) {
     const data = facts.data;
     return `<section class="townhall-details" data-townhall-panel>
-      ${['population', 'housing', 'education', 'health', 'medical', 'food', 'fuel', 'tools', 'arriving', 'schedule', 'decisions'].map(key => `<p class="row" data-townhall="${key}">${this.escHtml(data[key])}</p>`).join('')}
-      ${this.villageSupplyInfoMarkup()}${this.supplyModeInfoMarkup(b)}
-      ${this.fireActionMarkup('fire-rules', this.fireRulesInfoData(b))}${this.fishingInfoMarkup(b)}
+      <details class="building-help"><summary>全镇人口与生活概况</summary>${['population', 'housing', 'education', 'health', 'medical', 'food', 'fuel', 'tools', 'arriving', 'schedule', 'decisions'].map(key => `<p class="row" data-townhall="${key}">${this.escHtml(data[key])}</p>`).join('')}</details>
+      <details class="building-task"><summary>生活物资与配送规则</summary>${this.villageSupplyInfoMarkup()}${this.supplyModeInfoMarkup(b)}</details>
+      <details class="building-task"><summary>住宅火灾规则</summary>${this.fireActionMarkup('fire-rules', this.fireRulesInfoData(b))}</details>
+      <details class="building-task"><summary>全镇捕鱼规则</summary>${this.fishingInfoMarkup(b)}</details>
       <div data-townhall-offer></div>
       <p class="economy-message" data-townhall-message role="status" aria-live="polite"></p>
       <details class="townhall-ledger" data-town-challenges><summary>发展挑战（本作适配）</summary>
@@ -2507,8 +2509,8 @@ G.ui = {
         <select id="farm-crop" aria-describedby="farm-crop-note">${Object.keys(G.CROPS).map(type => `<option value="${type}"${type === facts.summary.choice ? ' selected' : ''}${facts.summary.unlocked[type] ? '' : ' disabled'}>${this.escHtml(G.CROPS[type].name)}${facts.summary.unlocked[type] ? '' : '（需购买种子）'}</option>`).join('')}</select>
         <p class="desc" id="farm-crop-note">春、夏尚未开始播种的空田立即应用；已接第一播种任务、已播种、生长或已收获的本季作物锁定，改选留到下一春。已背起的粮食不变。空田默认显示小麦；困难开局须先购种子。旧档缺少小麦解锁字段时保留可种。</p>
       </div>
-      ${Object.keys(facts.data).filter(key => !['status', 'workers'].includes(key)).map(key => `<p class="row" data-farm="${key}">${this.escHtml(facts.data[key])}</p>`).join('')}
-      <div class="farm-pests-setting" data-farm-pests-setting>
+      ${['current','progress','reason','pestField'].map(key => `<p class="row" data-farm="${key}">${this.escHtml(facts.data[key])}</p>`).join('')}<details class="building-help"><summary>种植、成长与目标明细</summary>${Object.keys(facts.data).filter(key => !['status','workers','current','progress','reason','pestField'].includes(key)).map(key => `<p class="row" data-farm="${key}">${this.escHtml(facts.data[key])}</p>`).join('')}</details>
+      <details class="building-task"><summary>农田虫害设置</summary><div class="farm-pests-setting" data-farm-pests-setting>
         <p class="row" data-farm-pests-status>${this.escHtml(this.farmPestSettingText(facts.pests))}</p>
         <div class="economy-actions"><button type="button" id="farm-pests-toggle" aria-describedby="farm-pests-note" aria-expanded="false">${facts.pests.enabled ? '关闭全镇农田虫害' : '开启全镇农田虫害…'}</button></div>
         <p class="desc" id="farm-pests-note">可选全镇规则，新局和旧档默认关闭。仅影响农田未收作物，邻近同种作物田可互相传播；仓内库存和已背起的粮食不受影响；果园、牧场不受影响。关闭即停止新感染与后续损失、清除活动虫害，已损失作物不返还。</p>
@@ -2517,17 +2519,17 @@ G.ui = {
           <div class="economy-actions"><button type="button" id="farm-pests-confirm">确认全镇开启</button><button type="button" id="farm-pests-cancel">保持关闭</button></div>
         </div>
       </div>
-      <div class="economy-actions"><button type="button" id="early-harvest-start">提前抢收</button></div>
+      </details><div class="economy-actions"><button type="button" id="early-harvest-start">提前抢收</button></div>
       <p class="desc" data-early-harvest-status></p>
       <div class="hidden" data-early-harvest-confirm role="group" aria-label="确认提前抢收">
         <p class="desc" data-early-harvest-quote></p>
         <div class="economy-actions"><button type="button" id="early-harvest-confirm">确认本季抢收</button><button type="button" id="early-harvest-cancel">继续等待</button></div>
       </div>
       <p class="economy-message" data-farm-message role="status" aria-live="polite"></p>
-      <p class="desc">全田播完才开始成长；小麦、卷心菜和耐寒瓜成长 ${G.CROPS.wheat.growDays} 天、秋季全熟后收获；早熟豆类成长 ${G.CROPS.beans.growDays} 天，夏、秋全熟即可正常收获。早熟的代价是基础每格 ${G.CROPS.beans.perTile} 蔬菜，低于小麦、卷心菜和耐寒瓜的 ${G.CROPS.wheat.perTile}。播种、走路、收割和送仓仍需时间，大田或农夫不足会推迟入库，不保证夏初就有粮。每年只种收一季，收完不能在夏季再次播种。</p>
+      <details class="building-help"><summary>收割与过冬规则</summary><p class="desc">全田播完才开始成长；小麦、卷心菜和耐寒瓜成长 ${G.CROPS.wheat.growDays} 天、秋季全熟后收获；早熟豆类成长 ${G.CROPS.beans.growDays} 天，夏、秋全熟即可正常收获。早熟的代价是基础每格 ${G.CROPS.beans.perTile} 蔬菜，低于小麦、卷心菜和耐寒瓜的 ${G.CROPS.wheat.perTile}。播种、走路、收割和送仓仍需时间，大田或农夫不足会推迟入库，不保证夏初就有粮。每年只种收一季，收完不能在夏季再次播种。</p>
       <p class="desc">也可确认提前抢收，按当时成熟度锁定较低产量并停止继续成长，本季不能复种。等待能提高成熟产量；若开启虫害，等候和收割期间仍可能损失未收格。小麦、卷心菜和豆类入冬即损失未收作物；耐寒瓜可延至入冬后的前两日，第3日零时清除未收部分。所有作物冬季都不播种、不成长；农夫仍须收割并实际搬运入仓。耐寒窗口是48日历适配，不是气温模拟。</p>
       <p class="desc">营养仍分肉类（含鸡蛋）、蔬菜（含苹果和梨）、主食三组。小麦产主食，卷心菜产蔬菜，早熟豆类和耐寒瓜也计入蔬菜；多种作物不额外增加饮食类别，也不产肉。</p>
-    </section>`;
+      </details></section>`;
   },
   refreshFarmInfo: function (b) {
     const el = this.el.info;
@@ -2614,6 +2616,7 @@ G.ui = {
     if (!toggle || !confirm || !cancel || !box) return;
     panel._pestEnable = null;
     const reset = () => { panel._pestEnable = null; box.classList.add('hidden'); toggle.setAttribute('aria-expanded', 'false'); };
+    panel._detailPestReset = reset;
     const valid = () => G.world === w && G.game === g && this.el.info === el && !el.classList.contains('hidden') &&
       G.sel?.kind === 'b' && G.sel.id === b.id && w.bmap[b.id] === b && b.type === 'farm' && b.state === 'ok' &&
       el.querySelector('[data-farm-panel]') === panel && panel.querySelector('#farm-pests-toggle') === toggle &&
@@ -2663,7 +2666,7 @@ G.ui = {
     const el=this.el.info,w=G.world,g=G.game,panel=el.querySelector('[data-farm-panel]');if(!panel)return;
     const start=panel.querySelector('#early-harvest-start'),confirm=panel.querySelector('#early-harvest-confirm'),cancel=panel.querySelector('#early-harvest-cancel'),box=panel.querySelector('[data-early-harvest-confirm]'),quote=panel.querySelector('[data-early-harvest-quote]'),msg=panel.querySelector('[data-farm-message]');
     if(!start||!confirm||!cancel||!box||!quote)return;panel._harvestQuote=null;
-    const reset=()=>{panel._harvestQuote=null;box.classList.add('hidden');};
+    const reset=()=>{panel._harvestQuote=null;box.classList.add('hidden');};panel._detailHarvestReset=reset;
     const valid=()=>G.world===w&&G.game===g&&this.el.info===el&&!el.classList.contains('hidden')&&G.sel?.kind==='b'&&G.sel.id===b.id&&w.bmap[b.id]===b&&b.state==='ok'&&el.querySelector('[data-farm-panel]')===panel&&!(G.hasOpenModal&&G.hasOpenModal());
     start.addEventListener('click',e=>{if(!valid()||e.detail>1){reset();return;}const q=G.earlyHarvestQuote(b);if(!q.ok){reset();this.refreshFarmInfo(b);return;}panel._harvestQuote=q.key;quote.textContent=this.earlyHarvestText(q)+' 确认后本季不再成长、不可撤回，也不能再次播种；只下收割指令，不会立即获得粮食。';box.classList.remove('hidden');if(confirm.focus)confirm.focus();});
     cancel.addEventListener('click',()=>{if(!valid()){reset();return;}reset();if(start.focus)start.focus();});
@@ -2825,6 +2828,7 @@ G.ui = {
     // Both map demolition and building details use the same inline confirmation.
     G.sel = { kind: 'b', id: b.id };
     this.showInfo();
+    this.selectBuildingDetailTab('management');
     const el = this.el.info, panel = el.querySelector && el.querySelector('[data-tunnel-removal-panel]');
     if (G.world !== world || G.game !== game || !panel || !this.tunnelRemovalControlValid(b, panel._tunnelContext)) return false;
     const current = G.tunnelRemovalQuote(b);
@@ -2941,6 +2945,7 @@ G.ui = {
     // Map-tool demolition has no selected details yet. Open the same owned panel.
     G.sel = { kind: 'b', id: b.id };
     this.showInfo();
+    this.selectBuildingDetailTab('management');
     const el = this.el.info, panel = el.querySelector && el.querySelector('[data-cemetery-removal-panel]');
     if (G.world !== world || G.game !== game || !panel || !panel._cemeteryContext ||
         !this.cemeteryRemovalControlValid(b, panel._cemeteryContext)) return false;
@@ -3035,6 +3040,7 @@ G.ui = {
     // Map-tool demolition has no selected details yet. Open the same owned panel.
     G.sel = { kind: 'b', id: b.id };
     this.showInfo();
+    this.selectBuildingDetailTab('management');
     const el = this.el.info, panel = el.querySelector && el.querySelector('[data-mineral-removal-panel]');
     if (G.world !== world || G.game !== game || !panel || !panel._mineralContext ||
         !this.mineralRemovalControlValid(b, panel._mineralContext)) return false;
@@ -3149,12 +3155,11 @@ G.ui = {
       ${choice ? `<div class="economy-form"><label for="${field}">${smith ? '铁匠配方' : '矿井开采模式'}</label>
         <select id="${field}" aria-describedby="resource-chain-change-note">${options.map(([value, label]) => `<option value="${value}"${value === choice ? ' selected' : ''}>${label}</option>`).join('')}</select>
         <p class="desc" id="resource-chain-change-note">${smith ? '切换后新批次使用所选配方；已接批次按原配方完成，已有随身物资继续送仓。' : '切换只影响新批次；已接开采批次和随身矿物保留，继续送仓。'}${mine && b.legacyMine ? '旧档混采不会自动切换，可在这里保留或改选。' : ''}</p></div>` : ''}
-      ${['production', 'recipe', 'inputs', 'stock', 'logistics'].filter(key => data[key]).map(key => `<div class="row" data-resource-chain-live="${key}">${this.escHtml(data[key])}</div>`).join('')}
+      ${['production', 'recipe'].filter(key => data[key]).map(key => `<div class="row" data-resource-chain-live="${key}">${this.escHtml(data[key])}</div>`).join('')}
       ${smith ? `<div class="row tog-row resource-chain-target"><span data-resource-chain-live="target">${this.escHtml(data.target)}</span>
         <button type="button" class="mini-tog" data-tl="-10" title="降低当前产物的本屋目标 10" aria-label="降低本屋工具目标 10">−</button>
         <button type="button" class="mini-tog" data-tl="10" title="提高当前产物的本屋目标 10" aria-label="提高本屋工具目标 10">＋</button></div>` : ''}
       <div class="row" data-resource-chain-live="goals">${this.escHtml(data.goals)}</div>
-      <div class="row" data-resource-chain-live="batches">${this.escHtml(data.batches)}</div>
       ${smith ? `<div class="row desc" data-resource-chain-live="lifetime">${this.escHtml(data.lifetime)}</div><div class="row desc">铁工具、钢工具各有独立的全镇目标。本屋目标随当前配方生效；已接批次仍可能完成并超过目标。</div>`
         : ['reserve', 'reserved', 'mineralWarning', 'mineralRule', 'ground'].map(key => `<div class="row desc" data-resource-chain-live="${key}">${this.escHtml(data[key])}</div>`).join('') + '<div class="row desc">实际开采所得须搬运入仓才可使用；满仓余矿保留随身，腾出空间后继续送仓。</div>'}
       ${choice ? '<p class="economy-message" data-resource-chain-message role="status" aria-live="polite"></p>' : ''}
@@ -3339,6 +3344,72 @@ G.ui = {
     const status = el.querySelector('[data-citizen-status]');
     if (status) status.textContent = this.citizenStatus(c);
   },
+  // Navigation owns presentation only. Existing controls keep their original IDs,
+  // panel contexts and transactional guards; simulation APIs are unchanged.
+  buildingOverviewMarkup: function (b, def, workforce) {
+    const facts = [['位置', `${b.x}, ${b.y}`], ['阶段', b.state === 'site' ? '施工中' : '已建成']];
+    if (workforce && workforce.summary.supported) facts.push(['用工', workforce.data.current]);
+    return `<dl class="building-facts">${facts.map(([label,value]) => `<div><dt>${label}</dt><dd${label === '用工' ? ' data-building-overview-workforce' : ''}>${this.escHtml(value)}</dd></div>`).join('')}</dl>
+      <div class="building-quick-actions">${workforce?.summary.supported ? `<button type="button" data-building-jump="production">${b.state === 'site' ? '暂停 / 优先施工' : '调整用工'}</button>` : ''}${!['mineralpit','graveremnant'].includes(b.type) ? `<button type="button" data-building-jump="management">${b.type === 'house' ? '升级 / 管理' : '查看管理'}</button>` : ''}</div>
+      <details class="building-help"><summary>建筑说明</summary><p class="desc">${def.desc}</p></details>`;
+  },
+  refreshBuildingOverview: function (b) {
+    const node = this.el.info.querySelector?.('[data-building-overview-workforce]');
+    const facts = node && this.workforceInfoData(b);
+    if (facts && node.textContent !== facts.data.current) node.textContent = facts.data.current;
+    const stock = this.el.info.querySelector?.('[data-building-public-stock]');
+    if (stock) { const markup = G.RES_KEYS.filter(key => G.RES[key]).map(key => `<div><dt>${this.escHtml(G.RES[key].name)}</dt><dd>${Math.floor(G.game.res[key] || 0)}</dd></div>`).join(''); if (stock.innerHTML !== markup) stock.innerHTML = markup; }
+    const alert = this.el.info.querySelector?.('[data-building-alert]');
+    if (alert) {
+      const mineral = G.mineralSummary?.(b);
+      const text = mineral?.finite && mineral.low ? (mineral.exhausted ? '矿藏已耗尽，请安排其他矿源。' : '矿藏余量 ≤20%，请安排其他矿源。') : '';
+      alert.textContent = text; alert.classList.toggle('hidden', !text);
+    }
+  },
+  selectBuildingDetailTab: function (key, focus = false, resetScroll = true) {
+    const el = this.el.info, target = el.querySelector?.(`[data-building-panel="${key}"]`);
+    if (!target) return false;
+    if (this._buildingDetailTab !== key) {
+      const previous = el.querySelector(`[data-building-panel="${this._buildingDetailTab}"]`);
+      if (previous) this.resetBuildingDetailConfirmations(previous);
+    }
+    this._buildingDetailTab = key;
+    el.querySelectorAll('[data-building-panel]').forEach(panel => {
+      const hidden = panel !== target;
+      panel.classList.toggle('hidden', hidden);
+      panel.inert = hidden;
+    });
+    el.querySelectorAll('[data-building-tab]').forEach(button => button.setAttribute?.('aria-pressed', String(button.dataset.buildingTab === key)));
+    if (focus) el.querySelector(`[data-building-tab="${key}"]`)?.focus();
+    if (resetScroll) el.scrollTop = 0;
+    return true;
+  },
+  resetBuildingDetailConfirmations: function (root) {
+    for (const [selector, method] of [
+      ['[data-supply-mode-panel]', 'resetSupplyConfirmation'], ['[data-supply-mode-panel]', 'resetClothingConfirmation'], ['[data-supply-mode-panel]', 'resetToolModeConfirmation'],
+      ['[data-fishing-panel]', 'resetFishingConfirmation'], ['[data-fire-rules-panel]', 'resetFireAction'], ['[data-fire-rebuild-panel]', 'resetFireAction'],
+      ['[data-house-upgrade-panel]', 'resetHouseUpgrade'], ['[data-mineral-removal-panel]', 'resetMineralRemoval'], ['[data-cemetery-removal-panel]', 'resetCemeteryRemoval'], ['[data-tunnel-removal-panel]', 'resetTunnelRemoval'],
+    ]) { const panel = root.querySelector(selector); if (panel) this[method](panel); }
+    for (const selector of ['[data-pasture-pests]', '[data-pasture-empty]', '[data-pasture-split]']) root.querySelector(selector)?._detailReset?.();
+    const farm = root.querySelector('[data-farm-panel]'); farm?._detailPestReset?.(); farm?._detailHarvestReset?.();
+    root.querySelector('[data-auto-trade]')?._autoTradeReset?.();
+  },
+  initBuildingDetailNavigation: function (b) {
+    const el = this.el.info, world = G.world, game = G.game;
+    const valid = () => this.el.info === el && G.world === world && G.game === game && G.sel?.kind === 'b' && world.bmap[G.sel.id] === b && !el.classList.contains('hidden');
+    const buttons = Array.from(el.querySelectorAll('[data-building-tab]'));
+    for (const button of buttons) {
+      button.addEventListener('click', () => { if (valid() && el.querySelector('#' + button.id) === button) this.selectBuildingDetailTab(button.dataset.buildingTab); });
+      button.addEventListener('keydown', e => {
+        if (!valid() || el.querySelector('#' + button.id) !== button || !['ArrowLeft','ArrowRight','Home','End'].includes(e.key)) return;
+        e.preventDefault(); e.stopPropagation?.();
+        const i = buttons.indexOf(button), next = e.key === 'Home' ? 0 : e.key === 'End' ? buttons.length - 1 : (i + (e.key === 'ArrowRight' ? 1 : -1) + buttons.length) % buttons.length;
+        this.selectBuildingDetailTab(buttons[next].dataset.buildingTab, true);
+      });
+    }
+    el.querySelectorAll('[data-building-jump]').forEach(button => button.addEventListener('click', () => { if (valid() && el.contains(button)) this.selectBuildingDetailTab(button.dataset.buildingJump, true); }));
+    this.selectBuildingDetailTab(this._buildingDetailTab, false, false);
+  },
   buildingActivityMarkup: function (b) {
     const activity = typeof G.buildingActivity === 'function' ? G.buildingActivity(b) : null;
     return activity ? `<div class="row" data-building-activity>${this.escHtml(activity.label)} · ${this.escHtml(activity.detail)}</div>` : '';
@@ -3387,7 +3458,7 @@ G.ui = {
     // Workforce facts must update before every specialized panel's early return.
     if (sameSelection && G.sel.kind === 'b' && this._infoBuildState === selected.state) this.refreshWorkforceInfo(selected);
     // The shared read-only activity facts must also bypass every early return.
-    if (sameSelection && G.sel.kind === 'b') this.refreshBuildingActivity(selected);
+    if (sameSelection && G.sel.kind === 'b') { this.refreshBuildingActivity(selected); this.refreshBuildingOverview(selected); }
     if (sameSelection && G.sel.kind === 'b' && selected.type === 'tunnel' && this._infoBuildState === selected.state) {
       const refreshed = this.refreshTunnelInfo(selected);
       if (!force && selected.state === 'ok' && refreshed) return;
@@ -3426,12 +3497,14 @@ G.ui = {
       }
       return;
     }
+    const detailScroll = sameSelection ? el.scrollTop : 0;
+    const detailOpen = sameSelection && this._infoBuildType === selected.type ? new Set(Array.from(el.querySelectorAll('details')).filter(node => node.open).map(node => node.querySelector?.('summary')?.textContent)) : new Set();
     const destructiveActionChanged = sameSelection && this._infoBuildState === 'site' && selected.state !== 'site' && active && ['info-demolish', 'construction-pause', 'construction-resume','construction-priority','construction-normal'].includes(active.id);
     const workforceInput = sameSelection && this._infoBuildState === selected.state && el.querySelector && el.querySelector('#worker-limit-input');
     const workforceDraft = workforceInput ? workforceInput.value : null;
     const merchantActionChanged = merchantChanged && active && ['trade-execute', 'trade-order-confirm', 'trade-order-cancel'].includes(active.id);
     const autoTradeActionChanged = merchantChanged && active && ['auto-trade-confirm', 'auto-trade-cancel'].includes(active.id);
-    const focusSelector = destructiveActionChanged || (firePresentationChanged && hadFocus) ? '#info-close' : merchantActionChanged ? '#trade-good' : autoTradeActionChanged ? '#auto-trade-apply' : hadFocus ? (active.id ? '#' + active.id : active.dataset.tl ? '[data-tl="' + active.dataset.tl + '"]' : active.dataset.fl ? '[data-fl="' + active.dataset.fl + '"]' : active.dataset.k ? '[data-k="' + active.dataset.k + '"]' : null) : null;
+    const focusSelector = (!sameSelection && hadFocus) || destructiveActionChanged || (firePresentationChanged && hadFocus) ? '#info-close' : merchantActionChanged ? '#trade-good' : autoTradeActionChanged ? '#auto-trade-apply' : hadFocus ? (active.id ? '#' + active.id : active.dataset.tl ? '[data-tl="' + active.dataset.tl + '"]' : active.dataset.fl ? '[data-fl="' + active.dataset.fl + '"]' : active.dataset.k ? '[data-k="' + active.dataset.k + '"]' : null) : null;
     this._infoWorld = w;
     this._infoGame = G.game;
     this._infoElement = el;
@@ -3494,15 +3567,15 @@ G.ui = {
         const names = b.workers.map(id => w.cmap[id]).filter(Boolean).map(c => this.escHtml(c.name)).join('、');
         workers = `<div class="row">${medicalData ? b.type === 'hospital' ? '医师' : '采药员' : tavernData ? '酿酒工（需 18 岁以上且健康）' : '工人'}：<span${b.type === 'dock' && b.state === 'ok' ? ' data-fishing-workers' : ''}${b.type === 'hunting' && b.state === 'ok' ? ' data-hunting-workers' : ''}${marketData ? ' data-market-workers' : ''}${siteData ? ' data-site-workers' : ''}${fuelData ? ' data-fuel="workers"' : ''}${medicalData ? ' data-medical="workers"' : ''}${chainData ? ' data-resource-chain-live="workers"' : ''}${tavernData ? ' data-tavern="workers"' : ''}${tailorData ? ' data-tailor="workers"' : ''}${farmData ? ' data-farm="workers"' : ''}${b.state === 'ok' && ['tradingpost', 'pasture', 'orchard'].includes(b.type) ? ' data-economy-workers' : ''}>${names || (b.state === 'site' ? '等待建筑工人' : '无')}</span></div>`;
       }
-      let extra = '';
-      if(remnant)extra=this.graveRemnantInfoMarkup(b);
-      if (pit) extra = `<div class="row" data-mineral-pit-source>原址：${this.escHtml(G.BDEF[mineral?.source]?.name || '矿点')} · 永久占地 3×3；没有岗位和产出。</div><div class="row desc" data-mineral-pit-reserve>拆除时丢弃的剩余矿藏：${Number(mineral?.remaining) || 0} 储量单位，永久不可恢复。</div>`;
-      if (homeData) extra = `<div class="row" data-home-residents>${this.escHtml(homeData.residents)}</div>`;
-      if(homeData)extra+=this.heatingInfoMarkup(b) + this.householdSupplyInfoMarkup(b);
-      if (upgradeData) extra += this.houseUpgradeInfoMarkup(upgradeData);
-      if (fireData) extra += this.homeFireInfoMarkup(fireData);
-      if (rebuildData) extra += this.fireActionMarkup('fire-rebuild', rebuildData);
-      if (b.type === 'well' && b.state === 'ok') extra += '<p class="row desc" data-well-purpose>救援者需沿可达通路走到井边取水，再携水返回住宅。水井无常驻岗位，不生成全镇水库存；也可从可达河岸取水。请靠近住房布置并保留通路。</p>';
+      let extra = '', overviewExtra = '', inventoryExtra = '', managementExtra = '';
+      if(remnant)overviewExtra=this.graveRemnantInfoMarkup(b);
+      if (pit) overviewExtra = `<div class="row" data-mineral-pit-source>原址：${this.escHtml(G.BDEF[mineral?.source]?.name || '矿点')} · 永久占地 3×3；没有岗位和产出。</div><div class="row desc" data-mineral-pit-reserve>拆除时丢弃的剩余矿藏：${Number(mineral?.remaining) || 0} 储量单位，永久不可恢复。</div>`;
+      if (homeData) overviewExtra = `<div class="row" data-home-residents>${this.escHtml(homeData.residents)}</div>`;
+      if(homeData)inventoryExtra+=this.heatingInfoMarkup(b) + this.householdSupplyInfoMarkup(b);
+      if (upgradeData) managementExtra += this.houseUpgradeInfoMarkup(upgradeData);
+      if (fireData) overviewExtra += this.homeFireInfoMarkup(fireData);
+      if (rebuildData) managementExtra += this.fireActionMarkup('fire-rebuild', rebuildData);
+      if (b.type === 'well' && b.state === 'ok') overviewExtra += '<p class="row desc" data-well-purpose>救援者需沿可达通路走到井边取水，再携水返回住宅。水井无常驻岗位，不生成全镇水库存；也可从可达河岸取水。请靠近住房布置并保留通路。</p>';
       if (b.type === 'school' && !schoolData) {
         const n = w.citizens.filter(cc => cc.school === b.id).length;
         extra = `<div class="row">学生：${n} / ${G.LIFE.schoolCap}</div>`;
@@ -3527,9 +3600,12 @@ G.ui = {
         <div class="row" data-fuel="gap">${fuelData.gap}</div>
         <div class="row desc">目标不是取暖需求。库存达到目标只阻止本屋接新批次；调低可给建设留木，但不会预留建材。已接批次仍可能耗木，其他伐木屋按各自目标继续。住房变化和户外受冻仍须留意。</div>`;
       }
-      if (chainData) extra += this.resourceChainInfoMarkup(b, chainData);
-      if (hallData) extra += this.townHallInfoMarkup(b, hallData);
-      if (marketData) extra += this.marketSupplyInfoMarkup(b) + this.supplyModeInfoMarkup(b);
+      if (chainData) {
+        extra += this.resourceChainInfoMarkup(b, chainData);
+        inventoryExtra += `<section class="building-stock"><h3>库存与批次</h3>${['inputs','stock','batches','logistics'].filter(key => chainData[key]).map(key => `<p class="row" data-resource-chain-live="${key}">${this.escHtml(chainData[key])}</p>`).join('')}</section>`;
+      }
+      if (hallData) managementExtra += this.townHallInfoMarkup(b, hallData);
+      if (marketData) { inventoryExtra += this.marketSupplyInfoMarkup(b); managementExtra += this.supplyModeInfoMarkup(b); }
       if (b.type === 'dock' && b.state === 'ok') extra += this.fishingInfoMarkup(b);
       if (b.type === 'hunting' && b.state === 'ok') extra += this.huntingInfoMarkup(b);
       if (tavernData) extra += this.tavernInfoMarkup(tavernData);
@@ -3538,8 +3614,8 @@ G.ui = {
       if (farmData) extra += this.farmInfoMarkup(farmData);
       if(schoolData)extra+=this.schoolInfoMarkup(b);
       if(cemeteryData)extra+=this.cemeteryInfoMarkup(cemeteryData);
-      if (tunnelData) extra += this.tunnelInfoMarkup(tunnelData);
-      if(b.type==='stockpile'&&b.state==='ok')extra+=this.stockpileInfoMarkup(b);
+      if (tunnelData) overviewExtra += this.tunnelInfoMarkup(tunnelData);
+      if(b.type==='stockpile'&&b.state==='ok')inventoryExtra+=this.stockpileInfoMarkup(b);
       if (b.state === 'ok') extra += this.economyInfoMarkup(b);
       if (medicalData) extra += this.medicalInfoMarkup(b, medicalData);
       const outputs = { gatherer: ['vegetables'], hunting: ['meat', 'leather'], dock: ['meat'], farm: ['grain'], orchard: ['vegetables'], pasture: ['meat', 'wool'], tailor: ['clothes'], herbalist: ['herbs'] };
@@ -3557,13 +3633,35 @@ G.ui = {
       if (b.type === 'farm' && b.farm && !farmData) {
         extra += `<div class="row">播种 ${b.farm.filter(f => f.sown).length}/${b.farm.length} · 收获 ${b.farm.filter(f => f.harvested).length}/${b.farm.length}</div>`;
       }
-      el.innerHTML = `
-        <div class="info-head"><span>${def.icon} ${def.name}</span><button id="info-close">✕</button></div>
-        <div class="row"${b.type === 'dock' && b.state === 'ok' ? ' data-fishing-status' : ''}${b.type === 'hunting' && b.state === 'ok' ? ' data-hunting-status' : ''}${siteData ? ' data-site-status' : ''}${homeData ? ' data-home-status' : ''}${fuelData ? ' data-fuel="status"' : ''}${medicalData ? ' data-medical="status"' : ''}${chainData ? ' data-resource-chain-live="status"' : ''}${hallData ? ' data-townhall="status"' : ''}${marketData ? ' data-market-supply="status"' : ''}${tavernData ? ' data-tavern="status"' : ''}${chapelData ? ' data-chapel="status"' : ''}${tailorData ? ' data-tailor="status"' : ''}${farmData ? ' data-farm="status"' : ''}${cemeteryData?' data-cemetery="status"':''}${schoolData?' data-school="status"':''}${b.state === 'ok' && ['tradingpost', 'pasture', 'orchard'].includes(b.type) ? ' data-economy-status' : ''}>${this.escHtml(status)}</div>
-        ${this.buildingActivityMarkup(b)}${workers}${this.workforceInfoMarkup(b, workforceData)}${siteData ? this.siteInfoMarkup(siteData) : ''}${extra}
-        <div class="row desc">${def.desc}</div>
-        ${pit||remnant ? '' : `<div class="row desc" data-info-refund${fuelData ? ' data-fuel="refund"' : ''}>${ruin ? '清理烧毁废墟退还 0 材料；不能回收原屋材料。' : fireData?.summary.active ? '火灾进行中，暂不能拆除；关闭新增火灾也不会停止当前损伤。' : fuelData ? fuelData.refund : siteData ? siteData.refund : '已开工：拆除退还一半已付建材，已砍树不恢复'}</div>
+      managementExtra += `        ${pit||remnant ? '' : `<div class="row desc" data-info-refund${fuelData ? ' data-fuel="refund"' : ''}>${ruin ? '清理烧毁废墟退还 0 材料；不能回收原屋材料。' : fireData?.summary.active ? '火灾进行中，暂不能拆除；关闭新增火灾也不会停止当前损伤。' : fuelData ? fuelData.refund : siteData ? siteData.refund : '已开工：拆除退还一半已付建材，已砍树不恢复'}</div>
         <button id="info-demolish" class="danger"${fireData?.summary.active ? ' disabled' : ''}>${b.type === 'roadwork' ? '取消剩余铺路' : b.state === 'site' ? '取消工地' : ruin ? '清理废墟（无返料）' : b.type==='cemetery'?'拆围栏…':b.type==='tunnel'?'拆除隧道…':'拆除'}</button>${this.mineralRemovalMarkup(b)}${this.cemeteryRemovalMarkup(b)}${this.tunnelRemovalMarkup(b)}`}`;
+      const hasWork = def.jobs > 0 || b.state === 'site' || schoolData || chapelData;
+      const work = hasWork ? workers + this.workforceInfoMarkup(b, workforceData) : '';
+      if (!hasWork && workforceData) managementExtra += `<details class="building-help"><summary>岗位与全镇人力</summary>${this.workforceInfoMarkup(b, workforceData)}</details>`;
+      if (siteData) inventoryExtra = this.siteInfoMarkup(siteData) + inventoryExtra;
+      if (b.type === 'storage' && b.state === 'ok') inventoryExtra += `<h3>全镇公共库存</h3><p class="desc">以下为全镇共用数据，不代表这座仓库独有的现货；在途货未入库不计。</p><dl class="building-facts" data-building-public-stock></dl>`;
+      if (fuelData) {
+        extra = extra.replace(/<div class="row" data-fuel="(stock|batches|heat|gap)">[\s\S]*?<\/div>/g, markup => { inventoryExtra += markup; return ''; });
+      }
+
+      const groups = [
+        ['overview', '概览', this.buildingOverviewMarkup(b, def, workforceData) + overviewExtra],
+        ['production', b.state === 'site' ? '施工与工人' : b.type === 'tradingpost' ? '贸易与工人' : ['school','chapel','hospital'].includes(b.type) ? '服务与工人' : '生产与工人', work + extra],
+        ['inventory', '库存与运输', inventoryExtra],
+        ['management', upgradeData ? '升级与管理' : '管理', managementExtra],
+      ].filter(group => group[2].trim());
+      if (!sameSelection || !groups.some(group => group[0] === this._buildingDetailTab)) this._buildingDetailTab = 'overview';
+      el.innerHTML = `
+        <div class="info-head"><span>${def.icon} ${def.name}</span><button id="info-close" aria-label="关闭建筑详情">✕</button></div>
+        <div class="row building-status"${b.type === 'dock' && b.state === 'ok' ? ' data-fishing-status' : ''}${b.type === 'hunting' && b.state === 'ok' ? ' data-hunting-status' : ''}${siteData ? ' data-site-status' : ''}${homeData ? ' data-home-status' : ''}${fuelData ? ' data-fuel="status"' : ''}${medicalData ? ' data-medical="status"' : ''}${chainData ? ' data-resource-chain-live="status"' : ''}${hallData ? ' data-townhall="status"' : ''}${marketData ? ' data-market-supply="status"' : ''}${tavernData ? ' data-tavern="status"' : ''}${chapelData ? ' data-chapel="status"' : ''}${tailorData ? ' data-tailor="status"' : ''}${farmData ? ' data-farm="status"' : ''}${cemeteryData?' data-cemetery="status"':''}${schoolData?' data-school="status"':''}${b.state === 'ok' && ['tradingpost', 'pasture', 'orchard'].includes(b.type) ? ' data-economy-status' : ''}>${this.escHtml(status)}</div>
+
+        ${this.buildingActivityMarkup(b)}<p class="building-alert hidden" data-building-alert role="status"></p>
+        <nav class="building-detail-tabs" aria-label="建筑详情栏目">${groups.map(([key, label]) => `<button type="button" id="building-tab-${key}" data-building-tab="${key}" aria-controls="building-panel-${key}" aria-pressed="${this._buildingDetailTab === key}">${label}</button>`).join('')}</nav>
+        ${groups.map(([key, label, markup]) => `<section id="building-panel-${key}" data-building-panel="${key}" class="building-detail-panel${this._buildingDetailTab === key ? '' : ' hidden'}" aria-labelledby="building-tab-${key}">${markup}</section>`).join('')}`;
+      this.initBuildingDetailNavigation(b);
+      this.refreshBuildingOverview(b);
+      for (const disclosure of el.querySelectorAll('details')) if (detailOpen.has(disclosure.querySelector?.('summary')?.textContent)) disclosure.open = true;
+      el.scrollTop = detailScroll;
       if (fuelData) this._fuelInfoState = b.state;
       this._economyInfoState = b.state;
       this._medicalInfoState = b.state;
@@ -3701,15 +3799,15 @@ G.ui = {
       return `<section class="economy-details" data-economy="tradingpost">
         <p class="row" data-economy-live="merchant"></p><p class="row" data-economy-live="merchant-payments"></p><p class="row" data-economy-live="trade-capacity"></p>
         <details class="trade-inventory"><summary>查看待售库存与目标</summary><p data-economy-live="inventory"></p></details>
-        <form id="trade-target-form" class="economy-form">
+        <details class="building-task"><summary>备货与搬回</summary><form id="trade-target-form" class="economy-form">
           <h3>① 备货 / 搬回</h3>
           <label for="trade-target-resource">资源</label><select id="trade-target-resource">${payments}</select>
           <p data-economy-live="target-stock"></p>
           <label for="trade-target-quantity">待售目标（0–2000）</label><input id="trade-target-quantity" type="number" min="0" max="2000" step="1" value="${Number(b.tradeTargets && b.tradeTargets.firewood) || 0}" inputmode="numeric">
           <div class="economy-actions"><button type="submit">应用待售目标</button><button type="button" id="trade-return-stock">设为 0 搬回</button></div>
           <p class="desc">商人从仓库搬货，不会凭空增加库存。所有待售物资共享本站容量，居民不能使用；调低目标后由商人运回仓库。</p>
-        </form>
-        <form id="trade-exchange-form" class="economy-form">
+        </form></details>
+        <details class="building-task"><summary>与当前商船交易</summary><form id="trade-exchange-form" class="economy-form">
           <h3>② 与商船交易</h3>
           <label for="trade-good">购买</label><select id="trade-good">${goods}</select>
           <label for="trade-buy-quantity">数量</label><input id="trade-buy-quantity" type="number" min="1" max="400" step="1" value="1" inputmode="numeric">
@@ -3717,8 +3815,8 @@ G.ui = {
           <p data-economy-live="quote" class="trade-quote" role="status" aria-live="polite"></p>
           <button type="submit" id="trade-execute">确认交易</button>
           <p class="desc">付款数量向上取整，不找零。买入普通物资先进入本站库存，低于现存数量的待售目标会让商人搬回；肉类与鸡蛋可分别买卖，鸡蛋价值2，肉类价值1；羊、牛或鸡购入后进入各自待安置数量，到同种牧场放入。旧通用果树、苹果、梨、卷心菜与早熟豆类种子分别买 1 次永久解锁，不能复购，不是库存物品，也不占贸易站或仓库容量。苹果、梨种子各2500，购买后到果园明确选择以后种植品种；旧通用果树继续产蔬菜，不解锁苹果或梨。卷心菜和早熟豆类解锁后到农田选择种植，产出都计入蔬菜。</p>
-        </form>
-        <form id="trade-order-form" class="economy-form">
+        </form></details>
+        <details class="building-task"><summary>下次到货订单</summary><form id="trade-order-form" class="economy-form">
           <h3>③ 向这位商人订货</h3>
           <p data-economy-live="merchant-order"></p>
           <p data-economy-live="merchant-orders"></p>
@@ -3727,7 +3825,7 @@ G.ui = {
           <p data-economy-live="order-quote" role="status" aria-live="polite"></p>
           <div class="economy-actions"><button type="submit" id="trade-order-confirm">确认一次订货</button><button type="button" id="trade-order-cancel">取消待到货订单</button></div>
           <p class="desc" id="trade-order-note">订单本身无需预付款，不会自动交易。每站每位商人只保留一份一次性订单；只能在该商人停靠时替换或取消。订单在同一商人下次到达时带来并清除，下一艘船可能是别的商人。到货单价为原价 × 1.25 向下取整，须手动支付购买（另行启用下方自动购买时会按规则检查）；其他货物仍按普通价。未买货物会随船离开。</p>
-        </form>
+        </form></details>
         ${this.autoTradeInfoMarkup(b)}
         <p class="economy-message" data-economy-message role="status" aria-live="polite"></p>
       </section>`;
@@ -3735,32 +3833,32 @@ G.ui = {
     if (b.type === 'pasture' && G.stockPasture && G.setPastureTarget) return `<section class="economy-details" data-economy="pasture">
       <p class="row" data-economy-live="pasture-area"></p><p class="desc" data-economy-live="pasture-capacity-rule"></p><p class="desc" data-economy-live="pasture-cattle-warning"></p>
       <p class="row" data-economy-live="animals"></p><p class="row" data-economy-live="pasture-production"></p><p class="row" data-economy-live="pasture-stock"></p><p class="desc" data-economy-live="pasture-logistics"></p>
-      ${this.pasturePestsMarkup()}
-      <form id="pasture-type-form" class="economy-form"><h3>空场选择物种</h3><label for="pasture-type">羊、牛或鸡（不能混养）</label><select id="pasture-type"><option value="sheep"${G.pastureTypeOf(b)==='sheep'?' selected':''}>羊：肉、羊毛</option><option value="cattle"${G.pastureTypeOf(b)==='cattle'?' selected':''}>牛：肉、皮革</option><option value="chicken"${G.pastureTypeOf(b)==='chicken'?' selected':''}>鸡：鸡蛋、肉</option></select><button type="submit" id="pasture-type-apply">应用物种</button><p data-economy-live="pasture-switch"></p></form>
-      <form id="pasture-stock-form" class="economy-form"><h3>放入已购同种牲畜</h3><p data-economy-live="sheep-bank"></p>
-        <label for="pasture-stock-quantity">放入数量</label><input id="pasture-stock-quantity" type="number" min="1" max="${G.pastureCapacity(b, G.pastureTypeOf(b))}" step="1" value="2" inputmode="numeric"><button type="submit" id="pasture-stock">放入牧场</button></form>
-      <form id="pasture-target-form" class="economy-form"><h3>繁殖与保留数量</h3><label for="pasture-target-quantity" data-economy-live="pasture-target-range"></label><input id="pasture-target-quantity" type="number" min="2" max="${G.pastureCapacity(b, G.pastureTypeOf(b))}" step="1" value="${Number(b.animalTarget) || 8}" inputmode="numeric"><button type="submit">应用保留数量</button>
-        <p class="desc" data-economy-live="pasture-rule"></p><p class="desc">至少2只/头同种牲畜且牧人实际照料才繁殖。保留数只控制超额屠宰。新圈牧场按面积计算容量，旧6×6场保留旧版容量适配；鸡蛋独立库存，与肉类同属一个营养组。产物逐批实背送仓后才可使用，库存满则保留；牧场内待送产物未搬空不能拆场。</p></form>
-      <section data-pasture-split><h3>分群扩场</h3>
+      <details class="building-task"><summary>牧场疫病设置</summary>${this.pasturePestsMarkup()}</details>
+      <details class="building-task"><summary>选择牲畜种类</summary><form id="pasture-type-form" class="economy-form"><h3>空场选择物种</h3><label for="pasture-type">羊、牛或鸡（不能混养）</label><select id="pasture-type"><option value="sheep"${G.pastureTypeOf(b)==='sheep'?' selected':''}>羊：肉、羊毛</option><option value="cattle"${G.pastureTypeOf(b)==='cattle'?' selected':''}>牛：肉、皮革</option><option value="chicken"${G.pastureTypeOf(b)==='chicken'?' selected':''}>鸡：鸡蛋、肉</option></select><button type="submit" id="pasture-type-apply">应用物种</button><p data-economy-live="pasture-switch"></p></form></details>
+      <details class="building-task"><summary>放入已购牲畜</summary><form id="pasture-stock-form" class="economy-form"><h3>放入已购同种牲畜</h3><p data-economy-live="sheep-bank"></p>
+        <label for="pasture-stock-quantity">放入数量</label><input id="pasture-stock-quantity" type="number" min="1" max="${G.pastureCapacity(b, G.pastureTypeOf(b))}" step="1" value="2" inputmode="numeric"><button type="submit" id="pasture-stock">放入牧场</button></form></details>
+      <details class="building-task"><summary>繁殖与保留数量</summary><form id="pasture-target-form" class="economy-form"><h3>繁殖与保留数量</h3><label for="pasture-target-quantity" data-economy-live="pasture-target-range"></label><input id="pasture-target-quantity" type="number" min="2" max="${G.pastureCapacity(b, G.pastureTypeOf(b))}" step="1" value="${Number(b.animalTarget) || 8}" inputmode="numeric"><button type="submit">应用保留数量</button>
+        <p class="desc" data-economy-live="pasture-rule"></p><p class="desc">至少2只/头同种牲畜且牧人实际照料才繁殖。保留数只控制超额屠宰。新圈牧场按面积计算容量，旧6×6场保留旧版容量适配；鸡蛋独立库存，与肉类同属一个营养组。产物逐批实背送仓后才可使用，库存满则保留；牧场内待送产物未搬空不能拆场。</p></form></details>
+      <details class="building-task"><summary>分群扩场</summary><section data-pasture-split><h3>分群扩场</h3>
         <label for="pasture-split-target">同种空牧场（确认时检查通路）</label><select id="pasture-split-target"></select>
         <p class="desc" data-pasture-split-status></p>
         <div class="economy-actions"><button type="button" id="pasture-split-start">查看分群方案</button></div>
         <div class="hidden" data-pasture-split-confirm role="group" aria-label="确认牲畜分群"><p class="desc" data-pasture-split-quote></p><div class="economy-actions"><button type="button" id="pasture-split-confirm">确认分群</button><button type="button" id="pasture-split-cancel">取消</button></div></div>
         <p class="desc">满10只/头后可分出一半到同种空场。沿用按畜群数量直接安置的规则，不模拟逐头赶路；两场必须连通。保留量与工人不自动调整，新场需牧人实际照料。已产鸡蛋、未成蛋进度、羊毛、肉皮和在途货留原场。</p>
       </section>
-      ${this.pastureEmptyMarkup()}
+      </details><details class="building-task"><summary>整群搬空</summary>${this.pastureEmptyMarkup()}</details>
       <p class="economy-message" data-economy-message role="status" aria-live="polite"></p>
     </section>`;
     if(b.type==='orchard')return `<section class="economy-details" data-economy="orchard">
       <p data-economy-live="orchard-area"></p><p class="desc" data-economy-live="orchard-area-rule"></p><p data-economy-live="orchard-age"></p><p data-economy-live="orchard-harvest"></p><p data-economy-live="orchard-renewal"></p>
       <p data-economy-live="orchard-types"></p><p data-economy-live="orchard-stock"></p><p data-economy-live="orchard-logistics"></p>
-      <form id="orchard-type-form" class="economy-form"><label for="orchard-type">以后空位种植品种</label><select id="orchard-type">${Object.entries(G.ORCHARD_TYPES).map(([type, def]) => `<option value="${type}"${G.orchardTypeOf(b) === type ? ' selected' : ''}${!G.game.unlocks?.[def.unlock] ? ' disabled' : ''}>${this.escHtml(def.name)} → ${G.RES[def.output].name}${!G.game.unlocks?.[def.unlock] ? '（尚未解锁）' : ''}</option>`).join('')}</select><div class="economy-actions"><button type="submit" id="orchard-type-apply">应用以后种植品种</button><button type="button" id="orchard-type-cancel">取消未应用选择</button></div><p data-economy-live="orchard-selection"></p></form>
-      <form id="orchard-replant-form" class="economy-form"><label for="orchard-replant">空位补种</label><select id="orchard-replant"><option value="on"${b.orchardReplant!==false?' selected':''}>允许农夫补种</option><option value="off"${b.orchardReplant===false?' selected':''}>暂停新补种</option></select><button type="submit">应用补种设置</button></form>
-      <p class="desc">苹果和梨种子各2500，分别购买一次永久解锁；购买后仍需在此明确应用，只改变以后新接的种植任务。旧通用果树种子仅解锁旧通用树，继续产蔬菜，不赠苹果、梨或新种子。已有树的品种、年龄、待采果实和已接任务/在途货不改换；买新果种不必先买通用种子。</p>
+      <details class="building-task"><summary>以后种植品种</summary><form id="orchard-type-form" class="economy-form"><label for="orchard-type">以后空位种植品种</label><select id="orchard-type">${Object.entries(G.ORCHARD_TYPES).map(([type, def]) => `<option value="${type}"${G.orchardTypeOf(b) === type ? ' selected' : ''}${!G.game.unlocks?.[def.unlock] ? ' disabled' : ''}>${this.escHtml(def.name)} → ${G.RES[def.output].name}${!G.game.unlocks?.[def.unlock] ? '（尚未解锁）' : ''}</option>`).join('')}</select><div class="economy-actions"><button type="submit" id="orchard-type-apply">应用以后种植品种</button><button type="button" id="orchard-type-cancel">取消未应用选择</button></div><p data-economy-live="orchard-selection"></p></form></details>
+      <details class="building-task"><summary>补种设置</summary><form id="orchard-replant-form" class="economy-form"><label for="orchard-replant">空位补种</label><select id="orchard-replant"><option value="on"${b.orchardReplant!==false?' selected':''}>允许农夫补种</option><option value="off"${b.orchardReplant===false?' selected':''}>暂停新补种</option></select><button type="submit">应用补种设置</button></form></details>
+      <details class="building-help"><summary>果树生长与品种规则</summary>      <p class="desc">苹果和梨种子各2500，分别购买一次永久解锁；购买后仍需在此明确应用，只改变以后新接的种植任务。旧通用果树种子仅解锁旧通用树，继续产蔬菜，不赠苹果、梨或新种子。已有树的品种、年龄、待采果实和已接任务/在途货不改换；买新果种不必先买通用种子。</p>
       <p class="desc">苹果与梨独立存量、贸易和生产目标；实际送仓后可食用或酿酒。营养都归蔬菜组，与肉类（含鸡蛋）、主食合为三组，不增加第四组。</p>
       <p class="desc">每株由农夫实际到达后种植、照料或采收。秋季先采果，再种空位和养幼树；暂停补种只影响新任务，已开始的单株工作照常完成。4年有效养护成熟，每株每秋最多20果，搬运后才入库；满仓携果保留，冬季未采果损失。</p>
       <p class="desc">树龄达到12–20年时按株错峰枯尽，届时该株未采果实一起损失（不计为已产出）；一年内将枯尽会预警，应优先采收。补种重新养4年。本作适配寿命，不是原版精确数值。旧成熟园从4岁迁移，至少还有8年宽限；不影响已有在途果实。</p>
-      <p class="desc" data-economy-live="orchard-trees" style="white-space:pre-line"></p><p class="economy-message" data-economy-message role="status" aria-live="polite"></p>
+      </details><details class="building-help"><summary>逐株树龄与产量</summary><p class="desc" data-economy-live="orchard-trees" style="white-space:pre-line"></p></details><p class="economy-message" data-economy-message role="status" aria-live="polite"></p>
     </section>`;
     return '';
   },
@@ -3936,6 +4034,7 @@ G.ui = {
     const toggle = panel.querySelector('#pasture-pests-toggle'), confirm = panel.querySelector('#pasture-pests-confirm'), cancel = panel.querySelector('#pasture-pests-cancel');
     const box = panel.querySelector('[data-pasture-pests-confirm]'), quote = panel.querySelector('[data-pasture-pests-quote]'), msg = el.querySelector('[data-economy-message]');
     const reset = () => { panel._pestEnable = null; box.classList.add('hidden'); toggle.setAttribute('aria-expanded', 'false'); };
+    panel._detailReset = reset;
     const controls = [['#pasture-pests-toggle', toggle], ['#pasture-pests-confirm', confirm], ['#pasture-pests-cancel', cancel]];
     const valid = () => this.pastureActionValid(b, el, w, g, panel, '[data-pasture-pests]', controls);
     panel._pestValid = valid; reset();
@@ -4000,6 +4099,7 @@ G.ui = {
     const select = panel.querySelector('#pasture-empty-target'), start = panel.querySelector('#pasture-empty-start'), confirm = panel.querySelector('#pasture-empty-confirm'), cancel = panel.querySelector('#pasture-empty-cancel');
     const box = panel.querySelector('[data-pasture-empty-confirm]'), quote = panel.querySelector('[data-pasture-empty-quote]'), msg = el.querySelector('[data-economy-message]');
     const reset = () => { panel._emptyQuote = null; box.classList.add('hidden'); start.setAttribute('aria-expanded', 'false'); };
+    panel._detailReset = reset;
     const controls = [['#pasture-empty-target', select], ['#pasture-empty-start', start], ['#pasture-empty-confirm', confirm], ['#pasture-empty-cancel', cancel]];
     const valid = () => this.pastureActionValid(b, el, w, g, panel, '[data-pasture-empty]', controls);
     panel._emptyValid = valid; reset();
@@ -4042,7 +4142,7 @@ G.ui = {
     const el=this.el.info,w=G.world,g=G.game,panel=el.querySelector('[data-pasture-split]');if(!panel)return;
     const select=panel.querySelector('#pasture-split-target'),start=panel.querySelector('#pasture-split-start'),confirm=panel.querySelector('#pasture-split-confirm'),cancel=panel.querySelector('#pasture-split-cancel'),box=panel.querySelector('[data-pasture-split-confirm]'),quote=panel.querySelector('[data-pasture-split-quote]'),msg=el.querySelector('[data-economy-message]');
     if(!select||!start||!confirm||!cancel||!box||!quote)return;
-    const reset=()=>{panel._splitQuote=null;box.classList.add('hidden');};reset();
+    const reset=()=>{panel._splitQuote=null;box.classList.add('hidden');};panel._detailReset=reset;reset();
     const valid=()=>G.world===w&&G.game===g&&this.el.info===el&&!el.classList.contains('hidden')&&G.sel?.kind==='b'&&G.sel.id===b.id&&w.bmap[b.id]===b&&b.state==='ok'&&el.querySelector('[data-pasture-split]')===panel&&!(G.hasOpenModal&&G.hasOpenModal());
     select.addEventListener('change',()=>{reset();if(valid())this.refreshPastureSplit(b);});
     start.addEventListener('click',e=>{if(!valid()||e.detail>1){reset();return;}const target=w.bmap[Number(select.value)],q=G.pastureSplitQuote(b,target);if(!q.ok){reset();if(msg)msg.textContent=q.reason;return;}panel._splitQuote={key:q.key,target};const unit=q.type==='chicken'?'只':'头';quote.textContent=`将${q.qty}${unit}${G.LIVESTOCK[q.type].name}直接分入牧场 #${target.id}（${target.x},${target.y}），本场留下${q.left}${unit}。总数量不增加，繁殖进度守恒；不移动鸡蛋、未成蛋进度、羊毛、肉皮、携货和工人。目标保留量${target.animalTarget||8}${unit}，超过时会由牧人正常屠宰。新场须实际照料才继续繁殖。`;box.classList.remove('hidden');if(confirm.focus)confirm.focus();});
