@@ -20,8 +20,8 @@ function fbm(seed, x, y) {
 
 /* Empty allocation is shared by generation and authoritative terrain loads.
  * It consumes no RNG/IDs and never repairs or populates a saved village. */
-G.emptyWorld = function (seed, mapVersion = 0) {
-  const N = G.MAP;
+G.emptyWorld = function (seed, mapVersion = 0, N = G.MAP) {
+  if (!Number.isInteger(N) || N < 1 || N > 4096) throw new Error('地图尺寸无效');
   return {
     seed, N, mapVersion,
     mountain: new Uint8Array(N * N),
@@ -49,13 +49,13 @@ G.isMountain = (w, x, y) => x >= 0 && y >= 0 && x < w.N && y < w.N && !!w.mounta
 G.genWorld = function (seed, options) {
   if (options?.terrain === 'mountain') {
     if (options.mapVersion !== undefined && options.mapVersion !== 2) throw new Error('山地生成版本不受支持');
-    return G.genMountainWorld(seed);
+    return G.genMountainWorld(seed, options.mapSize);
   }
   if (options?.terrain !== undefined && options.terrain !== 'classic') throw new Error('地形类型不受支持');
   if(options?.mapVersion!==undefined&&![0,1].includes(options.mapVersion))throw new Error('现行地形生成版本不受支持');
   if(options?.mapVersion!==undefined&&options.starterResources!==undefined&&options.starterResources!==(options.mapVersion===1))throw new Error('地形版本与启动资源设置冲突');
   const starterResources = options?.mapVersion!==undefined?options.mapVersion===1:!options || options.starterResources !== false;
-  const N = G.MAP, w = G.emptyWorld(seed, starterResources ? 1 : 0);
+  const N = options?.mapSize === undefined ? G.MAP : options.mapSize, w = G.emptyWorld(seed, starterResources ? 1 : 0, N);
 
   // 高度场 → 水体
   const hmap = new Float32Array(N * N);
@@ -174,8 +174,8 @@ G.mountainStartBudget = function (preset = 'hard') {
   if(!stocks)throw new Error('开局预设无效');
   return {gross,required:Object.fromEntries(Object.entries(gross).map(([k,n])=>[k,Math.max(0,n-(stocks[k]||0))])),retainedMature:G.PROD.gatherer.fullForest};
 };
-G.genMountainWorld = function (seed) {
-  const w=G.emptyWorld(seed,2),N=w.N;
+G.genMountainWorld = function (seed, mapSize = G.MAP) {
+  const w=G.emptyWorld(seed,2,mapSize),N=w.N;
   for(let y=0;y<N;y++)for(let x=0;x<N;x++){
     const i=y*N+x,h=fbm(seed,x,y);
     w.water[i]=h<.34?1:h<.375?2:0;

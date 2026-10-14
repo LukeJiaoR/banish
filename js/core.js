@@ -11,6 +11,7 @@ G.VERSION = '0.3.79';
 /* ---------- 常量 ---------- */
 G.TILE_W = 64;            // 等距菱形瓦片宽（缩放 1 时的像素）
 G.TILE_H = 32;
+G.MAP_SIZES = [128, 192]; // New-game options; default and legacy map size stay unchanged.
 G.MAP = 128;              // 地图边长（格）＝ 原版 Banished「小型」地图尺寸
 G.TRAVEL_SPEED = { field: 1.6, road: 2.6, stone: 3.2 }; // 格/游戏小时；寻路与实际移动共用
 G.DAY_H = 24;             // 一天 = 24 游戏小时

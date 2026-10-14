@@ -209,8 +209,12 @@
         <button type="button" id="new-game-terrain-classic" aria-pressed="true"><strong>原地形</strong><span>现有河流、森林与采集矿石</span></button>
         <button type="button" id="new-game-terrain-mountain" aria-pressed="false"><strong>山地</strong><span>阻路山脊与开局保障谷地 · 新村可选</span></button>
       </div>
+      <div id="new-game-map-size" class="start-presets" role="group" aria-label="选择新村地图大小">
+        <button type="button" id="new-game-size-128" aria-pressed="true"><strong>128×128 · 默认</strong><span>原有地图范围</span></button>
+        <button type="button" id="new-game-size-192" aria-pressed="false"><strong>192×192 · 扩展</strong><span>2.25倍土地 · 同等开局物资 · 手机性能未实测</span></button>
+      </div>
       <p id="new-game-summary"></p>
-      <p class="fb-hint">本片为小地图经济适配。地图大小与气候保持现状；地形选择只用于新村，可选灾难仍默认关闭。</p>
+      <p class="fb-hint">地图尺寸与地形只用于新村，不扩张现有村庄；气候与开局物资保持原规则，可选灾难仍默认关闭。</p>
       <p id="new-game-status" class="fb-status" role="status" aria-live="polite"></p>
       <button type="button" id="new-game-review-button">检查开局并继续</button>
       <section id="new-game-review" class="hidden" aria-label="新村最终确认">
