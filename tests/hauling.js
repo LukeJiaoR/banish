@@ -119,6 +119,9 @@ test('low food recalls builders and cannot leak food workers through rebalance',
   const huts=[building('gatherer',2,2,2,2),building('gatherer',12,2,2,2),building('gatherer',2,12,2,2),building('gatherer',12,12,2,2)];
   for(const h of huts) for(let y=h.y-1;y<h.y+5;y++) for(let x=h.x-1;x<h.x+5;x++) G.addTree(G.world,x,y,-200);
   const site=building('house',20,2,2,2);site.state='site';site.workLeft=90;site.totalWork=90;
+  // This scheduler scenario needs a fully supplied site, not a material-fetch job.
+  site.construction=G.newConstruction(G.BDEF.house.cost,G.BDEF.house.cost);
+  assert(G.constructionReady(site));
   building('woodcutter',20,10,2,2);
   for(let n=0;n<10;n++) {
     const c=G.spawnCitizen({x:5,y:5,age:30,sex:'m'});
@@ -189,10 +192,16 @@ test('64 generated starts have one real storage and 15 reachable citizens', () =
 });
 test('map version preserves starter minerals and legacy terrain on reload', () => {
   G.newGame(2);
-  assert.equal(G.world.mapVersion,1);
-  const saved=JSON.parse(JSON.stringify(G.serializeGame()));
+  assert.equal(G.world.mapVersion,3);
+  const saved=JSON.parse(JSON.stringify(G.serializeGame()));assert.equal(saved.v,4);
   const before=Array.from(G.world.rock);G.applySaveData(saved);assert.deepEqual(Array.from(G.world.rock),before);
-  delete saved.mapVersion;G.applySaveData(saved);assert.equal(G.world.mapVersion,0);
+  // Build an actual legacy generator fixture separately; never relabel a v4
+  // authoritative terrain save as an old archive by deleting its version.
+  G.world=G.genWorld(2,{starterResources:true});G.game=G.newGameState();
+  const legacy=JSON.parse(JSON.stringify(G.serializeGame()));
+  assert.equal(legacy.v,1);assert.equal(legacy.mapVersion,1);
+  const oldMinerals=Array.from(G.world.rock);G.applySaveData(legacy);assert.deepEqual(Array.from(G.world.rock),oldMinerals);
+  delete legacy.mapVersion;G.applySaveData(legacy);assert.equal(G.world.mapVersion,0);
   assert.deepEqual(Array.from(G.world.rock),Array.from(G.genWorld(2,{starterResources:false}).rock));
 });
 console.log(`${passed} economy regression scenarios passed`);
