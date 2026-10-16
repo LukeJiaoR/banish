@@ -1900,11 +1900,12 @@ G.ui = {
   houseUpgradeInfoData: function (b) {
     if (b.type !== 'house' || b.state !== 'ok' || !G.houseUpgradeQuote || G.houseFireSummary?.(b)?.active) return null;
     const quote = G.houseUpgradeQuote(b);
-    const materials = values => ['wood', 'stone', 'iron'].map(key => `${G.RES[key].name} ${Number(values && values[key]) || 0}`).join(' · ');
+    const materialData = {};
+    for (const kind of ['cost', 'salvage', 'due'])
+      for (const resource of ['wood', 'stone', 'iron'])
+        materialData[kind + '-' + resource] = String(Number(quote[kind]?.[resource]) || 0);
     return { quote, data: {
-      cost: `石屋完整建材：${materials(quote.cost)}`,
-      salvage: `旧屋回收留在工地：${materials(quote.salvage)}（按原屋实际投入）`,
-      due: `仍需从库存实运：${materials(quote.due)}（到仓领料才扣，不预留）`,
+      ...materialData,
       displaced: `开始后搬出：${quote.families} 户 / ${quote.people} 人；施工期间不能住在这里。`,
       housing: `全镇其余空屋 ${quote.freeHomes} 户 · 宿舍空位 ${quote.boardingSlots} 户。仅为全镇统计，未核实对住户是否可达，也不会预留床位。`,
       cold: `${quote.winter ? '⚠ 当前正值寒冬。' : '冬季风险：'}搬出后若无可达住处和柴火，住户可能受冻；即使全镇有空位也不能保证入住。`,
@@ -1916,8 +1917,32 @@ G.ui = {
     if (!facts) return '';
     return `<section class="economy-form house-upgrade-details" data-house-upgrade-panel aria-labelledby="house-upgrade-title">
       <h3 id="house-upgrade-title">木屋升级为石屋</h3>
-      ${Object.keys(facts.data).map(key => `<p class="row" data-house-upgrade="${key}">${this.escHtml(facts.data[key])}</p>`).join('')}
-      <p class="house-upgrade-warning">确认开始后立即拆除原木屋，住户搬出，原屋永久消失。取消升级工地也不会还原木屋。</p>
+      <table class="house-upgrade-materials">
+        <caption>建材对照</caption>
+        <thead><tr><th scope="col">材料</th><th scope="col">总需</th><th scope="col">回收</th><th scope="col">还需运入</th></tr></thead>
+        <tbody>${['wood', 'stone', 'iron'].map(resource => `<tr><th scope="row">${this.escHtml(G.RES[resource].name)}</th>${['cost', 'salvage', 'due'].map(kind => `<td data-house-upgrade="${kind}-${resource}">${this.escHtml(facts.data[kind + '-' + resource])}</td>`).join('')}</tr>`).join('')}</tbody>
+      </table>
+      <p class="house-upgrade-note">回收留在工地；补料到仓领取才扣，不预留库存。</p>
+      <section class="house-upgrade-group" aria-label="搬迁与安置">
+        <h4>搬迁与安置</h4>
+        <p data-house-upgrade="displaced">${this.escHtml(facts.data.displaced)}</p>
+        <p class="house-upgrade-note" data-house-upgrade="housing">${this.escHtml(facts.data.housing)}</p>
+      </section>
+      <section class="house-upgrade-group" aria-label="开始条件">
+        <h4>开始条件</h4>
+        <p data-house-upgrade="reason">${this.escHtml(facts.data.reason)}</p>
+      </section>
+      <div class="house-upgrade-warning">
+        <h4>冬季风险</h4>
+        <p data-house-upgrade="cold">${this.escHtml(facts.data.cold)}</p>
+        <h4>拆除不可逆</h4>
+        <p>确认开始后立即拆除原木屋，住户搬出，原屋永久消失。取消升级工地也不会还原木屋。</p>
+      </div>
+      <details class="house-upgrade-secondary">
+        <summary>查看省柴收益与回收说明</summary>
+        <p data-house-upgrade="fuel">${this.escHtml(facts.data.fuel)}</p>
+        <p>回收量按原屋实际投入计算，直接留在新工地，不额外发放到库存。</p>
+      </details>
       <button type="button" id="house-upgrade-start" aria-expanded="false">查看升级确认</button>
       <div class="house-upgrade-confirm hidden" data-house-upgrade-confirm>
         <p>已了解上方最新建材、搬迁和受冻风险？确认后立即拆除木屋并留下回收材料；补料从仓实运到场后，原址施工石屋。</p>
@@ -4951,3 +4976,4 @@ G.placementInfo = function (type, x, y) {
   result.text = lines.join('\n');
   return result;
 };
+
