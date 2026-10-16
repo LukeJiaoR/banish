@@ -140,17 +140,39 @@ test('only a completed wooden house has the upgrade action', () => {
 
 test('review shows exact cost, actual salvage, net payment, displacement and qualified housing/fuel risks', () => {
   const f = setup();
-  assert.match(live(f, 'cost'), /木材 24 · 石头 40 · 铁 10/);
-  assert.match(live(f, 'salvage'), /木材 8 · 石头 4 · 铁 0/);
-  assert.match(live(f, 'due'), /木材 16 · 石头 36 · 铁 10/);
+  assert.deepEqual(['wood', 'stone', 'iron'].map(r => live(f, 'cost-' + r)), ['24', '40', '10']);
+  assert.deepEqual(['wood', 'stone', 'iron'].map(r => live(f, 'salvage-' + r)), ['8', '4', '0']);
+  assert.deepEqual(['wood', 'stone', 'iron'].map(r => live(f, 'due-' + r)), ['16', '36', '10']);
   assert.match(live(f, 'displaced'), /1 户 \/ 1 人/);
   assert.match(live(f, 'housing'), /空屋 0 户.*宿舍空位 0 户.*未核实.*可达.*不会预留/);
   assert.match(live(f, 'cold'), /受冻.*不能保证入住/);
   assert.match(live(f, 'fuel'), /本作.*有人入住.*每年约 30 → 15 柴火/);
   assert.match(f.info.textContent, /原屋永久消失.*取消升级工地也不会还原木屋/);
   f.b.paidCost = { wood: 10, stone: 6 }; f.G.ui.renderInfo();
-  assert.match(live(f, 'salvage'), /木材 5 · 石头 3/);
-  assert.match(live(f, 'due'), /木材 19 · 石头 37 · 铁 10/);
+  assert.deepEqual(['wood', 'stone'].map(r => live(f, 'salvage-' + r)), ['5', '3']);
+  assert.deepEqual(['wood', 'stone', 'iron'].map(r => live(f, 'due-' + r)), ['19', '37', '10']);
+});
+
+test('structured review keeps all safety facts visible outside optional details', () => {
+  const f = setup(), panel = f.info.querySelector('[data-house-upgrade-panel]');
+  const table = panel.querySelector('table'), details = panel.querySelector('details');
+  assert(table); assert.equal(table.querySelectorAll('td').length, 9);
+  assert.equal(table.querySelectorAll('th').length, 7);
+  assert.equal(table.querySelector('caption').textContent, '建材对照');
+  assert(details); assert.equal(details.getAttribute('open'), null);
+  assert(details.contains(panel.querySelector('[data-house-upgrade="fuel"]')));
+  for (const key of ['displaced', 'housing', 'cold', 'reason']) {
+    assert(!details.contains(panel.querySelector('[data-house-upgrade="' + key + '"]')), key);
+  }
+  assert(!details.textContent.includes('原屋永久消失'));
+  assert.match(panel.textContent, /拆除不可逆/);
+  const cell = panel.querySelector('[data-house-upgrade="due-wood"]');
+  details.setAttribute('open', '');
+  f.b.paidCost = { wood: 10, stone: 6 };
+  f.G.ui.renderInfo();
+  assert.equal(panel.querySelector('[data-house-upgrade="due-wood"]'), cell);
+  assert.equal(cell.textContent, '19');
+  assert.equal(details.getAttribute('open'), '');
 });
 
 test('begin and explicit cancel preserve simulation and a hidden confirm cannot act', () => {
