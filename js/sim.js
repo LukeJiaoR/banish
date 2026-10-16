@@ -2074,6 +2074,7 @@ G.releaseWorker = function (c) {
 
 G.assignWorker = function (b, c) {
   if(!c||c.dead||c.mealJourney||!c.adult||c.student||c.job!=null||c.carry?.staffingReturn===true||G.toolFetchTask(c)||(G.fireTaskOf&&G.fireTaskOf(c))||(G.supplyTaskOf&&G.supplyTaskOf(c))||G.isArriving(c)||G.world.bmap[b.id]!==b||b.workers.length>=G.workerLimitOf(b))return;
+  if(b.state==='site'&&!G.constructionCanStaff(b,c))return;
   if(b.type==='tavern'&&b.state==='ok'&&(c.age<18||G.isSick(c)))return;
   if(b.type==='chapel'&&b.state==='ok'&&(G.isSick(c)||c.hunger>0))return;
   if (b.type === 'hospital' && b.state === 'ok' && G.isSick(c)) return;
@@ -2170,6 +2171,12 @@ G.scheduleJobs = function () {
   // releaseWorker preserves other bounded cargo and retries that delivery.
   for (const c of w.citizens) if (!c.dead && c.job != null && c.staffingRelease!==c.job && c.carry?.staffingReturn!==true && !c.mealJourney && !c.task && !c.pausedTask && G.mineralDeliveryBlocked(c)) G.releaseWorker(c);
   for (const b of w.buildings) {
+    // Plans do not reserve materials. Release only empty, uncommitted slots;
+    // fetching, delivery, clearing and suspended work keep their current owner.
+    if(b.state==='site')for(const id of b.workers.slice()){
+      const c=w.cmap[id];
+      if(c&&!c.carry&&!c.task&&!c.pausedTask&&!G.goalCommitment(c)&&!G.constructionCanStaff(b,c))G.releaseWorker(c);
+    }
     // 在重新探测岗位前先释放确实没活的闲人；旧逻辑每2h清旗，导致每日释放永远看不到它。
     if (b.noWork || (G.hasProductionGoal(b) && G.productionLimited(b))) for (const id of b.workers.slice()) {
       const c = w.cmap[id];
@@ -2251,7 +2258,7 @@ G.scheduleJobs = function () {
     while (b.workers.length < G.workerLimitOf(b) && guard++ < 8) {
       // 有标记待处理时给「砍伐/清石」保留 wantLabor 名无业散工——不够额就改抽在岗者（否则扩张期清石永远停摆）
       const free = jobless();
-      const reachable=xs=>b.sitePriority?xs.filter(c=>G.workSpot(w,b,c.x,c.y)):xs;
+      const reachable=xs=>xs.filter(c=>G.constructionCanStaff(b,c));
       let c = free.length > wantLabor ? G.pickNearest(reachable(free), b) : null;
       if (!c) {
         const busyAll = w.citizens.filter(ci => {
@@ -2348,6 +2355,31 @@ G.newConstruction=(required,onsite={})=>({required:{...required},onsite:{...onsi
 G.constructionCargo=c=>!!c?.carry&&Number.isInteger(c.carry.constructionId);
 G.constructionUsed=(b,type)=>b?.type==='roadwork'&&type==='stone'?b.roadWork.cells.filter(c=>c.used).length:0;
 G.constructionIncoming=function(b,type,except=null){return G.world.citizens.reduce((sum,c)=>sum+(c!==except&&!c.dead&&G.constructionCargo(c)&&!c.carry.constructionReturn&&c.carry.constructionId===b.id&&c.carry.type===type?c.carry.qty:0),0);};
+// Pure staffing preflight: a missing-material plan must not steal the workers
+// needed to produce its inputs. Partial deliveries and clearing remain useful.
+G.constructionCanStaff=function(b,c){
+ if(!b||b.state!=='site'||G.workerLimitOf(b)<=0)return false;
+ if(b.type==='roadwork'){
+  const claims=G.roadWorkClaims(b,c);
+  if(b.roadWork.cells.some((p,i)=>{
+   if(claims.has(i)||!G.roadWorkCellOpen(G.world,b,p))return false;
+   const direct=b.roadWork.surface==='dirt'||p.used;
+   if(!direct&&(b.construction.onsite.stone||0)<1)return false;
+   const target=direct?p:b;
+   return !!G.routeSpot(G.findPathToAny(G.world,c.x,c.y,[{x:target.x,y:target.y,building:b,state:b.state}]));
+  }))return true;
+ }
+ if(!G.workSpot(G.world,b,c.x,c.y))return false;
+ // Fully committed deliveries are a short, bounded wait, not missing stock.
+ // Keep that crew stable so ordinary construction and household errands do
+ // not churn while the last carrier approaches the site.
+ if(b.type!=='roadwork'&&(G.siteTrees(b).length||G.constructionReady(b)||
+  Object.entries(b.construction?.required||{}).every(([type,n])=>
+   (b.construction.onsite[type]||0)+G.constructionIncoming(b,type)>=n)))return true;
+ return Object.entries(b.construction?.required||{}).some(([type,n])=>
+  n-(b.construction.onsite[type]||0)-G.constructionIncoming(b,type)-G.constructionUsed(b,type)>0&&
+  G.game.res[type]>0&&!!G.storageRoute(c.x,c.y,type));
+};
 G.constructionReady=b=>!!b?.construction&&(b.construction.consumed||Object.entries(b.construction.required).every(([k,n])=>(b.construction.onsite[k]||0)>=n));
 G.constructionEntitlement=b=>b.construction?(b.construction.consumed?b.construction.required:b.construction.onsite):(b.paidCost||G.buildingDefinition(b).cost);
 G.constructionRefund=function(b){if(b.type==='roadwork')return {...b.construction.onsite};const paid=G.constructionEntitlement(b),full=b.construction?b.state==='site'&&!b.construction.consumed&&!b.construction.legacyRefundHalf:b.state==='site'&&!b.constructionStarted&&b.progress===0&&b.workLeft>=b.totalWork;
@@ -4068,7 +4100,7 @@ G.higherConstructionSites=function(b){
   return G.world.buildings.filter(x=>x!==b&&x.state==='site'&&x.sitePriority&&!x.sitePaused&&x.workers.length<G.workerLimitOf(x));
 };
 G.reachableConstructionPriority=function(c,b){
-  return G.higherConstructionSites(b).find(x=>G.workSpot(G.world,x,c.x,c.y));
+  return G.higherConstructionSites(b).find(x=>G.constructionCanStaff(x,c));
 };
 G.protectConstructionPriorityCargo=function(c){
   if(c.carry&&!c.carry.staffingReturn&&G.reachableConstructionPriority(c,G.world.bmap[c.job]))G.markStaffingCargo(c);
