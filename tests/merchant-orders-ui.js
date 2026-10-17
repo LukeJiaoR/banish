@@ -134,7 +134,7 @@ test('all three merchant names, accepted payments, refusal labels and order cata
     const f = trader(id), { G, get, live } = f;
     assert.match(live('merchant'), new RegExp(G.MERCHANTS[id].name + '停靠中.*12 天后离开'));
     assert.deepEqual(get('trade-order-good').querySelectorAll('option').map(option => option.value), Array.from(G.MERCHANTS[id].goods));
-    assert.match(live('merchant-payments'), id === 'general' ? /接受三类食物付款/ : /拒收食物：肉类、蔬菜、主食/);
+    assert.match(live('merchant-payments'), id === 'general' ? /接受肉类、鸡蛋、蔬菜、主食、苹果、梨付款/ : /拒收食物：肉类、鸡蛋、蔬菜、主食、苹果、梨/);
     for (const option of get('trade-payment').querySelectorAll('option')) assert.equal(option.disabled, id !== 'general' && G.FOOD_KEYS.includes(option.value));
     assert.equal(get('trade-target-resource').querySelectorAll('option').some(option => option.disabled), false, 'stocking food remains allowed');
     assert.match(f.info.textContent, /无需预付款，不会自动交易/);

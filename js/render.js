@@ -266,7 +266,7 @@ G.buildingProcessingWorker=function(b,c,context){
  return !G.isSick(c)&&cargo?.brewIngredient===true&&cargo.type===recipe.inputType&&cargo.qty===recipe.inputQty&&G.game.res.food>=population*G.LIFE.eatPerDay*G.tavernReserveDays(b);
 };
 G.buildingActivity=function(b,context){
- const w=G.world;if(!b||w.bmap[b.id]!==b||b.state!=='ok'||b.houseFire||!G.BUILD_ACTIVITY_TYPES.includes(b.type))return null;
+ const w=G.world;if(!b||!w||!w.bmap||w.bmap[b.id]!==b||b.state!=='ok'||b.houseFire||!G.BUILD_ACTIVITY_TYPES.includes(b.type))return null;
  context=context?.world===w?context:G.buildingActivityContext();
  const paused=!!G.game.paused;
  if(['house','stonehouse','boarding'].includes(b.type)){
@@ -325,7 +325,7 @@ G.drawBuildingStateMarker=function(ctx,s,x,y,active){
  ctx.restore();
 };
 G.renderBuildingActivity=function(b){
- const frame=G._buildingActivityFrame;let s=frame?.world===G.world?frame.entries.get(b.id):G.buildingActivity(b);if(!s)return;
+ const frame=G._buildingActivityFrame;let s=frame&&frame.entries&&frame.world===G.world?frame.entries.get(b.id):G.buildingActivity(b);if(!s)return;
  // Recheck live household references without another whole-world scan.
  if(s.kind==='home'){s=G.buildingActivity(b,frame?.context);if(!s)return;if(frame)frame.entries.set(b.id,s);}
  return s;
