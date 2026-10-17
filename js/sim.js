@@ -2371,7 +2371,7 @@ G.startConstructionCargo=function(c){if(c.carry?.roadPaving&&!c.carry.constructi
  if(cargo.constructionReturn||!b||b.state!=='site'||b.sitePaused||c.job!==b.id||b.construction?.consumed)return G.returnConstructionCargo(c);
  const spot=G.workSpot(G.world,b,c.x,c.y);if(!spot){b.warnText='工地入口不可达，已领建材退回仓库';return G.returnConstructionCargo(c);}b.warnText='';
  const t={kind:'constructionMaterial',phase:'deliver',b,resource:cargo.type,tx:spot.x,ty:spot.y,work:.1,workLeft:.1};c.task=t;c.pausedTask=null;c.haulPending=false;c.haulWait='';c.haulTo=null;return G.sendTo(c,t.tx,t.ty,spot.route);};
-G.requestConstructionMaterial=function(c,b){const state=b.construction;
+G.requestConstructionMaterial=function(c,b){const state=b.construction;if(!state)return false;
  for(const [type,n]of Object.entries(state.required)){
   const need=n-(state.onsite[type]||0)-G.constructionIncoming(b,type)-G.constructionUsed(b,type);if(need<=0||G.game.res[type]<=0)continue;
   const route=G.storageRoute(c.x,c.y,type);if(!route){b.warnText='取料仓库不可达，等待仓库或通路';continue;}b.warnText='';

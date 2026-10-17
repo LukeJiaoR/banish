@@ -11,7 +11,7 @@ const G = loadGame(root); global.G = G; global.window = global;
 global.addEventListener = () => {};
 require(path.join(root, 'js/ui.js'));
 const elements = new Map();
-global.document = { getElementById(id) {
+global.document = { addEventListener() {}, getElementById(id) {
   if (!elements.has(id)) elements.set(id, { innerHTML: '', textContent: '', classList: { add() {}, remove() {}, contains() { return true; } },
     addEventListener() {}, querySelectorAll() { return []; }, setAttribute() {}, getAttribute() { return null; } });
   return elements.get(id);
