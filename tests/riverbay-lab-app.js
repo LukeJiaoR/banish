@@ -7,7 +7,15 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 const source = fs.readFileSync(path.join(__dirname, '../tools/riverbay-lab/app.js'), 'utf8');
-const defaults = { waterV2: false, shore: false, lowFrequency: false, clutter: false };
+const html = fs.readFileSync(path.join(__dirname, '../riverbay-lab.html'), 'utf8');
+const defaults = { waterV2: false, shore: false, lowFrequency: false, clutter: false, shoreVariation: false };
+const presets = {
+  original: { ...defaults },
+  water: { ...defaults, waterV2: true },
+  shore: { ...defaults, waterV2: true, shore: true },
+  study: { ...defaults, waterV2: true, shore: true, lowFrequency: true, clutter: true },
+  variation: { ...defaults, waterV2: true, shore: true, lowFrequency: true, clutter: true, shoreVariation: true },
+};
 const settleMicrotasks = () => new Promise(resolve => setImmediate(resolve));
 
 function harness({ ready = true, failed = [], decodeError = null, sceneFailures = [] } = {}) {
@@ -28,7 +36,7 @@ function harness({ ready = true, failed = [], decodeError = null, sceneFailures 
     });
     return elements.get(id);
   };
-  const presetButtons = ['original', 'water', 'shore', 'study'].map(name => {
+  const presetButtons = Object.keys(presets).map(name => {
     const button = element('preset-' + name);
     button.dataset = { preset: name };
     button.attributes['aria-pressed'] = String(name === 'original');
@@ -115,6 +123,19 @@ async function test(name, run) {
 }
 
 (async () => {
+  await test('HTML exposes the five opt-in controls and both A/B presets', async () => {
+    assert.deepEqual([...html.matchAll(/data-preset="([^"]+)"/g)].map(match => match[1]), Object.keys(presets));
+    for (const key of Object.keys(defaults)) {
+      const input = html.match(new RegExp(`<input\\b[^>]*\\bid="${key}"[^>]*>`));
+      assert.ok(input, `missing ${key} control`);
+      assert.match(input[0], /type="checkbox"/);
+      assert.doesNotMatch(input[0], /\bchecked\b/, `${key} must remain opt-in`);
+    }
+    assert.match(html, /id="shoreVariation" type="checkbox">岸带宽色变化（需岸线）/);
+    assert.match(html, /2857b94 结构修正版已通过浏览器复测/);
+    assert.match(html, /新岸带宽色变化待复测，美术未签字/);
+  });
+
   await test('startup keeps candidate features and motion off', async () => {
     const h = harness();
     await h.startup;
@@ -250,8 +271,45 @@ async function test(name, run) {
     assert.equal(h.calls.controlWrites, writes);
     h.element('clutter').listeners.change({ target: { checked: true } });
     assert.equal(h.element('clutter').checked, true);
-    for (const name of ['original', 'water', 'shore', 'study']) assert.equal(h.element('preset-' + name).getAttribute('aria-pressed'), 'false');
+    for (const name of Object.keys(presets)) assert.equal(h.element('preset-' + name).getAttribute('aria-pressed'), 'false');
     assert.equal(h.rafs.size, 0);
+  });
+
+  await test('variation adds only the fifth option and all original presets reset it', async () => {
+    const h = harness();
+    await h.startup;
+    const lab = h.context.riverbayLab;
+    for (const [name, expected] of Object.entries(presets)) {
+      h.element('preset-variation').listeners.click();
+      assert.deepEqual(lab.terrain.getOptions(), presets.variation);
+      h.element('preset-' + name).listeners.click();
+      assert.deepEqual(lab.terrain.getOptions(), expected, `${name} has explicit, complete options`);
+      for (const [key, value] of Object.entries(expected)) assert.equal(h.element(key).checked, value);
+      for (const selected of Object.keys(presets)) assert.equal(h.element('preset-' + selected).getAttribute('aria-pressed'), String(selected === name));
+      const writes = h.calls.controlWrites;
+      h.element('preset-' + name).listeners.click();
+      assert.equal(h.calls.controlWrites, writes, `repeated ${name} does not rewrite attributes`);
+    }
+    h.element('preset-study').listeners.click();
+    h.element('shoreVariation').listeners.change({ target: { checked: true } });
+    assert.deepEqual(lab.terrain.getOptions(), presets.variation);
+    assert.equal(h.element('preset-variation').getAttribute('aria-pressed'), 'true');
+    h.element('shoreVariation').listeners.change({ target: { checked: false } });
+    assert.deepEqual(lab.terrain.getOptions(), presets.study);
+    assert.equal(h.element('preset-study').getAttribute('aria-pressed'), 'true');
+    assert.equal(h.rafs.size, 0);
+  });
+
+  await test('the shore variation checkbox does not implicitly enable shore', async () => {
+    const h = harness();
+    await h.startup;
+    h.element('shoreVariation').listeners.change({ target: { checked: true } });
+    assert.deepEqual(h.context.riverbayLab.terrain.getOptions(), { ...defaults, shoreVariation: true });
+    assert.equal(h.element('shore').checked, false);
+    for (const name of Object.keys(presets)) assert.equal(h.element('preset-' + name).getAttribute('aria-pressed'), 'false');
+    h.element('preset-original').listeners.click();
+    assert.deepEqual(h.context.riverbayLab.terrain.getOptions(), defaults);
+    assert.equal(h.element('shoreVariation').checked, false);
   });
 
   console.log(`River-bay app: ${passed} VM controller contracts passed (not browser acceptance).`);

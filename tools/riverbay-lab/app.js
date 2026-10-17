@@ -153,7 +153,7 @@ if (typeof module !== 'object' || !module.exports) (async function () {
  function controls(options){for(const [key,input]of Object.entries(optionInputs))if(input.checked!==options[key])input.checked=options[key];
   for(const button of presetButtons){const pressed=String(Object.keys(options).every(key=>presets[button.dataset.preset][key]===options[key]));if(button.getAttribute('aria-pressed')!==pressed)button.setAttribute('aria-pressed',pressed);}
  }
- const presets={original:{waterV2:false,shore:false,lowFrequency:false,clutter:false},water:{waterV2:true,shore:false,lowFrequency:false,clutter:false},shore:{waterV2:true,shore:true,lowFrequency:false,clutter:false},study:{waterV2:true,shore:true,lowFrequency:true,clutter:true}};
+ const presets={original:{waterV2:false,shore:false,lowFrequency:false,clutter:false,shoreVariation:false},water:{waterV2:true,shore:false,lowFrequency:false,clutter:false,shoreVariation:false},shore:{waterV2:true,shore:true,lowFrequency:false,clutter:false,shoreVariation:false},study:{waterV2:true,shore:true,lowFrequency:true,clutter:true,shoreVariation:false},variation:{waterV2:true,shore:true,lowFrequency:true,clutter:true,shoreVariation:true}};
  function setOptions(value){return profile.operation('setOptions',()=>{
   profile.section('optionsMutationSyncMs',()=>terrain.setOptions(value));
   profile.section('controlsUpdateSyncMs',()=>controls(terrain.getOptions()));render();

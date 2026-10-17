@@ -2,7 +2,7 @@
 /* Candidate-only renderer. Loaded by riverbay-lab.html, never by index.html.
  * The low-frequency field is a code colour study, NOT newly painted grass art. */
 (function (root) {
-  const defaults = Object.freeze({waterV2:false, shore:false, lowFrequency:false, clutter:false});
+  const defaults = Object.freeze({waterV2:false, shore:false, lowFrequency:false, clutter:false, shoreVariation:false});
   const key = p => p[0]+','+p[1];
   function boundaryPaths(w, includeMapBoundary) {
     const edges=[], outgoing=new Map(), incoming=new Map(), N=w.N;
@@ -42,13 +42,34 @@
     });
     return {...route,points};
   }
+  function shoreVariationProfile(seed,x,y){
+    // Deliberate broad reaches, not per-tile dirt/noise. The shortest wave is
+    // 22 world tiles; all bands stay world-anchored during pan, zoom and repair.
+    const phase=((seed>>>0)%4096)/4096*Math.PI*2;
+    const reach=.5+.3*Math.sin((x*.82+y*.32)*Math.PI*2/26+phase)+.2*Math.sin((y*.7-x*.28)*Math.PI*2/22-phase*.4);
+    const tint=.5+.5*Math.sin((x+y)*Math.PI*2/38+phase*.5);
+    return {wetWidth:4+10*reach,shallowWidth:6+12*(.65*reach+.35*(1-tint)),tint};
+  }
+  function sampleCurve(route,N,steps=6){
+    // Sample exactly the same quadratic joins as curve(), including fixed map
+    // exits. Sampling only shapes decorative band edges, never water/collision.
+    const p=route.points,n=p.length,out=[];if(n<2)return {points:p.map(v=>v.slice()),closed:route.closed};
+    const mid=(a,b)=>[(a[0]+b[0])/2,(a[1]+b[1])/2];
+    const add=q=>{if(!out.length||key(out[out.length-1])!==key(q))out.push(q);};
+    function corner(i,end){const control=p[i],start=out[out.length-1];
+      if(control[0]===0||control[1]===0||control[0]===N||control[1]===N){add(control.slice());add(end);return;}
+      for(let j=1;j<=steps;j++){const t=j/steps,u=1-t;add([u*u*start[0]+2*u*t*control[0]+t*t*end[0],u*u*start[1]+2*u*t*control[1]+t*t*end[1]]);}}
+    if(route.closed){add(mid(p[n-1],p[0]));for(let i=0;i<n;i++)corner(i,mid(p[i],p[(i+1)%n]));if(key(out[0])===key(out[out.length-1]))out.pop();}
+    else{add(p[0].slice());add(mid(p[0],p[1]));for(let i=1;i<n-1;i++)corner(i,mid(p[i],p[i+1]));add(p[n-1].slice());}
+    return {points:out,closed:route.closed};
+  }
   function install(G, assets={}) {
     if(G._riverbayTerrain)throw new Error('Riverbay renderer already installed');
-    let options={...defaults}, topologyWorld=null, paths=[], shorePaths=[], polygons=[], material=null, materialSeed=null;
+    let options={...defaults}, topologyWorld=null, paths=[], shorePaths=[], polygons=[], variationGeometry=new Map(), material=null, materialSeed=null;
     const originalTile=G.drawGroundTile, originalBuild=G.buildGround;
     const patterns=new WeakMap();
     const metrics={fullBuilds:0,partialBuilds:0,tileDraws:0,lastTileDraws:0,lastBuildMs:0,topologyBuilds:0,materialBuilds:0};
-    function topology(){if(topologyWorld!==G.world){paths=coastlines(G.world);shorePaths=paths.map(p=>smoothRoute(p,G.world.N));polygons=waterPolygons(G.world).map(p=>smoothRoute(p,G.world.N));topologyWorld=G.world;metrics.topologyBuilds++;}return paths;}
+    function topology(){if(topologyWorld!==G.world){paths=coastlines(G.world);shorePaths=paths.map(p=>smoothRoute(p,G.world.N));polygons=waterPolygons(G.world).map(p=>smoothRoute(p,G.world.N));variationGeometry=new Map();topologyWorld=G.world;metrics.topologyBuilds++;}return paths;}
     function noiseField(seed,period){
       // Hash only the 4x4 / 8x8 lattice, rather than eight hashes per pixel.
       const grid=Array.from({length:period*period},(_,i)=>G.h2(seed,i%period,Math.floor(i/period)));
@@ -101,11 +122,39 @@
       let entries=G.terrainPatterns.get(c);if(!entries){entries=new Map();G.terrainPatterns.set(c,entries);}let p=entries.get(name);if(!p||p.image!==im){p={image:im,pattern:c.createPattern(im,'repeat')};entries.set(name,p);}
       c.save();c.transform(.5,.25,-.5,.25,0,0);c.fillStyle=p.pattern;c.fillRect(bounds.x0*64-1,bounds.y0*64-1,(bounds.x1-bounds.x0+1)*64+2,(bounds.y1-bounds.y0+1)*64+2);c.restore();
     }
+    function variedBands(c,routes,water){
+      const w=G.world,side=water?1:-1;
+      const shapes=routes.map(route=>{let cached=variationGeometry.get(route);if(cached)return cached;
+        const sampled=sampleCurve(route,w.N),screen=sampled.points.map(p=>G.T2S(...p)),n=screen.length;
+        const normals=screen.map((p,i)=>{const a=screen[sampled.closed?(i+n-1)%n:Math.max(0,i-1)],b=screen[sampled.closed?(i+1)%n:Math.min(n-1,i+1)],dx=b[0]-a[0],dy=b[1]-a[1],length=Math.hypot(dx,dy)||1;return [-dy/length,dx/length];});
+        cached={...sampled,screen,normals,widths:sampled.points.map(p=>shoreVariationProfile(w.seed,...p))};variationGeometry.set(route,cached);return cached;});
+      const start=G.T2S(0,0),end=G.T2S(w.N*.75,w.N);
+      function paint(scale,extra,alpha){
+        const gradient=c.createLinearGradient(...start,...end),cool=water?[94,142,151]:[127,136,100],warm=water?[133,166,155]:[165,150,110];
+        for(let i=0;i<=4;i++){const t=i/4,mix=shoreVariationProfile(w.seed,w.N*.75*t,w.N*t).tint,rgb=cool.map((v,j)=>Math.round(v+(warm[j]-v)*mix));gradient.addColorStop(t,`rgba(${rgb.join(',')},${alpha})`);}c.fillStyle=gradient;c.beginPath();
+        for(const s of shapes){if(s.screen.length<2)continue;
+          const inner=s.screen.map((p,i)=>[p[0]-s.normals[i][0]*side*2,p[1]-s.normals[i][1]*side*2]);
+          const outer=s.screen.map((p,i)=>{const width=s.widths[i][water?'shallowWidth':'wetWidth']*scale+extra;return [p[0]+s.normals[i][0]*side*width,p[1]+s.normals[i][1]*side*width];});
+          function triangle(a,b,d){const area=(b[0]-a[0])*(d[1]-a[1])-(b[1]-a[1])*(d[0]-a[0]);if(Math.abs(area)<1e-9)return;if(area<0)[b,d]=[d,b];c.moveTo(...a);c.lineTo(...b);c.lineTo(...d);c.closePath();}
+          for(let i=0;i<(s.closed?s.screen.length:s.screen.length-1);i++){const j=(i+1)%s.screen.length;triangle(inner[i],inner[j],outer[j]);triangle(inner[i],outer[j],outer[i]);}
+          // Map exits need a round cap too: a butt section can leave a wedge
+          // between its normal and the oblique map boundary. Masking clips the
+          // fan back to the exact world and correct water/land side.
+          if(!s.closed)for(const i of [0,s.screen.length-1]){const p=s.screen[i],r=s.widths[i][water?'shallowWidth':'wetWidth']*scale+extra;for(let j=0;j<24;j++){const a=j*Math.PI/12,b=(j+1)*Math.PI/12;triangle(p,[p[0]+Math.cos(a)*r,p[1]+Math.sin(a)*r],[p[0]+Math.cos(b)*r,p[1]+Math.sin(b)*r]);}}
+        }
+        // Union consistently oriented local triangles in one fill. A reversed
+        // closed offset ring would cancel itself when wider than a tiny pond's
+        // radius; these pieces keep overlapping/folded bands covered. Shared
+        // continuous masks still determine the exact land/water boundary.
+        c.fill();
+      }
+      paint(1.2,2,water?.12:.14);paint(1,0,water?.25:.30);paint(.46,0,water?.17:.20);
+    }
     function shore(c,bounds){if(!options.shore||G.game.season===3)return;topology();const routes=shorePaths.filter(p=>p.bounds.x1>=bounds.x0-3&&p.bounds.y1>=bounds.y0-3&&p.bounds.x0<=bounds.x1+4&&p.bounds.y0<=bounds.y1+4);if(!routes.length)return;
       function stroke(color,width,dash){c.beginPath();for(const p of routes)curve(c,p);c.strokeStyle=color;c.lineWidth=width;c.lineJoin='round';c.lineCap='round';c.setLineDash(dash||[]);c.stroke();}
       const pal=G.PAL[G.game.season];c.save();protectObjects(c,bounds);ribbonMask(c,routes);
-      c.save();continuousMask(c,false);surface(c,'meadow_'+G.TEX_SEASON[G.game.season],bounds,pal.grass);if(options.lowFrequency&&G.game.season===1)fillLow(c,bounds);stroke('rgba(151,140,100,.65)',25);stroke('rgba(169,155,110,.35)',10);c.restore();
-      c.save();continuousMask(c,true);surface(c,options.waterV2?'_riverbay_water_v2':'water_open',bounds,pal.water,options.waterV2?assets.waterImage:null);stroke('rgba(108,156,153,.52)',24);stroke('rgba(148,176,158,.28)',10);c.restore();
+      c.save();continuousMask(c,false);surface(c,'meadow_'+G.TEX_SEASON[G.game.season],bounds,pal.grass);if(options.lowFrequency&&G.game.season===1)fillLow(c,bounds);if(options.shoreVariation)variedBands(c,routes,false);else{stroke('rgba(151,140,100,.65)',25);stroke('rgba(169,155,110,.35)',10);}c.restore();
+      c.save();continuousMask(c,true);surface(c,options.waterV2?'_riverbay_water_v2':'water_open',bounds,pal.water,options.waterV2?assets.waterImage:null);if(options.shoreVariation)variedBands(c,routes,true);else{stroke('rgba(108,156,153,.52)',24);stroke('rgba(148,176,158,.28)',10);}c.restore();
       stroke('rgba(211,211,174,.37)',.85,[3,19,1.4,29]);c.restore();
     }
     function overlays(c,bounds){grassOverlay(c,bounds);shore(c,bounds);if(options.clutter&&G.game.season===1)for(let y=bounds.y0;y<=bounds.y1;y++)for(let x=bounds.x0;x<=bounds.x1;x++)clutter(c,G.world,x,y);}
@@ -115,7 +164,7 @@
     function rectTiles(r){const s=G.groundScale,N=G.world.N;const corners=[[r.x0,r.y0],[r.x1,r.y0],[r.x0,r.y1],[r.x1,r.y1]].map(([x,y])=>{x=x/s-G.groundOX;y=y/s-G.groundOY;return [x/64+y/32,y/32-x/64];});return {x0:Math.max(0,Math.floor(Math.min(...corners.map(p=>p[0])))-2),y0:Math.max(0,Math.floor(Math.min(...corners.map(p=>p[1])))-2),x1:Math.min(N-1,Math.ceil(Math.max(...corners.map(p=>p[0])))+2),y1:Math.min(N-1,Math.ceil(Math.max(...corners.map(p=>p[1])))+2)};}
     G.buildGround=function(){const start=performance.now(),before=metrics.tileDraws,w=G.world,size=G.groundCacheSize(G.groundScale);
       const partial=!G.needGround&&G._gcv&&G._gcv.width===size.width&&G._gcv.height===size.height&&G._groundWorld===w&&G._groundScale===size.scale&&G.groundDirty.size>0;
-      if(partial&&Object.values(options).some(Boolean)){
+      if(partial&&(options.waterV2||options.shore||options.lowFrequency||options.clutter)){
         const c=G._gcv.getContext('2d'),r=partialRect(),b=rectTiles(r),s=G.groundScale,pal=G.PAL[G.game.season];
         c.save();c.setTransform(1,0,0,1,0,0);c.beginPath();c.rect(r.x0,r.y0,r.x1-r.x0,r.y1-r.y0);c.clip();c.clearRect(r.x0,r.y0,r.x1-r.x0,r.y1-r.y0);c.fillStyle=pal.bg;c.fillRect(r.x0,r.y0,r.x1-r.x0,r.y1-r.y0);c.setTransform(s,0,0,s,G.groundOX*s,G.groundOY*s);
         for(const water of [false,true])for(let y=b.y0;y<=b.y1;y++)for(let x=b.x0;x<=b.x1;x++)if((w.water[y*w.N+x]===1)===water)G.drawGroundTile(c,w,pal,x,y);
@@ -123,8 +172,8 @@
       }else{originalBuild();const c=G._gcv.getContext('2d');overlays(c,{x0:0,y0:0,x1:w.N-1,y1:w.N-1});if(partial)metrics.partialBuilds++;else metrics.fullBuilds++;}
       metrics.lastTileDraws=metrics.tileDraws-before;metrics.lastBuildMs=performance.now()-start;
     };
-    const api={metrics,getOptions:()=>({...options}),setOptions(next){for(const k of Object.keys(next))if(!(k in defaults)||typeof next[k]!=='boolean')throw new Error('Invalid riverbay option: '+k);const changed=Object.keys(next).some(k=>options[k]!==next[k]);options={...options,...next};if(changed)G.needGround=true;return {...options};},invalidateTopology(){topologyWorld=null;G.needGround=true;},getCoastlines:()=>topology().map(p=>({points:p.points.map(v=>v.slice()),closed:p.closed,bounds:{...p.bounds}}))};
+    const api={metrics,getOptions:()=>({...options}),setOptions(next){for(const k of Object.keys(next))if(!(k in defaults)||typeof next[k]!=='boolean')throw new Error('Invalid riverbay option: '+k);const changed=Object.keys(next).some(k=>options[k]!==next[k]&&(k!=='shoreVariation'||G.game.season!==3&&(options.shore||next.shore)));options={...options,...next};if(changed)G.needGround=true;return {...options};},invalidateTopology(){topologyWorld=null;G.needGround=true;},getCoastlines:()=>topology().map(p=>({points:p.points.map(v=>v.slice()),closed:p.closed,bounds:{...p.bounds}}))};
     G._riverbayTerrain=api;return api;
   }
-  const api={install,coastlines,waterPolygons,defaults};if(typeof module!=='undefined'&&module.exports)module.exports=api;root.RiverbayTerrain=api;
+  const api={install,coastlines,waterPolygons,shoreVariationProfile,sampleCurve,smoothRoute,defaults};if(typeof module!=='undefined'&&module.exports)module.exports=api;root.RiverbayTerrain=api;
 })(typeof globalThis!=='undefined'?globalThis:this);
