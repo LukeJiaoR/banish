@@ -24,7 +24,7 @@ v2 water now measures 2.52 versus 2.44 internally on X and 6.57 versus 6.50 on Y
 
 ## In-game A/B method
 
-A real Chromium session was available on 2026-10-17 (ego-browser, 1227×763 CSS px, devicePixelRatio 1). The earlier `socket() failed` block applied to the 2026-10-13 VM and is not repeated here.
+A real Chromium session was available on 2026-10-17 (ego-browser, 1227×763 CSS px, devicePixelRatio 1), running main `986d13b` (v0.3.79 through #103). The earlier `socket() failed` block applied to the 2026-10-13 VM and is not repeated here.
 
 - One saved v3 village (seed `2685766889`, day 140) was applied through `G.applySaveData` in every copy. Game state was then frozen at summer (`season=1`), day 12, 10:00, `paused=true`, `speed=0`, zoom 1.
 - Four static copies were served side by side: baseline, grass-only, water-only, both. Only the single PNG differs between copies. The camera was centered on the storage building for the grass view and on the local water centroid for the water view; `G.needGround` was raised and the ground cache rebuilt at scale 0.68.
