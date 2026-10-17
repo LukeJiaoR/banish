@@ -705,7 +705,7 @@ G.sendTo = function (c, tx, ty, planned = null) {
   if (!p) { c.state = 'idle'; c.task = null; return false; }
   // The path planner rounds its start cell. Physically checked factory/mineral
   // tasks still walk the final fraction after an interrupted commute.
-  if((['build','constructionMaterial'].includes(c.task?.kind)||c.task?.kind==='hunt'||c.task?.mineral||c.task?.economy==='pasture'||['firefight','supply','toolFetch','cleric','worship'].includes(c.task?.kind)||['fuel','tailor','brew','roadPave'].includes(c.task?.kind)) && p.length===0 && G.d2(c.x,c.y,tx,ty)>1e-8) {
+  if((['build','constructionMaterial'].includes(c.task?.kind)||c.task?.kind==='hunt'||c.task?.mineral||c.task?.economy==='pasture'||['firefight','supply','toolFetch','cleric','worship'].includes(c.task?.kind)||['smith','fuel','tailor','brew','roadPave'].includes(c.task?.kind)) && p.length===0 && G.d2(c.x,c.y,tx,ty)>1e-8) {
     c.path=[{x:tx,y:ty}];c.pi=0;c.state='walk';c.walkKind='task';return true;
   }
   c.path = p; c.pi = 0;
