@@ -11,3 +11,17 @@ Water: source-scale improvement is clearer, with fewer bright fragmented highlig
 Neither material is accepted as seamless. Grass top/bottom RGB mean edge jump is 10.09/255 versus original 9.11, while the candidate internal vertical adjacent-pixel mean is 5.69. Water left/right edge jump is 6.19 versus its internal horizontal mean 2.61. These are risk signals, not proof that a seam is visible in-game.
 
 No game screenshot or game-scale A/B was available. Inspect repeated tiles and actual camera scale before enabling either candidate.
+
+---
+
+Second review pass, 2026-10-17 (v2 + real in-game captures)
+
+Scope: v2 grass (derivative of the current meadow) and v2 water (v1 with an edge cross-fade). Four same-state Canvas captures were inspected: baseline, grass-only, water-only and both, plus native 1:1 crops.
+
+Grass v2: the warm-yellow specks are clearly reduced and the broad mottling is quieter. Pure-grass RGB standard deviation in the fixed view falls from 10.09/7.49/3.61 to 7.27/7.04/4.50. The tile edge jump (7.25/7.21) is now close to its internal adjacent mean (6.57/6.32), so the previous seam risk is largely removed. However, the composition is still the baseline's: a reviewer looking for a different hand-painted direction will find it too close to the current texture. It is an improvement in quietness, not a new look.
+
+Water v2: the calmer surface survives game scale and the fixed-view standard deviation falls from 11.42/11.03/11.48 to 7.01/7.24/7.78. Edge metrics are effectively internal (2.52 vs 2.44 on X, 6.57 vs 6.50 on Y). No seam was visible in the inspected water view. Dense directional ripples still repeat every eight tiles; long views were not captured.
+
+Game-scale method: one saved v3 village, summer day 12 10:00, paused, zoom 1, 1227×763, ground-cache scale 0.68, identical camera per pair; only one PNG differs per copy. This is a real Canvas capture, not an offline synthetic render.
+
+Verdict: keep Draft. Water v2 is the stronger candidate and is close to adoptable pending independent review and a dense-town/phone check. Grass v2 is a measurable but subtle improvement; it does not yet justify replacing the current meadow on its own. No runtime or manifest change was made.

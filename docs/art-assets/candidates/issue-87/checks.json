@@ -1,25 +1,72 @@
 {
-  "scope": "Static PNG checks only; no browser/game A/B acceptance",
-  "results": [
+  "scope": "Static PNG checks plus one fixed-camera in-game capture pair; neither is an adoption score",
+  "static": [
     {
       "name": "meadow-summer-candidate.png",
       "width": 512,
       "height": 512,
       "opaque": true,
-      "adjacentMeanX": 5.866820572407045,
-      "adjacentMeanY": 5.69249811439987,
-      "edgeMeanX": 11.4921875,
-      "edgeMeanY": 10.087890625
+      "adjacentMeanX": 5.867,
+      "adjacentMeanY": 5.692,
+      "edgeMeanX": 11.492,
+      "edgeMeanY": 10.088
+    },
+    {
+      "name": "meadow-summer-candidate-v2.png",
+      "width": 512,
+      "height": 512,
+      "opaque": true,
+      "adjacentMeanX": 6.57,
+      "adjacentMeanY": 6.316,
+      "edgeMeanX": 7.253,
+      "edgeMeanY": 7.208
     },
     {
       "name": "water-open-candidate.png",
       "width": 512,
       "height": 512,
       "opaque": true,
-      "adjacentMeanX": 2.610275756278539,
-      "adjacentMeanY": 6.930845615215264,
-      "edgeMeanX": 6.193359375,
-      "edgeMeanY": 6.826171875
+      "adjacentMeanX": 2.61,
+      "adjacentMeanY": 6.931,
+      "edgeMeanX": 6.193,
+      "edgeMeanY": 6.826
+    },
+    {
+      "name": "water-open-candidate-v2.png",
+      "width": 512,
+      "height": 512,
+      "opaque": true,
+      "adjacentMeanX": 2.442,
+      "adjacentMeanY": 6.499,
+      "edgeMeanX": 2.515,
+      "edgeMeanY": 6.572
     }
-  ]
+  ],
+  "inGame": {
+    "scene": "saved v3 village seed 2685766889, summer day 12 10:00, paused, zoom 1, 1227x763, ground-cache scale 0.68",
+    "grassPureGrassRgbStd": {
+      "baseline": [
+        10.09,
+        7.49,
+        3.61
+      ],
+      "candidateV2": [
+        7.27,
+        7.04,
+        4.5
+      ]
+    },
+    "waterRgbStd": {
+      "baseline": [
+        11.42,
+        11.03,
+        11.48
+      ],
+      "candidateV2": [
+        7.01,
+        7.24,
+        7.78
+      ]
+    }
+  }
 }

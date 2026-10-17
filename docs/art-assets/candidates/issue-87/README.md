@@ -2,33 +2,49 @@
 
 Status: **unaccepted candidates preserved in a candidate-only Draft PR; not connected to the game manifest and not ready for merge**.
 
-Baseline: LukeJiaoR/banish main `f4fffa72c95d0cb844bc988a57a3778e6648a661` (v0.3.79), retrieved through the GitHub connector on 2026-10-13. Original assets remain unchanged under `assets/terrain-v2/`. 
+Baseline: LukeJiaoR/banish main `f4fffa72c95d0cb844bc988a57a3778e6648a661` (v0.3.79) for v1. v2 was prepared against the same runtime assets on 2026-10-17; no runtime, manifest, rendering, gameplay or CI change is included. Original assets remain unchanged under `assets/terrain-v2/`.
 
 ## Files and provenance
 
-- Built-in image-generation source outputs were 1254×1254 opaque PNGs; the two 512×512 candidates below preserve the complete generated image content at the existing material size. Source outputs are retained in the task workspace.
-- `meadow-summer-candidate.png`, `water-open-candidate.png`: whole-image resized 512×512 copies using ImageMagick, matching the existing material dimensions. No recoloring, blur, masks or procedural painting were applied.
-- `checks.json`: dimensions, opacity and simple edge-difference diagnostics from `check-candidates.cjs`. These numbers are not a naturalness or seamlessness acceptance score.
+- v1 `meadow-summer-candidate.png`, `water-open-candidate.png`: built-in image-generation outputs (1254×1254 opaque), whole-image resized to 512×512 with ImageMagick. No recoloring, blur, masks or procedural painting.
+- v2 `meadow-summer-candidate-v2.png`: **offline derivative of the current `assets/terrain-v2/meadow_summer.png`**, not a new generation. Warm/yellow tuft pixels were pulled toward the local green, the 55 px low-pass component was kept at 42 % while detail was kept at 95 %, an 80 px edge cross-fade made the tile periodic, and 0.8 RGB grain was added. 512×512, opaque.
+- v2 `water-open-candidate-v2.png`: **offline derivative of v1 water**. An 80 px edge cross-fade makes the tile periodic; the original mean is preserved and no color grade was applied. 512×512, opaque.
+- `checks.json`: dimensions, opacity, adjacent-pixel and edge diagnostics for all four PNGs, plus the fixed-view in-game RGB standard deviations. None of these numbers is a naturalness or seamlessness acceptance score.
+- `in-game-*.png`: native 1:1 game-canvas captures and side-by-side comparisons. See the method below.
 
 Input references were visually inspected: current summer meadow, current open water and original house. The house was a style reference only. House/tree/citizen assets and adopted warm/winter mountain assets are not modified.
 
 ## Review findings
 
-The summer candidate is somewhat quieter in fine grain but retains yellow grass tufts and broad mottling. It does not yet establish that the user's unnatural-grass concern is solved. The water candidate reduces dense sharp crests and reads calmer at source scale. Both require repeat/seam inspection and actual native-scale game rendering before adoption. Grass horizontal/vertical edge differences exceed internal adjacent-pixel differences; seamless tiling must not be assumed from the generation prompt.
+v1 grass was rejected: still mottled and tuft-heavy. v1 water was calmer at source scale but its left/right edge jump (6.19) was more than twice its internal adjacent-pixel mean (2.61), so seamless tiling could not be assumed.
 
-## Blocking verification
+v2 grass, measured in the same in-game view on a pure-grass patch, drops RGB standard deviation from 10.09/7.49/3.61 to 7.27/7.04/4.50 (about 28 % lower overall) and visibly reduces warm-yellow specks. Its edge jump is 7.25/7.21 versus an internal adjacent mean of 6.57/6.32, so the tile is close to periodic. It deliberately keeps the baseline's large-scale variation; the difference is measurable but subtle, and a reviewer may still call it "close to baseline".
 
-The actual game rendering code was obtained, including `G.fillTerrainSurface`, its world-anchored eight-tile pattern and half-resolution ground cache. A real Chromium launch with Playwright failed before any page rendered:
+v2 water now measures 2.52 versus 2.44 internally on X and 6.57 versus 6.50 on Y. In the fixed water view its RGB standard deviation falls from 11.42/11.03/11.48 to 7.01/7.24/7.78: calmer, fewer sharp crests. Dense directional ripples and an eight-tile repeat remain.
 
-`FATAL:chrome/browser/process_singleton_posix.cc:297 Check failed: . socket() failed: Operation not permitted (1)`
+## In-game A/B method
 
-No security settings were changed, and no browser/socket workaround was attempted. There are **no real-browser before/after screenshots, no native camera/scale acceptance result, no gameplay tests and no merge** from this candidate pass. Offline Canvas or source previews must not be presented as successful browser A/B verification.
+A real Chromium session was available on 2026-10-17 (ego-browser, 1227×763 CSS px, devicePixelRatio 1). The earlier `socket() failed` block applied to the 2026-10-13 VM and is not repeated here.
 
-## Required next acceptance step
+- One saved v3 village (seed `2685766889`, day 140) was applied through `G.applySaveData` in every copy. Game state was then frozen at summer (`season=1`), day 12, 10:00, `paused=true`, `speed=0`, zoom 1.
+- Four static copies were served side by side: baseline, grass-only, water-only, both. Only the single PNG differs between copies. The camera was centered on the storage building for the grass view and on the local water centroid for the water view; `G.needGround` was raised and the ground cache rebuilt at scale 0.68.
+- Captures were exported from the game canvas (`G.cv.toDataURL`) rather than a page screenshot, so no DOM panel or toast covers the terrain.
+- Files: `in-game-summer-grass-baseline.png`, `in-game-summer-grass-v2.png`, `in-game-summer-grass-compare.png`, `in-game-water-baseline.png`, `in-game-water-v2.png`, `in-game-water-compare.png`.
 
-Use an authorized environment where the real game can run. Materialize the full frozen baseline, load its PNGs and freeze one saved seed, game time, season, camera position, zoom, viewport and ground-cache scale. Capture the unchanged scene first; swap only the candidate summer texture and capture at identical state. Restore baseline and independently compare the candidate water with the same conditions. Include buildings, trees, citizens, water/shore and mountain context; inspect repeat seams and both near and distant views. Keep the original files unless the reviewed game-scale result clearly improves the concern. Retain winter ice and other seasons' routing. Run repository asset/terrain/cache tests after any selected replacement. Open a Draft PR only for a verified minimal change, and require independent review before ordinary merge.
+This establishes that both v2 files render in the actual Canvas pipeline at native scale without an exception, and gives a same-state comparison. It does **not** establish a full-town look, mobile/DPI behavior, or long-play acceptance.
 
-## Generation prompts
+## Remaining limitations
+
+- The captured village has five citizens and five buildings; it is a real saved town but not a dense late-game scene. A dense-town capture at zoom 0.75/1/2 and a phone-sized viewport are still required before adoption.
+- The grass candidate is derived from the current texture, so it inherits the baseline's composition. It is quieter, not a new art direction.
+- The water candidate is still a single static pattern; repetition every eight tiles remains visible in long views.
+- No independent reviewer has accepted v2 yet. `checks.json` numbers are risk signals, not an acceptance verdict.
+
+## Recommendation
+
+Keep this PR Draft. Do not merge or enable either texture until an independent review and a denser in-game capture establish a clear improvement. If the team wants to continue, water v2 is the stronger of the two; grass v2 is a measurable but subtle reduction of the reported tuft/mottle problem.
+
+## Generation prompts (v1, retained for provenance)
 
 Summer: Square opaque seamlessly tileable summer meadow for the existing small-scale isometric settlement game. Current meadow is the edit target; original house is style-only. Preserve muted warm olive-green summer palette and softly hand-painted finish. Reduce dense repeated bright yellow upright tufts and high-frequency scratchiness; use subtle irregular fine blades and gently varied flat greens. Low contrast, quiet at distant scale. Flat top-down material, uniform lighting. No baked perspective, isometric diamond, buildings, paths, trees, flowers, rocks, water, large bare earth patches, dramatic clumps, stripes, grid, border, vignette, shadows or text. Seamless in both axes; no identifiable motif.
 

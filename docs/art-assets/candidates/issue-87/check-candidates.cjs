@@ -1,3 +1,37 @@
-const sharp=require('sharp');
-const path=require('path');
-(async()=>{const results=[];for(const name of ['meadow-summer-candidate.png','water-open-candidate.png']){const p=path.join(__dirname,name),{data,info}=await sharp(p).ensureAlpha().raw().toBuffer({resolveWithObject:true});let opaque=true,dx=0,dy=0,sx=0,sy=0;const {width:w,height:h,channels:c}=info;for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=(y*w+x)*c;if(data[i+3]!==255)opaque=false;for(let k=0;k<3;k++){if(x)dx+=Math.abs(data[i+k]-data[i-c+k]);if(y)dy+=Math.abs(data[i+k]-data[i-w*c+k]);}}for(let y=0;y<h;y++)for(let k=0;k<3;k++)sx+=Math.abs(data[y*w*c+k]-data[(y*w+w-1)*c+k]);for(let x=0;x<w;x++)for(let k=0;k<3;k++)sy+=Math.abs(data[x*c+k]-data[((h-1)*w+x)*c+k]);results.push({name,width:w,height:h,opaque,adjacentMeanX:dx/(h*(w-1)*3),adjacentMeanY:dy/(w*(h-1)*3),edgeMeanX:sx/(h*3),edgeMeanY:sy/(w*3)});}console.log(JSON.stringify({scope:'Static PNG checks only; no browser/game A/B acceptance',results},null,2));})();
+const sharp = require('sharp');
+const path = require('path');
+
+const names = [
+  'meadow-summer-candidate.png',
+  'meadow-summer-candidate-v2.png',
+  'water-open-candidate.png',
+  'water-open-candidate-v2.png',
+];
+
+(async () => {
+  const results = [];
+  for (const name of names) {
+    const p = path.join(__dirname, name);
+    const { data, info } = await sharp(p).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    let opaque = true, dx = 0, dy = 0, sx = 0, sy = 0;
+    const { width: w, height: h, channels: c } = info;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * c;
+      if (data[i + 3] !== 255) opaque = false;
+      for (let k = 0; k < 3; k++) {
+        if (x) dx += Math.abs(data[i + k] - data[i - c + k]);
+        if (y) dy += Math.abs(data[i + k] - data[i - w * c + k]);
+      }
+    }
+    for (let y = 0; y < h; y++) for (let k = 0; k < 3; k++) sx += Math.abs(data[y * w * c + k] - data[(y * w + w - 1) * c + k]);
+    for (let x = 0; x < w; x++) for (let k = 0; k < 3; k++) sy += Math.abs(data[x * c + k] - data[((h - 1) * w + x) * c + k]);
+    results.push({
+      name, width: w, height: h, opaque,
+      adjacentMeanX: dx / (h * (w - 1) * 3),
+      adjacentMeanY: dy / (w * (h - 1) * 3),
+      edgeMeanX: sx / (h * 3),
+      edgeMeanY: sy / (w * 3),
+    });
+  }
+  console.log(JSON.stringify({ scope: 'Static PNG checks only; see README for the in-game captures', results }, null, 2));
+})();
