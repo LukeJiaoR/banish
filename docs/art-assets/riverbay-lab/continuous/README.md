@@ -58,12 +58,15 @@ node tests/mountain-render.js
 
 同一套新计时器另测 [07607c6 的旧 terrain](terrain-07607-profile.json)，不是旧版完整 browser controller：桌面 1 倍旧 terrain 同步帧 181.294ms、构建 64.570ms。两次串行观察顺序不同、共用 VM，不能据此宣称稳定提速。首轮修正版测量曾与轻量回归交叠，[原始报告](initial-shared-vm-profile.json) 保留：有 443.568ms 冷帧及 127.049ms 暖 P95 离群，随后停止并行回归单独重测；这些波动不能掩盖为性能已达标。
 
-尤其不能把 native 的 drawImage 同步耗时直接归因为浏览器 GPU 栅格。用户在 `07607c6` 的真实 Chromium 首次切换 **236–283ms**、buildGround **2–9ms**、暖 P95 约 **0.6ms** 的记录仍有效，当前版本尚无浏览器重新测量；新增计时只是让下一次能区分调用边界。
+尤其不能把 native 的 drawImage 同步耗时直接归因为浏览器 GPU 栅格。用户在 `07607c6` 的真实 Chromium 首次切换 **236–283ms**、buildGround **2–9ms**、暖 P95 约 **0.6ms** 的记录仍有效；修复版本轮已补测，见下节。
 
-## 下一次浏览器验收
+## 浏览器复测（修复版，2026-10-18）
 
-旧版真实 Chromium 桌面 1215×751 DPR1 / CDP 390×620 DPR2 的四预设、开关与拖动已验，详见保留的 [用户验收](../browser/browser-acceptance.md)。这不是实体手机。此次没有重跑或冒充浏览器结果。
+真实 Chromium 桌面 1215×751 DPR1 / CDP 390×620 DPR2 已复测四预设、开关、拖动和 0.75/1/2。旧版记录仍保留在 [用户验收](../browser/browser-acceptance.md)，未覆盖；本轮记录与截图在 [browser-fixed](../browser-fixed/browser-acceptance-fixed.md)。
 
-打开原独立 `riverbay-lab.html`，保持同场景/镜头，按 0.75/1/2 比较原版、仅水、水岸、完整候选；查看草纹理、岛边、出口、道路与岸带相接处，连续来回切换及平移/缩放观察残影。
+- 草地：原 meadow 绘制始终执行，26% 低频色域叠加后原纹理仍在；不再出现纯色平地。
+- 岸线：连续多边形裁剪生效，2 倍近景与岛屿边连成曲线，初版的菱形阶梯/三角缺口消失。等宽岸带与旧草高频感仍在，美术未签字。
+- 首帧：完整候选首次切换 32–48ms（0.75/1/2 为 31.9/40.6/32.3ms），水+岸 26.5–28.0ms，仅水 27.9ms；同一台机器上一版为 236–283ms，约 6 倍改善。暖帧 p95 0.7ms。48ms 在 60fps 下仍约 3 帧卡顿，不能宣称零卡顿。
+- 未验：30 秒以上平移/缩放 P95、实体手机热量/触摸/帧率、美术方向确认。继续保持 Draft。
 
-控制台 `window.riverbayLab.metrics().profile` 提供 frames 与 operations。取最新 `setOptions` operation 的 `totalSyncMs`、`sections` 和所引用 frameSequences 的帧分段；同时记录视口、DPR、UA。首次冷切换与稳定暖帧分开报告，不用仅 buildGround 数字代表整帧。浏览器复测、美术确认、30 秒以上交互及真机触摸/热量仍待完成，继续保持 Draft。
+控制台 `window.riverbayLab.metrics().profile` 提供 frames 与 operations；取最新 `setOptions` 的 `totalSyncMs`、`sections`，首次冷切换与稳定暖帧分开报告，不用仅 buildGround 数字代表整帧。
