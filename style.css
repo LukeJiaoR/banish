@@ -500,6 +500,21 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .workforce-details input:focus-visible, .workforce-details button:focus-visible, .workforce-overview summary:focus-visible { outline: 2px solid #ffe4a0; outline-offset: 3px; }
 
 /* Destructive home conversion has an explicit, persistent review step. */
+.house-upgrade-materials { width: 100%; border-collapse: collapse; table-layout: fixed; margin: 10px 0 6px; font-variant-numeric: tabular-nums; }
+.house-upgrade-materials caption { text-align: left; color: #e5c88c; font-weight: 700; margin-bottom: 6px; }
+.house-upgrade-materials th, .house-upgrade-materials td { padding: 6px 4px; text-align: right; border-bottom: 1px solid rgba(216,178,90,.18); overflow-wrap: anywhere; }
+.house-upgrade-materials thead th { color: #cbb990; font-size: .9em; font-weight: 400; }
+.house-upgrade-materials th:first-child { text-align: left; }
+.house-upgrade-materials td:last-child, .house-upgrade-materials thead th:last-child { color: #ffe4a0; background: rgba(216,178,90,.08); font-weight: 700; }
+.house-upgrade-group { border-top: 1px solid rgba(216,178,90,.22); margin-top: 12px; padding-top: 10px; }
+.house-upgrade-details h4 { margin: 0 0 5px; color: #e5c88c; font-size: 1em; }
+.house-upgrade-details .house-upgrade-note { color: #cbb990; font-size: .9em; }
+.house-upgrade-details .house-upgrade-warning { margin: 12px 0; }
+.house-upgrade-warning h4:not(:first-child) { margin-top: 10px; }
+.house-upgrade-secondary { margin: 10px 0; }
+.house-upgrade-secondary summary { cursor: pointer; color: #cbb990; padding: 5px 0; }
+.house-upgrade-secondary summary:focus-visible { outline: 2px solid #ffe4a0; outline-offset: 3px; }
+
 .house-upgrade-details p { margin: 6px 0; overflow-wrap: anywhere; }
 .house-upgrade-details [data-house-upgrade] { font-variant-numeric: tabular-nums; }
 .house-upgrade-warning, .house-upgrade-confirm { padding: 8px; border-left: 2px solid #b97d57; background: rgba(120, 62, 32, .2); color: #ffd5b1; }

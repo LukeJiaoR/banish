@@ -160,7 +160,7 @@ test('woodcutter site uses material phase rather than claiming immediate buildin
 });
 test('upgrade and rebuild previews describe later real pickup, not immediate charge',()=>{
  const f=setup(),G=f.G;const house=G.addBuilding('house',22,8,{instant:true,free:true}).b;
- const upgrade=G.ui.houseUpgradeInfoData(house);assert.match(upgrade.data.due,/实运.*到仓领料才扣/);assert(!G.ui.houseUpgradeInfoMarkup(upgrade).includes('立即补付'));
+ const upgrade=G.ui.houseUpgradeInfoData(house);assert.match(G.ui.houseUpgradeInfoMarkup(upgrade),/补料到仓领取才扣，不预留库存/);assert(!G.ui.houseUpgradeInfoMarkup(upgrade).includes('立即补付'));
  house.type='burntruins';house.ruinFrom='house';house.ruinIncident=1;G.game.fireDisasters.serial=1;
  const rebuild=G.ui.fireRebuildInfoData(house);assert.match(rebuild.confirmation,/不预扣或预留/);assert.match(rebuild.confirm,/创建重建工地/);
 });
