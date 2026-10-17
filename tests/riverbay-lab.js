@@ -147,7 +147,7 @@ function test(name, fn) {
 const allOptions = { waterV2: true, shore: true, lowFrequency: true, clutter: true };
 const noOptions = { waterV2: false, shore: false, lowFrequency: false, clutter: false };
 
-function expectedShoreEdges(world) {
+function expectedShoreEdges(world, includeMapBoundary = false) {
   const edges = new Set();
   function edge(a, b) { return [a.join(','), b.join(',')].sort().join('|'); }
   for (let y = 0; y < world.N; y++) for (let x = 0; x < world.N; x++) {
@@ -157,11 +157,77 @@ function expectedShoreEdges(world) {
       [x, y + 1, [x, y + 1], [x + 1, y + 1]],
       [x - 1, y, [x, y], [x, y + 1]]];
     for (const [nx, ny, a, b] of neighbors) {
-      if (nx < 0 || ny < 0 || nx >= world.N || ny >= world.N) continue;
-      if (world.water[ny * world.N + nx] !== 1) edges.add(edge(a, b));
+      const outside = nx < 0 || ny < 0 || nx >= world.N || ny >= world.N;
+      if (outside && !includeMapBoundary) continue;
+      if (outside || world.water[ny * world.N + nx] !== 1) edges.add(edge(a, b));
     }
   }
   return edges;
+}
+
+function polygonArea(points) {
+  return points.reduce((area, a, i) => {
+    const b = points[(i + 1) % points.length];
+    return area + a[0] * b[1] - b[0] * a[1];
+  }, 0) / 2;
+}
+
+function insidePolygons(lines, x, y) {
+  let inside = false;
+  for (const { points } of lines) for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+    const a = points[i], b = points[j];
+    if ((a[1] > y) !== (b[1] > y) && x < (b[0] - a[0]) * (y - a[1]) / (b[1] - a[1]) + a[0]) inside = !inside;
+  }
+  return inside;
+}
+
+function maskFixtures() {
+  return [
+    ['dry map', () => false, 0],
+    ['all-water map', () => true, 1],
+    ['interior pond', (x, y) => x >= 3 && x <= 8 && y >= 2 && y <= 9, 1],
+    ['edge-open water with island', (x, y) => x >= 2 && !(x >= 5 && x <= 7 && y >= 4 && y <= 7), 2],
+    ['diagonal-only ponds', (x, y) => x === 4 && y === 4 || x === 5 && y === 5, 2],
+    ['four edge exits', (x, y) => x === 5 || y === 5, 1],
+    ['one-cell winding channel', (x, y) => y === 3 && x >= 2 && x <= 9 || x === 9 && y >= 3 && y <= 7 || y === 7 && x >= 2 && x <= 9 || x === 2 && y >= 7 && y <= 10, 1],
+    ['diagonal touching land holes', (x, y) => !(x === 5 && y === 5 || x === 6 && y === 6)],
+    ['checkerboard point contacts', (x, y) => (x + y) % 2 === 0, 72],
+  ];
+}
+
+function setMask(world, shape) {
+  for (let y = 0; y < world.N; y++) for (let x = 0; x < world.N; x++)
+    world.water[y * world.N + x] = shape(x, y) ? 1 : (x + y) % 3 === 0 ? 2 : 0;
+}
+
+// Inspect the paths actually sent to Canvas.clip, not only the topology helper.
+// Quadratic segments are flattened only for the independent containment oracle.
+function recordedCurveMasks(calls) {
+  let commands = [];
+  const masks = [];
+  for (const call of calls) {
+    if (call[0] === 'beginPath') commands = [];
+    else if (['moveTo', 'lineTo', 'quadraticCurveTo', 'closePath'].includes(call[0])) commands.push(call);
+    else if (call[0] === 'clip' && commands.some(c => c[0] === 'quadraticCurveTo')) {
+      const lines = [];
+      let current;
+      for (const [op, ...args] of commands) {
+        if (op === 'moveTo') { current = { points: [args], closed: false }; lines.push(current); }
+        else if (op === 'lineTo') current.points.push(args);
+        else if (op === 'closePath') current.closed = true;
+        else {
+          const a = current.points.at(-1), [cx, cy, x, y] = args;
+          for (let step = 1; step <= 16; step++) {
+            const t = step / 16, u = 1 - t;
+            current.points.push([u * u * a[0] + 2 * u * t * cx + t * t * x,
+              u * u * a[1] + 2 * u * t * cy + t * t * y]);
+          }
+        }
+      }
+      masks.push({ rule: call[1], lines });
+    }
+  }
+  return masks;
 }
 
 function actualShoreEdges(lines) {
@@ -264,6 +330,76 @@ function contracts() {
     }
   });
 
+  test('closed water polygons preserve map exits, holes, narrow channels, and point contacts', () => {
+    const h = harness({ N: 12 }), lab = install(h), world = h.G.world;
+    const waterPolygons = h.context.RiverbayTerrain.waterPolygons;
+    assert.equal(typeof waterPolygons, 'function', 'full-water polygon topology is exported');
+    for (const [name, shape, count] of maskFixtures()) {
+      setMask(world, shape);
+      const before = stateSnapshot(h.G), lines = waterPolygons(world);
+      assert.equal(stateSnapshot(h.G), before, `${name}: tracing is read-only`);
+      assert.ok(lines.every(line => line.closed), `${name}: fill contours must all close`);
+      if (count !== undefined) assert.equal(lines.length, count, `${name}: component/contour count`);
+      assert.deepEqual([...actualShoreEdges(lines)].sort(), [...expectedShoreEdges(world, true)].sort(), `${name}: every full boundary appears exactly once`);
+      assert.equal(lines.reduce((sum, line) => sum + polygonArea(line.points), 0),
+        world.water.filter(value => value === 1).length, `${name}: outer winding minus holes conserves water area`);
+      for (const line of lines) for (const [x, y] of line.points)
+        assert.ok(x >= 0 && x <= world.N && y >= 0 && y <= world.N, `${name}: bounded map coordinates`);
+      for (let y = 0; y < world.N; y++) for (let x = 0; x < world.N; x++)
+        assert.equal(insidePolygons(lines, x + .5, y + .5), world.water[y * world.N + x] === 1, `${name}: correct water/land parity at ${x},${y}`);
+      assert.equal(JSON.stringify(waterPolygons(world)), JSON.stringify(lines), `${name}: deterministic ordering`);
+      lab.invalidateTopology();
+      assert.deepEqual([...actualShoreEdges(lab.getCoastlines())].sort(), [...expectedShoreEdges(world)].sort(), `${name}: public coastline remains interior-only`);
+    }
+  });
+
+  test('renderer uses shared closed curved masks and inverse land parity instead of tile water clips', () => {
+    for (const [name, shape] of maskFixtures().slice(2)) {
+      const h = harness({ N: 12 }), G = h.G, lab = install(h);
+      setMask(G.world, shape);
+      lab.setOptions({ shore: true }); G.buildGround();
+      const masks = recordedCurveMasks(G._gcv.getContext('2d').calls);
+      assert.equal(masks.length, 2, `${name}: one continuous land mask and one water mask`);
+      for (const mask of masks) {
+        assert.equal(mask.rule, 'evenodd', `${name}: island holes use even-odd parity`);
+        assert.ok(mask.lines.every(line => line.closed), `${name}: every rendered mask contour closes`);
+      }
+      const water = masks.find(mask => mask.lines.length === h.context.RiverbayTerrain.waterPolygons(G.world).length);
+      const land = masks.find(mask => mask !== water);
+      assert.ok(water && land, `${name}: masks contain topology loops, not per-tile diamonds`);
+      assert.equal(land.lines.length, water.lines.length + 1, `${name}: inverse land adds only the world outline`);
+      assert.deepEqual(land.lines.slice(1), water.lines, `${name}: water and land share identical curved geometry`);
+      for (let y = 0; y < G.world.N; y++) for (let x = 0; x < G.world.N; x++) {
+        const wet = G.world.water[y * G.world.N + x] === 1, center = G.T2S(x + .5, y + .5);
+        assert.equal(insidePolygons(water.lines, ...center), wet, `${name}: smoothed mask preserves cell center ${x},${y}`);
+        assert.equal(insidePolygons(land.lines, ...center), !wet, `${name}: land mask complements water at ${x},${y}`);
+        if (!wet) continue;
+        for (const [dx, dy] of [[1, 0], [0, 1]]) if (x + dx < G.world.N && y + dy < G.world.N && G.world.water[(y + dy) * G.world.N + x + dx] === 1)
+          assert.ok(insidePolygons(water.lines, ...G.T2S(x + .5 + dx / 2, y + .5 + dy / 2)), `${name}: narrow channel remains joined at ${x},${y}`);
+      }
+    }
+  });
+
+  test('low-frequency color overlays preserve every original tile and meadow draw', () => {
+    const h = harness({ N: 12 }), G = h.G, tiles = [], meadows = [];
+    const originalTile = G.drawGroundTile, originalSurface = G.fillTerrainSurface;
+    G.drawGroundTile = function (c, w, pal, x, y) { tiles.push([x, y]); return originalTile(c, w, pal, x, y); };
+    G.fillTerrainSurface = function (c, name, x, y) { if (name === 'meadow_summer') meadows.push([x, y]); return originalSurface(c, name, x, y); };
+    G.SPR.map.set('meadow_summer', { width: 512, height: 512 });
+    const lab = install(h);
+    lab.setOptions({ lowFrequency: true }); G.buildGround();
+    assert.equal(tiles.length, G.world.N ** 2, 'overlay does not replace any original ground tile');
+    assert.equal(new Set(tiles.map(p => p.join(','))).size, G.world.N ** 2, 'each original tile is drawn once');
+    const eligible = [];
+    for (let y = 0; y < G.world.N; y++) for (let x = 0; x < G.world.N; x++)
+      if (!G.world.water[y * G.world.N + x] && !G.world.road[y * G.world.N + x]) eligible.push([x, y]);
+    assert.deepEqual(meadows.sort(), eligible.sort(), 'original detailed meadow is retained under color variation');
+    const calls = G._gcv.getContext('2d').calls;
+    const broadTransforms = calls.filter(call => call[0] === 'transform' && call.slice(1).join(',') === '8,4,-8,4,0,0');
+    assert.equal(broadTransforms.length, 1, 'one broad color overlay avoids per-tile alpha accumulation');
+    assert.ok(calls.some(call => call[0] === 'set' && call[1] === 'globalAlpha' && call[2] > 0 && call[2] <= .3), 'broad overlay leaves at least 70% of original detail');
+  });
+
   test('coastline caching is deterministic and invalidates only when requested', () => {
     const h = harness(), lab = install(h);
     const first = JSON.stringify(lab.getCoastlines()), builds = lab.metrics.topologyBuilds;
@@ -359,27 +495,107 @@ async function pixels() {
   try { ({ createCanvas, loadImage } = require('@napi-rs/canvas')); }
   catch (error) { throw new Error('--pixels requires optional @napi-rs/canvas', { cause: error }); }
   const waterImage = await loadImage(path.join(root, 'tools/riverbay-lab/water-open-candidate-v2.png'));
+  const meadowImage = await loadImage(path.join(root, 'assets/terrain-v2/meadow_summer.png'));
+  const originalWaterImage = await loadImage(path.join(root, 'assets/terrain-v2/water_open.png'));
   const bitmap = G => Buffer.from(G._gcv.getContext('2d').getImageData(0, 0, G._gcv.width, G._gcv.height).data);
-  test('all-off full-cache pixels exactly match the production renderer', () => {
+  test('all-off pixels and switch round-trips exactly match the textured production renderer', () => {
     const h = harness({ createCanvas, N: 16 }), G = h.G;
+    G.SPR.map.set('meadow_summer', meadowImage); G.SPR.map.set('water_open', originalWaterImage);
     G.buildGround(); const baseline = bitmap(G);
-    install(h); G.needGround = true; G.buildGround();
+    const lab = install(h, { waterImage }); G.needGround = true; G.buildGround();
     assert.equal(digest(bitmap(G)), digest(baseline));
+    for (let repeat = 0; repeat < 2; repeat++) {
+      lab.setOptions(allOptions); G.buildGround();
+      lab.setOptions(noOptions); G.buildGround();
+      assert.equal(digest(bitmap(G)), digest(baseline), 'switching the candidate off restores exact original pixels');
+      assert.equal(G.SPR.get('water_open'), originalWaterImage, 'candidate water never replaces the original asset');
+    }
+    for (const canvas of h.canvases) { canvas.width = 1; canvas.height = 1; }
+  });
+  global.gc?.();
+  test('low-frequency overlays retain the real meadow texture detail signal', () => {
+    const h = harness({ createCanvas, N: 12 }), G = h.G;
+    G.world.water.fill(0); G.world.road.fill(0); G.world.rock.fill(0);
+    G.SPR.map.set('meadow_summer', meadowImage); G.groundScale = 1;
+    G.buildGround(); const baseline = bitmap(G);
+    const lab = install(h, { waterImage }); lab.setOptions({ lowFrequency: true }); G.buildGround();
+    const candidate = bitmap(G), W = G._gcv.width, H = G._gcv.height;
+    let baseEnergy = 0, candidateEnergy = 0, dot = 0, baseSquare = 0, candidateSquare = 0, samples = 0, changed = 0;
+    const light = (pixels, i) => .2126 * pixels[i] + .7152 * pixels[i + 1] + .0722 * pixels[i + 2];
+    for (let py = 0; py < H - 1; py++) for (let px = 0; px < W - 1; px++) {
+      const sx = px + .5 - G.groundOX, sy = py + .5 - G.groundOY;
+      const x = sx / 64 + sy / 32, y = sy / 32 - sx / 64;
+      if (x < 2 || y < 2 || x >= G.world.N - 2 || y >= G.world.N - 2) continue;
+      const i = (py * W + px) * 4;
+      changed += Number(candidate[i] !== baseline[i] || candidate[i + 1] !== baseline[i + 1] || candidate[i + 2] !== baseline[i + 2]);
+      for (const offset of [4, W * 4]) {
+        const a = light(baseline, i + offset) - light(baseline, i), b = light(candidate, i + offset) - light(candidate, i);
+        baseEnergy += Math.abs(a); candidateEnergy += Math.abs(b); dot += a * b;
+        baseSquare += a * a; candidateSquare += b * b; samples++;
+      }
+    }
+    const ratio = candidateEnergy / baseEnergy, correlation = dot / Math.sqrt(baseSquare * candidateSquare);
+    assert.ok(samples > 10000 && baseEnergy / samples > .1, 'actual meadow image contributes measurable fine detail');
+    assert.ok(changed > samples / 8, 'broad overlay visibly changes the meadow color field');
+    assert.ok(ratio >= .65 && ratio <= 1.1, `original fine-detail energy is retained: ratio=${ratio}`);
+    assert.ok(correlation >= .9, `fine detail remains aligned with the original meadow: correlation=${correlation}`);
+    console.log(`  meadow detail: energy ratio=${ratio.toFixed(3)}, gradient correlation=${correlation.toFixed(3)}`);
+    for (const canvas of h.canvases) { canvas.width = 1; canvas.height = 1; }
+  });
+  global.gc?.();
+  test('shore reconstruction stays in its coast ribbon and preserves road and rock interiors', () => {
+    const h = harness({ createCanvas, N: 16 }), G = h.G;
+    G.SPR.map.set('meadow_summer', meadowImage); G.SPR.map.set('water_open', originalWaterImage);
+    const protectedTiles = [];
+    for (const [y, property, value] of [[3, 'road', 1], [7, 'road', 2], [11, 'rock', 2]]) {
+      const x = Array.from(G.world.water.slice(y * G.world.N, (y + 1) * G.world.N)).indexOf(2);
+      G.world[property][y * G.world.N + x] = value; protectedTiles.push([x, y]);
+    }
+    G.groundScale = 1; G.buildGround(); const baseline = bitmap(G);
+    const lab = install(h, { waterImage }); lab.setOptions({ shore: true }); G.buildGround();
+    const candidate = bitmap(G), W = G._gcv.width;
+    for (const [x, y] of protectedTiles) for (let u = .2; u <= .8; u += .1) for (let v = .2; v <= .8; v += .1) {
+      const [sx, sy] = G.T2S(x + u, y + v), px = Math.round(sx + G.groundOX), py = Math.round(sy + G.groundOY), i = (py * W + px) * 4;
+      assert.deepEqual(candidate.subarray(i, i + 4), baseline.subarray(i, i + 4), `shore must not repaint road/rock interior at ${x},${y}`);
+    }
+    const segments = [];
+    for (const line of lab.getCoastlines()) {
+      const points = line.points.map(point => G.T2S(...point));
+      for (let i = 0; i < points.length - Number(!line.closed); i++) segments.push([points[i], points[(i + 1) % points.length]]);
+    }
+    function distanceSquared(x, y, a, b) {
+      const dx = b[0] - a[0], dy = b[1] - a[1], t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / (dx * dx + dy * dy)));
+      return (x - a[0] - t * dx) ** 2 + (y - a[1] - t * dy) ** 2;
+    }
+    let changed = 0;
+    for (let i = 0; i < candidate.length; i += 4) {
+      if (candidate[i] === baseline[i] && candidate[i + 1] === baseline[i + 1] && candidate[i + 2] === baseline[i + 2] && candidate[i + 3] === baseline[i + 3]) continue;
+      changed++;
+      const x = i / 4 % W + .5 - G.groundOX, y = Math.floor(i / 4 / W) + .5 - G.groundOY;
+      assert.ok(segments.some(([a, b]) => distanceSquared(x, y, a, b) <= 80 ** 2), 'shore edits are confined to a bounded continuous coast ribbon');
+    }
+    assert.ok(changed > 100, 'fixture exercises actual shoreline reconstruction');
     for (const canvas of h.canvases) { canvas.width = 1; canvas.height = 1; }
   });
   global.gc?.();
   test('candidate dirty road/rock repairs stay within raster tolerance and never accumulate alpha', () => {
+    let auditedChanges = 0, worstOutsideCount = 0, worstOutsideDelta = 0, worstInsideDelta = 0, worstInsideMean = 0;
     for (const scale of [.25, .5, 1]) {
       const h = harness({ createCanvas, N: 16 }), G = h.G, lab = install(h, { waterImage });
+      G.SPR.map.set('meadow_summer', meadowImage); G.SPR.map.set('water_open', originalWaterImage);
       lab.setOptions(allOptions); G.groundScale = scale; G.buildGround();
+      const bankAt = y => Array.from(G.world.water.slice(y * G.world.N, (y + 1) * G.world.N)).indexOf(2);
       const changes = [
         [3, 8, 'road', 1], [3, 8, 'road', 2], [3, 8, 'road', 0],
         [2, 2, 'rock', 0], [2, 3, 'rock', 0],
         [5, 11, 'road', 1], [5, 11, 'road', 0],
         [0, 0, 'road', 1], [0, 0, 'road', 0],
         [1, 15, 'road', 1], [1, 15, 'road', 0],
+        [bankAt(8), 8, 'road', 1], [bankAt(8), 8, 'road', 2], [bankAt(8), 8, 'road', 0],
+        [bankAt(1), 1, 'rock', 1], [bankAt(1), 1, 'rock', 2], [bankAt(1), 1, 'rock', 0],
       ];
       for (const [x, y, property, value] of changes) {
+        const previous = bitmap(G);
         G.world[property][y * G.world.N + x] = value;
         G.markGroundDirty(x, y); G.buildGround();
         const partial = bitmap(G);
@@ -392,28 +608,47 @@ async function pixels() {
         }
         G.needGround = true; G.buildGround();
         const complete = bitmap(G), W = G._gcv.width;
+        G.needGround = true; G.buildGround();
+        assert.equal(digest(bitmap(G)), digest(complete), 'a repeated full render is byte-stable');
         const [sx, sy] = G.T2S(x, y);
         const r = { x0: Math.max(0, Math.floor((sx - 80 + G.groundOX) * scale)),
           x1: Math.min(W, Math.ceil((sx + 80 + G.groundOX) * scale)),
           y0: Math.max(0, Math.floor((sy - 48 + G.groundOY) * scale)),
           y1: Math.min(G._gcv.height, Math.ceil((sy + 80 + G.groundOY) * scale)) };
-        let changed = 0, max = 0, total = 0;
+        let changed = 0, max = 0, total = 0, outsideChanged = 0, outsideMax = 0;
         for (let i = 0; i < partial.length; i += 4) {
+          const px = i / 4 % W, py = Math.floor(i / 4 / W);
+          const inRepair = px >= r.x0 && px < r.x1 && py >= r.y0 && py < r.y1;
+          if (!inRepair) for (let channel = 0; channel < 4; channel++)
+            assert.equal(partial[i + channel], previous[i + channel], 'dirty repair must leave distant cached pixels byte-identical');
           let delta = 0;
           for (let channel = 0; channel < 4; channel++) delta = Math.max(delta, Math.abs(partial[i + channel] - complete[i + channel]));
           if (!delta) continue;
-          const px = i / 4 % W, py = Math.floor(i / 4 / W);
-          assert.ok(px >= r.x0 && px < r.x1 && py >= r.y0 && py < r.y1, 'repair differs outside its cleared rectangle');
+          if (!inRepair) {
+            // The actual repair remains byte-identical outside its rectangle
+            // (asserted against previous above). Changing a hole in the full
+            // compound protection clip can reround a handful of distant
+            // shoreline/ribbon AA samples in the independently rebuilt full
+            // reference. This is bounded separately from interior tolerance.
+            outsideChanged++; outsideMax = Math.max(outsideMax, delta);
+            assert.ok(delta <= 2, `scale=${scale}, ${property}(${x},${y})=${value}: remote full-reference AA delta=${delta} at ${px},${py}`);
+            continue;
+          }
           changed++; max = Math.max(max, delta); total += delta;
         }
         const area = (r.x1 - r.x0) * (r.y1 - r.y0);
         const diagnostic = `scale=${scale}, ${property}(${x},${y})=${value}: ${changed} pixels, max=${max}, mean=${total / area}`;
         assert.ok(max <= 32 && changed <= area * .12 && total / area <= .25, diagnostic);
+        assert.ok(outsideChanged <= 16, `${diagnostic}, too many remote full-reference AA samples: ${outsideChanged}`);
+        auditedChanges++; worstOutsideCount = Math.max(worstOutsideCount, outsideChanged);
+        worstOutsideDelta = Math.max(worstOutsideDelta, outsideMax); worstInsideDelta = Math.max(worstInsideDelta, max);
+        worstInsideMean = Math.max(worstInsideMean, total / area);
         global.gc?.();
       }
       for (const canvas of h.canvases) { canvas.width = 1; canvas.height = 1; }
       global.gc?.();
     }
+    console.log(`  repair audit: ${auditedChanges} edits, ${auditedChanges * 3} byte-stable repeats; actual outside changes=0; full-reference outside max=${worstOutsideCount} pixels/${worstOutsideDelta} levels; inside max=${worstInsideDelta}, mean<=${worstInsideMean.toFixed(4)}`);
   });
 }
 

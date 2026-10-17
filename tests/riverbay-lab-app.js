@@ -13,22 +13,34 @@ const settleMicrotasks = () => new Promise(resolve => setImmediate(resolve));
 function harness({ ready = true, failed = [], decodeError = null, sceneFailures = [] } = {}) {
   let now = 1000, nextHandle = 1, options = { ...defaults };
   const rafs = new Map(), timers = new Map(), elements = new Map();
-  const calls = { createScene: 0, install: 0, render: 0, pose: [], cancelled: [] };
+  const calls = { createScene: 0, install: 0, render: 0, pose: [], cancelled: [], viewportReads: 0, queries: 0, controlWrites: 0, init: 0, saves: 0 };
+  const drawing = { drawImage() {} };
   const element = id => {
     if (!elements.has(id)) elements.set(id, {
-      id, clientWidth: 800, clientHeight: 600,
-      getContext() { return {}; },
-      addEventListener() {}, setAttribute() {},
+      id,
+      get clientWidth() { calls.viewportReads++; return 800; },
+      get clientHeight() { calls.viewportReads++; return 600; },
+      getContext() { return drawing; },
+      checked: false, attributes: {}, listeners: {},
+      addEventListener(name, fn) { this.listeners[name] = fn; },
+      getAttribute(name) { return this.attributes[name] ?? null; },
+      setAttribute(name, value) { calls.controlWrites++; this.attributes[name] = value; },
     });
     return elements.get(id);
   };
+  const presetButtons = ['original', 'water', 'shore', 'study'].map(name => {
+    const button = element('preset-' + name);
+    button.dataset = { preset: name };
+    button.attributes['aria-pressed'] = String(name === 'original');
+    return button;
+  });
   const scene = { failures: sceneFailures, kind: 'mock authored visual fixture' };
   const context = {
     console,
     performance: { now: () => now },
     devicePixelRatio: 3,
     Image: class { async decode() { if (decodeError) throw new Error(decodeError); } },
-    document: { getElementById: element, querySelectorAll: () => [] },
+    document: { getElementById: element, querySelectorAll: () => { calls.queries++; return presetButtons; } },
     requestAnimationFrame(fn) { const id = nextHandle++; rafs.set(id, fn); return id; },
     cancelAnimationFrame(id) { calls.cancelled.push(id); rafs.delete(id); },
     setTimeout(fn, delay) { const id = nextHandle++; timers.set(id, { fn, delay }); return id; },
@@ -39,7 +51,10 @@ function harness({ ready = true, failed = [], decodeError = null, sceneFailures 
       SPR: { ready, failed: [...failed] },
       cam: { z: 1 }, _gcv: { width: 1448, height: 751 },
       T2S: (x, y) => [(x - y) * 32, (x + y) * 16],
-      frame() { calls.render++; },
+      init() { calls.init++; },
+      autosave() { calls.saves++; },
+      buildGround() {},
+      frame() { calls.render++; this.ctx.drawImage(this._gcv, 0, 0); },
     },
     RiverbayScene: {
       createScene() { calls.createScene++; return scene; },
@@ -109,6 +124,9 @@ async function test(name, run) {
     assert.equal(h.calls.install, 1);
     assert.equal(h.calls.render, 1);
     assert.equal(h.calls.pose.length, 0);
+    h.context.G.autosave();
+    assert.equal(h.calls.init, 0);
+    assert.equal(h.calls.saves, 0);
     assert.equal(h.rafs.size, 0);
     assert.equal(h.context.G.dpr, 2, 'controller caps the backing-store DPR');
     assert.equal(h.element('lab').width, 1600);
@@ -189,6 +207,51 @@ async function test(name, run) {
     await assert.rejects(h.startup, /blocked fixture/);
     assertNotReady(h);
     assert.equal(h.calls.createScene, 1);
+  });
+
+  await test('controller reports scoped timings and avoids redundant layout and control queries', async () => {
+    const h = harness();
+    await h.startup;
+    assert.equal(h.calls.viewportReads, 2, 'resize reads each viewport dimension once');
+    assert.equal(h.calls.queries, 1, 'preset elements are looked up once');
+    const lab = h.context.riverbayLab;
+    lab.setOptions({ waterV2: true });
+    lab.center();
+    lab.render();
+    assert.equal(h.calls.viewportReads, 2, 'controller reuses dimensions until resize');
+    assert.equal(h.calls.queries, 1);
+    assert.equal(h.element('waterV2').checked, true);
+    lab.resize();
+    assert.equal(h.calls.viewportReads, 4);
+    const profile = lab.metrics().profile;
+    assert.equal(profile.engine, 'browser Canvas 2D');
+    assert.match(profile.timingScope, /No GPU\/raster completion/);
+    assert.equal(profile.frames.length, 4);
+    assert.equal(profile.operations.length, 4, 'nested render is part of setOptions or resize');
+    const changed = profile.operations.find(value => value.label === 'setOptions');
+    assert.equal(changed.completed, true);
+    assert.equal(changed.timingValid, true);
+    assert.deepEqual(Object.keys(changed.sections).sort(), ['controlsUpdateSyncMs', 'optionsMutationSyncMs', 'statsUpdateSyncMs']);
+    assert.equal(changed.frameSequences.length, 1);
+    assert.equal(profile.frames[1].groundDrawCalls, 1);
+    assert.equal(profile.frames[1].firstGroundDrawImageCallMs, 0);
+  });
+
+  await test('repeated presets keep selected controls correct without redundant attribute writes', async () => {
+    const h = harness();
+    await h.startup;
+    const waterButton = h.element('preset-water');
+    waterButton.listeners.click();
+    assert.equal(waterButton.getAttribute('aria-pressed'), 'true');
+    assert.equal(h.element('preset-original').getAttribute('aria-pressed'), 'false');
+    assert.equal(h.element('waterV2').checked, true);
+    const writes = h.calls.controlWrites;
+    waterButton.listeners.click();
+    assert.equal(h.calls.controlWrites, writes);
+    h.element('clutter').listeners.change({ target: { checked: true } });
+    assert.equal(h.element('clutter').checked, true);
+    for (const name of ['original', 'water', 'shore', 'study']) assert.equal(h.element('preset-' + name).getAttribute('aria-pressed'), 'false');
+    assert.equal(h.rafs.size, 0);
   });
 
   console.log(`River-bay app: ${passed} VM controller contracts passed (not browser acceptance).`);
