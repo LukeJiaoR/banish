@@ -133,7 +133,7 @@ async function test(name, run) {
     }
     assert.match(html, /id="shoreVariation" type="checkbox">岸带宽色变化（需岸线）/);
     assert.match(html, /2857b94 结构修正版已通过浏览器复测/);
-    assert.match(html, /新岸带宽色变化待复测，美术未签字/);
+    assert.match(html, /新岸带宽色变化已完成同相机浏览器复测，美术未通过（窄处滩消失），真机未验收/);
   });
 
   await test('startup keeps candidate features and motion off', async () => {
