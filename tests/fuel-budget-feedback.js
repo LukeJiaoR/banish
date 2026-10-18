@@ -309,10 +309,10 @@ test('focused selection changes, world replacement, deletion, close/reopen and s
   f.button(50).focus(); delete G.world.bmap[a.id]; G.ui.renderInfo();
   assert.equal(G.sel, null); assert.equal(f.info.classList.contains('hidden'), true);
   const site = f.building('woodcutter', { state: 'site', progress: 0, totalWork: 60, workLeft: 60 }); f.select(site);
-  assert.match(f.node('refund').textContent, /未开工.*全部/);
+  assert.match(f.node('refund').textContent, /当前可立即返还/);
   f.button(50).focus(); site.constructionStarted = true; G.ui.renderInfo();
-  assert.match(f.node('refund').textContent, /已开工.*一半/);
-  site.progress = 0.75; G.ui.renderInfo(); assert.match(f.node('status').textContent, /75%/);
+  assert.match(f.node('refund').textContent, /当前可立即返还/);
+  site.progress = 0.75; site.construction = { required: { wood: 8, stone: 4 }, onsite: { wood: 8, stone: 4 }, consumed: true }; G.ui.renderInfo(); assert.match(f.node('status').textContent, /75%/);
   site.state = 'ok'; G.ui.renderInfo(); assert.doesNotMatch(f.node('status').textContent, /建造中/);
   assert.match(f.info.innerHTML, /id="info-demolish" class="danger">拆除/);
 });

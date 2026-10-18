@@ -51,7 +51,7 @@ test('wood goal leaves planting on and disables automatic felling',()=>{
 test('mine goals independently switch output without blocking construction',()=>{
  const {G,building,citizen}=fixture(),b=building('mine'),c=citizen(b);G.setProductionGoal('stone',0);G.setProductionGoal('iron',50);G.game.res.iron=0;G.updateProductionGoals();
  for(let i=0;i<8;i++)assert.equal(G.makeTask(b,c).yield.type,'iron');G.setProductionGoal('stone',100);G.setProductionGoal('iron',0);for(let i=0;i<8;i++)assert.equal(G.makeTask(b,c).yield.type,'stone');
- G.setProductionGoal('stone',0);assert.equal(G.makeTask(b,c),null);assert.equal(G.jobCanProduce(b),false);b.state='site';b.workLeft=50;assert.equal(G.productionLimited(b),false);G.requestTask(c);assert.equal(c.task.kind,'build');
+ G.setProductionGoal('stone',0);assert.equal(G.makeTask(b,c),null);assert.equal(G.jobCanProduce(b),false);b.state='site';b.workLeft=50;b.construction={required:{},onsite:{},consumed:true};assert.equal(G.productionLimited(b),false);G.requestTask(c);assert.equal(c.task.kind,'build');
 });
 test('0 food stops unstarted field but not an active or paused first sow task',()=>{
  for(const paused of [false,true]){const {G,building,citizen}=fixture(),b=building('farm'),c=citizen(b);const task=G.makeTask(b,c);assert.equal(task.kind,'sow');c[paused?'pausedTask':'task']=task;
@@ -120,7 +120,7 @@ test('all six lower targets conserve stock and carried quantities before hard-ca
  for(const type of ['wood','stone','iron','tools','food','firewood']){const {G,citizen}=fixture(),c=citizen();G.game.res[type]=G.storageCap()-37;c.carry={type,qty:40};const before=JSON.stringify([G.game.res,c.carry]);G.setProductionGoal(type,0);assert.equal(JSON.stringify([G.game.res,c.carry]),before,type);assert.equal(G.deposit(type,40),type==='tools'?40:37,type+' retains existing storage semantics');}
 });
 test('zero wood and fuel goals do not stop actual construction-site tree clearing',()=>{
- const {G,building,citizen}=fixture();G.addTree(G.world,3,3,-200);const b=building('woodcutter',{state:'site',workLeft:50,fuelLimit:100}),c=citizen(b);G.setProductionGoal('wood',0);G.setProductionGoal('firewood',0);G.requestTask(c);assert.equal(c.task.kind,'clearSite');const stock=G.game.res.wood;G.completeTask(c);assert.equal(G.game.res.wood,stock+2);assert.equal(c.task.kind,'build');
+ const {G,building,citizen}=fixture();G.addTree(G.world,3,3,-200);const b=building('woodcutter',{state:'site',workLeft:50,fuelLimit:100,construction:{required:{},onsite:{},consumed:true}}),c=citizen(b);G.setProductionGoal('wood',0);G.setProductionGoal('firewood',0);G.requestTask(c);assert.equal(c.task.kind,'clearSite');const stock=G.game.res.wood;G.completeTask(c);assert.equal(G.game.res.wood,stock+2);assert.equal(c.task.kind,'build');
 });
 test('new seasonal reset expires a paused old sow without deleting already-carried food',()=>{
  const {G,building,citizen}=fixture(),b=building('farm'),c=citizen(b);c.pausedTask=G.makeTask(b,c);G.setProductionGoal('food',0);c.carry={type:'food',qty:14};G.resetFarm(b);assert.equal(G.resumeTask(c),false,'old sow cannot bypass the next season goal');assert.equal(c.pausedTask,null);assert.equal(c.carry.qty,14);assert.equal(G.makeTask(b,c),null);

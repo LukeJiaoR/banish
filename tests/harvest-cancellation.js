@@ -172,6 +172,8 @@ test('cancelling an active night worker waits for the normal sleep transition', 
 });
 test('cancelled labor is available at the next normal scheduler pass without forced reassignment', () => {
   const c = adult(), dock = building('dock', 4, 6); const p = target('trees', 5, 4); c.task = claim('trees', p); c.state = 'work';
+  // A dock needs real fishable water; the synthetic flat map otherwise cannot staff it.
+  for (let y = 5; y < 10; y++) for (let x = 7; x < 11; x++) G.world.water[y * G.world.N + x] = 1;
   G.scheduleJobs(); assert.equal(c.job, null); assert.equal(dock.workers.length, 0);
   const timer = G.game.schedT; G.cancelResourceMarks('trees'); assert.equal(c.job, null); assert.equal(G.game.schedT, timer); assert.equal(dock.workers.length, 0);
   G.scheduleJobs(); assert.equal(c.job, dock.id); assert.deepEqual(Array.from(dock.workers), [c.id]); jobsValid();

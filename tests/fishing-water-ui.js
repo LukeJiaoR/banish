@@ -287,7 +287,7 @@ test('paused placement explains raw/free/blocked/shared/effective water and curr
     const f = fishing(rule, 'dock', false), { G } = f; G.game.paused = true;
     const p = G.ui.refreshPlacement('dock', 20, 16);
     assert.equal(p.water, 36); assert.equal(p.fishing.effective, 18);
-    assert.match(f.placement.textContent, /材料（现有\/需要）.*\n全镇渔业/);
+    assert.match(f.placement.textContent, /材料（现有\/需要）[\s\S]*\n全镇渔业/);
     assert.match(f.placement.textContent, /原始 36.*桥占 0.*可用 36.*重叠共享 36.*有效 18/);
     assert.match(f.placement.textContent, /假定本屋完工并配渔民.*当前实际在岗/);
     assert(f.placement.textContent.includes(`#${f.a.id} 8 → ${rule === 'shared' ? 6 : 8}`));

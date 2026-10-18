@@ -6,11 +6,14 @@ const path = require('node:path');
 const { loadGame } = require('./helpers/playability');
 const G = loadGame(path.resolve(__dirname, '..'));
 global.window = global; global.G = G;
+global.document = { getElementById() { return null; }, addEventListener() {} };
 require('../js/ui.js');
 const guide = G.ui.refreshGuide, refreshHarvest = G.ui.refreshHarvest, refreshPlacement = G.ui.refreshPlacement;
 const renderInfo = G.ui.renderInfo, escHtml = G.ui.escHtml;
 const heatDemand = G.ui.heatDemand, citizenStatus = G.ui.citizenStatus;
-G.ui = { heatDemand, citizenStatus, toast() {}, refreshHUD() {}, hideInfo() {}, setToolActive() {} };
+const realUi = G.ui;
+G.ui = { ...realUi, heatDemand, citizenStatus, toast() {}, refreshHUD() {}, hideInfo() {}, setToolActive() {},
+  toggleHelp() {}, refreshHarvestRangeControls() {} };
 let passed = 0;
 function fresh() {
   G.newGame(44);
