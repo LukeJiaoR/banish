@@ -71,6 +71,7 @@ function harness(options = {}) {
     setTimeout(fn, delay) { const id = nextTimer++; timers.set(id, { fn, delay }); return id; },
     clearTimeout(id) { timers.delete(id); },
   };
+  if (options.Path2D) context.Path2D = options.Path2D;
   context.window = context;
   vm.createContext(context);
   function load(relative) {
@@ -261,10 +262,55 @@ function recordedGradientFills(calls) {
     else if (op === 'moveTo') { current = { points: [args], closed: false }; lines.push(current); }
     else if (op === 'lineTo' && current) current.points.push(args);
     else if (op === 'closePath' && current) current.closed = true;
-    else if (op === 'fill' && typeof style?.addColorStop === 'function')
-      fills.push({ rule: args[0] || 'nonzero', lines });
+    else if (op === 'fill' && typeof style?.addColorStop === 'function') {
+      const submitted = args[0]?.commands;
+      let pathLines = lines;
+      if (submitted) {
+        pathLines = []; let pathLine;
+        for (const [verb, ...points] of submitted) {
+          if (verb === 'moveTo') { pathLine = { points: [points], closed: false }; pathLines.push(pathLine); }
+          else if (verb === 'lineTo') pathLine.points.push(points);
+          else if (verb === 'closePath') pathLine.closed = true;
+          else assert.fail(`unexpected cached path operation: ${verb}`);
+        }
+      }
+      fills.push({ rule: (submitted ? args[1] : args[0]) || 'nonzero', lines: pathLines });
+    }
   }
   return fills;
+}
+
+// Keep recorder gradient objects unchanged so legacy command hashes stay strict.
+// Stops are associated with their actual createLinearGradient call in draw order.
+function recordedLinearGradients(calls) {
+  const gradients = [];
+  let current;
+  for (const [op, ...args] of calls) {
+    if (op === 'createLinearGradient') { current = { coordinates: args, stops: [] }; gradients.push(current); }
+    else if (op === 'createRadialGradient') current = null;
+    else if (op === 'addColorStop' && current) current.stops.push(args);
+  }
+  return gradients;
+}
+
+function rgba(color) {
+  const channels = /^rgba\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*\)$/.exec(color);
+  assert.ok(channels, `expected an explicit rgba shoreline stop, got ${color}`);
+  return channels.slice(1).map(Number);
+}
+
+// Minimal Path2D substitute: exercises the fast-path contract without a native
+// graphics dependency and keeps the submitted triangle commands inspectable.
+function recordingPath2D() {
+  const instances = [];
+  class RecordedPath {
+    constructor(source) { this.commands = source ? source.commands.map(command => command.slice()) : []; instances.push(this); }
+    moveTo(...args) { this.commands.push(['moveTo', ...args]); }
+    lineTo(...args) { this.commands.push(['lineTo', ...args]); }
+    closePath() { this.commands.push(['closePath']); }
+    addPath(source) { this.commands.push(...source.commands.map(command => command.slice())); }
+  }
+  return { Path2D: RecordedPath, instances };
 }
 
 function windingAt(lines, x, y) {
@@ -543,7 +589,7 @@ function contracts() {
     const h = harness({ N: 16 }), G = h.G, lab = install(h);
     const profile = h.context.RiverbayTerrain.shoreVariationProfile;
     assert.equal(typeof profile, 'function', 'the actual rendering profile is inspectable');
-    const limits = { wetWidth: [4, 14, .15], shallowWidth: [6, 18, .15], tint: [0, 1, .015] };
+    const limits = { wetWidth: [8, 14, .15], shallowWidth: [8, 18, .15], tint: [0, 1, .015] };
     const points = [];
     for (let y = -64; y <= 64; y += 4) for (let x = -64; x <= 64; x += 4) points.push([x, y]);
     for (const seed of [0, 65, 66, 4294967295]) {
@@ -551,6 +597,12 @@ function contracts() {
       for (const [x, y] of points) {
         const a = profile(seed, x, y);
         assert.deepEqual(plain(profile(seed, x, y)), plain(a), 'identical inputs reproduce exactly');
+        const phase = ((seed >>> 0) % 4096) / 4096 * Math.PI * 2;
+        const reach = .5 + .3 * Math.sin((x * .82 + y * .32) * Math.PI * 2 / 26 + phase)
+          + .2 * Math.sin((y * .7 - x * .28) * Math.PI * 2 / 22 - phase * .4);
+        assert.ok(Math.abs(a.wetWidth - (8 + 6 * reach)) < 1e-12, 'wet core retains its readable 8-pixel minimum');
+        assert.ok(Math.abs(a.shallowWidth - (8 + 10 * (.65 * reach + .35 * (1 - a.tint)))) < 1e-12,
+          'shallow width combines the broad reach and world tint with the intended weights');
         for (const [key, [min, max, slope]] of Object.entries(limits)) {
           assert.ok(Number.isFinite(a[key]) && a[key] >= min && a[key] <= max,
             `seed=${seed}, ${x},${y}: ${key}=${a[key]} outside ${min}..${max}`);
@@ -581,6 +633,95 @@ function contracts() {
     const snapshot = profile(65, 0, 0); snapshot.wetWidth = -100; snapshot.tint = -100;
     assert.deepEqual(plain(profile(65, 0, 0)), expected[points.findIndex(([x, y]) => x === 0 && y === 0)],
       'profile results do not expose mutable state');
+  });
+
+  test('period-14 shoreline tint and dense stop sampling cannot alias on a 32-tile world', () => {
+    const h = harness({ N: 32 }), lab = install(h);
+    const { shoreVariationProfile: profile, shoreColorStops: colorStops } = h.context.RiverbayTerrain;
+    assert.equal(typeof colorStops, 'function', 'the actual color-stop sampler is inspectable');
+    for (const seed of [0, 65, 66, 4095, 4294967295]) {
+      const phase = ((seed >>> 0) % 4096) / 4096 * Math.PI * 2;
+      for (const [x, y] of [[0, 0], [1.25, 5.5], [9, 23], [31.5, 31.5], [-7, 12]]) {
+        const tint = profile(seed, x, y).tint;
+        assert.ok(Math.abs(tint - (.5 + .5 * Math.sin((x + y) * Math.PI * 2 / 14 + phase * .5))) < 1e-12,
+          'the rendered tint uses the intended 14-tile x+y period');
+        assert.ok(Math.abs(profile(seed, x + 14, y).tint - tint) < 1e-12, 'one world period repeats');
+        assert.ok(Math.abs(profile(seed, x, y + 7).tint + tint - 1) < 1e-12, 'half a period reaches the opposite tint');
+        assert.ok(Math.abs(profile(seed, x + 3, y - 3).tint - tint) < 1e-12, 'equal x+y shares one tint');
+      }
+      for (const N of [12, 32, 128, 192, 256]) {
+        const stops = plain(colorStops(seed, N));
+        assert.deepEqual(stops, plain(colorStops(seed, N, 14)), 'explicit and default color periods agree');
+        assert.equal(stops[0].offset, 0, 'the gradient begins at the world origin');
+        assert.equal(stops.at(-1).offset, 1, 'the gradient reaches the opposite world corner');
+        assert.ok(stops.length >= Math.ceil(2 * N / (14 / 8)) + 1, 'at least eight intervals sample every tint cycle');
+        for (let i = 0; i < stops.length; i++) {
+          const { offset, tint } = stops[i], sum = 2 * N * offset;
+          assert.ok(Number.isFinite(offset) && offset >= 0 && offset <= 1 && Number.isFinite(tint) && tint >= 0 && tint <= 1);
+          assert.ok(Math.abs(tint - profile(seed, sum / 2, sum / 2).tint) < 1e-12,
+            'every color stop samples its actual projected world coordinate');
+          if (!i) continue;
+          const previous = stops[i - 1], gap = (offset - previous.offset) * 2 * N;
+          assert.ok(gap > 0 && gap <= 14 / 8 + 1e-12, 'world-space stop spacing cannot undersample the color wave');
+          for (const t of [.25, .5, .75]) {
+            const at = previous.offset + (offset - previous.offset) * t;
+            const interpolated = previous.tint + (tint - previous.tint) * t;
+            assert.ok(Math.abs(interpolated - profile(seed, N * at, N * at).tint) < .04,
+              'linear gradient interpolation retains the intended tint wave between stops');
+          }
+        }
+        assert.ok(Math.max(...stops.map(stop => stop.tint)) - Math.min(...stops.map(stop => stop.tint)) > .95,
+          `N=${N}: sampled stops retain almost the full tint range`);
+        const saved = JSON.stringify(stops);
+        const snapshot = colorStops(seed, N); snapshot[0].offset = -1; snapshot[0].tint = -1; snapshot.pop();
+        assert.equal(JSON.stringify(colorStops(seed, N)), saved, 'color-stop results cannot mutate later renders');
+      }
+    }
+    assert.deepEqual(plain(lab.getOptions()), noOptions, 'inspectable helpers do not enable rendering');
+  });
+
+  test('actual shoreline gradients follow world x+y with readable cores and darker wet inner edges', () => {
+    const h = harness({ N: 32, seed: 65 }), G = h.G, lab = install(h);
+    lab.setOptions({ shore: true, shoreVariation: true }); G.buildGround();
+    const gradients = recordedLinearGradients(G._gcv.getContext('2d').calls);
+    const expected = plain(h.context.RiverbayTerrain.shoreColorStops(G.world.seed, G.world.N));
+    assert.equal(gradients.length, 6, 'three land and three water gradients are actually painted');
+    const alphas = [.14, .48, .30, .12, .45, .24];
+    const luminance = rgb => .2126 * rgb[0] + .7152 * rgb[1] + .0722 * rgb[2];
+    for (let layer = 0; layer < gradients.length; layer++) {
+      const gradient = gradients[layer], water = layer >= 3;
+      assert.deepEqual(gradient.coordinates, [...G.T2S(0, 0), ...G.T2S(G.world.N, G.world.N)],
+        'the vertical projected gradient measures x+y, independent of x-y');
+      assert.deepEqual(gradient.stops.map(stop => stop[0]), expected.map(stop => stop.offset),
+        'Canvas receives the dense world-coordinate stops rather than a sparse approximation');
+      const cool = water ? [94, 142, 151] : [127, 136, 100];
+      const warm = water ? [133, 166, 155] : [165, 150, 110];
+      for (let i = 0; i < expected.length; i++) {
+        const color = rgba(gradient.stops[i][1]);
+        assert.equal(color[3], alphas[layer], `layer ${layer}: readable alpha is explicit in every stop`);
+        if (layer % 3 !== 2) assert.deepEqual(color.slice(0, 3), cool.map((v, j) => Math.round(v + (warm[j] - v) * expected[i].tint)),
+          'outer and core colors use the tint from their actual world position');
+        else {
+          const core = rgba(gradients[layer - 1].stops[i][1]);
+          assert.ok(luminance(color) <= luminance(core) - 15,
+            'inner wet color is meaningfully darker than the core RGB, beyond an alpha-only change');
+        }
+      }
+      const [x0, y0, x1, y1] = gradient.coordinates;
+      for (const [x, y] of [[0, 16], [8, 8], [16, 0], [4, 28], [16, 16], [28, 4]]) {
+        const [sx, sy] = G.T2S(x, y);
+        const offset = ((sx - x0) * (x1 - x0) + (sy - y0) * (y1 - y0)) / ((x1 - x0) ** 2 + (y1 - y0) ** 2);
+        assert.ok(Math.abs(offset - (x + y) / (2 * G.world.N)) < 1e-12,
+          'Canvas projection assigns matching offsets to all points with equal x+y');
+      }
+    }
+    const baseline = plain(gradients);
+    for (const [zoom, dpr, scale] of [[.25, 1, .25], [.55, 3, .5], [2, 2, 1]]) {
+      G.cam.z = zoom; G.cam.x += 173; G.cam.y -= 89; G.dpr = dpr; G.groundScale = scale;
+      G._gcv.getContext('2d').calls.length = 0; G.needGround = true; G.buildGround();
+      assert.deepEqual(plain(recordedLinearGradients(G._gcv.getContext('2d').calls)), baseline,
+        'camera, DPR, and raster scale cannot move or resample the world gradient');
+    }
   });
 
   test('varied bands sample the shared curved mask with stable closed seams and exact map exits', () => {
@@ -732,6 +873,96 @@ function contracts() {
     }
   });
 
+  test('cached triangle fallback and Path2D submit identical single-union layer geometry', () => {
+    for (const [name, shape] of maskFixtures().slice(2)) {
+      const outputs = [];
+      for (const nativePath of [false, true]) {
+        const recorder = recordingPath2D();
+        const h = harness({ N: 12, Path2D: nativePath ? recorder.Path2D : undefined }), G = h.G, lab = install(h);
+        setMask(G.world, shape); lab.setOptions({ shore: true, shoreVariation: true }); G.buildGround();
+        const calls = G._gcv.getContext('2d').calls, fills = recordedGradientFills(calls);
+        assert.equal(fills.length, 6, `${name}: cached routes still union into one fill for each side/layer`);
+        assert.ok(fills.every(fill => fill.rule === 'nonzero'), 'cached paths preserve consistently wound triangle unions');
+        const routes = lab.getCoastlines().length;
+        assert.equal(lab.metrics.variationGeometryBuilds, routes, 'shared route sampling is built once for both sides');
+        assert.equal(lab.metrics.variationPathBuilds, routes * 6, 'each route builds exactly six side/layer command sets');
+        assert.equal(lab.metrics.variationCombinedPathBuilds, nativePath ? 6 : 0,
+          'only Path2D builds combined paths, once per side/layer');
+        if (nativePath) {
+          assert.equal(recorder.instances.length, 6, 'Path2D allocates only one combined path per side/layer');
+          assert.equal(calls.filter(call => call[0] === 'fill' && call[1] instanceof recorder.Path2D).length, 6,
+            'the Canvas fast path receives all six actual cached Path2D objects');
+        }
+        outputs.push({ fills: plain(fills), gradients: plain(recordedLinearGradients(calls)) });
+      }
+      assert.deepEqual(outputs[1], outputs[0], `${name}: Path2D and command fallback submit the same geometry and colors`);
+    }
+  });
+
+  test('shore geometry and layer paths reuse warm caches and invalidate with their topology', () => {
+    for (const nativePath of [false, true]) {
+      const recorder = recordingPath2D();
+      const h = harness({ N: 24, Path2D: nativePath ? recorder.Path2D : undefined }), G = h.G, lab = install(h);
+      setMask(G.world, (x, y) => x === 3 && y === 3 || x === 20 && y === 20);
+      lab.setOptions({ shore: true, shoreVariation: true }); G.buildGround();
+      let geometry = 2, layers = 12;
+      assert.equal(lab.getCoastlines().length, 2, 'fixture exercises independently cached routes');
+      const assertGeometry = message => {
+        assert.equal(lab.metrics.variationGeometryBuilds, geometry, `${message}: route geometry builds`);
+        assert.equal(lab.metrics.variationPathBuilds, layers, `${message}: side/layer command builds`);
+      };
+      assertGeometry('first render');
+      const calls = G._gcv.getContext('2d').calls;
+      const submittedPaths = () => calls.filter(call => call[0] === 'fill' && call[1] instanceof recorder.Path2D).map(call => call[1]);
+      const initialPaths = submittedPaths(), initialCommands = nativePath ? initialPaths.map(p => JSON.stringify(p.commands)) : [];
+      const initialCombined = lab.metrics.variationCombinedPathBuilds;
+      for (let turn = 0; turn < 2; turn++) {
+        calls.length = 0; G.needGround = true; G.buildGround();
+        assertGeometry('repeated full render');
+        assert.equal(lab.metrics.variationCombinedPathBuilds, initialCombined);
+        if (nativePath) submittedPaths().forEach((path, i) => assert.equal(path, initialPaths[i], 'a repeated full render reuses identical Path2D objects'));
+      }
+      const full = lab.metrics.fullBuilds, partial = lab.metrics.partialBuilds;
+      for (const zoom of [.25, .55, 1, 2]) { G.cam.z = zoom; G.cam.x += 17; G.cam.y -= 31; G.dpr = 3; G.frame(0); }
+      assert.equal(lab.metrics.fullBuilds, full); assert.equal(lab.metrics.partialBuilds, partial);
+      assertGeometry('warm camera frames');
+      G.world.road[3 * G.world.N + 2] = 1;
+      calls.length = 0; G.markGroundDirty(2, 3); G.buildGround();
+      assert.equal(lab.metrics.partialBuilds, partial + 1, 'a road edit stays a local repair');
+      assertGeometry('first local road repair');
+      const localPaths = submittedPaths(), localCombined = lab.metrics.variationCombinedPathBuilds;
+      for (let repeat = 0; repeat < 3; repeat++) {
+        calls.length = 0; G.markGroundDirty(2, 3); G.buildGround();
+        assertGeometry('repeated local repair');
+        assert.equal(lab.metrics.variationCombinedPathBuilds, localCombined, 'the same selected route set reuses combined paths');
+        if (nativePath) submittedPaths().forEach((path, i) => assert.equal(path, localPaths[i], 'local repair reuses its exact Path2D object'));
+      }
+      lab.setOptions({ shoreVariation: false }); G.buildGround();
+      assertGeometry('switch off');
+      calls.length = 0; lab.setOptions({ shoreVariation: true }); G.buildGround();
+      assertGeometry('switch back on');
+      if (nativePath) submittedPaths().forEach((path, i) => assert.equal(path, initialPaths[i], 'style switches reuse the original full-route paths'));
+      for (const scale of [.25, .5, 1]) {
+        G.groundScale = scale; G.needGround = true; G.buildGround();
+        assertGeometry('raster-scale change');
+      }
+      G.game.season = 2; G.needGround = true; G.buildGround();
+      assertGeometry('nonwinter season change');
+      if (nativePath) assert.deepEqual(initialPaths.map(p => JSON.stringify(p.commands)), initialCommands,
+        'repair, scale, season, and toggles cannot mutate cached triangle commands');
+      calls.length = 0; lab.invalidateTopology(); G.buildGround(); geometry += 2; layers += 12;
+      assertGeometry('explicit topology invalidation');
+      if (nativePath) for (const path of submittedPaths()) assert.ok(!initialPaths.includes(path), 'invalidation cannot retain a stale combined Path2D');
+      G.world = fixture(G, 24, 66); G.markGroundDirty(4, 4); G.buildGround();
+      const routes = lab.getCoastlines().length; geometry += routes; layers += routes * 6;
+      assertGeometry('replacement seeded world');
+      const pathsAfterReplacement = lab.metrics.variationCombinedPathBuilds;
+      G.needGround = true; G.buildGround(); assertGeometry('replacement warm render');
+      assert.equal(lab.metrics.variationCombinedPathBuilds, pathsAfterReplacement);
+      if (!nativePath) assert.equal(lab.metrics.variationCombinedPathBuilds, 0, 'command fallback never depends on Path2D');
+    }
+  });
+
   test('variation switches, warm frames, and local edits retain cache invalidation rules', () => {
     const h = harness({ N: 24, recordLimit: 0 }), G = h.G, lab = install(h);
     lab.setOptions(allOptions); G.buildGround();
@@ -849,13 +1080,39 @@ function contracts() {
 }
 
 async function pixels() {
-  let createCanvas, loadImage;
-  try { ({ createCanvas, loadImage } = require('@napi-rs/canvas')); }
+  let createCanvas, loadImage, Path2D;
+  try { ({ createCanvas, loadImage, Path2D } = require('@napi-rs/canvas')); }
   catch (error) { throw new Error('--pixels requires optional @napi-rs/canvas', { cause: error }); }
   const waterImage = await loadImage(path.join(root, 'tools/riverbay-lab/water-open-candidate-v2.png'));
   const meadowImage = await loadImage(path.join(root, 'assets/terrain-v2/meadow_summer.png'));
   const originalWaterImage = await loadImage(path.join(root, 'assets/terrain-v2/water_open.png'));
   const bitmap = G => Buffer.from(G._gcv.getContext('2d').getImageData(0, 0, G._gcv.width, G._gcv.height).data);
+  test('native Path2D and cached command fallback render byte-identical shores and dirty repairs', () => {
+    assert.equal(typeof Path2D, 'function', 'native pixel checks include the browser-style Path2D fast path');
+    const fixtures = [['open shore', 16, null], ['checkerboard point contacts', 12, (x, y) => (x + y) % 2 === 0]];
+    for (const [name, N, shape] of fixtures) for (const scale of [.25, .55, 1]) {
+      const outputs = [];
+      for (const nativePath of [false, true]) {
+        const h = harness({ createCanvas, N, Path2D: nativePath ? Path2D : undefined }), G = h.G;
+        if (shape) setMask(G.world, shape);
+        G.SPR.map.set('meadow_summer', meadowImage); G.SPR.map.set('water_open', originalWaterImage);
+        const lab = install(h, { waterImage }); lab.setOptions(variedOptions); G.groundScale = scale; G.buildGround();
+        const snapshots = [digest(bitmap(G))];
+        const x = Array.from(G.world.water.slice(8 * G.world.N, 9 * G.world.N)).indexOf(2);
+        assert.ok(x >= 0, `${name}: dirty parity fixture has a shore tile`);
+        for (const value of [1, 2, 0]) {
+          G.world.road[8 * G.world.N + x] = value; G.markGroundDirty(x, 8); G.buildGround(); snapshots.push(digest(bitmap(G)));
+          G.markGroundDirty(x, 8); G.buildGround();
+          assert.equal(digest(bitmap(G)), snapshots.at(-1), 'both cache paths keep dirty repeats byte-stable');
+        }
+        outputs.push(snapshots);
+        for (const canvas of h.canvases) { canvas.width = 1; canvas.height = 1; }
+        global.gc?.();
+      }
+      assert.deepEqual(outputs[1], outputs[0], `${name}, scale=${scale}: native and fallback pixels must agree after full and partial builds`);
+    }
+  });
+  global.gc?.();
   test('all-off pixels and switch round-trips exactly match the textured production renderer', () => {
     const h = harness({ createCanvas, N: 16 }), G = h.G;
     G.SPR.map.set('meadow_summer', meadowImage); G.SPR.map.set('water_open', originalWaterImage);
