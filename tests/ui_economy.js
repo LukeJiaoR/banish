@@ -4,7 +4,7 @@ const assert=require('node:assert/strict');
 global.window=global;
 for(const name of ['core','defs','map','sim','ui']) require('../js/'+name+'.js');
 const buttons=[];
-const info={innerHTML:'',querySelectorAll(){
+const info={innerHTML:'',classList:{add(){},remove(){},toggle(){},contains(){return false;}},querySelectorAll(){
   buttons.length=0;
   for(const match of this.innerHTML.matchAll(/<button[^>]*class="mini-tog" data-(tl|fl)="([^"]+)"/g)) {
     const b={dataset:{[match[1]]:match[2]},addEventListener(name,fn){this[name]=fn;}};buttons.push(b);

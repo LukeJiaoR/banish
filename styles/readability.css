@@ -1,0 +1,61 @@
+/* Shared readable woodcut UI. No simulation or world-art changes. */
+:root { --ui-body: 12px; --ui-secondary: 11px; --ui-title: 16px; }
+body { font-size: var(--ui-body); }
+.ui-icon { width: 24px; height: 24px; display: inline-block; flex: none; vertical-align: middle; }
+.res-icon .ui-icon { width: 100%; height: 100%; }
+#hud button, #hud input, #hud select, #hud textarea { font-family: inherit; }
+#hud button:focus-visible, #hud input:focus-visible, #hud select:focus-visible,
+#hud textarea:focus-visible, #hud summary:focus-visible { outline: 2px solid #fff0b5; outline-offset: 3px; }
+#hud [hidden] { display: none !important; }
+#hud .hidden { display: none !important; }
+#hud .row, #hud p, #hud li { font-size: max(var(--ui-body), 1em); }
+#hud .desc, #hud .fb-hint, #hud .sav-hint, #hud .res-label, #hud small,
+#hud .building-facts dt, #hud .town-health { font-size: var(--ui-secondary); }
+#hud h2 { font-size: 19px; line-height: 1.4; }
+#hud h3, #hud .info-head { font-size: var(--ui-title); }
+#hud .res-cost { font-size: var(--ui-body); gap: 3px; }
+#hud .res-cost .res-icon { width: 14px; height: 14px; }
+#toolbar .tb:not(.tb-category) { position: relative; min-width: 152px; max-width: 190px; min-height: 82px; padding: 7px 9px; }
+#toolbar .tb .cost { font-size: var(--ui-body); display:flex; flex-wrap:wrap; gap:2px 6px; max-width:170px; line-height:1.4; }
+#toolbar .tb .lb { font-size: var(--ui-body); }
+#toolbar .tb .ic { display:flex; align-items:center; justify-content:center; }
+#toolbar .tb .ic .ui-icon { width: 24px; height:24px; }
+#toolbar .tb-category .ic .ui-icon { width:26px; height:26px; }
+#toolbar .tb.is-short { border-color:#a87745; }
+#toolbar .material-badge { margin-top:2px; padding:1px 5px; font-size:var(--ui-secondary); color:#ffd4a4; background:#5b3b22; border-radius:3px; line-height:1.4; }
+#toolbar .tb.is-short .cost { color:#dfc29d; }
+#toolbar .tb.is-short.active { border-color:#ffd98a; }
+#toolbar-state { font-size:var(--ui-secondary); }
+#placement-panel { max-height:max(72px, calc(100dvh - var(--hud-height, 110px) - var(--toolbar-height, 160px) - 40px)); z-index:3; }
+#info { z-index:4; max-height:max(90px, calc(100dvh - var(--hud-height, 110px) - var(--toolbar-height, 160px) - 34px)); }
+#survival-guide { max-height:calc(100dvh - var(--hud-height, 110px) - var(--toolbar-height, 160px) - 38px); overflow-y:auto; overscroll-behavior:contain; }
+#hud:has(#placement-info:not(.hidden)) #survival-guide { display:none; }
+#toasts { max-height:150px; overflow:hidden; z-index:5; pointer-events:none; }
+#meal-transition-notice:not([hidden]) { top:calc(var(--hud-height, 100px) + 8px); }
+@media(max-width:760px) {
+  #info { right:8px; width:min(352px,calc(100vw - 16px)); }
+  #hud:has(#info:not(.hidden)) #survival-guide { display:none; }
+  #hud:has(#info:not(.hidden)) #placement-panel { display:none; }
+  #toolbar .tb:not(.tb-category) { min-width:144px; }
+  #hud .dialog { max-width:calc(100vw - 16px); }
+}
+@media(max-height:600px) {
+  #toolbar { gap:3px; padding:5px; bottom:5px; }
+  #toolbar .tb-category { min-height:52px; height:52px; }
+  #toolbar .tb:not(.tb-category) { min-height:66px; padding:4px 7px; gap:1px; }
+  #toolbar .tb:not(.tb-category) .ic { display:none; }
+  #toolbar-state { max-height:34px; overflow-y:auto; }
+  #toasts { max-height:64px; }
+  #survival-guide { max-height:110px; }
+  #hud:has(#info:not(.hidden)) #survival-guide { display:none; }
+}
+@media(prefers-reduced-motion:reduce) { .toast { animation:none; transition:none; } }
+/* At short heights the inspector becomes a focused sheet. Reclaim surrounding
+   chrome rather than clipping its close/tab/action controls into a 90px slot. */
+@media(max-height:500px) {
+  #hud:has(#info:not(.hidden)) #topbar,
+  #hud:has(#info:not(.hidden)) #toolbar,
+  #hud:has(#info:not(.hidden)) #placement-panel,
+  #hud:has(#info:not(.hidden)) #survival-guide { visibility:hidden; }
+  #hud #info.detail-inspector { top:8px; bottom:8px; max-height:calc(100dvh - 16px); height:calc(100dvh - 16px); }
+}

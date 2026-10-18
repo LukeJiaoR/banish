@@ -5,29 +5,38 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>归园 · 放逐小镇（Banished 复刻原型）</title>
 <link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="styles/hud.css">
+<link rel="stylesheet" href="styles/start-settings.css">
+<link rel="stylesheet" href="styles/resource-goals.css">
+<link rel="stylesheet" href="styles/details.css">
+<link rel="stylesheet" href="styles/readability.css">
 </head>
 <body>
   <div id="meal-transition-notice" role="status" hidden></div>
 <canvas id="game"></canvas>
 
 <div id="hud">
-  <div id="topbar">
+  <div id="topbar" aria-label="小镇概况与系统操作">
     <div id="res-row"></div>
     <div id="date">第 1 年 · 春</div>
-    <div id="pop">👥 0</div>
-    <div id="speed"></div>
-    <div id="sys">
-      <button id="btn-err" title="脚本错误记录" class="hidden">⚠</button>
-      <button id="btn-production-goals" title="全镇自动生产目标">资源目标</button>
-      <button id="btn-save" title="保存到手动档">💾</button>
-      <button id="btn-load" title="存档管理：载入 / 删除">📂</button>
-      <button id="btn-new" title="新游戏设置 / 查看地图种子">🌱</button>
-      <button id="btn-fb" title="发送试玩反馈（无需注册）">📮</button>
-      <button id="btn-help" title="帮助">❓</button>
+    <div id="pop">人口 0</div>
+    <div id="speed" aria-label="模拟速度"></div>
+    <div id="sys" role="group" aria-label="系统操作">
+      <button id="btn-err" title="脚本错误记录" aria-label="脚本错误记录" class="hidden">错误</button>
+      <button id="btn-production-goals" title="全镇自动生产目标" aria-label="全镇自动生产目标">目标</button>
+      <button id="btn-save" title="保存到手动档" aria-label="保存到手动档">保存</button>
+      <button id="btn-load" title="存档管理：载入 / 删除" aria-label="存档管理：载入 / 删除">存档</button>
+      <button id="btn-new" title="新游戏设置 / 查看地图种子" aria-label="新游戏设置 / 查看地图种子">新局</button>
+      <button id="btn-fb" title="发送试玩反馈（无需注册）" aria-label="发送试玩反馈">反馈</button>
+      <button id="btn-help" title="帮助" aria-label="帮助">帮助</button>
     </div>
+    <p id="save-status" role="status" hidden></p>
   </div>
 
-  <div id="survival-guide" aria-label="生存清单"></div>
+  <section id="survival-guide" aria-label="生存清单">
+    <div class="guide-heading"><h2>生存清单</h2><span id="guide-count" hidden></span><button type="button" id="guide-toggle" aria-expanded="false" aria-controls="guide-list">全部</button></div>
+    <ul id="guide-list"></ul>
+  </section>
   <div id="placement-panel">
     <div id="harvest-range-controls" class="hidden" role="group" aria-label="采集范围预览">
       <p id="harvest-range-status" role="status" aria-live="polite"></p>
@@ -112,15 +121,44 @@
     </div>
   </div>
 
-  <div id="production-goals" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="production-goals-title">
+  <div id="production-goals" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="production-goals-title" aria-describedby="production-goals-draft-help">
     <div class="dialog production-goals-dialog">
-      <h2 id="production-goals-title">自动生产目标</h2>
-      <p>库存达标后暂停新生产，消耗到恢复线再开工。0关闭新生产；未设置则继承原规则。目标不会增加仓储容量，也不保证够吃或够过冬。</p>
-      <p>总食物与肉类、蔬菜、主食可分别设目标：总量与各类目标同时生效。总食物是三类之和，三类共享食物仓容；调低一类目标不会单独限制其他类别。</p>
-      <div id="production-goal-rows"></div>
-      <p>已接批次和在途货物继续完成；手动采运标记、工地清场不受限制。已开始播种的农田继续播完和收获，目标仅限制未开始的新一季。护林木材达标仍可补种。猎人是否接新猎杀由肉类与总食物目标控制；每只鹿的肉皮一起实背送仓，皮革目标不会凭空删去副产物；衣物仓满也会暂停裁缝。</p>
-      <p id="production-goals-message" role="status" aria-live="polite"></p>
-      <button id="production-goals-close">完成</button>
+      <header class="production-goals-header">
+        <h2 id="production-goals-title">资源目标表</h2>
+        <p id="production-goals-draft-help">先编辑草稿，再一次应用。留空继承原规则；0停止新自动生产。关闭会丢弃未应用的草稿。</p>
+      </header>
+      <div class="production-goals-body">
+        <section class="goal-presets" aria-labelledby="goal-presets-title">
+          <h3 id="goal-presets-title">储备建议 · 只填草稿</h3>
+          <div class="goal-preset-actions" role="group" aria-label="按当前村况填写建议草稿">
+            <button type="button" id="goal-preset-balanced">均衡储备</button>
+            <button type="button" id="goal-preset-winter">备冬储备</button>
+            <button type="button" id="goal-preset-stockpile">储粮</button>
+          </div>
+          <p id="goal-preset-notes">选择建议会填写部分草稿。检查数值后，仍需点击“应用全部草稿”。</p>
+        </section>
+        <p class="goal-table-hint">库存按实际生产目标口径计量，缺口 = 草稿目标 − 计量库存（最低0）。缺口不是可用口粮或过冬保证。</p>
+        <div class="goal-table-scroll" tabindex="0" role="region" aria-label="全资源目标表，可横向滚动">
+          <table class="production-goal-table">
+            <caption>20项资源与总量 · 可展开每项规则和公共库存明细</caption>
+            <thead><tr><th scope="col">资源</th><th scope="col">计量库存</th><th scope="col">目标草稿</th><th scope="col">草稿缺口</th></tr></thead>
+            <tbody id="production-goal-rows"></tbody>
+          </table>
+        </div>
+        <div class="production-goals-rules">
+          <p>总食物是肉类、鸡蛋、蔬菜、主食、苹果、梨六种物品之和，仍归三类营养组，六种共享食物仓容。总量与单项目标同时生效，单项达标不拦停其他食物。</p>
+          <p>库存达标后暂停新生产，消耗到恢复线再开工。柴火和工具仍取全镇与本屋目标较低值；这里不改本屋上限。目标不会增加仓容，也不保证够吃或够过冬。</p>
+          <p>已接批次和在途货物继续完成；手动采运标记、工地清场不受限制。已开始播种的农田继续播完和收获，目标只限制未开始的新季。护林达标仍可补种。狩猎肉皮一起实运；皮革目标不会删除副产物，衣物仓满仍会暂停裁缝。</p>
+        </div>
+      </div>
+      <footer class="production-goals-footer">
+        <p id="production-goals-message" role="status" aria-live="polite"></p>
+        <div class="production-goals-actions">
+          <button type="button" id="production-goals-apply">应用全部草稿</button>
+          <button type="button" id="production-goals-reset">撤销草稿</button>
+          <button type="button" id="production-goals-close">关闭</button>
+        </div>
+      </footer>
     </div>
   </div>
 
@@ -193,41 +231,62 @@
   </div>
   <div id="new-game-settings" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="new-game-title">
     <div class="dialog start-settings-dialog">
-      <h2 id="new-game-title">🌱 开创新家园</h2>
-      <p id="new-game-current"></p>
-      <div class="start-seed-row">
-        <label for="new-game-seed">地图种子<input id="new-game-seed" type="text" inputmode="numeric" maxlength="11" autocomplete="off" aria-describedby="new-game-seed-hint"></label>
-        <button type="button" id="new-game-random">随机种子</button>
-        <button type="button" id="new-game-reuse">复用当前种子</button>
+      <header class="start-settings-header">
+        <h2 id="new-game-title"><span id="new-game-title-icon" aria-hidden="true"></span>开创新家园</h2>
+        <p id="new-game-step">1 / 2 · 选择开局</p>
+      </header>
+      <div id="new-game-body" class="start-settings-body">
+        <p id="new-game-status" class="fb-status" role="status" aria-live="polite"></p>
+        <section id="new-game-edit" aria-label="新村开局设置">
+          <p id="new-game-current"></p>
+          <div class="start-seed-row">
+            <label for="new-game-seed">地图种子<input id="new-game-seed" type="text" inputmode="numeric" maxlength="11" autocomplete="off" aria-describedby="new-game-seed-hint" aria-invalid="false"></label>
+            <button type="button" id="new-game-random">随机种子</button>
+            <button type="button" id="new-game-reuse">复用当前种子</button>
+          </div>
+          <p id="new-game-seed-hint">整数 −2147483648 至 4294967295，0也是固定种子。</p>
+          <h3>开局预设</h3>
+          <div id="new-game-presets" class="start-presets" role="group" aria-label="选择开局预设">
+            <button type="button" id="new-game-preset-classic" data-start-preset="classic" aria-pressed="true"></button>
+            <button type="button" id="new-game-preset-hard" data-start-preset="hard" aria-pressed="false"></button>
+          </div>
+          <h3>地形</h3>
+          <div id="new-game-terrain" class="start-presets" role="group" aria-label="选择新村地形">
+            <button type="button" id="new-game-terrain-classic" aria-pressed="true"><strong>原地形</strong><span>河流、森林与地表矿石</span></button>
+            <button type="button" id="new-game-terrain-mountain" aria-pressed="false"><strong>山地</strong><span>阻路山脊与开局保障谷地</span></button>
+          </div>
+          <h3>地图大小</h3>
+          <div id="new-game-map-size" class="start-presets" role="group" aria-label="选择新村地图大小">
+            <button type="button" id="new-game-size-128" aria-pressed="true"><strong>128×128 · 默认</strong><span>原有地图范围</span></button>
+            <button type="button" id="new-game-size-192" aria-pressed="false"><strong>192×192 · 扩展</strong><span>2.25倍土地 · 物资不变 · 手机性能未实测</span></button>
+          </div>
+          <p id="new-game-preview" class="start-preview"></p>
+        </section>
+        <section id="new-game-review" class="hidden" aria-label="新村最终确认">
+          <h3>请核对新村参数</h3>
+          <p id="new-game-confirm-summary"></p>
+          <p>不会搬入当前村的库存、建筑和居民；需要修改时请选择“返回修改”。</p>
+        </section>
+        <details id="new-game-details" class="start-settings-details">
+          <summary tabindex="0">开局物资与规则详情</summary>
+          <p id="new-game-summary"></p>
+        </details>
+        <details id="new-game-help" class="start-settings-details">
+          <summary tabindex="0">种子、地图与存档说明</summary>
+          <p>同种子、同配置与同版本会重建初始村庄，不是中途存档回放。地图尺寸与地形只用于新村，不扩张现有村庄；气候与开局物资保持原规则，可选灾难仍默认关闭。</p>
+          <p>打开、修改与取消不会替换当前村或删除存档。导出只会请求浏览器下载；请自行核对文件已保存，再重新检查并确认。</p>
+        </details>
       </div>
-      <p id="new-game-seed-hint">整数 −2147483648 至 4294967295，0也是固定种子。同种子与开局配置重建初始村庄；不是中途存档回放。</p>
-      <div id="new-game-presets" class="start-presets" role="group" aria-label="选择开局预设">
-        <button type="button" id="new-game-preset-classic" data-start-preset="classic" aria-pressed="true"></button>
-        <button type="button" id="new-game-preset-hard" data-start-preset="hard" aria-pressed="false"></button>
-      </div>
-      <div id="new-game-terrain" class="start-presets" role="group" aria-label="选择新村地形">
-        <button type="button" id="new-game-terrain-classic" aria-pressed="true"><strong>原地形</strong><span>现有河流、森林与采集矿石</span></button>
-        <button type="button" id="new-game-terrain-mountain" aria-pressed="false"><strong>山地</strong><span>阻路山脊与开局保障谷地 · 新村可选</span></button>
-      </div>
-      <div id="new-game-map-size" class="start-presets" role="group" aria-label="选择新村地图大小">
-        <button type="button" id="new-game-size-128" aria-pressed="true"><strong>128×128 · 默认</strong><span>原有地图范围</span></button>
-        <button type="button" id="new-game-size-192" aria-pressed="false"><strong>192×192 · 扩展</strong><span>2.25倍土地 · 同等开局物资 · 手机性能未实测</span></button>
-      </div>
-      <p id="new-game-summary"></p>
-      <p class="fb-hint">地图尺寸与地形只用于新村，不扩张现有村庄；气候与开局物资保持原规则，可选灾难仍默认关闭。</p>
-      <p id="new-game-status" class="fb-status" role="status" aria-live="polite"></p>
-      <button type="button" id="new-game-review-button">检查开局并继续</button>
-      <section id="new-game-review" class="hidden" aria-label="新村最终确认">
-        <h3>确认替换当前进度</h3>
-        <p id="new-game-confirm-summary"></p>
-        <p class="warn-txt">继续会放弃当前未保存进度，并清理当前自动档，新村之后会自动保存。手动档不会删除。若要保留此村，请先导出，并自行核对下载文件已保存。</p>
-        <button type="button" id="new-game-back">返回修改</button>
-        <button type="button" id="new-game-confirm">放弃当前进度并创建新村</button>
-      </section>
-      <div class="save-actions">
-        <button type="button" id="new-game-export">导出当前村</button>
-        <button type="button" id="new-game-close" class="plain">取消，继续当前村</button>
-      </div>
+      <footer class="start-settings-footer">
+        <p id="new-game-warning" class="start-settings-warning hidden"><strong>当前未保存进度将丢失，当前自动档将清理。</strong>新村之后会自动保存，手动档不会删除。保留此村请先导出并核对文件。</p>
+        <div class="start-footer-actions">
+          <button type="button" id="new-game-review-button" class="start-primary-action">检查开局并继续</button>
+          <button type="button" id="new-game-back" class="hidden">返回修改</button>
+          <button type="button" id="new-game-confirm" class="start-primary-action hidden" aria-describedby="new-game-warning">放弃当前进度并创建新村</button>
+          <button type="button" id="new-game-export">导出当前村</button>
+          <button type="button" id="new-game-close" class="plain" aria-label="取消，继续当前村">取消</button>
+        </div>
+      </footer>
     </div>
   </div>
 </div>
@@ -244,6 +303,7 @@ window.addEventListener('unhandledrejection', e => window.__errs.push('promise: 
 <script src="js/sim.js"></script>
 <script src="js/fire.js"></script>
 <script src="js/supply.js"></script>
+<script src="js/goal-presets.js"></script>
 <script src="js/sprites.js"></script>
 <script src="js/render.js"></script>
 <script src="js/ui.js"></script>

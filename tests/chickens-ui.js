@@ -263,7 +263,7 @@ test('HUD labels eggs independently, includes them once in food total, and ident
   f.G.ui.refreshHUD(); const eggs = f.doc.getElementById('res-eggs'), food = f.doc.getElementById('res-food');
   assert.equal(eggs.querySelector('b').textContent, '12'); assert.equal(food.querySelector('b').textContent, '25');
   assert.match(eggs.title, /鸡蛋.*独立库存.*同属肉类营养组/); assert.match(food.title, /肉类 6.*鸡蛋 12.*蔬菜 3.*主食 4/);
-  assert.match(f.G.ui.resourceIcon('eggs'), /res_eggs\.png/); assert(!eggs.title.includes('三类食物共享'));
+  assert.match(f.G.ui.resourceIcon('eggs'), /aria-label="鸡蛋"[\s\S]*stroke="currentColor"/); assert(!eggs.title.includes('三类食物共享'));
 });
 
 test('production targets show separate egg stock, shared total limits and preservation of produced eggs', () => {
