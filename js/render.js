@@ -180,6 +180,24 @@ G.sprDraw = function (ctx, name, cx, by, opts) {
   return [dw, dh];
 };
 
+/* 17px citizens vanish into grass and snow. Four hard shadow passes draw a
+ * one-pixel dark rim around the same sprite without touching the artwork or
+ * adding an offscreen buffer; the final draw paints the sprite itself. */
+G.sprDrawRim = function (ctx, name, cx, by, opts) {
+  const im = G.SPR && G.SPR.get(name);
+  if (!im || !im.width) return G.sprDraw(ctx, name, cx, by, opts);
+  const r = G.dpr || 1;   // shadow offsets ignore the canvas transform
+  ctx.save();
+  ctx.shadowColor = 'rgba(22,16,9,0.35)';
+  ctx.shadowBlur = 0;
+  for (const [ox, oy] of [[r, 0], [-r, 0], [0, r], [0, -r]]) {
+    ctx.shadowOffsetX = ox; ctx.shadowOffsetY = oy;
+    G.sprDraw(ctx, name, cx, by, opts);
+  }
+  ctx.restore();
+  return G.sprDraw(ctx, name, cx, by, opts);
+};
+
 /* 地表纹理：季节后缀映射（G.PAL 下标 → 切图文件名后缀） */
 G.TEX_SEASON = ['spring', 'summer', 'autumn', 'winter'];
 /* 在地面缓存里以菱形裁切铺一张可平铺纹理（轻微外溢 1px 消除瓦片接缝），
@@ -425,9 +443,10 @@ G.drawGroundTile = function (c, w, pal, x, y) {
   if (w.rock[i]) {
     const iron = w.rock[i] === 2;
     const rk = iron ? pal.iron : pal.rock, rkD = iron ? pal.ironD : pal.rockD;
+    const v = G.scatterVariation((w.seed | 0) + 17, x, y, 0.9, 1.1);
     const cx = sx, cy = sy + 16;
-    const rn = iron ? 'res_iron' : 'rock_' + (((x * 7 + y * 13) % 2) ? 'b' : 'a') + (G.isWinter() ? '_snow' : '');
-    const spr = G.sprDraw(c, rn, cx, cy + 10, { w: 26 });
+    const rn = iron ? 'res_iron' : 'rock_' + (v.variant ? 'b' : 'a') + (G.isWinter() ? '_snow' : '');
+    const spr = G.sprDraw(c, rn, cx, cy + 10, { w: 26 * v.scale });
     if (spr) {
       if (iron && G.isWinter()) { // 雪顶保持矿脉轮廓可辨，不依赖颜色区分
         c.fillStyle = '#d8e6ef';
@@ -494,13 +513,29 @@ G.buildGround = function () {
 };
 
 /* ---------- 树 ---------- */
-G.drawTree = function (ctx, t) {
+/* Deterministic size variation for scattered ground props.
+ * Render-only: derived from the map seed and the tile, never stored, and it
+ * never touches collision, tasks, pathing or saves. No lateral offset and no
+ * flip yet: the source art carries baked light and a ground shadow, and the
+ * older tree PNGs had stray corner fragments, so mirroring would move both.
+ * A forest of one stamp at identical scale reads as a lattice; a small,
+ * repeatable size spread removes most of that without moving anything. */
+G.scatterVariation = function (seed, x, y, scaleMin, scaleMax) {
+  const a = G.h2(seed + 101, x, y), b = G.h2(seed + 211, x, y);
+  return { scale: scaleMin + (scaleMax - scaleMin) * a, variant: b > 0.5 };
+};
+G.treeVariation = function (t) {
+  return G.scatterVariation(((G.world && G.world.seed) | 0) + 7, t.x, t.y, 0.94, 1.06);
+};
+G.drawTree = function (ctx, t, variation) {
+  const v = variation || G.treeVariation(t);
   const [sx, sy] = G.T2S(t.x, t.y);
   const by = sy + 16;
   const stage = G.treeStage(t);
   const winter = G.isWinter();
   const sprName = 'tree_' + ['sapling', 'young', 'mature'][stage] + (winter ? '_snow' : '');
-  if (G.sprDraw(ctx, sprName, sx, by)) return;
+  const baseH = (G.SPRITE_SIZES[sprName] || {}).h;
+  if (G.sprDraw(ctx, sprName, sx, by, baseH ? { h: baseH * v.scale } : undefined)) return;
   const col = G.TREE_COLORS.canopy[(t.x * 7 + t.y * 13) % G.TREE_COLORS.canopy.length];
   const trunk = G.TREE_COLORS.trunk;
   if (stage === 0) {
@@ -1051,9 +1086,9 @@ G.drawCitizen = function (ctx, c, time, homes) {
   const atTarget = target && G.d2(target.x, target.y, c.x, c.y) < 0.01;
   const sx = sx0 - (atTarget ? facing * 4 * s : 0);
   // 阴影；露宿者保持可见，不用透明度伪装成入屋。
-  ctx.fillStyle = 'rgba(0,0,0,0.25)';
+  ctx.fillStyle = 'rgba(0,0,0,0.3)';
   ctx.beginPath();
-  ctx.ellipse(sx, sy, 3.4 * s, 1.7 * s, 0, 0, Math.PI * 2);
+  ctx.ellipse(sx, sy, 2.9 * s, 1.5 * s, 0, 0, Math.PI * 2);
   ctx.fill();
   const f = Math.floor(c.animT / 1.5);
   let frame, fallback;
@@ -1069,8 +1104,8 @@ G.drawCitizen = function (ctx, c, time, homes) {
     fallback = walking ? 'adult_walk_' + (f % 4) : 'adult_idle';
   } else frame = walking ? 'adult_walk_' + (f % 4) : 'adult_idle';
   const bodyY = sy - (working ? bob : 0);
-  if (!G.sprDraw(ctx, frame, sx, bodyY, { flip }) &&
-      !(fallback && G.sprDraw(ctx, fallback, sx, bodyY, { flip }))) {
+  if (!G.sprDrawRim(ctx, frame, sx, bodyY, { flip }) &&
+      !(fallback && G.sprDrawRim(ctx, fallback, sx, bodyY, { flip }))) {
     ctx.fillStyle = child ? '#a3703f' : '#6e4a33';
     ctx.fillRect(sx - 1.7 * s, sy - 7.5 * s - bob, 3.4 * s, 5.2 * s);
     ctx.fillStyle = '#d8a37a';
@@ -1306,7 +1341,10 @@ G.frame = function (dtReal) {
     for (let x = tx0; x <= tx1; x++) {
       const idx = w.treeIdx[y * w.N + x];
       if(G.isMountain&&G.isMountain(w,x,y))items.push({d:x+y+1,k:8,x,y});
-      if (idx >= 0) items.push({ d: x + y, k: 0, x, y, t: w.trees[idx], marked: w.marked.has(y * w.N + x) });
+      if (idx >= 0) {
+        const tree = w.trees[idx];
+        items.push({ d: x + y, k: 0, x, y, t: tree, v: G.treeVariation(tree), marked: w.marked.has(y * w.N + x) });
+      }
       if (w.rock[y * w.N + x] && w.markedRocks && w.markedRocks.has(y * w.N + x))
         items.push({ d: x + y + 0.02, k: 3, x, y });
     }
@@ -1340,7 +1378,7 @@ G.frame = function (dtReal) {
   G.prepareBuildingActivities(G._visibleActivityBuildings,now);
   for (const it of items) {
     if (it.k === 0) {
-      G.drawTree(ctx, it.t);
+      G.drawTree(ctx, it.t, it.v);
       if (it.marked) { // 待砍标记（原版 Harvest Trees 的选中态）
         const [msx, msy] = G.T2S(it.x, it.y);
         G.diamondPath(ctx, msx, msy);
