@@ -143,7 +143,40 @@ function review(f,value=0,preset='hard'){seed(f,value);press(f,'preset-'+preset)
 const snapshot=G=>JSON.stringify(G.serializeGame());
 const clone=x=>JSON.parse(JSON.stringify(x));
 
-test('actual HTML mounts labelled controls and reuses original icons with a separate final decision',()=>{const f=settings();assert.equal(node(f,'seed').getAttribute('maxlength'),'11');assert(node(f,'preset-hard').innerHTML.includes('assets/icons/res_food.png'));assert(node(f,'confirm').textContent.includes('放弃当前进度'));assert(node(f,'review').classList.contains('hidden'));assert(node(f,'current').textContent.includes('未记录'));assert.equal(f.G.game.paused,true);assert.equal(f.doc.activeElement,node(f,'seed'));});
+test('actual HTML mounts labelled controls and shared resource icons with a separate final decision',()=>{const f=settings();assert.equal(node(f,'seed').getAttribute('maxlength'),'11');assert(node(f,'preset-hard').innerHTML.includes(f.G.ui.resourceIcon('food')));assert(node(f,'confirm').textContent.includes('放弃当前进度'));assert(node(f,'review').classList.contains('hidden'));assert(node(f,'current').textContent.includes('未记录'));assert.equal(f.G.game.paused,true);assert.equal(f.doc.activeElement,node(f,'seed'));});
+test('header and footer stay outside the scroll body; review risk is never hidden inside optional help',()=>{
+  const f=settings(),body=node(f,'body'),header=node(f,'title').parentNode,footer=node(f,'warning').parentNode;
+  assert.equal(header.parentNode,body.parentNode);assert.equal(footer.parentNode,body.parentNode);
+  assert(body.contains(node(f,'seed')));assert(body.contains(node(f,'review')));
+  for(const id of ['review-button','back','confirm','export','close']){assert(footer.contains(node(f,id)));assert(!body.contains(node(f,id)));}
+  for(const id of ['details','help']){assert.equal(node(f,id).open,false);assert(!node(f,id).contains(node(f,'warning')));assert.equal(node(f,id).children[0].getAttribute('tabindex'),'0');}
+  assert.equal(node(f,'confirm').getAttribute('aria-describedby'),'new-game-warning');
+  assert(node(f,'warning').textContent.includes('未保存进度将丢失'));assert(node(f,'warning').textContent.includes('自动档将清理'));assert(node(f,'warning').textContent.includes('手动档不会删除'));
+});
+test('review has a distinct compact screen, visible irreversible warning and reachable actions',()=>{
+  const f=settings();review(f,0);assert(node(f,'edit').classList.contains('hidden'));assert(!node(f,'review').classList.contains('hidden'));
+  for(const id of ['warning','confirm','back','export','close'])assert(!node(f,id).classList.contains('hidden'));
+  assert(node(f,'review-button').classList.contains('hidden'));assert(node(f,'step').textContent.startsWith('2 / 2'));
+  assert(node(f,'confirm-summary').textContent.includes('种子 0'));assert(node(f,'confirm-summary').textContent.includes('4家庭 / 13人'));
+  assert.equal(f.doc.activeElement,node(f,'confirm'));assert.equal(node(f,'body').scrollTop,0);
+  press(f,'back');assert(!node(f,'edit').classList.contains('hidden'));assert(node(f,'warning').classList.contains('hidden'));assert(node(f,'confirm').disabled);assert(node(f,'step').textContent.startsWith('1 / 2'));
+});
+test('periodic refresh preserves focus, selection, scroll, expanded help and unchanged live text',()=>{
+  const f=settings(),field=node(f,'seed'),details=node(f,'details'),body=node(f,'body'),status=node(f,'status'),summary=node(f,'summary');
+  field.focus();field.selectionStart=2;field.selectionEnd=4;details.open=true;node(f,'help').open=true;body.scrollTop=216;
+  const writes={status:status.textWrites,summary:summary.textWrites};
+  for(let i=0;i<20;i++)f.G.ui.refreshNewGameSettings();
+  assert.equal(f.doc.activeElement,field);assert.equal(node(f,'seed'),field);assert.equal(field.selectionStart,2);assert.equal(field.selectionEnd,4);
+  assert.equal(details.open,true);assert.equal(node(f,'help').open,true);assert.equal(body.scrollTop,216);assert.equal(status.textWrites,writes.status);assert.equal(summary.textWrites,writes.summary);
+  review(f);node(f,'export').focus();body.scrollTop=36;f.G.ui.refreshNewGameSettings();assert.equal(f.doc.activeElement,node(f,'export'));assert.equal(body.scrollTop,36);
+});
+test('reopening starts at the top with optional explanations collapsed without touching the village',()=>{
+  const f=settings(),world=f.G.world;node(f,'details').open=true;node(f,'help').open=true;node(f,'body').scrollTop=300;press(f,'close');f.G.ui.showNewGameSettings();
+  assert.equal(node(f,'details').open,false);assert.equal(node(f,'help').open,false);assert.equal(node(f,'body').scrollTop,0);assert.equal(f.G.world,world);assert.equal(f.calls.removed.length,0);
+});
+test('invalid seed is programmatically identified and recovers without replacing the input',()=>{
+  const f=settings(),input=node(f,'seed');seed(f,'1e3');assert.equal(input.getAttribute('aria-invalid'),'true');assert(node(f,'review-button').disabled);seed(f,'0');assert.equal(input.getAttribute('aria-invalid'),'false');assert.equal(node(f,'seed'),input);assert(!node(f,'review-button').disabled);
+});
 test('opening, modifying and cancelling preserve the existing world, RNG, UID, resources and saves',()=>{const f=settings(),G=f.G,w=G.world,g=G.game,rng=G.rng,uid=G._peekUid(),before=snapshot(G);seed(f,0);press(f,'preset-hard');press(f,'random');press(f,'reuse');press(f,'close');assert.equal(G.world,w);assert.equal(G.game,g);assert.equal(G.rng,rng);assert.equal(G._peekUid(),uid);assert.equal(snapshot(G),before);assert.equal(g.paused,false);assert.deepEqual(f.calls,{removed:[],saved:[],server:[],exported:0});assert.equal(f.doc.activeElement,f.open);});
 test('random and reuse change only draft values; seed zero remains explicit',()=>{const f=settings();const before=snapshot(f.G),rng=f.G.rng;press(f,'random');assert(Number.isInteger(Number(node(f,'seed').value)));assert(Number(node(f,'seed').value)>=0);press(f,'reuse');assert.equal(node(f,'seed').value,'17');seed(f,0);assert(node(f,'summary').textContent.includes('种子 0'));assert.equal(f.G.rng,rng);assert.equal(snapshot(f.G),before);});
 for(const value of ['', '1.5','1e3','0x10','NaN','Infinity','4294967296','-2147483649'])test('invalid seed blocks review without writes: '+JSON.stringify(value),()=>{const f=settings(),w=f.G.world;seed(f,value);press(f,'review-button');assert.equal(f.G.ui._startSession.phase,'edit');assert(node(f,'review-button').disabled);assert.equal(f.G.world,w);assert.equal(f.calls.removed.length,0);assert.equal(f.calls.server.length,0);});
@@ -174,12 +207,19 @@ function bindSettingsInput() {
   const f=settings(), canvas=f.mount('game');canvas.style={};canvas.getContext=()=>({});canvas.getBoundingClientRect=()=>({left:0,top:0});
   f.G.ui.init=()=>{};f.G.feedback={init(){}};f.G.tryReplayLoad=()=>true;f.G.probeServerSaves=()=>{};f.G.init();
   const query=f.modal.querySelectorAll.bind(f.modal);
-  f.modal.querySelectorAll=selector=>selector.includes('button, input')?f.modal.descendants().filter(el=>['BUTTON','INPUT','SELECT','TEXTAREA'].includes(el.tagName)):query(selector);
-  for(const el of f.modal.descendants())el.getClientRects=()=>{for(let at=el;at;at=at.parentNode)if(at.classList.contains('hidden'))return [];return [{}];};
+  f.modal.querySelectorAll=selector=>selector.includes('button, input')?f.modal.descendants().filter(el=>['BUTTON','INPUT','SELECT','TEXTAREA'].includes(el.tagName)||el.getAttribute('tabindex')!==null):query(selector);
+  for(const el of f.modal.descendants())el.getClientRects=()=>{for(let at=el;at;at=at.parentNode){if(at.classList.contains('hidden'))return [];if(at.parentNode?.tagName==='DETAILS'&&!at.parentNode.open&&at.tagName!=='SUMMARY')return [];}return [{}];};
   return {...f,canvas};
 }
 test('production Escape cancels from the seed field and restores the old pause state without deleting saves',()=>{const f=bindSettingsInput(),w=f.G.world;review(f);node(f,'seed').focus();f.windowEvent('keydown',{key:'Escape',target:node(f,'seed')});assert(f.modal.classList.contains('hidden'));assert.equal(f.G.world,w);assert.equal(f.G.game.paused,false);assert.equal(f.calls.removed.length,0);assert.equal(f.doc.activeElement,f.open);});
 test('production Tab traps focus among visible controls and ignores the hidden final confirmation',()=>{const f=bindSettingsInput();node(f,'close').focus();f.windowEvent('keydown',{key:'Tab',target:node(f,'close')});assert.equal(f.doc.activeElement,node(f,'seed'));f.windowEvent('keydown',{key:'Tab',shiftKey:true,target:node(f,'seed')});assert.equal(f.doc.activeElement,node(f,'close'));assert(!node(f,'confirm').getClientRects().length);});
+test('review focus trap includes optional summaries and excludes the hidden editing screen',()=>{
+  const f=bindSettingsInput();review(f);const summary=node(f,'details').children[0];
+  node(f,'close').focus();f.windowEvent('keydown',{key:'Tab',target:node(f,'close')});assert.equal(f.doc.activeElement,summary);
+  f.windowEvent('keydown',{key:'Tab',shiftKey:true,target:summary});assert.equal(f.doc.activeElement,node(f,'close'));
+  assert(!node(f,'seed').getClientRects().length);assert(node(f,'warning').getClientRects().length);assert(node(f,'confirm').getClientRects().length);
+  summary.focus();for(let i=0;i<5;i++)f.G.ui.refreshNewGameSettings();assert.equal(f.doc.activeElement,summary);
+});
 test('production pause/speed shortcuts and canvas placement cannot change the old village under settings',()=>{const f=bindSettingsInput(),G=f.G,w=G.world,oldSpeed=G.game.speed;G.tool={kind:'build',type:'house'};f.canvas.focus();for(const key of [' ','1','2','3','w'])f.windowEvent('keydown',{key,target:f.canvas});f.canvas.emit('mousedown',{button:0,clientX:120,clientY:200});f.windowEvent('mouseup',{button:0,clientX:120,clientY:200,target:f.canvas});assert.equal(G.world,w);assert.equal(G.world.buildings.length,0);assert.equal(G.game.speed,oldSpeed);assert.equal(G.game.paused,true);assert.deepEqual(Object.keys(G.keys),[]);assert.equal(f.calls.removed.length,0);});
 test('production page-hide and before-unload keep automatic saves untouched while settings are open',()=>{const f=bindSettingsInput();f.windowEvent('pagehide');f.windowEvent('beforeunload');f.doc.visibilityState='hidden';f.documentEvent('visibilitychange');assert.equal(f.calls.saved.length,0);assert.equal(f.calls.server.length,0);assert.equal(f.calls.removed.length,0);});
 test('terrain choice is a read-only draft, explains v2 and tunnel limit, and cancels without replacing old land',()=>{const f=settings(),w=f.G.world,before=snapshot(f.G);press(f,'terrain-mountain');assert.equal(node(f,'terrain-mountain').getAttribute('aria-pressed'),'true');assert(node(f,'summary').textContent.includes('山地'));assert(node(f,'summary').textContent.includes('v2'));assert(node(f,'summary').textContent.includes('隧道')&&node(f,'summary').textContent.includes('完工'));assert.equal(f.G.world,w);assert.equal(snapshot(f.G),before);press(f,'close');assert.equal(f.G.world,w);assert.equal(f.calls.removed.length,0);});

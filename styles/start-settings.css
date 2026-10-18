@@ -1,0 +1,65 @@
+/* Keep the decision controls on screen; only the settings and optional explanations scroll. */
+#new-game-settings { position: fixed; padding: 8px; box-sizing: border-box; }
+#new-game-settings .start-settings-dialog {
+  display: flex;
+  flex-direction: column;
+  width: min(760px, 100%);
+  max-width: 760px;
+  max-height: calc(100vh - 16px);
+  max-height: calc(100dvh - 16px);
+  padding: 0;
+  overflow: hidden;
+  text-align: left;
+}
+.start-settings-header, .start-settings-footer { flex: 0 0 auto; padding: 12px 18px; }
+.start-settings-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid #6b5839; }
+#new-game-settings .start-settings-header h2 { margin: 0; font-size: 20px; line-height: 1.4; }
+#new-game-title { display: flex; align-items: center; gap: 8px; }
+#new-game-title-icon { display: inline-flex; }
+#new-game-title-icon svg { width: 22px; height: 22px; }
+#new-game-step { flex: 0 0 auto; margin: 0; color: #ebd9b0; }
+.start-settings-body { min-height: 0; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; padding: 12px 18px; scrollbar-gutter: stable; }
+#new-game-settings .start-settings-body p { margin: 0 0 9px; line-height: 1.55; overflow-wrap: anywhere; }
+#new-game-settings .start-settings-body h3 { margin: 12px 0 6px; }
+#new-game-status { min-height: 0; }
+#new-game-current, #new-game-seed-hint { color: #bfb193; font-size: 12px; }
+#new-game-settings .start-seed-row { gap: 8px; }
+#new-game-settings .start-seed-row label { min-width: 0; flex-basis: 220px; }
+#new-game-settings button { margin: 0; min-height: 44px; min-width: 44px; padding: 8px 10px; line-height: 1.4; }
+#new-game-settings .start-seed-row button { margin-bottom: 0; }
+#new-game-settings .start-presets { margin: 0 0 10px; gap: 8px; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+#new-game-settings .start-presets button { gap: 4px; min-width: 0; border-width: 2px; }
+#new-game-settings .start-presets strong { font-size: 14px; }
+#new-game-settings .start-presets span { line-height: 1.45; }
+#new-game-settings .start-preview { margin: 12px 0; padding: 9px 11px; border-left: 3px solid #d8b25a; background: #332c1c; }
+.start-settings-details { border-top: 1px solid #665436; }
+.start-settings-details summary { min-height: 44px; box-sizing: border-box; padding: 12px 2px; color: #ecd49d; cursor: pointer; font-size: 13px; line-height: 20px; }
+#new-game-settings .start-settings-details p { padding: 0 2px 6px; font-size: 12px; }
+#new-game-settings #new-game-review { margin: 0 0 12px; padding: 12px; }
+#new-game-settings #new-game-review h3 { margin-top: 0; }
+#new-game-settings #new-game-confirm-summary { color: #ffebba; font-size: 14px; line-height: 1.7; }
+.start-settings-footer { border-top: 1px solid #75603a; background: #251e13; }
+#new-game-settings .start-settings-warning { margin: 0 0 10px; padding: 8px 10px; border-left: 3px solid #edb36a; background: #463322; color: #ffe6bd; line-height: 1.5; font-size: 13px; overflow-wrap: anywhere; }
+.start-settings-warning strong { color: #ffe5b0; }
+.start-footer-actions { display: flex; flex-wrap: wrap; align-items: stretch; gap: 8px; }
+.start-footer-actions .start-primary-action { flex: 1 1 190px; font-weight: bold; }
+#new-game-settings button:focus-visible, #new-game-settings input:focus-visible, #new-game-settings summary:focus-visible { outline: 3px solid #ffe9ae; outline-offset: 3px; }
+#new-game-settings button:disabled { opacity: .45; cursor: not-allowed; }
+#new-game-settings [aria-invalid="true"] { border-color: #f2a27f; }
+@media (max-width: 480px) {
+  .start-settings-header, .start-settings-footer { padding: 10px 12px; }
+  .start-settings-header { flex-wrap: wrap; gap: 2px 12px; }
+  #new-game-settings .start-settings-header h2 { font-size: 18px; }
+  #new-game-step { font-size: 12px; }
+  .start-settings-body { padding: 10px 12px; }
+  #new-game-settings .start-seed-row label { flex-basis: 100%; }
+  #new-game-settings .start-presets { grid-template-columns: minmax(0, 1fr); }
+  .start-footer-actions .start-primary-action { flex-basis: 100%; order: -1; }
+  .start-footer-actions > button:not(.start-primary-action) { flex: 1 1 auto; }
+}
+@media (max-height: 480px) {
+  .start-settings-header, .start-settings-footer { padding-top: 6px; padding-bottom: 6px; }
+  #new-game-settings .start-settings-header h2 { font-size: 17px; }
+  #new-game-settings .start-settings-warning { padding: 5px 8px; margin-bottom: 6px; font-size: 12px; line-height: 1.4; }
+  .start-settings-body { padding-top: 8px; padding-bottom: 8px; }
+}

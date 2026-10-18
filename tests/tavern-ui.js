@@ -16,7 +16,7 @@ function fixture() {
     const handlers = {}, classes = new Set((attrs.class || '').split(/\s+/));
     let html = '', text = '';
     return {
-      tagName: tag.toUpperCase(), id: attrs.id || '', dataset: Object.fromEntries(Object.entries(attrs)
+      value: attrs.value || '', tagName: tag.toUpperCase(), id: attrs.id || '', dataset: Object.fromEntries(Object.entries(attrs)
         .filter(([key]) => key.startsWith('data-')).map(([key, value]) => [key.slice(5).replace(/-([a-z])/g, (_, c) => c.toUpperCase()), value])),
       children: [], parentNode: null, htmlWrites: 0, textWrites: 0,
       classList: { add(k) { classes.add(k); }, remove(k) { classes.delete(k); }, contains(k) { return classes.has(k); },
@@ -116,7 +116,7 @@ function tavern() {
 test('tavern appears in industry with dedicated art and real recipe, food protection, adult service facts', () => {
   const f = tavern(); f.G.ui.initToolbar();
   assert(f.G.ui.toolGroups.find(group => group.id === 'industry').tools.includes('tavern'));
-  assert.match(f.G.ui.toolButton('tavern'), /assets\/icons\/tool_tavern\.png/);
+  assert.match(f.G.ui.toolButton('tavern'), /class="ui-icon"/);
   assert.equal(f.G.BDEF.tavern.jobs, 1); f.select(f.b);
   assert.match(live(f, 'recipe').textContent, /30 主食 → 3 麦酒（受教育 4）.*6 小时/);
   assert.match(live(f, 'reserve').textContent, /全村 12 天.*50/);
@@ -235,7 +235,7 @@ test('citizen statuses distinguish actual fetching, ingredient transport, brewin
 test('ale HUD and production goal register independently of all six food items and describe lossless full-cargo delivery', () => {
   const f = tavern(), { G } = f;
   assert(G.RES_KEYS.includes('ale')); assert(!G.FOOD_KEYS.includes('ale'));
-  assert.match(G.ui.resourceIcon('ale'), /assets\/icons\/res_ale\.png/);
+  assert.match(G.ui.resourceIcon('ale'), /aria-label="麦酒"[\s\S]*stroke="currentColor"/);
   G.game.res.ale = G.storageCap(); f.visitor.carry = { type: 'ale', qty: 2 }; G.ui.refreshHUD();
   const title = f.doc.getElementById('res-ale').title;
   assert.match(title, /麦酒不计入食物，不可充饥.*18 岁以上.*1 麦酒/); assert.match(title, /仓满保留麦酒/);

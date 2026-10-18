@@ -7,16 +7,66 @@ G.ui = {
   el: {},
   infoT: 0,
 
-  // Every stock display and HTML building cost uses the same resource registry.
-  // Emoji are a shared image-load fallback only; text tooltips spell out names.
+  // Original single-ink, 24px line icons. UI-only: world artwork is unchanged.
+  icon: function (name) {
+    const paths = {
+      wood:'M5 5h11a4 7 0 0 1 0 14H5a4 7 0 0 1 0-14Zm0 0a4 7 0 0 1 0 14m1-9v4m4-7h5m-5 10h5',
+      stone:'m3 15 4-9 9-2 5 9-4 7H7Zm4-9 4 7 10 0m-10 0-4 7',
+      iron:'m3 16 4-8h11l3 8-5 4H8Zm4-8 3 8h11M10 16l-2 4',
+      coal:'m4 16 2-9 9-3 6 10-5 6H9Zm2-9 8 4 7 3m-7-3 2 9',
+      tools:'m4 20 9-9m-3-7 4 2 4-1 3 3-5 2-1 4m-2 1 6 6m-2-4 3-3',
+      steelTools:'m4 20 9-9m-3-7 4 2 4-1 3 3-5 2-1 4m-2 1 6 6m-2-4 3-3M3 4h4M5 2v4',
+      food:'M4 10h16l-2 10H6ZM8 10 6 5m6 5V3m4 7 2-5M8 14h8m-7 3h6',
+      meat:'M8 7c4-7 15-2 11 6-2 4-6 4-9 2l-4 5-3-3 5-4c-2-2-2-4 0-6Zm5 0c4-1 5 4 2 5-3 1-5-3-2-5Z',
+      eggs:'M5 14C5 8 10 3 12 3s7 5 7 11a7 7 0 0 1-14 0Zm4 0c0 2 1 3 3 3',
+      vegetables:'M12 21C1 16 1 7 7 7c-1-6 9-6 10 0 7 0 6 11-5 14Zm0 0V7m0 7-5-3m5 6 5-6',
+      grain:'M12 22V3m0 7C5 10 4 6 5 4c5 0 7 3 7 6Zm0 6c-7 0-8-4-7-6 5 0 7 3 7 6Zm0-9c6 0 7-4 6-6-4 0-6 3-6 6Zm0 7c7 0 8-4 7-6-5 0-7 3-7 6Z',
+      apples:'M12 8c-8-5-12 3-7 10 3 4 5 2 7 2s5 2 7-2c5-7 1-15-7-10Zm0 0V3m0 2c1-3 4-3 6-2-1 3-3 4-6 2',
+      pears:'M9 5h6c-2 5 3 6 4 10 2 8-16 8-14 0 1-4 6-5 4-10Zm3 0 1-3',
+      firewood:'M7 14c-3-5 2-7 3-11 4 4 1 7 5 8l2-5c4 6 6 14-5 15-4 0-8-3-5-7Zm4 7c-4-4 0-5 1-8 4 4 4 6-1 8Z',
+      leather:'m8 3 4 3 4-3 5 4-3 5 3 6-5 3-4-2-4 2-5-3 3-6-3-5Z',
+      wool:'M6 7c0-5 7-5 8-1 6-3 10 4 5 7 2 7-6 10-9 6-6 2-10-5-5-8-2-2-2-4 1-4Zm0 10 9-9M9 20l10-9M4 13l6-7',
+      clothes:'m8 3 4 2 4-2 6 5-4 4-2-2v11H8V10l-2 2-4-4Z',
+      warmCoats:'m8 3 4 2 4-2 6 5-4 4-2-2v11H8V10l-2 2-4-4Zm4 2v16m-4-8h8m-8 5h8',
+      herbs:'M5 21 19 3M9 16c-8-1-8-7-7-9 7 0 9 5 7 9Zm4-6c0-7 6-9 9-8-1 7-5 9-9 8Zm0 7c7 1 9-3 9-6-6-1-10 3-9 6Z',
+      ale:'M5 5h12v16H5Zm12 3h3c4 0 4 8 0 8h-3M8 9v8m5-8v8M5 5c-3-5 5-6 6-3 3-3 8 0 6 3',
+      building:'m2 10 10-8 10 8M5 8v13h14V8M10 21v-8h4v8',
+      storage:'m3 9 9-6 9 6v12H3Zm4 3h10v9M7 16h10m-5-4v9',
+      tree:'m12 2-7 7h3l-5 7h7v6h4v-6h7l-5-7h3Z',
+      farm:'M2 20h20M3 15l5-5 5 5 5-5 3 3M5 6v3m0-5V2m7 5V3m6 3V2',
+      road:'M8 2 3 22m13-20 5 20M12 3v4m0 4v3m0 4v4',
+      bridge:'M2 20V8m20 12V8M2 12h20M5 20c0-10 14-10 14 0M6 8V4m12 4V4M6 5h12',
+      fish:'M4 12C8 3 18 3 22 12c-4 9-14 9-18 0Zm0 0-3-5v10Zm13-2h.1',
+      cross:'M9 3h6v6h6v6h-6v6H9v-6H3V9h6Z',
+      citizen:'M8 6a4 4 0 1 0 8 0 4 4 0 1 0-8 0ZM4 22v-4a8 8 0 0 1 16 0v4',
+      people:'M6 7a3 3 0 1 0 6 0 3 3 0 1 0-6 0ZM2 21v-3a7 7 0 0 1 14 0v3m0-16a3 3 0 0 1 0 6m2 3c4 0 5 4 4 7',
+      clock:'M2 12a10 10 0 1 0 20 0 10 10 0 1 0-20 0Zm10-6v6l4 3',
+      close:'m5 5 14 14M19 5 5 19',
+      chevronDown:'m5 9 7 7 7-7',
+      alert:'m12 2 10 19H2Zm0 6v6m0 3h.1',
+      check:'m4 12 5 5L20 6',
+      save:'M3 3h15l3 3v15H3Zm4 0v7h10V3M7 21v-7h10v7',
+      folder:'M2 6h8l2 3h10l-3 12H2Zm0 3V3h7l3 3h8v3',
+      sprout:'M12 22V11M12 15C3 15 2 10 2 6c7-1 10 2 10 9Zm0-4C11 3 16 1 22 2c0 7-3 10-10 9Z',
+      mail:'M2 4h20v16H2Zm0 0 10 9L22 4',
+      help:'M2 12a10 10 0 1 0 20 0 10 10 0 1 0-20 0Zm6-4c0-5 9-5 9 0 0 4-5 3-5 7m0 3h.1',
+      pause:'M7 3v18M17 3v18', play:'m6 3 15 9-15 9Z',
+      fast:'m2 4 10 8-10 8Zm10 0 10 8-10 8Z', fastest:'m2 4 8 8-8 8Zm9 0 8 8-8 8Zm11-1v18',
+      demolish:'m4 4 16 16M4 20 20 4M2 12a10 10 0 1 0 20 0 10 10 0 1 0-20 0Z',
+    };
+    const aliases = {settings:'tools',house:'building',stonehouse:'building',boarding:'building',homes:'building',services:'building',industry:'tools',land:'road',other:'tools',mine:'tools',stonequarry:'stone',blacksmith:'tools',hunting:'meat',stockpile:'wood',market:'food',gatherer:'vegetables',forester:'tree',woodcutter:'wood',dock:'fish',school:'building',herbalist:'herbs',hospital:'cross',townhall:'building',tavern:'ale',stoneroad:'road',tunnel:'bridge',tailor:'clothes',tradingpost:'bridge',pasture:'wool',orchard:'apples',chapel:'cross',well:'storage',cemetery:'cross',fell:'wood',quarry:'tools',burntruins:'firewood',mineralpit:'stone'};
+    const key = paths[name] ? name : aliases[name] || 'building';
+    return `<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="${paths[key]}"></path></svg>`;
+  },
+
   resourceIcon: function (type) {
     const r = G.RES[type];
-    return `<span class="res-icon" role="img" aria-label="${r.name}" title="${r.name}"><span aria-hidden="true">${r.icon}</span>${r.iconAsset ? `<img src="assets/icons/${r.iconAsset}.png" alt="" onerror="this.remove()">` : ''}</span>`;
+    return `<span class="res-icon" role="img" aria-label="${r.name}" title="${r.name}">${this.icon(type)}</span>`;
   },
 
   resourceCost: function (cost, html) {
     return Object.keys(cost).map(type => html
-      ? `<span class="res-cost">${this.resourceIcon(type)}<span>${cost[type]}</span></span>`
+      ? `<span class="res-cost">${this.resourceIcon(type)}<span>${G.RES[type].name} ${cost[type]}</span></span>`
       : `${G.RES[type].name}×${cost[type]}`).join(' ') || '免费';
   },
 
@@ -198,20 +248,22 @@ G.ui = {
       cancelRocks: $('cancel-rock-marks'), cancelStatus: $('harvest-cancel-status'),
     };
 
-    // 资源栏
-    const foodKeys = ['food', ...(G.FOOD_KEYS || [])].filter(k => G.RES_KEYS.includes(k));
-    const resourceChip = k => `<span class="res${k === 'food' ? ' res-total' : ''}" id="res-${k}" title="${G.RES[k].name}">${this.resourceIcon(k)}<span class="res-label">${k === 'food' ? '总食物' : G.RES[k].name}</span><b>0</b>${k === 'food' ? '<i id="net-food"></i>' : ''}</span>`;
-    this.el.resRow.innerHTML = `<div class="resource-group food-resources" aria-label="食物总量与物品明细">${foodKeys.map(resourceChip).join('')}</div>` +
-      `<div class="resource-group materials-resources" aria-label="材料与用品">${G.RES_KEYS.filter(k => !foodKeys.includes(k)).map(resourceChip).join('')}</div>`;
+    // Core resources never disappear or move when their amount reaches zero.
+    this.initResourceHUD();
+    this.initGuideHUD();
+    for (const [id, name] of [['btn-err', 'alert'], ['btn-production-goals', 'settings'], ['btn-save', 'save'], ['btn-load', 'folder'], ['btn-new', 'sprout'], ['btn-fb', 'mail'], ['btn-help', 'help']]) {
+      const button = $(id);
+      if (button && this.icon) button.innerHTML = this.icon(name);
+    }
 
     // 速度按钮（原版：暂停 / 1x / 2x / 5x）
     this.el.speed.innerHTML = [
-      ['⏸', 'pause', '暂停 (空格)'],
-      ['▶', 1, '正常速度 (1)'],
-      ['⏩', 2, '二倍速 (2)'],
-      ['⏭', 5, '五倍速 (3)'],
-    ].map(([ic, v, tip]) =>
-      `<button class="sp" data-v="${v}" title="${tip}">${ic}</button>`
+      ['pause', 'pause', '暂停 (空格)', '暂停'],
+      ['play', 1, '正常速度 (1)', '1×'],
+      ['fast', 2, '二倍速 (2)', '2×'],
+      ['fastest', 5, '五倍速 (3)', '5×'],
+    ].map(([ic, v, tip, label]) =>
+      `<button class="sp" data-v="${v}" title="${tip}" aria-label="${tip}">${this.icon ? this.icon(ic) : ''}<span>${label}</span></button>`
     ).join('');
     this.el.speed.querySelectorAll('button').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -317,14 +369,10 @@ G.ui = {
 
   toolCategoryButton: function (group) {
     const name=this.escHtml(group.name);
-    return `<button type="button" class="tb tb-category" data-category="${group.id}" aria-controls="toolbar-group-${group.id}" aria-expanded="false" aria-label="${name}" title="${name}"><span class="ic" aria-hidden="true">${group.icon}</span><span class="category-label"><span class="lb">${name}</span><span class="category-arrow" aria-hidden="true">›</span></span></button>`;
+    return `<button type="button" class="tb tb-category" data-category="${group.id}" aria-controls="toolbar-group-${group.id}" aria-expanded="false" aria-label="${name}" title="${name}"><span class="ic" aria-hidden="true">${this.icon(group.id)}</span><span class="category-label"><span class="lb">${name}</span><span class="category-arrow" aria-hidden="true">›</span></span></button>`;
   },
 
   toolButton: function (t) {
-    const icons = { stonehouse: 'tool_stonehouse', boarding: 'tool_boarding', mine: 'tool_mine', stonequarry: 'tool_stonequarry',
-      blacksmith: 'tool_blacksmith', hunting: 'tool_hunting', house: 'tool_house', storage: 'tool_storage', stockpile:'tool_stockpile', market:'tool_market',
-      gatherer: 'tool_gatherer', forester: 'tool_forester', woodcutter: 'tool_woodcutter', dock: 'tool_dock',
-      school: 'tool_school', herbalist: 'tool_herbalist', hospital: 'tool_hospital', townhall: 'tool_townhall', tavern: 'tool_tavern', farm: 'tool_farm', road: 'tool_road', stoneroad: 'tool_stoneroad', bridge: 'tool_bridge', demolish: 'tool_demolish' };
     const special = {
       demolish: { name: '拆除', icon: '🚫', cost: '建筑 · 道路', tip: '拆除：点击建筑或道路移除；树木请用砍伐，岩石和铁矿请用采石采铁' },
       quarry: { name: '采石采铁', icon: '⛏', cost: '灰石 · 锈铁', tip: '采石采铁：框选预览并确认矿石；灰色岩石产石头，锈色铁矿产铁，散工开采后搬运入库' },
@@ -335,9 +383,30 @@ G.ui = {
     const cost = action ? action.cost : t === 'road' ? '免材料 · 每格1工时' : t === 'stoneroad' ? '每格1石 · 1工时' : t === 'tunnel' ? '每格4石 · 3工时' : t === 'pasture' ? '7–20格 · 按面积圈地' : t === 'orchard' ? '4–15格 · 按树列开园' : t === 'cemetery' ? '7–20格 · 按墓位规划' : this.resourceCost(def.cost, true);
     const tip = action ? action.tip : t === 'tunnel' ? '隧道：选两个已清场陆地洞口，沿一个网格轴穿过连续山体；每格4石、3游戏施工小时（含两端）。只在首选洞口实运材料并施工，完工后按土路速度通行' : t === 'cemetery' ? '墓园：每边7–20格，选两个角或拖出矩形；预览实际墓位、石材和工时，确认后实运施工。拆围栏不清除墓碑' : t === 'pasture' ? '牧场：每边7–20格，选两个角或拖出矩形；预览羊、牛、鸡容量和建材用工，确认后清场施工' : t === 'orchard' ? '果园：每边4–15格，选两个角或拖矩形；按东西2格/南北3格树距预览株数、成本与农夫用工，确认后清场施工' : ['road', 'stoneroad'].includes(t) ? `${t === 'stoneroad' ? '石路每个新铺/升级格需1石' : '土路无需材料'}：点选或拖出起终点预览连通路线，清树后再确认施工；每格1基础游戏施工小时为本作适配。确认排队，逐格实运施工后才提速；原道路仍可走` :
       `${def.name}（${this.resourceCost(def.cost, false)}${def.jobs ? ' · 岗位×' + def.jobs : ''}）— ${def.desc}`;
-    const imagePath = icons[t] ? `assets/icons/${icons[t]}.png` : ['tailor', 'tradingpost', 'pasture', 'orchard', 'chapel'].includes(t) ? `assets/buildings/${t}.png` : null;
-    const image = imagePath ? `<img class="icimg" src="${imagePath}" alt="" onerror="this.remove()">` : '';
-    return `<button type="button" class="tb" data-tool="${t}" title="${this.escHtml(tip)}" aria-pressed="false"><span class="ic" aria-hidden="true">${icon}${image}</span><span class="lb">${name}</span><span class="cost">${cost}</span></button>`;
+    const shortage = this.toolMaterialShortage(t);
+    return `<button type="button" class="tb${shortage ? ' is-short' : ''}" data-tool="${t}" title="${this.escHtml(tip)}" aria-pressed="false"><span class="ic" aria-hidden="true">${this.icon(t)}</span><span class="lb">${name}</span><span class="cost">${cost}</span><span class="material-badge${shortage ? '' : ' hidden'}" data-material-shortage="${t}">${shortage ? '缺料 · 可选址' : ''}</span></button>`;
+  },
+
+  // Preview is always available. addBuilding/plan confirmation retains the
+  // authoritative public-stock check; opening a tool spends/reserves nothing.
+  toolMaterialShortage: function (type) {
+    const def = G.BDEF[type];
+    if (!def || !G.game || ['road','stoneroad','bridge','tunnel','farm','pasture','orchard','cemetery'].includes(type)) return '';
+    return Object.entries(def.cost || {}).filter(([key, qty]) => (G.game.res[key] || 0) < qty)
+      .map(([key, qty]) => `${G.RES[key].name}缺${Math.ceil(qty - (G.game.res[key] || 0))}`).join('、');
+  },
+
+  refreshToolAffordability: function () {
+    if (!this.el.toolbar) return;
+    this.el.toolbar.querySelectorAll('[data-tool]').forEach(btn => {
+      const missing = this.toolMaterialShortage(btn.dataset.tool);
+      btn.classList.toggle('is-short', !!missing);
+      const badge = btn.querySelector('[data-material-shortage]');
+      if (badge) { badge.classList.toggle('hidden', !missing); badge.textContent = missing ? '缺料 · 可选址' : ''; badge.title = missing; }
+      const base = btn._materialBaseTitle || btn.title || btn.getAttribute('title') || '';
+      btn._materialBaseTitle = base;
+      btn.title = base + (missing ? `；${missing}。可先查看选址，正式落点仍需公共库存足额；不预扣。` : '');
+    });
   },
 
   openToolCategory: function (id) {
@@ -906,12 +975,110 @@ G.ui = {
     }, 6000);
   },
 
+  // These views describe existing stock and risks; they never change simulation data.
+  hudCoreResources: function () {
+    return ['food', 'wood', 'stone', 'iron', 'tools', 'firewood'];
+  },
+
+  initResourceHUD: function () {
+    const row = this.el.resRow;
+    if (!row) return;
+    const core = this.hudCoreResources();
+    const secondary = [...(G.FOOD_KEYS || []), 'leather', 'wool', 'clothes', 'warmCoats', 'herbs', 'coal', 'steelTools', 'ale'];
+    // Keep unknown future resources visible, after the established fixed slots.
+    const extra = [...new Set([...secondary, ...G.RES_KEYS])].filter(k => !core.includes(k) && G.RES[k]);
+    const chip = k => `<span class="res${k === 'food' ? ' res-total' : ''}" id="res-${k}" data-resource="${k}" tabindex="0" title="${G.RES[k].name}">${this.resourceIcon(k)}<span class="res-label">${k === 'food' ? '总食物' : G.RES[k].name}</span><b>0</b>${k === 'food' ? '<i id="net-food"></i>' : ''}</span>`;
+    row.innerHTML = `<div id="core-resources" class="resource-group core-resources" aria-label="核心库存">${core.map(chip).join('')}</div>` +
+      `<button type="button" id="resource-more" aria-expanded="false" aria-controls="secondary-resources" title="展开食物明细、衣物和其他资源">${this.icon ? this.icon('chevronDown') : ''}<span id="resource-more-label">更多</span><span id="resource-warning-count" hidden></span></button>` +
+      `<div id="secondary-resources" class="resource-group secondary-resources hidden" aria-label="更多资源，固定排序" hidden>${extra.map(chip).join('')}</div>`;
+    const button = document.getElementById('resource-more');
+    button.addEventListener('click', () => {
+      if (G.hasOpenModal?.()) return;
+      this.setResourceExpanded(!this._resourceExpanded);
+    });
+    row.addEventListener('keydown', e => {
+      if (e.key !== 'Escape' || !this._resourceExpanded || G.hasOpenModal?.()) return;
+      e.preventDefault(); e.stopPropagation();
+      this.setResourceExpanded(false); button.focus({ preventScroll: true });
+    });
+    this.setResourceExpanded(false);
+  },
+
+  setResourceExpanded: function (expanded) {
+    const button = document.getElementById('resource-more'), panel = document.getElementById('secondary-resources');
+    if (!button || !panel) return;
+    if (!expanded && panel.contains?.(document.activeElement)) button.focus({ preventScroll: true });
+    this._resourceExpanded = !!expanded;
+    panel.hidden = !expanded; panel.classList.toggle('hidden', !expanded);
+    button.setAttribute('aria-expanded', String(!!expanded));
+    const label = document.getElementById('resource-more-label');
+    if (label) label.textContent = expanded ? '收起' : '更多';
+  },
+
+  initGuideHUD: function () {
+    const button = this.el.guide?.querySelector?.('#guide-toggle');
+    if (!button || button._guideBound) return;
+    button._guideBound = true;
+    button.addEventListener('click', () => {
+      if (G.hasOpenModal?.()) return;
+      this._guideExpanded = !this._guideExpanded;
+      this.refreshGuide();
+    });
+  },
+
+  refreshSaveStatus: function () {
+    const el = document.getElementById('save-status');
+    if (!el) return;
+    const warning = G.autosaveBlocked ? '原自动档已保护：临时局不自动保存，请打开存档管理备份或手动保存。' : '';
+    el.textContent = warning; el.hidden = !warning;
+    const button = document.getElementById('btn-load');
+    if (button) button.classList.toggle('save-attention', !!warning);
+  },
+
+  refreshResourceWarnings: function (hauling, supplies) {
+    const button = document.getElementById('resource-more');
+    if (!button) return;
+    const g = G.game, w = G.world, warnings = {};
+    const physical = !!supplies, stock = physical ? supplies.available : g.res;
+    const add = (key, text, urgent = false) => { warnings[key] = { text, urgent }; };
+    const alive = w.citizens.filter(c => !c.dead);
+    const groups = G.foodGroupsOf((G.FOOD_KEYS || []).filter(k => stock[k] > 0));
+    if (alive.length && groups.length < 3) for (const type of ['meat', 'vegetables', 'grain'])
+      if (!groups.includes(type)) add(type, `${G.RES[type].name}营养组暂无储备；可补充多样食物`);
+    if (alive.some(c => !(c.clothingLeft > 0)) && (stock.clothes || 0) + (stock.warmCoats || 0) <= 0)
+      add('clothes', '有居民衣物耗尽且暂无成衣储备；暖衣与普通衣均可补给', g.season === 3);
+    if (alive.some(c => G.isSick?.(c)) && !(g.res.herbs > 0))
+      add('herbs', '草药暂无储备；可补充保健用药，诊所治疗不消耗草药');
+    if (w.buildings.some(b => b.type === 'blacksmith' && b.state === 'ok' && G.blacksmithOutput?.(b) === 'steelTools') && g.res.coal < 1)
+      add('coal', '钢工具配方缺煤；铁工具不需要煤');
+    for (const key of G.RES_KEYS) {
+      if (hauling.carry[key] > 0 && !['tools', 'steelTools'].includes(key) && g.res[key] >= G.storageCap(key))
+        add(key, `${G.RES[key].name}仓满，随身产出等待入库`);
+      const chip = document.getElementById('res-' + key);
+      if (chip) {
+        chip.classList.toggle('resource-warning', !!warnings[key]);
+        chip.classList.toggle('resource-urgent', !!warnings[key]?.urgent);
+        if (warnings[key]) chip.title += ' · 提醒：' + warnings[key].text;
+        chip.setAttribute?.('aria-label', chip.title);
+      }
+    }
+    const core = this.hudCoreResources(), hidden = Object.keys(warnings).filter(k => !core.includes(k));
+    const badge = document.getElementById('resource-warning-count');
+    if (badge) { badge.textContent = String(hidden.length); badge.hidden = !hidden.length; }
+    button.classList.toggle('has-warning', !!hidden.length);
+    button.classList.toggle('has-urgent', hidden.some(k => warnings[k].urgent));
+    button.title = hidden.length ? `更多资源有 ${hidden.length} 项提醒：` + hidden.map(k => warnings[k].text).join('；') : '食物明细、衣物和其他资源；数量为零仍保留原位';
+    button.setAttribute('aria-label', `更多资源${hidden.length ? '，' + hidden.length + ' 项提醒' : ''}`);
+  },
+
   refreshHUD: function () {
     if (!G.world) return;
     const g = G.game, physical = G.supplyEnabled && G.supplyEnabled(), supplies = physical ? G.supplyInventory() : null;
     const mealNotice=document.getElementById('meal-transition-notice');
     if(mealNotice){const notice=G.mealTransitionNotice?.()||'';mealNotice.textContent=notice;mealNotice.hidden=!notice;}
     this.refreshGuide();
+    this.refreshSaveStatus();
+    this.refreshToolAffordability?.();
     this.refreshProductionGoals();
     this.refreshNewGameSettings();
     const hauling = G.harvestFeedback();
@@ -960,6 +1127,7 @@ G.ui = {
         }
       }
     }
+    this.refreshResourceWarnings(hauling, supplies);
     const netEl = document.getElementById('net-food');
     if (netEl) {
       const net = Math.round(g.foodNet);
@@ -968,12 +1136,13 @@ G.ui = {
       netEl.title = physical ? '全村食物净变（包括已配送物资）；左侧数字仅为公共库存' : '食物净变';
     }
     const hh = Math.floor(g.h);
-    this.el.date.textContent = `${G.SEASON_ICONS[g.season]} 第 ${g.year} 年 · ${G.SEASON_NAMES[g.season]} 第 ${(g.day % G.SEASON_DAYS) + 1} 天 · ${G.isRestTime() ? '🌙' : '☀️'} ${String(hh).padStart(2, '0')}:00`;
+    this.el.date.innerHTML = `${this.icon ? this.icon('clock') : ''}<span>第 ${g.year} 年 · ${G.SEASON_NAMES[g.season]} ${(g.day % G.SEASON_DAYS) + 1} 日 · ${String(hh).padStart(2, '0')}:00</span>`;
+    this.el.date.title = '游戏时间；时钟图标不代表日照或居民作息';
     const w = G.world;
     const adults = w.citizens.filter(c => c.adult).length;
     const children = w.citizens.length - adults;
     const homeless = w.families.filter(f => f.houseId == null && f.members.length).length;
-    this.el.pop.innerHTML = `👥 ${w.citizens.length} <small>(成人${adults}·儿童${children})</small>` +
+    this.el.pop.innerHTML = `${this.icon ? this.icon('people') : ''}<b>${w.citizens.length}</b> <small>成人${adults} · 儿童${children}</small>` +
       (homeless ? ` <span class="warn-txt">无房${homeless}家</span>` : '') + this.healthSummaryMarkup();
     const errBtn = document.getElementById('btn-err');
     if (errBtn) errBtn.classList.toggle('hidden', !window.__errs.length);
@@ -994,30 +1163,81 @@ G.ui = {
     const el = this.el.guide;
     if (!el || !G.world) return;
     const g = G.game, w = G.world, physical = G.supplyEnabled && G.supplyEnabled(), supplies = physical ? G.supplyInventory().available : g.res;
-    const days = w.citizens.length ? (physical ? G.supplyFood(supplies) : g.res.food) / (w.citizens.length * G.LIFE.eatPerDay) : 0;
+    const alive = w.citizens.filter(c => !c.dead);
+    const days = alive.length ? (physical ? G.supplyFood(supplies) : g.res.food) / (alive.length * G.LIFE.eatPerDay) : 0;
     const untilWinter = (G.SEASON_DAYS * 3 - g.day % G.YEAR_DAYS + G.YEAR_DAYS) % G.YEAR_DAYS;
     const food = w.buildings.some(b => ['gatherer', 'dock', 'hunting', 'farm', 'orchard', 'pasture'].includes(b.type) && b.state === 'ok' && (b.type !== 'farm' || G.cropUnlocked(G.farmCropOf(b))));
     const fuel = w.buildings.some(b => b.type === 'woodcutter' && b.state === 'ok');
     const homeless = w.families.filter(f => f.members.length && f.houseId == null).length;
-    const heat = this.heatDemand();
-    const remainingHeat = heat.winter ? heat.futureWinter : heat.fullWinter;
-    const risks = [];
-    const harvest = G.harvestFeedback();
-    if (g.res.wood < 2) {
-      if (harvest.carry.wood) risks.push(`木材库存耗尽：另有 ${harvest.carry.wood} 随身待入库，送达后才能使用。`);
-      else if (harvest.trees) risks.push(`木材库存耗尽：${harvest.trees} 棵已标记，查看采运进度；砍倒后仍需送仓。`);
-      else risks.push('木材耗尽：向更远可达森林标记砍伐，后续护林补种；避开食物林。');
+    const heat = this.heatDemand(), remainingHeat = heat.winter ? heat.futureWinter : heat.fullWinter;
+    const harvest = G.harvestFeedback(), rows = [];
+    const add = (kind, level, priority, text, detail = text) => rows.push({ kind, level, priority, text, detail });
+    const hungry = alive.filter(c => c.hunger > 0).length;
+    const foodGroups = G.foodGroupsOf((G.FOOD_KEYS || []).filter(type => supplies[type] > 0));
+    const foodLabel = `${physical ? '全村粮食合计' : '粮食'}约 ${days.toFixed(1)} 天`;
+    const foodDetail = `${foodLabel}（不计新产出${physical ? '，含在途与待回收，逐户现货才可食用' : ''}）` + (G.FOOD_KEYS ? ` · 营养组 ${foodGroups.length}/3（肉类含鸡蛋，蔬菜含苹果和梨）` : '');
+    add('food', alive.length && (hungry || days < 2) ? 'urgent' : alive.length && days < 5 ? 'recommend' : 'status', 0,
+      `${hungry ? hungry + ' 人饥饿 · ' : ''}${foodLabel} · 营养组 ${foodGroups.length}/3`,
+      `${hungry ? hungry + ' 人饥饿：检查现货、通路与食物生产。' : ''}${foodDetail}`);
+    if (g.season >= 2 && G.usableHeatingFuel() < remainingHeat) {
+      const coal = G.heatingPolicy().allowCoal;
+      const detail = coal ? `取暖燃料不足：可用 ${Math.floor(G.usableHeatingFuel())} 柴火当量 / ${heat.winter ? '本冬此后' : '整冬'}约需 ${Math.ceil(remainingHeat)}，伐木屋需原木；住房可设煤补柴。` : `柴火不足：${physical ? '全村实物合计' : '现有'} ${Math.floor(physical ? supplies.firewood : g.res.firewood)} / ${heat.winter ? '本冬此后' : '整冬'}约需 ${Math.ceil(remainingHeat)}，伐木屋需原木。`;
+      add('heating', heat.winter ? 'urgent' : 'recommend', 1,
+        `${coal ? '取暖燃料不足' : '柴火不足'} · ${Math.floor(G.usableHeatingFuel())} / ${Math.ceil(remainingHeat)}${coal ? ' 柴火当量' : ''}；近仓备柴`, detail);
     }
-    if (g.season >= 2 && G.usableHeatingFuel() < remainingHeat) risks.push(G.heatingPolicy().allowCoal?`取暖燃料不足：可用 ${Math.floor(G.usableHeatingFuel())} 柴火当量 / ${heat.winter ? '本冬此后' : '整冬'}约需 ${Math.ceil(remainingHeat)}，伐木屋需原木；住房可设煤补柴。`:`柴火不足：${physical ? '全村实物合计' : '现有'} ${Math.floor(physical ? supplies.firewood : g.res.firewood)} / ${heat.winter ? '本冬此后' : '整冬'}约需 ${Math.ceil(remainingHeat)}，伐木屋需原木。`);
+    const cold = alive.filter(c => c.cold >= 1).length;
+    if (cold) add('cold', 'urgent', 2, `${cold} 人受冻 · 检查住房与实际供暖`, '居民正在受冻；库存估算不保证每户有燃料，检查住房、配送和返家通路。');
+    if (g.res.wood < 2) {
+      const detail = harvest.carry.wood ? `木材库存耗尽：另有 ${harvest.carry.wood} 随身待入库，送达后才能使用。`
+        : harvest.trees ? `木材库存耗尽：${harvest.trees} 棵已标记，查看采运进度；砍倒后仍需送仓。`
+        : '木材耗尽：向更远可达森林标记砍伐，后续护林补种；避开食物林。';
+      add('wood', 'recommend', 3, harvest.carry.wood ? `木材耗尽 · ${harvest.carry.wood} 随身待入库` : harvest.trees ? `木材耗尽 · ${harvest.trees} 棵已标记待采运` : '木材耗尽 · 标记更远可达森林，避开食物林', detail);
+    }
+    if (homeless) add('housing', heat.winter ? 'urgent' : 'recommend', 4,
+      `${homeless} 家无房 · ${heat.winter ? '尽快安置并备柴' : '入冬前逐步补住房'}`);
     const stage = !food ? '① 先保持续食物：在近仓森林建采集小屋；不要先连盖住房耗尽木石。'
       : !fuel ? '② 近仓建伐木屋备柴；在食物林外标记砍伐和矿石，保留散工。'
       : homeless ? `③ 入冬前安家：还有 ${homeless} 家无房；逐步补住房和取暖柴。`
       : '④ 补齐肉类（含鸡蛋）、蔬菜（含苹果和梨）、主食三组营养与衣物，再扩教育、医疗和贸易，为下一代留空房。';
-    const foodKinds = (G.FOOD_KEYS || []).filter(type => supplies[type] > 0);
-    const foodGroups = G.foodGroupsOf(foodKinds);
-    const variety = G.FOOD_KEYS ? ` · 营养组 ${foodGroups.length}/3（肉类含鸡蛋，蔬菜含苹果和梨）` : '';
-    const progress = harvest.total ? `\n采运标记：待领 ${harvest.queued} · 执行 ${harvest.active} · 夜间保留 ${harvest.paused}${harvest.reason ? '；' + harvest.reason : ''}` : '';
-    el.textContent = (G.autosaveBlocked ? '⚠ 原自动档已保护：临时局不自动保存，请打开存档管理备份/手动保存。\n' : '') + `${physical ? '全村粮食合计' : '粮食'}约 ${days.toFixed(1)} 天（不计新产出${physical ? '，含在途与待回收，逐户现货才可食用' : ''}）${variety} · ${G.isWinter() ? '寒冬中' : '距入冬 ' + untilWinter + ' 天'} · ${g.paused ? '已暂停' : '运行中'}\n${stage}${risks.length ? '\n⚠ ' + risks.join(' ') : ''}${progress}`;
+    if (!food || !fuel || !homeless) add('next-step', !food || !fuel ? 'recommend' : 'status', 2.5,
+      !food ? '先保持续食物 · 在近仓森林建采集小屋' : !fuel ? '近仓建伐木屋 · 提前储备柴火' : '补齐营养与衣物，再扩教育、医疗和贸易', stage);
+    if (harvest.total) add('harvest', harvest.reason ? 'recommend' : 'status', 8,
+      `采运标记 · 待领 ${harvest.queued} · 执行 ${harvest.active} · 夜间保留 ${harvest.paused}`,
+      `采运标记：待领 ${harvest.queued} · 执行 ${harvest.active} · 夜间保留 ${harvest.paused}${harvest.reason ? '；' + harvest.reason : ''}`);
+    add('season', 'status', 9, `${G.isWinter() ? '寒冬中' : '距入冬 ' + untilWinter + ' 天'} · ${g.paused ? '已暂停' : '运行中'}`);
+    const rank = { urgent: 0, recommend: 1, status: 2 };
+    rows.sort((a, b) => rank[a.level] - rank[b.level] || a.priority - b.priority);
+    // Legacy/minimal DOM consumers retain all descriptive facts. The real view
+    // keeps the same keyed types, shows three priorities, and puts detail in titles.
+    const list = el.querySelector?.('#guide-list');
+    if (!list) { el.textContent = rows.map(row => row.detail).join('\n'); return; }
+    if (this._guideWorld !== w) { this._guideWorld = w; this._guideExpanded = false; }
+    const signature = rows.map(row => row.kind).join(':');
+    if (list.dataset.signature !== signature) {
+      list.innerHTML = rows.map(row => `<li data-guide-kind="${row.kind}"><span class="guide-level" data-guide-level></span><span class="guide-text" data-guide-text></span></li>`).join('');
+      list.dataset.signature = signature;
+    }
+    const labels = { urgent: '紧急', recommend: '建议', status: '状态' };
+    rows.forEach((row, i) => {
+      const node = list.querySelector(`[data-guide-kind="${row.kind}"]`);
+      node.dataset.level = row.level; node.title = row.detail;
+      node.hidden = !this._guideExpanded && i >= 3;
+      node.classList.toggle('hidden', node.hidden);
+      node.querySelector('[data-guide-level]').textContent = labels[row.level];
+      node.querySelector('[data-guide-text]').textContent = row.text;
+    });
+    el.classList.toggle('guide-expanded', !!this._guideExpanded);
+    const toggle = el.querySelector('#guide-toggle'), count = el.querySelector('#guide-count');
+    if (toggle) {
+      toggle.textContent = this._guideExpanded ? '收起' : `全部 ${rows.length}`;
+      toggle.setAttribute('aria-expanded', String(!!this._guideExpanded));
+      toggle.hidden = rows.length <= 3;
+    }
+    if (count) {
+      const urgent = rows.filter(row => row.level === 'urgent').length;
+      count.textContent = urgent ? `${urgent} 项紧急` : '';
+      count.hidden = !urgent;
+    }
   },
 
   refreshHarvest: function () {
@@ -1294,9 +1514,39 @@ G.ui = {
   householdSupplyInfoMarkup: function (b) {
     const data = this.householdSupplyInfoData(b);
     if (!data) return '';
-    return `<section class="economy-form" data-household-supply-panel><h3>${b.type === 'supplycamp' ? '家庭临时补给' : '家庭生活物资'}</h3>${Object.keys(data).map(k => `<p class="row" data-household-supply="${k}">${this.escHtml(data[k])}</p>`).join('')}</section>`;
+    const summary = G.householdSupplySummary(b);
+    return `<section class="economy-form household-supply" data-household-supply-panel><h3>${b.type === 'supplycamp' ? '家庭临时补给' : '家庭生活物资'}</h3>${Object.keys(data).map(k => ['stock', 'incoming'].includes(k)
+      ? `<div class="household-inventory" data-household-supply="${k}">${this.householdInventoryMarkup(summary[k], k === 'stock' ? b.type === 'supplycamp' ? '临时补给点现货' : '屋内现货' : '实际在途')}</div>`
+      : `<p class="row" data-household-supply="${k}">${this.escHtml(data[k])}</p>`).join('')}</section>`;
+  },
+  householdInventoryData: function (stock) {
+    const present = G.SUPPLY.types.filter(k => Number(stock?.[k]) > 0);
+    const empty = G.SUPPLY.types.filter(k => !(Number(stock?.[k]) > 0));
+    return {
+      present: present.map(k => `<span class="inventory-item">${this.escHtml(G.RES[k].name)} <b>${stock[k] < .01 ? '&lt;0.01' : this.supplyNumber(stock[k])}</b></span>`).join(' · '),
+      empty: empty.map(k => `${G.RES[k].name} 0`).join(' · '),
+      count: empty.length,
+    };
+  },
+  householdInventoryMarkup: function (stock, label) {
+    const data = this.householdInventoryData(stock);
+    return `<p class="inventory-label">${this.escHtml(label)}：</p><div class="inventory-present" data-supply-present>${data.present || '<span class="inventory-none">暂无</span>'}</div><details class="inventory-empty${data.count ? '' : ' hidden'}" data-supply-empty data-detail-disclosure="supply-${this.escHtml(label)}"><summary data-supply-empty-summary>其余为空（${data.count} 项）</summary><p data-supply-empty-list>${this.escHtml(data.empty)}</p></details>`;
+  },
+  refreshHouseholdInventory: function (holder, stock) {
+    const data = this.householdInventoryData(stock);
+    const present = holder.querySelector('[data-supply-present]'), empty = holder.querySelector('[data-supply-empty]');
+    if (!present || !empty) return;
+    const markup = data.present || '<span class="inventory-none">暂无</span>';
+    if (present.innerHTML !== markup) present.innerHTML = markup;
+    const summary = empty.querySelector('[data-supply-empty-summary]'), list = empty.querySelector('[data-supply-empty-list]');
+    if (summary) summary.textContent = `其余为空（${data.count} 项）`;
+    if (list && list.textContent !== data.empty) list.textContent = data.empty;
+    // Keep the disclosure and its focused summary intact as resources arrive.
+    // An already-open empty list stays available until the user closes it.
+    empty.classList.toggle('hidden', !data.count && !empty.open && document.activeElement !== summary);
   },
   refreshCitizenSupplyInfo: function (c) {
+    this.refreshCitizenSurvival(c);
     const meal=this.el.info.querySelector?.('[data-citizen-meal]');if(meal)meal.textContent=G.householdMealStatus?.(c)||'';
     const holder = this.el.info.querySelector?.('[data-citizen-household-supply]');
     if (!holder || !G.supplyFamilyTarget) return;
@@ -1307,9 +1557,11 @@ G.ui = {
   refreshHouseholdSupplyInfo: function (b) {
     const panel = this.el.info.querySelector?.('[data-household-supply-panel]'), data = this.householdSupplyInfoData(b);
     if (!panel || !data) return false;
+    const summary = G.householdSupplySummary(b);
     for (const [k, value] of Object.entries(data)) {
       const node = panel.querySelector(`[data-household-supply="${k}"]`);
-      if (node && node.textContent !== value) node.textContent = value;
+      if (node && ['stock', 'incoming'].includes(k)) this.refreshHouseholdInventory(node, summary[k]);
+      else if (node && node.textContent !== value) node.textContent = value;
     }
     return true;
   },
@@ -3306,12 +3558,53 @@ G.ui = {
     this.refreshMedicalPatients(b);
     return true;
   },
-  citizenHealthMarkup: function (c) {
-    if (!G.healthOf || !G.medicalStatus) return '';
+  citizenSurvivalData: function (c) {
+    const home = G.homeOf?.(c), sheltered = home && home.state === 'ok' && !home.houseFire;
+    const health = G.healthOf ? G.healthOf(c) : Number(c.health) || 0, sick = G.isSick?.(c);
+    const clothing = G.clothingTypeOf ? G.clothingTypeOf(c) : c.clothingLeft > 0 ? 'basic' : 'none';
+    return {
+      hunger: { label: '进食', value: c.hunger > 0 ? `饥饿 ${this.supplyNumber(c.hunger)} 天` : '未饥饿', warn: c.hunger > 0 },
+      cold: { label: '体温', value: c.cold > 1 ? '正在受冻' : c.cold > 0 ? '轻微受冻' : '未受冻', warn: c.cold > 1 },
+      health: { label: '健康', value: `${health.toFixed(1)} / 5${sick ? ' · 患病' : ''}`, warn: sick || health < 3 },
+      home: { label: '住房', value: sheltered ? home.unheated && G.isWinter?.() ? '冷屋 · 缺燃料' : '有住房' : '暂无可用住房', warn: !sheltered || !!(home.unheated && G.isWinter?.()) },
+      clothing: { label: '衣物', value: clothing === 'warm' ? '暖衣' : clothing === 'basic' ? '普通衣物' : '等待衣物', warn: clothing === 'none' },
+    };
+  },
+  citizenSurvivalMarkup: function (c) {
+    const data = this.citizenSurvivalData(c);
+    return `<section class="citizen-survival" aria-label="生存概况"><h3>生存概况</h3><dl>${Object.entries(data).map(([key, item]) => `<div class="survival-fact${item.warn ? ' is-warning' : ''}" data-citizen-survival="${key}"><dt>${item.label}</dt><dd>${this.escHtml(item.value)}</dd></div>`).join('')}</dl></section>`;
+  },
+  refreshCitizenSurvival: function (c) {
+    for (const [key, item] of Object.entries(this.citizenSurvivalData(c))) {
+      const node = this.el.info.querySelector?.(`[data-citizen-survival="${key}"]`), value = node?.querySelector('dd');
+      if (value && value.textContent !== item.value) value.textContent = item.value;
+      node?.classList.toggle('is-warning', !!item.warn);
+    }
+  },
+  citizenHealthData: function (c) {
+    if (!G.healthOf || !G.medicalStatus) return null;
     const health = G.healthOf(c), sick = G.isSick(c), work = G.healthWorkMul(c);
-    return `<div class="row${health < 3 ? ' warn-txt' : ''}">健康：${health.toFixed(1)} / 5${work > 1 ? ` · 劳作工时 ×${work.toFixed(2)}` : ''}</div>
-      <div class="row${sick ? ' warn-txt' : ''}">疾病：${sick ? `患病第 ${Math.ceil(c.sickDays)} 天` : '无'}${!sick && c.immunityDays > 0 ? ` · 免疫约余 ${Math.ceil(c.immunityDays)} 天` : ''}</div>
-      <div class="row">医疗：${this.escHtml(G.medicalStatus(c))}${c.herbCooldown > 0 ? ` · 草药调养间隔约余 ${Math.ceil(c.herbCooldown)} 天` : ''}</div>`;
+    return {
+      health: { text: `健康：${health.toFixed(1)} / 5${work > 1 ? ` · 劳作工时 ×${work.toFixed(2)}` : ''}`, warn: health < 3 },
+      disease: { text: `疾病：${sick ? `患病第 ${Math.ceil(c.sickDays)} 天` : '无'}${!sick && c.immunityDays > 0 ? ` · 免疫约余 ${Math.ceil(c.immunityDays)} 天` : ''}`, warn: sick },
+      medical: { text: `医疗：${G.medicalStatus(c)}${c.herbCooldown > 0 ? ` · 草药调养间隔约余 ${Math.ceil(c.herbCooldown)} 天` : ''}`, warn: false },
+    };
+  },
+  citizenHealthMarkup: function (c) {
+    const data = this.citizenHealthData(c);
+    return data ? Object.entries(data).map(([key, row]) => `<div class="row${row.warn ? ' warn-txt' : ''}" data-citizen-health="${key}">${this.escHtml(row.text)}</div>`).join('') : '';
+  },
+  citizenDietText: function (c) {
+    return Number.isFinite(c.dietVariety) ? `最近饮食：${Math.max(0, Math.min(3, c.dietVariety))} / 3 营养组（肉类含鸡蛋，蔬菜含苹果和梨）${Number.isFinite(c.dietScore) ? ' · 长期均衡 ' + c.dietScore.toFixed(1) + '/3' : ''}` : '';
+  },
+  refreshCitizenHealth: function (c) {
+    const data = this.citizenHealthData(c);
+    for (const [key, row] of Object.entries(data || {})) {
+      const node = this.el.info.querySelector?.(`[data-citizen-health="${key}"]`);
+      if (node) { if (node.textContent !== row.text) node.textContent = row.text; node.classList.toggle('warn-txt', !!row.warn); }
+    }
+    const diet = this.el.info.querySelector?.('[data-citizen-diet]'), text = this.citizenDietText(c);
+    if (diet) { if (diet.textContent !== text) diet.textContent = text; diet.classList.toggle('hidden', !text); }
   },
   citizenClothingData: function (c) {
     const type = G.clothingTypeOf ? G.clothingTypeOf(c) : c.clothingLeft > 0 ? 'basic' : 'none';
@@ -3372,13 +3665,16 @@ G.ui = {
   // Navigation owns presentation only. Existing controls keep their original IDs,
   // panel contexts and transactional guards; simulation APIs are unchanged.
   buildingOverviewMarkup: function (b, def, workforce) {
-    const facts = [['位置', `${b.x}, ${b.y}`], ['阶段', b.state === 'site' ? '施工中' : '已建成']];
+    const facts = [['阶段', this.buildingStatusChipsData(b).phase]];
     if (workforce && workforce.summary.supported) facts.push(['用工', workforce.data.current]);
-    return `<dl class="building-facts">${facts.map(([label,value]) => `<div><dt>${label}</dt><dd${label === '用工' ? ' data-building-overview-workforce' : ''}>${this.escHtml(value)}</dd></div>`).join('')}</dl>
+    return `<dl class="building-facts">${facts.map(([label,value]) => `<div><dt>${label}</dt><dd${label === '用工' ? ' data-building-overview-workforce' : label === '阶段' ? ' data-building-overview-phase' : ''}>${this.escHtml(value)}</dd></div>`).join('')}</dl>
       <div class="building-quick-actions">${workforce?.summary.supported ? `<button type="button" data-building-jump="production">${b.state === 'site' ? '暂停 / 优先施工' : '调整用工'}</button>` : ''}${!['mineralpit','graveremnant'].includes(b.type) ? `<button type="button" data-building-jump="management">${b.type === 'house' ? '升级 / 管理' : '查看管理'}</button>` : ''}</div>
-      <details class="building-help"><summary>建筑说明</summary><p class="desc">${def.desc}</p></details>`;
+      <details class="building-help"><summary>建筑说明</summary><p class="desc">${def.desc}</p></details>
+      <details class="building-help" data-building-debug><summary>位置与调试信息</summary><dl class="building-debug-facts"><div><dt>位置</dt><dd>${b.x}, ${b.y}</dd></div><div><dt>占地</dt><dd>${b.w} × ${b.h}</dd></div><div><dt>建筑编号</dt><dd>${Number(b.id)}</dd></div></dl></details>`;
   },
   refreshBuildingOverview: function (b) {
+    const phase = this.el.info.querySelector?.('[data-building-overview-phase]'), label = this.buildingStatusChipsData(b).phase;
+    if (phase && phase.textContent !== label) phase.textContent = label;
     const node = this.el.info.querySelector?.('[data-building-overview-workforce]');
     const facts = node && this.workforceInfoData(b);
     if (facts && node.textContent !== facts.data.current) node.textContent = facts.data.current;
@@ -3405,8 +3701,12 @@ G.ui = {
       panel.inert = hidden;
     });
     el.querySelectorAll('[data-building-tab]').forEach(button => button.setAttribute?.('aria-pressed', String(button.dataset.buildingTab === key)));
+    el.querySelectorAll('[data-building-actions]').forEach(actions => {
+      const hidden = actions.dataset.buildingActions !== key;
+      actions.classList.toggle('hidden', hidden); actions.inert = hidden;
+    });
     if (focus) el.querySelector(`[data-building-tab="${key}"]`)?.focus();
-    if (resetScroll) el.scrollTop = 0;
+    if (resetScroll) { el.scrollTop = 0; const scroll = el.querySelector('[data-detail-scroll]'); if (scroll) scroll.scrollTop = 0; }
     return true;
   },
   resetBuildingDetailConfirmations: function (root) {
@@ -3437,15 +3737,32 @@ G.ui = {
   },
   buildingActivityMarkup: function (b) {
     const activity = typeof G.buildingActivity === 'function' ? G.buildingActivity(b) : null;
-    return activity ? `<div class="row" data-building-activity>${this.escHtml(activity.label)} · ${this.escHtml(activity.detail)}</div>` : '';
+    return activity ? `<details class="building-help activity-help" data-building-activity-help><summary>状态说明</summary><div class="row" data-building-activity>${this.escHtml(activity.label)} · ${this.escHtml(activity.detail)}</div></details>` : '';
+  },
+  buildingStatusChipsData: function (b) {
+    const fire = G.houseFireSummary?.(b), activity = G.buildingActivity?.(b);
+    const phase = fire?.active ? '火灾中' : fire?.ruin ? '烧毁废墟' : b.type === 'mineralpit' ? '废矿坑' : b.type === 'graveremnant' ? '墓地遗址' : b.state === 'site' ? b.sitePaused ? '施工暂停' : '施工中' : '已建成';
+    const labels = { working: '现场加工', paused: '已暂停', fetching: '取料中', returning: '返工坊途中', hauling: '搬运中', unstaffed: '无人值岗', hosting: '接待中', blocked: '条件受阻', idle: '空闲', vacant: '空置', home: '住户在家', away: '住户在外' };
+    return { phase, activity: activity ? labels[activity.state] || activity.label : '', warning: !!fire?.active || !!fire?.ruin || activity?.state === 'blocked' };
+  },
+  buildingStatusChipsMarkup: function (b) {
+    const data = this.buildingStatusChipsData(b);
+    return `<div class="detail-status-chips" aria-label="建筑状态"><span class="detail-chip${data.warning ? ' is-warning' : ''}" data-building-phase>${this.escHtml(data.phase)}</span><span class="detail-chip${data.activity ? '' : ' hidden'}" data-building-current-activity>${this.escHtml(data.activity)}</span></div>`;
+  },
+  refreshBuildingStatusChips: function (b) {
+    const data = this.buildingStatusChipsData(b), phase = this.el.info.querySelector?.('[data-building-phase]'), activity = this.el.info.querySelector?.('[data-building-current-activity]');
+    if (phase) { if (phase.textContent !== data.phase) phase.textContent = data.phase; phase.classList.toggle('is-warning', data.warning); }
+    if (activity) { if (activity.textContent !== data.activity) activity.textContent = data.activity; activity.classList.toggle('hidden', !data.activity); }
   },
   refreshBuildingActivity: function (b) {
+    this.refreshBuildingStatusChips(b);
     const row = this.el.info.querySelector?.('[data-building-activity]');
     if (!row) return;
     const activity = typeof G.buildingActivity === 'function' ? G.buildingActivity(b) : null;
     const text = activity ? `${activity.label} · ${activity.detail}` : '';
     if (row.textContent !== text) row.textContent = text;
     row.classList.toggle('hidden', !activity);
+    this.el.info.querySelector?.('[data-building-activity-help]')?.classList.toggle('hidden', !activity);
   },
   renderInfo: function (force) {
     if (!G.sel) return;
@@ -3511,7 +3828,7 @@ G.ui = {
     if (sameSelection && selected.type === 'woodcutter' && this._fuelInfoState === selected.state && this.refreshFuelInfo(selected)) return;
     if (hadFocus && !force && sameSelection && selected.type !== 'woodcutter' &&
         !(selected.type === 'farm' && selected.state === 'ok' && G.farmSummary) && (G.sel.kind === 'c' || (this._infoBuildState === selected.state && this._infoBuildType === selected.type))) {
-      if (G.sel.kind === 'c') { this.refreshCitizenSupplyInfo(selected); this.refreshCitizenLeisure(selected); this.refreshCitizenClothing(selected); this.refreshStudentInfo(selected); }
+      if (G.sel.kind === 'c') { this.refreshCitizenSupplyInfo(selected); this.refreshCitizenHealth(selected); this.refreshCitizenLeisure(selected); this.refreshCitizenClothing(selected); this.refreshStudentInfo(selected); }
       // Patch changing site facts in place without stealing keyboard focus.
       if (G.sel.kind === 'b' && selected.state === 'site') {
         const data = this.siteInfoData(selected);
@@ -3523,7 +3840,8 @@ G.ui = {
       return;
     }
     const detailScroll = sameSelection ? el.scrollTop : 0;
-    const detailOpen = sameSelection && this._infoBuildType === selected.type ? new Set(Array.from(el.querySelectorAll('details')).filter(node => node.open).map(node => node.querySelector?.('summary')?.textContent)) : new Set();
+    const bodyScroll = sameSelection ? el.querySelector?.('[data-detail-scroll]')?.scrollTop || 0 : 0;
+    const detailOpen = sameSelection && this._infoBuildType === selected.type ? new Set(Array.from(el.querySelectorAll('details')).filter(node => node.open).map(node => node.dataset.detailDisclosure || node.querySelector?.('summary')?.textContent)) : new Set();
     const destructiveActionChanged = sameSelection && this._infoBuildState === 'site' && selected.state !== 'site' && active && ['info-demolish', 'construction-pause', 'construction-resume','construction-priority','construction-normal'].includes(active.id);
     const workforceInput = sameSelection && this._infoBuildState === selected.state && el.querySelector && el.querySelector('#worker-limit-input');
     const workforceDraft = workforceInput ? workforceInput.value : null;
@@ -3536,6 +3854,9 @@ G.ui = {
     this._infoSelection = selected;
     this._infoBuildState = selected.state;
     this._infoBuildType = selected.type;
+    el.classList.add('detail-inspector');
+    el.classList.toggle('citizen-inspector', G.sel.kind === 'c');
+    el.classList.toggle('building-inspector', G.sel.kind === 'b');
     if (G.sel.kind === 'b') {
       const b = w.bmap[G.sel.id];
       if (!b) { this.hideInfo(); return; }
@@ -3659,7 +3980,8 @@ G.ui = {
         extra += `<div class="row">播种 ${b.farm.filter(f => f.sown).length}/${b.farm.length} · 收获 ${b.farm.filter(f => f.harvested).length}/${b.farm.length}</div>`;
       }
       managementExtra += `        ${pit||remnant ? '' : `<div class="row desc" data-info-refund${fuelData ? ' data-fuel="refund"' : ''}>${ruin ? '清理烧毁废墟退还 0 材料；不能回收原屋材料。' : fireData?.summary.active ? '火灾进行中，暂不能拆除；关闭新增火灾也不会停止当前损伤。' : fuelData ? fuelData.refund : siteData ? siteData.refund : '已开工：拆除退还一半已付建材，已砍树不恢复'}</div>
-        <button id="info-demolish" class="danger"${fireData?.summary.active ? ' disabled' : ''}>${b.type === 'roadwork' ? '取消剩余铺路' : b.state === 'site' ? '取消工地' : ruin ? '清理废墟（无返料）' : b.type==='cemetery'?'拆围栏…':b.type==='tunnel'?'拆除隧道…':'拆除'}</button>${this.mineralRemovalMarkup(b)}${this.cemeteryRemovalMarkup(b)}${this.tunnelRemovalMarkup(b)}`}`;
+        ${this.mineralRemovalMarkup(b)}${this.cemeteryRemovalMarkup(b)}${this.tunnelRemovalMarkup(b)}`}`;
+      const managementAction = pit || remnant ? '' : `<footer class="detail-actions${this._buildingDetailTab === 'management' ? '' : ' hidden'}" data-building-actions="management"><button type="button" id="info-demolish" class="danger"${fireData?.summary.active ? ' disabled' : ''}>${b.type === 'roadwork' ? '取消剩余铺路' : b.state === 'site' ? '取消工地' : ruin ? '清理废墟（无返料）' : b.type==='cemetery'?'拆围栏…':b.type==='tunnel'?'拆除隧道…':'拆除建筑'}</button></footer>`;
       const hasWork = def.jobs > 0 || b.state === 'site' || schoolData || chapelData;
       const work = hasWork ? workers + this.workforceInfoMarkup(b, workforceData) : '';
       if (!hasWork && workforceData) managementExtra += `<details class="building-help"><summary>岗位与全镇人力</summary>${this.workforceInfoMarkup(b, workforceData)}</details>`;
@@ -3677,16 +3999,15 @@ G.ui = {
       ].filter(group => group[2].trim());
       if (!sameSelection || !groups.some(group => group[0] === this._buildingDetailTab)) this._buildingDetailTab = 'overview';
       el.innerHTML = `
-        <div class="info-head"><span>${def.icon} ${def.name}</span><button id="info-close" aria-label="关闭建筑详情">✕</button></div>
+        <div class="info-head"><div class="detail-heading"><span class="detail-title">${this.icon ? this.icon(b.type) : ''}<span>${this.escHtml(def.name)}管理</span></span>${this.buildingStatusChipsMarkup(b)}</div><button type="button" id="info-close" aria-label="关闭建筑详情">${this.icon ? this.icon('close') : '×'}</button></div>
+        <nav class="building-detail-tabs" aria-label="建筑详情栏目">${groups.map(([key, label]) => `<button type="button" id="building-tab-${key}" data-building-tab="${key}" aria-controls="building-panel-${key}" aria-pressed="${this._buildingDetailTab === key}">${label}</button>`).join('')}</nav>
+        <div class="detail-scroll" data-detail-scroll>
         <div class="row building-status"${b.type === 'dock' && b.state === 'ok' ? ' data-fishing-status' : ''}${b.type === 'hunting' && b.state === 'ok' ? ' data-hunting-status' : ''}${siteData ? ' data-site-status' : ''}${homeData ? ' data-home-status' : ''}${fuelData ? ' data-fuel="status"' : ''}${medicalData ? ' data-medical="status"' : ''}${chainData ? ' data-resource-chain-live="status"' : ''}${hallData ? ' data-townhall="status"' : ''}${marketData ? ' data-market-supply="status"' : ''}${tavernData ? ' data-tavern="status"' : ''}${chapelData ? ' data-chapel="status"' : ''}${tailorData ? ' data-tailor="status"' : ''}${farmData ? ' data-farm="status"' : ''}${cemeteryData?' data-cemetery="status"':''}${schoolData?' data-school="status"':''}${b.state === 'ok' && ['tradingpost', 'pasture', 'orchard'].includes(b.type) ? ' data-economy-status' : ''}>${this.escHtml(status)}</div>
 
         ${this.buildingActivityMarkup(b)}<p class="building-alert hidden" data-building-alert role="status"></p>
-        <nav class="building-detail-tabs" aria-label="建筑详情栏目">${groups.map(([key, label]) => `<button type="button" id="building-tab-${key}" data-building-tab="${key}" aria-controls="building-panel-${key}" aria-pressed="${this._buildingDetailTab === key}">${label}</button>`).join('')}</nav>
-        ${groups.map(([key, label, markup]) => `<section id="building-panel-${key}" data-building-panel="${key}" class="building-detail-panel${this._buildingDetailTab === key ? '' : ' hidden'}" aria-labelledby="building-tab-${key}">${markup}</section>`).join('')}`;
+        ${groups.map(([key, label, markup]) => `<section id="building-panel-${key}" data-building-panel="${key}" class="building-detail-panel${this._buildingDetailTab === key ? '' : ' hidden'}" aria-labelledby="building-tab-${key}">${markup}</section>`).join('')}</div>${managementAction}`;
       this.initBuildingDetailNavigation(b);
       this.refreshBuildingOverview(b);
-      for (const disclosure of el.querySelectorAll('details')) if (detailOpen.has(disclosure.querySelector?.('summary')?.textContent)) disclosure.open = true;
-      el.scrollTop = detailScroll;
       if (fuelData) this._fuelInfoState = b.state;
       this._economyInfoState = b.state;
       this._medicalInfoState = b.state;
@@ -3732,22 +4053,30 @@ G.ui = {
       const jobName = jobB ? G.BDEF[jobB.type].name : (c.student ? '学堂学生' : (c.adult ? '无业' : '儿童'));
       const fam = G.familyOf(c), supplyHome = G.supplyFamilyTarget && G.supplyFamilyTarget(fam, false);
       el.innerHTML = `
-        <div class="info-head"><span>🧑 ${this.escHtml(c.name)}</span><button id="info-close">✕</button></div>
+        <div class="info-head"><span class="detail-title">${this.icon ? this.icon('citizen') : ''}<span>${this.escHtml(c.name)}</span></span><button type="button" id="info-close" aria-label="关闭居民详情">${this.icon ? this.icon('close') : '×'}</button></div>
+        <div class="detail-scroll" data-detail-scroll>
+        ${this.citizenSurvivalMarkup(c)}
         <div class="row" data-citizen-role>${c.sex === 'm' ? '男' : '女'} · ${Math.floor(c.age)} 岁 · ${c.student ? '学生' : c.adult ? '成人' : '儿童'}</div>
         <div class="row">职业：<span data-citizen-job>${jobName}</span> · <span data-citizen-status>${this.escHtml(status)}</span></div>
         ${c.carry ? `<div class="row">随身：${this.cargoText(c.carry)}（${Number.isInteger(c.carry.constructionId)?'建材已出库、尚未投入施工':c.carry.smithInput?'铁匠原料已出库、尚未消耗':'未入库'}）</div>` : ''}
         <div class="row">家庭：${fam ? (fam.houseId != null ? '有房' : '无房') : '单身'}</div>
         <p class="row" data-citizen-meal>${this.escHtml(G.householdMealStatus?.(c)||'')}</p><div data-citizen-household-supply>${supplyHome ? this.householdSupplyInfoMarkup(supplyHome) : ''}</div>
         ${this.studentInfoMarkup(c)}
-        <div class="row">饥饿 ${'▕'.repeat(Math.min(4, c.hunger)) || '无'} · 受冻 ${c.cold > 1 ? '是' : '无'}</div>
-        ${this.citizenClothingMarkup(c)}
-        ${Number.isFinite(c.dietVariety) ? `<div class="row">最近饮食：${Math.max(0, Math.min(3, c.dietVariety))} / 3 营养组（肉类含鸡蛋，蔬菜含苹果和梨）${Number.isFinite(c.dietScore) ? ' · 长期均衡 ' + c.dietScore.toFixed(1) + '/3' : ''}</div>` : ''}
-        ${this.citizenHealthMarkup(c)}
-        ${this.citizenLeisureMarkup(c)}`;
+        <details class="building-help citizen-help"><summary>衣物与工具</summary>${this.citizenClothingMarkup(c)}</details>
+        <details class="building-help citizen-help"><summary>健康与饮食</summary>
+        <div class="row${Number.isFinite(c.dietVariety) ? '' : ' hidden'}" data-citizen-diet>${this.escHtml(this.citizenDietText(c))}</div>
+        ${this.citizenHealthMarkup(c)}</details>
+        <details class="building-help citizen-help"><summary>幸福与休闲</summary>${this.citizenLeisureMarkup(c)}</details></div>`;
       const supplyHolder = el.querySelector?.('[data-citizen-household-supply]');
       if (supplyHolder) supplyHolder._supplyTarget = supplyHome;
       this.initStudentInfo(c);
     }
+    for (const disclosure of el.querySelectorAll('details')) if (detailOpen.has(disclosure.dataset.detailDisclosure || disclosure.querySelector?.('summary')?.textContent)) {
+      disclosure.open = true;
+      if (disclosure.dataset.supplyEmpty !== undefined) disclosure.classList.remove('hidden');
+    }
+    el.scrollTop = detailScroll;
+    const scrollBody = el.querySelector?.('[data-detail-scroll]'); if (scrollBody) scrollBody.scrollTop = bodyScroll;
     document.getElementById('info-close').addEventListener('click', () => this.hideInfo());
     el.querySelectorAll('.mini-tog').forEach(btn => btn.addEventListener('click', () => {
       if (!G.sel || G.sel.kind !== 'b' || G.world !== w || w.bmap[G.sel.id] !== selected) return;
@@ -4418,62 +4747,115 @@ G.ui = {
     }
   },
 
-  // Rows are built once. Refresh never replaces an input or changes a draft.
+  // Build once: refreshing stocks never replaces focused inputs or their draft.
   initProductionGoals: function () {
-    const rows = document.getElementById('production-goal-rows');
-    rows.innerHTML = G.RES_KEYS.map(type => {
-      const step = type === 'food' || (G.FOOD_KEYS || []).includes(type) ? 100 : ['tools', 'steelTools', 'clothes', 'warmCoats'].includes(type) ? 10 : 50;
-      return `<section class="production-goal-row" aria-labelledby="goal-label-${type}">
-        <label id="goal-label-${type}" for="goal-input-${type}">${this.resourceIcon(type)}${type === 'food' ? '总食物（六种食物物品之和）' : G.RES[type].name}</label>
-        <p id="goal-stock-${type}"></p>
-        <div class="goal-controls"><button type="button" data-goal="${type}" data-step="${-step}" aria-label="减少${G.RES[type].name}目标${step}">−${step}</button>
-        <input id="goal-input-${type}" type="number" inputmode="numeric" min="0" max="${G.PRODUCTION_GOAL_MAX}" step="1" placeholder="未设置" aria-describedby="goal-status-${type}">
-        <button type="button" data-goal="${type}" data-step="${step}" aria-label="增加${G.RES[type].name}目标${step}">＋${step}</button>
-        <button type="button" data-goal="${type}" data-apply="true">应用</button>
-        <button type="button" class="goal-inherit" data-goal="${type}" data-inherit="true">继承原规则</button></div>
-        <p id="goal-status-${type}"></p></section>`;
-    }).join('');
-    rows.querySelectorAll('button').forEach(button => button.addEventListener('click', () => {
-      const type = button.dataset.goal, input = document.getElementById('goal-input-' + type);
-      if (!button.dataset.inherit && input.validity && input.validity.badInput) {
-        document.getElementById('production-goals-message').textContent = '请输入有效数字，或完整清空以继承原规则'; return;
-      }
-      if (button.dataset.inherit) {
-        G.setProductionGoal(type, null); input.value = '';
-        document.getElementById('production-goals-message').textContent = `${G.RES[type].name}已继承原规则`;
-      } else if (button.dataset.step) {
-        const current = input.value.trim() === '' ? (G.productionGoalOf(type) ?? Math.ceil(G.game.res[type])) : Number(input.value);
-        if (!Number.isFinite(current)) { document.getElementById('production-goals-message').textContent = '请输入有限整数'; return; }
-        input.value = String(G.clamp(Math.round(current) + Number(button.dataset.step), 0, G.PRODUCTION_GOAL_MAX));
-        document.getElementById('production-goals-message').textContent = '数值尚未应用，点击“应用”生效';
-      } else {
-        const value = input.value.trim() === '' ? null : Number(input.value);
-        if (!G.setProductionGoal(type, value)) {
-          document.getElementById('production-goals-message').textContent = `请输入0至${G.PRODUCTION_GOAL_MAX}的整数，或清空以继承原规则`; return;
-        }
-        document.getElementById('production-goals-message').textContent = `${G.RES[type].name}目标已应用`;
-      }
-      this.refreshProductionGoals();
-      if (G.sel) this.renderInfo(true);
+    const rows=document.getElementById('production-goal-rows');
+    if(!rows||rows._goalsBound)return;rows._goalsBound=true;
+    const bind=(button,action)=>{
+      if(!button)return;let armed=null,blocked=false;
+      const capture=()=>{armed=this._productionGoalSession;blocked=!this.productionGoalSessionCurrent();};
+      for(const event of ['pointerdown','mousedown','touchstart'])button.addEventListener(event,capture);
+      button.addEventListener('keydown',e=>{if(['Enter',' '].includes(e.key)){if(e.repeat){blocked=true;e.preventDefault();}else capture();}});
+      for(const event of ['pointercancel','touchcancel'])button.addEventListener(event,()=>{blocked=true;});
+      button.addEventListener('click',e=>{
+        if(blocked||e.detail>1||!this.productionGoalSessionCurrent()||(armed&&armed!==this._productionGoalSession))return;
+        armed=null;action();
+      });
+    };
+    rows.innerHTML=G.RES_KEYS.map(type=>`<tr class="production-goal-row" data-goal-row="${type}">
+      <th scope="row"><label id="goal-label-${type}" for="goal-input-${type}">${this.resourceIcon(type)}${type==='food'?'总食物':G.RES[type].name}</label>${type==='food'?'<small>六种食物之和</small>':''}</th>
+      <td><strong id="goal-stock-value-${type}"></strong><small id="goal-public-${type}"></small></td>
+      <td><div class="goal-controls"><input id="goal-input-${type}" type="number" inputmode="numeric" min="0" max="${G.PRODUCTION_GOAL_MAX}" step="1" placeholder="继承" aria-describedby="production-goals-draft-help goal-applied-${type} goal-status-${type}">
+      <button type="button" class="goal-inherit" data-goal="${type}" data-inherit="true" aria-label="将${G.RES[type].name}草稿设为继承原规则">继承</button></div><small id="goal-applied-${type}"></small></td>
+      <td><strong id="goal-gap-${type}"></strong><small id="goal-gap-note-${type}"></small></td></tr>
+      <tr class="goal-detail-row"><td colspan="4"><details><summary tabindex="0">${type==='food'?'总食物':G.RES[type].name} · 规则与库存口径</summary><p id="goal-stock-${type}"></p><p id="goal-status-${type}"></p></details></td></tr>`).join('');
+    rows.querySelectorAll('button').forEach(button=>bind(button,()=>{
+      if(!this.productionGoalSessionCurrent())return;
+      const input=document.getElementById('goal-input-'+button.dataset.goal);
+      input.value='';input.setAttribute('aria-invalid','false');
+      this.productionGoalDraftChanged('继承仅写入草稿；点击“应用全部草稿”后生效。');
     }));
-    document.getElementById('btn-production-goals').addEventListener('click', () => this.showProductionGoals());
-    document.getElementById('production-goals-close').addEventListener('click', () => this.closeProductionGoals());
+    rows.querySelectorAll('input').forEach(input=>input.addEventListener('input',()=>{
+      if(!this.productionGoalSessionCurrent())return;
+      input.setAttribute('aria-invalid','false');this.productionGoalDraftChanged();
+    }));
+    document.getElementById('btn-production-goals').addEventListener('click',()=>this.showProductionGoals());
+    document.getElementById('production-goals-close').addEventListener('click',()=>this.closeProductionGoals());
+    bind(document.getElementById('production-goals-apply'),()=>this.applyProductionGoalDraft());
+    bind(document.getElementById('production-goals-reset'),()=>{
+      if(!this.productionGoalSessionCurrent())return;
+      this.resetProductionGoalDraft();this.productionGoalDraftChanged('已撤销未应用的草稿，恢复为当前已应用目标。');
+    });
+    for(const mode of ['balanced','winter','stockpile'])bind(document.getElementById('goal-preset-'+mode),()=>this.stageProductionGoalRecommendation(mode));
+  },
+  productionGoalSessionCurrent: function () {
+    const s=this._productionGoalSession,modal=document.getElementById('production-goals');
+    return !!s&&s.game===G.game&&s.world===G.world&&modal&&!modal.classList.contains('hidden')&&(!G.topModal||G.topModal()===modal);
+  },
+  resetProductionGoalDraft: function () {
+    for(const type of G.RES_KEYS){
+      const input=document.getElementById('goal-input-'+type);
+      input.value=String(G.productionGoalOf(type)??'');input.setAttribute('aria-invalid','false');
+    }
+    const notes=document.getElementById('goal-preset-notes');if(notes)notes.textContent='选择建议会填写部分草稿。检查数值后，仍需点击“应用全部草稿”。';
+    this._productionGoalRecommendation=null;
+  },
+  productionGoalDraftChanged: function (message) {
+    document.getElementById('production-goals-message').textContent=message||'草稿尚未应用；库存缺口按草稿计算。';
+    this.refreshProductionGoals();
+  },
+  readProductionGoalDraft: function () {
+    const values={},errors=[];
+    for(const type of G.RES_KEYS){
+      const input=document.getElementById('goal-input-'+type),raw=input.value.trim();
+      const value=raw===''?null:Number(raw);
+      const valid=!input.validity?.badInput&&(value===null||(/^\d+$/.test(raw)&&Number.isSafeInteger(value)&&value<=G.PRODUCTION_GOAL_MAX));
+      if(!valid)errors.push(type);else values[type]=value;
+    }
+    return {values,errors};
+  },
+  applyProductionGoalDraft: function () {
+    if(!this.productionGoalSessionCurrent())return false;
+    // Validate every row before calling even the first engine setter.
+    const draft=this.readProductionGoalDraft();
+    for(const type of G.RES_KEYS)document.getElementById('goal-input-'+type).setAttribute('aria-invalid',draft.errors.includes(type)?'true':'false');
+    if(draft.errors.length){
+      document.getElementById('production-goals-message').textContent=`未应用任何目标：${draft.errors.map(k=>G.RES[k].name).join('、')}请输入0至${G.PRODUCTION_GOAL_MAX}的有效数字整数，或完整清空以继承原规则。`;
+      document.getElementById('goal-input-'+draft.errors[0]).focus();return false;
+    }
+    let changes=0;
+    for(const type of G.RES_KEYS)if(G.productionGoalOf(type)!==draft.values[type]){G.setProductionGoal(type,draft.values[type]);changes++;}
+    document.getElementById('production-goals-message').textContent=changes?`已应用${changes}项全镇目标。本屋上限未改动；已接批次仍会完成。`:'草稿与已应用目标一致，无需更改。';
+    this.refreshProductionGoals();if(G.sel)this.renderInfo(true);return true;
+  },
+  stageProductionGoalRecommendation: function (mode) {
+    if(!this.productionGoalSessionCurrent()||!G.recommendProductionGoals)return;
+    const context=G.goalRecommendationContext(),draft=this.readProductionGoalDraft();
+    context.specificGoals=Object.fromEntries(G.FOOD_KEYS.map(k=>[k,draft.values[k]??null]));
+    const suggestion=G.recommendProductionGoals(mode,context);if(!suggestion)return;
+    const lowered=Object.entries(suggestion.values).filter(([k,v])=>Number.isInteger(draft.values[k])&&draft.values[k]>v);
+    if(lowered.length)suggestion.warnings.push('建议调低草稿：'+lowered.map(([k,v])=>`${G.RES[k].name} ${draft.values[k]} → ${v}`).join('、')+'；应用后可能提前停产，如需原储备请保留或调高。');
+    for(const [type,value] of Object.entries(suggestion.values)){
+      const input=document.getElementById('goal-input-'+type);input.value=String(value);input.setAttribute('aria-invalid','false');
+    }
+    this._productionGoalRecommendation=suggestion;
+    const names=Object.keys(suggestion.values).map(k=>G.RES[k].name).join('、');
+    const notes=document.getElementById('goal-preset-notes');
+    if(notes)notes.textContent=[`${suggestion.label} · 填写时估算，不自动应用。${names?'填写：'+names+'。':''}`,...suggestion.notes,...suggestion.warnings,'这些是可调整的储备建议，不保证够吃或安全过冬；请检查人手、生产链、运输和每屋上限。'].join('\n');
+    this.productionGoalDraftChanged(names?`${suggestion.label}已填入草稿；检查后点击“应用全部草稿”。`:'没有可填写的建议；原草稿保留。');
   },
   showProductionGoals: function () {
-    const modal = document.getElementById('production-goals');
-    if (!modal.classList.contains('hidden')) return;
-    if (G.hasOpenModal && G.hasOpenModal()) return;
-    this._productionGoalsPaused = G.game.paused; G.game.paused = true;
-    for (const type of G.RES_KEYS) document.getElementById('goal-input-' + type).value = G.productionGoalOf(type) ?? '';
-    document.getElementById('production-goals-message').textContent = '';
-    modal.classList.remove('hidden'); this.refreshProductionGoals(); this.enterDialog('production-goals'); this.refreshHUD();
+    const modal=document.getElementById('production-goals');
+    if(!modal.classList.contains('hidden')||(G.hasOpenModal&&G.hasOpenModal()))return;
+    this._productionGoalSession={game:G.game,world:G.world,paused:G.game.paused};G.game.paused=true;
+    this.resetProductionGoalDraft();document.getElementById('production-goals-message').textContent='';
+    modal.classList.remove('hidden');this.refreshProductionGoals();this.enterDialog('production-goals');this.refreshHUD();
   },
   closeProductionGoals: function () {
-    const modal = document.getElementById('production-goals');
-    if (modal.classList.contains('hidden')) return;
-    modal.classList.add('hidden');
-    if (!G.game.over) G.game.paused = !!this._productionGoalsPaused;
-    this.leaveDialog('production-goals'); this.refreshHUD();
+    const modal=document.getElementById('production-goals');if(modal.classList.contains('hidden'))return;
+    const s=this._productionGoalSession;modal.classList.add('hidden');this._productionGoalSession=null;this._productionGoalRecommendation=null;
+    if(s&&s.game===G.game&&s.world===G.world&&!G.game.over)G.game.paused=!!s.paused;
+    this.leaveDialog('production-goals');this.refreshHUD();
   },
   refreshProductionGoals: function () {
     const modal = document.getElementById('production-goals');
@@ -4487,6 +4869,18 @@ G.ui = {
       const foodClass = (G.FOOD_KEYS || []).includes(type);
       const tool = type === 'tools' || type === 'steelTools';
       const distributedGoal = physical && (type === 'food' || foodClass || type === 'firewood' || G.clothingSupplyEnabled?.() && G.CLOTHING_KEYS.includes(type));
+      const measured=distributedGoal?(type==='food'?G.supplyFood(supplies):supplies[type]):tool&&G.personalToolsEnabled()?G.toolReserveCount(type):G.game.res[type];
+      const set=(id,text)=>{const el=document.getElementById(id+'-'+type);if(el)el.textContent=text;};
+      set('goal-stock-value',this.supplyNumber(measured));
+      set('goal-public',distributedGoal||tool&&G.personalToolsEnabled()?`公共 ${this.supplyNumber(G.game.res[type])}`:'当前库存');
+      set('goal-applied',target===null?'已应用：继承原规则':`已应用：${target}`);
+      const input=document.getElementById('goal-input-'+type);
+      if(input){
+        const raw=input.value.trim(),value=raw===''?null:Number(raw);
+        const valid=!input.validity?.badInput&&(value===null||(/^\d+$/.test(raw)&&Number.isSafeInteger(value)&&value<=G.PRODUCTION_GOAL_MAX));
+        set('goal-gap',!valid||value===null?'—':this.supplyNumber(Math.max(0,value-measured)));
+        set('goal-gap-note',!valid?'无效草稿':value===null?'继承规则':value===0?'停止新生产':value>measured?'距草稿目标':'库存已达草稿');
+      }
       stock.textContent = `${physical ? '公共库存' : '库存'} ${Math.floor(G.game.res[type])} · ${foodClass ? '与其他食物共享总仓容 ' + cap + '（总食物 ' + Math.floor(G.game.res.food) + '）' : '硬仓容 ' + (tool ? '不限' : cap)}`;
       if(tool&&G.personalToolsEnabled())stock.textContent+=`；目标计量 ${this.supplyNumber(G.toolReserveCount(type))}（全新备用 + 旧半用，不含已装备）`;
       if (distributedGoal) stock.textContent += `；目标计量 ${this.supplyNumber(type === 'food' ? G.supplyFood(supplies) : supplies[type])}（公共 + 市场/住处/配送在途/待回收，不含火情封存；逐户现货才可使用）`;
@@ -4511,6 +4905,7 @@ G.ui = {
   initNewGameSettings: function () {
     const modal=document.getElementById('new-game-settings');if(!modal||modal._startBound)return;
     modal._startBound=true;
+    document.getElementById('new-game-title-icon').innerHTML=this.icon('sprout');
     const current=s=>!!s&&this._startSession===s&&s.world===G.world&&s.game===G.game&&
       document.getElementById('new-game-settings')===modal&&!modal.classList.contains('hidden')&&G.topModal()===modal;
     const bind=(id,action)=>{
@@ -4547,9 +4942,9 @@ G.ui = {
       if(s.phase!=='edit')return;const q=G.startConfigQuote({seed:seed.value,preset:s.preset,terrain:s.terrain,mapSize:s.mapSize});
       if(!q.ok){s.message=q.reason;return;}
       s.intent={world:s.world,game:s.game,key:q.key,config:{...q.config}};s.phase='review';s.rev++;s.message='请核对新村参数和旧进度处理，再单独确认。';
-      this.refreshNewGameSettings();document.getElementById('new-game-confirm')?.focus();
+      this.refreshNewGameSettings();document.getElementById('new-game-body').scrollTop=0;document.getElementById('new-game-confirm')?.focus();
     });
-    bind('new-game-back',()=>{this.invalidateStartDraft('已返回修改，尚未创建新村。');seed?.focus();});
+    bind('new-game-back',()=>{this.invalidateStartDraft('已返回修改，尚未创建新村。');document.getElementById('new-game-body').scrollTop=0;seed?.focus();});
     bind('new-game-confirm',s=>{
       if(s.phase!=='review'||!s.intent)return;
       const q=G.startConfigQuote({seed:seed.value,preset:s.preset,terrain:s.terrain,mapSize:s.mapSize});
@@ -4580,8 +4975,10 @@ G.ui = {
     G.game.paused=true;document.getElementById('new-game-seed').value=String(Math.floor(Math.random()*0x100000000));
     for(const preset of ['classic','hard']){
       const p=G.startConfigQuote({seed:0,preset}).presetSummary,card=document.getElementById('new-game-preset-'+preset);
-      card.innerHTML=`<strong>${esc(p.name)}</strong><span>${p.families}家庭 · ${p.population}人（${p.adults}成人 / ${p.children}儿童）</span><span>${['wood','stone','food','firewood','tools'].map(k=>`${this.resourceIcon(k)}${G.RES[k].name} ${p.resources[k]}`).join(' · ')}</span><span>${esc(p.seedNote)}</span>`;
+      card.innerHTML=`<strong>${esc(p.name)}</strong><span>${p.families}家庭 · ${p.population}人（${p.adults}成人 / ${p.children}儿童）</span><span>${['food','tools'].map(k=>`${this.resourceIcon(k)}${G.RES[k].name} ${p.resources[k]}`).join(' · ')}</span><span>${esc(p.seedNote)}</span>`;
     }
+    for(const id of ['new-game-details','new-game-help'])document.getElementById(id).open=false;
+    document.getElementById('new-game-body').scrollTop=0;
     modal.classList.remove('hidden');this.refreshNewGameSettings();this.enterDialog('new-game-settings');
     document.getElementById('new-game-seed').focus();this.refreshHUD();
   },
@@ -4597,22 +4994,33 @@ G.ui = {
   refreshNewGameSettings: function () {
     const modal=document.getElementById('new-game-settings'),s=this._startSession;
     if(!modal||modal.classList.contains('hidden')||!s)return;
-    const seed=document.getElementById('new-game-seed'),status=document.getElementById('new-game-status'),review=document.getElementById('new-game-review'),check=document.getElementById('new-game-review-button'),confirm=document.getElementById('new-game-confirm');
-    if(s.world!==G.world||s.game!==G.game){s.phase='edit';s.intent=null;review.classList.add('hidden');check.disabled=confirm.disabled=true;status.textContent='当前村已改变，此设置已过期；请取消后重新打开。';return;}
+    const seed=document.getElementById('new-game-seed'),review=document.getElementById('new-game-review'),check=document.getElementById('new-game-review-button'),confirm=document.getElementById('new-game-confirm');
+    // Preserve controls, focused elements, expanded help and the body's scroll position on HUD refresh.
+    const write=(id,value)=>{const el=document.getElementById(id);if(el&&el.textContent!==value)el.textContent=value;};
+    const phase=reviewing=>{
+      document.getElementById('new-game-edit').classList.toggle('hidden',reviewing);
+      review.classList.toggle('hidden',!reviewing);check.classList.toggle('hidden',reviewing);
+      for(const id of ['new-game-confirm','new-game-back','new-game-warning'])document.getElementById(id).classList.toggle('hidden',!reviewing);
+      write('new-game-step',reviewing?'2 / 2 · 检查并确认':'1 / 2 · 选择开局');
+    };
+    if(s.world!==G.world||s.game!==G.game){s.phase='edit';s.intent=null;phase(false);check.disabled=confirm.disabled=true;write('new-game-status','当前村已改变，此设置已过期；请取消后重新打开。');return;}
     const recorded=G.game.startConfig,known=recorded&&G.startConfigQuote(recorded),currentName=known?.ok?known.presetSummary.name:'旧档未记录开局配置（不根据现存资源猜测）';
-    document.getElementById('new-game-current').textContent=`当前村：地图种子 ${G.world.seed} · ${G.world.N}×${G.world.N} · ${currentName} · ${G.world.mapVersion===2?'山地':'原地形'}。打开、修改和取消不会替换此村或删除存档。`;
+    write('new-game-current',`当前村：种子 ${G.world.seed} · ${G.world.N}×${G.world.N} · ${currentName} · ${G.world.mapVersion===2?'山地':'原地形'}`);
     for(const preset of ['classic','hard'])document.getElementById('new-game-preset-'+preset).setAttribute('aria-pressed',String(s.preset===preset));
     for(const terrain of ['classic','mountain'])document.getElementById('new-game-terrain-'+terrain)?.setAttribute('aria-pressed',String(s.terrain===terrain));
     for(const size of G.MAP_SIZES)document.getElementById('new-game-size-'+size)?.setAttribute('aria-pressed',String(s.mapSize===size));
     const terrainName=s.terrain==='mountain'?'山地（开局保障谷地）':'原地形';
     const terrainNote=s.terrain==='mountain'?'山体通常不能步行或建造；可在道路分类规划直线隧道，实运施工完工后通行。开局谷地保障住房用地、可达水岸与有限原料，仍需自行采运施工；没有额外库存或住房。128格山地使用 v2 地形存档，192格使用 v3；旧版本不能读取相应新格式。':'原地形与镇址保持；新村附近分别保证至少3处可达石头和3处铁矿，工人仍须采运。新经典村使用v4地形存档，旧程序不能读取；已存村庄不补矿。';
-    const q=G.startConfigQuote({seed:seed.value,preset:s.preset,terrain:s.terrain,mapSize:s.mapSize}),summary=document.getElementById('new-game-summary');
-    if(q.ok){const p=q.presetSummary;summary.textContent=`新村预览：种子 ${q.config.seed} · ${p.name} · ${terrainName} · ${q.mapSizeSummary.name}\n${q.mapSizeSummary.note}\n${p.families}家庭 / ${p.population}人（${p.adults}成人、${p.children}儿童）；仅有储物车，住房需自行建设\n${['wood','stone','iron','food','firewood','tools'].map(k=>`${G.RES[k].name} ${p.resources[k]}`).join(' · ')}\n${p.seedNote}\n${p.equipmentNote} ${p.adaptationNote}\n${terrainNote}`;}
-    else summary.textContent=q.reason;
+    const q=G.startConfigQuote({seed:seed.value,preset:s.preset,terrain:s.terrain,mapSize:s.mapSize});
+    seed.setAttribute('aria-invalid',String(!q.ok));
+    if(q.ok){const p=q.presetSummary;
+      write('new-game-preview',`已选：${p.name} · ${terrainName} · ${q.mapSizeSummary.name} · ${p.population}人`);
+      write('new-game-summary',`新村预览：种子 ${q.config.seed} · ${p.name} · ${terrainName} · ${q.mapSizeSummary.name}\n${q.mapSizeSummary.note}\n${p.families}家庭 / ${p.population}人（${p.adults}成人、${p.children}儿童）；仅有储物车，住房需自行建设\n${['wood','stone','iron','food','firewood','tools'].map(k=>`${G.RES[k].name} ${p.resources[k]}`).join(' · ')}\n${p.seedNote}\n${p.equipmentNote} ${p.adaptationNote}\n${terrainNote}`);
+    }else{write('new-game-preview',q.reason);write('new-game-summary',q.reason);}
     const reviewing=s.phase==='review'&&!!s.intent&&q.ok&&s.intent.key===q.key;
-    review.classList.toggle('hidden',!reviewing);check.classList.toggle('hidden',reviewing);check.disabled=!q.ok;confirm.disabled=!reviewing;
-    if(reviewing)document.getElementById('new-game-confirm-summary').textContent=`将创建：种子 ${s.intent.config.seed} · ${q.presetSummary.name} · ${terrainName} · ${q.mapSizeSummary.name} · ${q.presetSummary.population}人。不会重放或搬入当前村的库存、建筑和居民。`;
-    status.textContent=s.message||(!q.ok?q.reason:'草稿不会触发开局发放；先检查，再单独确认。');
+    phase(reviewing);check.disabled=!q.ok;confirm.disabled=!reviewing;
+    if(reviewing)write('new-game-confirm-summary',`地图种子 ${s.intent.config.seed}\n${q.presetSummary.name} · ${terrainName} · ${q.mapSizeSummary.name}\n${q.presetSummary.families}家庭 / ${q.presetSummary.population}人 · 仅有储物车，住房需自行建设\n${q.presetSummary.seedNote}`);
+    write('new-game-status',s.message||(!q.ok?q.reason:'当前村已暂停。先检查开局，再单独确认。'));
   },
 
   enterDialog: function (id) {

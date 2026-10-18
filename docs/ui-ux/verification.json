@@ -1,0 +1,1183 @@
+{
+  "base": "421793ac1a6bd073b19e0df1b46e557efb0b43a1",
+  "reviewedUiSha256": "666f382b8a312be98eec60b59988844e7fb8e029b3220dea430216f95a16346a",
+  "browser": "blocked before browser launch; not run",
+  "knownNonpassing": {
+    "building-completion.js": "Timed out after150 seconds on both the batch and pristine main; no pass claimed.",
+    "farm-planning-ui.js": "Both fail: fixture lacks G.screenToMapTile.",
+    "harvest-range-ui.js": "Both fail: fixture lacks G.screenToMapTile.",
+    "harvest-cancel-ui.js": "Both report17 pass/8 failures: pre-existing DOM/input fixture drift.",
+    "fishing-water-ui.js": "Isolated batch and pristine main both fail the legacy placement-text regex after construction-delivery wording. Initial concurrent batch run was killed; isolated rerun reached the matching baseline assertion.",
+    "merchant-orders-ui.js": "Both fail the old three-food payment wording assertion; current six item wording is unchanged.",
+    "mineral-reserves-ui.js": "Both fail the legacy1080 stock expectation (actual1000).",
+    "orchard-renewal-ui.js": "Both fail old 未采果实17 wording against current 本季未采果实合计17.",
+    "resource-goals.js": "Both report26 pass/2 construction fixture failures missing required delivery state; engine source unchanged.",
+    "stockpile-ui.js": "Both fail the pre-existing missing stockpile detail after reload fixture assertion.",
+    "focused-building-state.js": "Still fails old50% construction-progress expectation against actual waiting-for-materials state. Only DOM API and renamed-action expectations adapted here; new focused-site regressions pass."
+  },
+  "initialRun": [
+    {
+      "test": "auto-trade-ui.js",
+      "exit": 0,
+      "seconds": 7.63,
+      "last": [
+        "Automatic purchase UI: 16 DOM/live-simulation suites passed (not browser/mobile acceptance)."
+      ]
+    },
+    {
+      "test": "blacksmith-arrival.js",
+      "exit": 0,
+      "seconds": 8.04,
+      "last": [
+        "Blacksmith arrival: 5 passed"
+      ]
+    },
+    {
+      "test": "blacksmith-input-ui.js",
+      "exit": 0,
+      "seconds": 0.29,
+      "last": [
+        "Blacksmith input UI: 3 passed (DOM, not browser acceptance)"
+      ]
+    },
+    {
+      "test": "blacksmith-input.js",
+      "exit": 0,
+      "seconds": 7.43,
+      "last": [
+        "Blacksmith input: 13 passed"
+      ]
+    },
+    {
+      "test": "boarding-regressions.js",
+      "exit": 0,
+      "seconds": 0.18,
+      "last": [
+        "11 boarding scenarios passed; 0 failed"
+      ]
+    },
+    {
+      "test": "build-affordance-ui.js",
+      "exit": 0,
+      "seconds": 6.76,
+      "last": [
+        "Build affordability, mono resource icons and typography: 15 contract groups passed."
+      ]
+    },
+    {
+      "test": "building-activity-ui.js",
+      "exit": 0,
+      "seconds": 1.41,
+      "last": [
+        "Building activity UI: 9 DOM suites passed (not browser/mobile acceptance)."
+      ]
+    },
+    {
+      "test": "building-completion.js",
+      "exit": 124,
+      "seconds": 150.05,
+      "last": [
+        "Command '['node', 'tests/building-completion.js']' timed out after 150 seconds"
+      ],
+      "baselineExit": 124,
+      "baselineLast": [
+        "Command '['node', 'tests/building-completion.js']' timed out after 150 seconds"
+      ]
+    },
+    {
+      "test": "building-detail-navigation-ui.js",
+      "exit": 0,
+      "seconds": 3.03,
+      "last": [
+        "Building detail navigation: 9 DOM/live-simulation suites passed (not browser/mobile)."
+      ]
+    },
+    {
+      "test": "category-cards-ui.js",
+      "exit": 0,
+      "seconds": 0.31,
+      "last": [
+        "Category cards: 6 DOM/CSS suites passed (not browser layout or mobile acceptance)."
+      ]
+    },
+    {
+      "test": "cattle-pasture-ui.js",
+      "exit": 0,
+      "seconds": 0.94,
+      "last": [
+        "Cattle pasture UI: 10 DOM/live-simulation suites passed (not browser/mobile)."
+      ]
+    },
+    {
+      "test": "cemetery-area-ui.js",
+      "exit": 0,
+      "seconds": 1.64,
+      "last": [
+        "Cemetery area UI: 21 DOM/input suites passed; not browser/mobile acceptance."
+      ]
+    },
+    {
+      "test": "cemetery-ui.js",
+      "exit": 0,
+      "seconds": 0.99,
+      "last": [
+        "Cemetery UI: 7 passed (DOM only)"
+      ]
+    },
+    {
+      "test": "chapel-ui.js",
+      "exit": 1,
+      "seconds": 0.2,
+      "last": [
+        "Node.js v24.19.0"
+      ],
+      "baselineExit": 0,
+      "baselineLast": [
+        "Chapel UI: 13 DOM suites passed (browser visual acceptance not performed)."
+      ]
+    },
+    {
+      "test": "chickens-ui.js",
+      "exit": 1,
+      "seconds": 1.46,
+      "last": [
+        "Node.js v24.19.0"
+      ],
+      "baselineExit": 0,
+      "baselineLast": [
+        "Chicken UI: 20 DOM/live-simulation suites passed (not browser/mobile)."
+      ]
+    },
+    {
+      "test": "citizen-presentation.js",
+      "exit": 0,
+      "seconds": 0.22,
+      "last": [
+        "Citizen presentation: 22 cases passed."
+      ]
+    },
+    {
+      "test": "coal-heating-ui.js",
+      "exit": 0,
+      "seconds": 2.05,
+      "last": [
+        "Coal heating UI: 7 passed (DOM only)"
+      ]
+    },
+    {
+      "test": "cold-squash-ui.js",
+      "exit": 0,
+      "seconds": 1.37,
+      "last": [
+        "Cold squash UI: 8 DOM/live-state suites passed (not browser/mobile acceptance)."
+      ]
+    },
+    {
+      "test": "construction-delivery-ui.js",
+      "exit": 0,
+      "seconds": 0.53,
+      "last": [
+        "Construction UI: 8 DOM/live-game suites passed (not browser/mobile acceptance)."
+      ]
+    },
+    {
+      "test": "construction-delivery.js",
+      "exit": 0,
+      "seconds": 12.94,
+      "last": [
+        "Construction delivery: 24 passed"
+      ]
+    },
+    {
+      "test": "construction-priority-ui.js",
+      "exit": 0,
+      "seconds": 0.61,
+      "last": [
+        "Construction priority UI: 4 passed (DOM only)"
+      ]
+    },
+    {
+      "test": "construction-staffing.js",
+      "exit": 0,
+      "seconds": 5.81,
+      "last": [
+        "Construction staffing: 10 passed"
+      ]
+    },
+    {
+      "test": "crop-seeds-ui.js",
+      "exit": 0,
+      "seconds": 5.24,
+      "last": [
+        "Crop seeds UI: 17 DOM and live-simulation suites passed (browser visual acceptance not performed)."
+      ]
+    },
+    {
+      "test": "deer-hunting-ui.js",
+      "exit": 0,
+      "seconds": 0.38,
+      "last": [
+        "Deer UI: 8 DOM/live-game suites passed (not browser acceptance)."
+      ]
+    },
+    {
+      "test": "early-beans-ui.js",
+      "exit": 0,
+      "seconds": 5.11,
+      "last": [
+        "Early beans UI: 14 DOM and live-simulation suites passed (not browser/mobile visual acceptance)."
+      ]
+    },
+    {
+      "test": "early-harvest-ui.js",
+      "exit": 0,
+      "seconds": 0.87,
+      "last": [
+        "Early harvest UI: 6 passed (DOM only)"
+      ]
+    },
+    {
+      "test": "family-clearing-regressions.js",
+      "exit": 0,
+      "seconds": 1.27,
+      "last": [
+        "24 family and clearing scenarios passed; 0 failed"
+      ]
+    },
+    {
+      "test": "farm-pests-ui.js",
+      "exit": 0,
+      "seconds": 4.13,
+      "last": [
+        "Farm pests UI: 13 DOM and live-simulation suites passed (browser visual acceptance not performed)."
+      ]
+    },
+    {
+      "test": "farm-planning-ui.js",
+      "exit": 1,
+      "seconds": 0.59,
+      "last": [
+        "Node.js v24.19.0"
+      ],
+      "baselineExit": 1,
+      "baselineLast": [
+        "Node.js v24.19.0"
+      ]
+    },
+    {
+      "test": "fishing-water-ui.js",
+      "exit": -9,
+      "seconds": 27.05,
+      "last": [
+        "ok detached or stale controls cannot change policy across selection, world, game, entity, node or modal changes"
+      ],
+      "baselineExit": 1,
+      "baselineLast": [
+        "Node.js v24.19.0"
+      ]
+    },
+    {
+      "test": "fruit-brewing-ui.js",
+      "exit": 0,
+      "seconds": 3.17,
+      "last": [
+        "17 fruit/brewing UI contracts passed (DOM/live APIs; not browser or mobile visual acceptance)."
+      ]
+    },
+    {
+      "test": "fuel-input-ui.js",
+      "exit": 0,
+      "seconds": 0.21,
+      "last": [
+        "Fuel input UI: 3 passed (DOM only)"
+      ]
+    },
+    {
+      "test": "harvest-cancel-ui.js",
+      "exit": 1,
+      "seconds": 7.63,
+      "last": [
+        "Harvest cancellation UI: 17 passed, 8 failed (DOM/event fixtures and static CSS only)."
+      ],
+      "baselineExit": 1,
+      "baselineLast": [
+        "Harvest cancellation UI: 17 passed, 8 failed (DOM/event fixtures and static CSS only)."
+      ]
+    },
+    {
+      "test": "harvest-range-ui.js",
+      "exit": 1,
+      "seconds": 0.57,
+      "last": [
+        "Node.js v24.19.0"
+      ],
+      "baselineExit": 1,
+      "baselineLast": [
+        "Node.js v24.19.0"
+      ]
+    },
+    {
+      "test": "hauling.js",
+      "exit": 0,
+      "seconds": 1.93,
+      "last": [
+        "19 economy regression scenarios passed"
+      ]
+    },
+    {
+      "test": "house-upgrade-ui.js",
+      "exit": 0,
+      "seconds": 5.52,
+      "last": [
+        "House upgrade UI: 20 DOM/live-simulation suites passed (not browser/mobile acceptance)."
+      ]
+    },
+    {
+      "test": "household-supply-ui.js",
+      "exit": 0,
+      "seconds": 71.22,
+      "last": [
+        "Household supply UI: 49 suites passed (headless DOM with real migration/save APIs; browser/mobile visual acceptance not performed)."
+      ]
+    },
+    {
+      "test": "housing-fire-ui.js",
+      "exit": 0,
+      "seconds": 38.53,
+      "last": [
+        "Housing fire UI: 32 DOM/live-simulation suites passed (not browser/mobile acceptance)."
+      ]
+    },
+    {
+      "test": "hud-guidance-ui.js",
+      "exit": 0,
+      "seconds": 0.61,
+      "last": [
+        "HUD and survival guidance: 16 passed (DOM/static only; browser acceptance separate)"
+      ]
+    },
+    {
+      "test": "map-size.js",
+      "exit": 0,
+      "seconds": 51.05,
+      "last": [
+        "}"
+      ]
+    },
+    {
+      "test": "marked-reachability.js",
+      "exit": 0,
+      "seconds": 9.52,
+      "last": [
+        "6 marked reachability scenarios passed"
+      ]
+    },
+    {
+      "test": "merchant-orders-ui.js",
+      "exit": 1,
+      "seconds": 0.19,
+      "last": [
+        "Node.js v24.19.0"
+      ],
+      "baselineExit": 1,
+      "baselineLast": [
+        "Node.js v24.19.0"
+      ]
+    },
+    {
+      "test": "mineral-reserves-ui.js",
+      "exit": 1,
+      "seconds": 0.52,
+      "last": [
+        "Node.js v24.19.0"
+      ],
+      "baselineExit": 1,
+      "baselineLast": [
+        "Node.js v24.19.0"
+      ]
+    },
+    {
+      "test": "mineral-resource-ui.js",
+      "exit": 1,
+      "seconds": 0.11,
+      "last": [
+        "Node.js v24.19.0"
+      ],
+      "baselineExit": 1,
+      "baselineLast": [
+        "Node.js v24.19.0"
+      ]
+    },
+    {
+      "test": "mountain-start.js",
+      "exit": 0,
+      "seconds": 30.18,
+      "last": [
+        "Mountain starts: 23 passed (headless focused contracts; no browser or full-suite claim)."
+      ]
+    },
+    {
+      "test": "orchard-area-ui.js",
+      "exit": 0,
+      "seconds": 3.81,
+      "last": [
+        "Orchard area UI: 53 DOM/live-simulation suites passed (not browser acceptance)."
+      ]
+    },
+    {
+      "test": "orchard-renewal-ui.js",
+      "exit": 1,
+      "seconds": 0.27,
+      "last": [
+        "Node.js v24.19.0"
+      ],
+      "baselineExit": 1,
+      "baselineLast": [
+        "Node.js v24.19.0"
+      ]
+    },
+    {
+      "test": "pasture-area-ui.js",
+      "exit": 0,
+      "seconds": 2.96,
+      "last": [
+        "56 pasture area UI contracts passed (DOM/live simulation, not browser visual acceptance)"
+      ]
+    },
+    {
+      "test": "pasture-pests-ui.js",
+      "exit": 0,
+      "seconds": 5.27,
+      "last": [
+        "Pasture pests UI: 23 DOM/live-simulation suites passed (not browser/mobile)."
+      ]
+    },
+    {
+      "test": "pasture-split-ui.js",
+      "exit": 0,
+      "seconds": 0.81,
+      "last": [
+        "Pasture split UI: 6 passed (DOM only)"
+      ]
+    },
+    {
+      "test": "personal-tools.js",
+      "exit": 0,
+      "seconds": 5.89,
+      "last": [
+        "Personal tools: 14 passed"
+      ]
+    },
+    {
+      "test": "placement-ux.js",
+      "exit": 0,
+      "seconds": 0.87,
+      "last": [
+        "Paused free placement invalidates the preview text cache."
+      ]
+    },
+    {
+      "test": "reachable-meals.js",
+      "exit": 0,
+      "seconds": 25.0,
+      "last": [
+        "26 reachable meal checks passed"
+      ]
+    },
+    {
+      "test": "resource-chain-ui.js",
+      "exit": 0,
+      "seconds": 0.46,
+      "last": [
+        "Resource chain UI: 7 interaction suites passed (DOM fixture; no browser visual acceptance)."
+      ]
+    },
+    {
+      "test": "resource-goals-ui.js",
+      "exit": 0,
+      "seconds": 15.14,
+      "last": [
+        "Resource goal UI: 17 passed, 0 failed (DOM only)."
+      ]
+    },
+    {
+      "test": "resource-goals.js",
+      "exit": 1,
+      "seconds": 1.99,
+      "last": [
+        "Resource goals: 26 passed, 2 failed (simulation contracts, not browser tests)."
+      ],
+      "baselineExit": 1,
+      "baselineLast": [
+        "Resource goals: 26 passed, 2 failed (simulation contracts, not browser tests)."
+      ]
+    },
+    {
+      "test": "road-plan-ui.js",
+      "exit": 0,
+      "seconds": 12.24,
+      "last": [
+        "Road plan UI: 18 passed (DOM/event fixtures, not real browser/mobile acceptance)"
+      ]
+    },
+    {
+      "test": "road-work-ui.js",
+      "exit": 0,
+      "seconds": 1.84,
+      "last": [
+        "Road-work UI: 37 DOM/input suites passed (not browser/mobile acceptance)."
+      ]
+    },
+    {
+      "test": "save-input-regressions.js",
+      "exit": 0,
+      "seconds": 8.88,
+      "last": [
+        "Save/input regressions: 28 passed, 0 failed (DOM stubs only)."
+      ]
+    },
+    {
+      "test": "school-attendance-ui.js",
+      "exit": 0,
+      "seconds": 1.08,
+      "last": [
+        "School attendance UI: 17 DOM and real-simulation suites passed (not browser/mobile acceptance)."
+      ]
+    },
+    {
+      "test": "smoke.js",
+      "exit": 0,
+      "seconds": 0.82,
+      "last": [
+        "全部通过: 226 passed, 0 failed"
+      ]
+    },
+    {
+      "test": "start-settings-ui.js",
+      "exit": 0,
+      "seconds": 7.2,
+      "last": [
+        "Start settings UI: 59 DOM/live-simulation suites passed (not browser acceptance)."
+      ]
+    },
+    {
+      "test": "start-settings.js",
+      "exit": 0,
+      "seconds": 18.85,
+      "last": [
+        "Start settings: 17 passed"
+      ]
+    },
+    {
+      "test": "stockpile-ui.js",
+      "exit": 1,
+      "seconds": 0.25,
+      "last": [
+        "Node.js v24.19.0"
+      ],
+      "baselineExit": 1,
+      "baselineLast": [
+        "Node.js v24.19.0"
+      ]
+    },
+    {
+      "test": "tavern-ui.js",
+      "exit": 0,
+      "seconds": 0.75,
+      "last": [
+        "Tavern UI: 11 DOM and live-simulation suites passed (browser visual acceptance not performed)."
+      ]
+    },
+    {
+      "test": "terrain-presentation.js",
+      "exit": 0,
+      "seconds": 0.11,
+      "last": [
+        "Terrain presentation: 8/8 groups passed"
+      ]
+    },
+    {
+      "test": "town-hall-ui.js",
+      "exit": 0,
+      "seconds": 23.7,
+      "last": [
+        "Town hall UI: 13 interaction suites passed (DOM fixture; browser visual acceptance not performed)."
+      ]
+    },
+    {
+      "test": "town-ledger-ui.js",
+      "exit": 0,
+      "seconds": 15.16,
+      "last": [
+        "Town flow ledger UI: 9 suites passed (DOM fixture, actual summary/save APIs; browser visual acceptance not performed)."
+      ]
+    },
+    {
+      "test": "tunnel-ui.js",
+      "exit": 0,
+      "seconds": 2.69,
+      "last": [
+        "Tunnel UI: 36 DOM/input suites passed (not browser/mobile acceptance)."
+      ]
+    },
+    {
+      "test": "ui_economy.js",
+      "exit": 0,
+      "seconds": 0.14,
+      "last": [
+        "Wood exploration and autumn fuel warnings persist in the guide."
+      ]
+    },
+    {
+      "test": "warm-coats-ui.js",
+      "exit": 0,
+      "seconds": 2.44,
+      "last": [
+        "Warm coats UI: 22 DOM and live-simulation suites passed (browser visual acceptance not performed)."
+      ]
+    },
+    {
+      "test": "workforce-controls-ui.js",
+      "exit": 0,
+      "seconds": 3.67,
+      "last": [
+        "Workforce UI: 14 DOM/live-simulation suites passed (not browser/mobile)."
+      ]
+    },
+    {
+      "test": "workforce-controls.js",
+      "exit": 0,
+      "seconds": 10.59,
+      "last": [
+        "Workforce controls: 20 passed"
+      ]
+    }
+  ],
+  "finalRun": [
+    {
+      "test": "auto-trade-ui.js",
+      "exit": 0,
+      "seconds": 4.0,
+      "last": [
+        "Automatic purchase UI: 16 DOM/live-simulation suites passed (not browser/mobile acceptance)."
+      ]
+    },
+    {
+      "test": "blacksmith-arrival.js",
+      "exit": 0,
+      "seconds": 5.83,
+      "last": [
+        "Blacksmith arrival: 5 passed"
+      ]
+    },
+    {
+      "test": "blacksmith-input-ui.js",
+      "exit": 0,
+      "seconds": 0.18,
+      "last": [
+        "Blacksmith input UI: 3 passed (DOM, not browser acceptance)"
+      ]
+    },
+    {
+      "test": "blacksmith-input.js",
+      "exit": 0,
+      "seconds": 6.03,
+      "last": [
+        "Blacksmith input: 13 passed"
+      ]
+    },
+    {
+      "test": "boarding-regressions.js",
+      "exit": 0,
+      "seconds": 0.12,
+      "last": [
+        "11 boarding scenarios passed; 0 failed"
+      ]
+    },
+    {
+      "test": "build-affordance-ui.js",
+      "exit": 0,
+      "seconds": 3.87,
+      "last": [
+        "Build affordability, mono resource icons and typography: 15 contract groups passed."
+      ]
+    },
+    {
+      "test": "building-activity-ui.js",
+      "exit": 0,
+      "seconds": 0.92,
+      "last": [
+        "Building activity UI: 9 DOM suites passed (not browser/mobile acceptance)."
+      ]
+    },
+    {
+      "test": "building-detail-navigation-ui.js",
+      "exit": 0,
+      "seconds": 2.45,
+      "last": [
+        "Building detail navigation: 9 DOM/live-simulation suites passed (not browser/mobile)."
+      ]
+    },
+    {
+      "test": "category-cards-ui.js",
+      "exit": 0,
+      "seconds": 0.34,
+      "last": [
+        "Category cards: 6 DOM/CSS suites passed (not browser layout or mobile acceptance)."
+      ]
+    },
+    {
+      "test": "cattle-pasture-ui.js",
+      "exit": 0,
+      "seconds": 1.01,
+      "last": [
+        "Cattle pasture UI: 10 DOM/live-simulation suites passed (not browser/mobile)."
+      ]
+    },
+    {
+      "test": "cemetery-area-ui.js",
+      "exit": 0,
+      "seconds": 1.27,
+      "last": [
+        "Cemetery area UI: 21 DOM/input suites passed; not browser/mobile acceptance."
+      ]
+    },
+    {
+      "test": "cemetery-ui.js",
+      "exit": 0,
+      "seconds": 0.87,
+      "last": [
+        "Cemetery UI: 7 passed (DOM only)"
+      ]
+    },
+    {
+      "test": "chapel-ui.js",
+      "exit": 0,
+      "seconds": 0.67,
+      "last": [
+        "Chapel UI: 13 DOM suites passed (browser visual acceptance not performed)."
+      ]
+    },
+    {
+      "test": "chickens-ui.js",
+      "exit": 0,
+      "seconds": 2.58,
+      "last": [
+        "Chicken UI: 20 DOM/live-simulation suites passed (not browser/mobile)."
+      ]
+    },
+    {
+      "test": "citizen-presentation.js",
+      "exit": 0,
+      "seconds": 0.18,
+      "last": [
+        "Citizen presentation: 22 cases passed."
+      ]
+    },
+    {
+      "test": "coal-heating-ui.js",
+      "exit": 0,
+      "seconds": 1.95,
+      "last": [
+        "Coal heating UI: 7 passed (DOM only)"
+      ]
+    },
+    {
+      "test": "cold-squash-ui.js",
+      "exit": 0,
+      "seconds": 1.1,
+      "last": [
+        "Cold squash UI: 8 DOM/live-state suites passed (not browser/mobile acceptance)."
+      ]
+    },
+    {
+      "test": "construction-delivery-ui.js",
+      "exit": 0,
+      "seconds": 0.42,
+      "last": [
+        "Construction UI: 8 DOM/live-game suites passed (not browser/mobile acceptance)."
+      ]
+    },
+    {
+      "test": "construction-delivery.js",
+      "exit": 0,
+      "seconds": 9.75,
+      "last": [
+        "Construction delivery: 24 passed"
+      ]
+    },
+    {
+      "test": "construction-priority-ui.js",
+      "exit": 0,
+      "seconds": 0.72,
+      "last": [
+        "Construction priority UI: 4 passed (DOM only)"
+      ]
+    },
+    {
+      "test": "construction-staffing.js",
+      "exit": 0,
+      "seconds": 4.39,
+      "last": [
+        "Construction staffing: 10 passed"
+      ]
+    },
+    {
+      "test": "crop-seeds-ui.js",
+      "exit": 0,
+      "seconds": 4.39,
+      "last": [
+        "Crop seeds UI: 17 DOM and live-simulation suites passed (browser visual acceptance not performed)."
+      ]
+    },
+    {
+      "test": "deer-hunting-ui.js",
+      "exit": 0,
+      "seconds": 0.31,
+      "last": [
+        "Deer UI: 8 DOM/live-game suites passed (not browser acceptance)."
+      ]
+    },
+    {
+      "test": "details-readability-ui.js",
+      "exit": 0,
+      "seconds": 1.21,
+      "last": [
+        "Detail readability: 11 DOM/CSS suites passed (not browser/zoom acceptance)."
+      ]
+    },
+    {
+      "test": "early-beans-ui.js",
+      "exit": 0,
+      "seconds": 3.04,
+      "last": [
+        "Early beans UI: 14 DOM and live-simulation suites passed (not browser/mobile visual acceptance)."
+      ]
+    },
+    {
+      "test": "early-harvest-ui.js",
+      "exit": 0,
+      "seconds": 0.5,
+      "last": [
+        "Early harvest UI: 6 passed (DOM only)"
+      ]
+    },
+    {
+      "test": "family-clearing-regressions.js",
+      "exit": 0,
+      "seconds": 0.96,
+      "last": [
+        "24 family and clearing scenarios passed; 0 failed"
+      ]
+    },
+    {
+      "test": "farm-pests-ui.js",
+      "exit": 0,
+      "seconds": 2.49,
+      "last": [
+        "Farm pests UI: 13 DOM and live-simulation suites passed (browser visual acceptance not performed)."
+      ]
+    },
+    {
+      "test": "fruit-brewing-ui.js",
+      "exit": 0,
+      "seconds": 2.06,
+      "last": [
+        "17 fruit/brewing UI contracts passed (DOM/live APIs; not browser or mobile visual acceptance)."
+      ]
+    },
+    {
+      "test": "fuel-input-ui.js",
+      "exit": 0,
+      "seconds": 0.22,
+      "last": [
+        "Fuel input UI: 3 passed (DOM only)"
+      ]
+    },
+    {
+      "test": "goal-recommendations.js",
+      "exit": 0,
+      "seconds": 0.46,
+      "last": [
+        "Goal recommendation boundaries: 10 passed, 0 failed."
+      ]
+    },
+    {
+      "test": "hauling.js",
+      "exit": 0,
+      "seconds": 1.61,
+      "last": [
+        "19 economy regression scenarios passed"
+      ]
+    },
+    {
+      "test": "house-upgrade-ui.js",
+      "exit": 0,
+      "seconds": 4.29,
+      "last": [
+        "House upgrade UI: 20 DOM/live-simulation suites passed (not browser/mobile acceptance)."
+      ]
+    },
+    {
+      "test": "household-supply-ui.js",
+      "exit": 0,
+      "seconds": 44.38,
+      "last": [
+        "Household supply UI: 49 suites passed (headless DOM with real migration/save APIs; browser/mobile visual acceptance not performed)."
+      ]
+    },
+    {
+      "test": "housing-fire-ui.js",
+      "exit": 0,
+      "seconds": 36.61,
+      "last": [
+        "Housing fire UI: 32 DOM/live-simulation suites passed (not browser/mobile acceptance)."
+      ]
+    },
+    {
+      "test": "hud-guidance-ui.js",
+      "exit": 0,
+      "seconds": 0.47,
+      "last": [
+        "HUD and survival guidance: 16 passed (DOM/static only; browser acceptance separate)"
+      ]
+    },
+    {
+      "test": "map-size.js",
+      "exit": 0,
+      "seconds": 65.11,
+      "last": [
+        "}"
+      ]
+    },
+    {
+      "test": "marked-reachability.js",
+      "exit": 0,
+      "seconds": 19.17,
+      "last": [
+        "6 marked reachability scenarios passed"
+      ]
+    },
+    {
+      "test": "mineral-resource-ui.js",
+      "exit": 0,
+      "seconds": 0.15,
+      "last": [
+        "Mineral resource UI: 27 registry/markup contracts passed (headless only)."
+      ]
+    },
+    {
+      "test": "mountain-start.js",
+      "exit": 0,
+      "seconds": 40.84,
+      "last": [
+        "Mountain starts: 23 passed (headless focused contracts; no browser or full-suite claim)."
+      ]
+    },
+    {
+      "test": "orchard-area-ui.js",
+      "exit": 0,
+      "seconds": 3.42,
+      "last": [
+        "Orchard area UI: 53 DOM/live-simulation suites passed (not browser acceptance)."
+      ]
+    },
+    {
+      "test": "pasture-area-ui.js",
+      "exit": 0,
+      "seconds": 5.76,
+      "last": [
+        "56 pasture area UI contracts passed (DOM/live simulation, not browser visual acceptance)"
+      ]
+    },
+    {
+      "test": "pasture-pests-ui.js",
+      "exit": 0,
+      "seconds": 6.03,
+      "last": [
+        "Pasture pests UI: 23 DOM/live-simulation suites passed (not browser/mobile)."
+      ]
+    },
+    {
+      "test": "pasture-split-ui.js",
+      "exit": 0,
+      "seconds": 1.44,
+      "last": [
+        "Pasture split UI: 6 passed (DOM only)"
+      ]
+    },
+    {
+      "test": "personal-tools.js",
+      "exit": 0,
+      "seconds": 14.62,
+      "last": [
+        "Personal tools: 14 passed"
+      ]
+    },
+    {
+      "test": "placement-ux.js",
+      "exit": 0,
+      "seconds": 1.85,
+      "last": [
+        "Paused free placement invalidates the preview text cache."
+      ]
+    },
+    {
+      "test": "reachable-meals.js",
+      "exit": 0,
+      "seconds": 25.25,
+      "last": [
+        "26 reachable meal checks passed"
+      ]
+    },
+    {
+      "test": "resource-chain-ui.js",
+      "exit": 0,
+      "seconds": 0.28,
+      "last": [
+        "Resource chain UI: 7 interaction suites passed (DOM fixture; no browser visual acceptance)."
+      ]
+    },
+    {
+      "test": "resource-goals-ui.js",
+      "exit": 0,
+      "seconds": 16.4,
+      "last": [
+        "Resource goal UI: 19 passed, 0 failed (DOM only)."
+      ]
+    },
+    {
+      "test": "road-plan-ui.js",
+      "exit": 0,
+      "seconds": 16.05,
+      "last": [
+        "Road plan UI: 18 passed (DOM/event fixtures, not real browser/mobile acceptance)"
+      ]
+    },
+    {
+      "test": "road-work-ui.js",
+      "exit": 0,
+      "seconds": 1.52,
+      "last": [
+        "Road-work UI: 37 DOM/input suites passed (not browser/mobile acceptance)."
+      ]
+    },
+    {
+      "test": "save-input-regressions.js",
+      "exit": 0,
+      "seconds": 12.45,
+      "last": [
+        "Save/input regressions: 28 passed, 0 failed (DOM stubs only)."
+      ]
+    },
+    {
+      "test": "school-attendance-ui.js",
+      "exit": 0,
+      "seconds": 1.08,
+      "last": [
+        "School attendance UI: 17 DOM and real-simulation suites passed (not browser/mobile acceptance)."
+      ]
+    },
+    {
+      "test": "smoke.js",
+      "exit": 0,
+      "seconds": 0.75,
+      "last": [
+        "全部通过: 226 passed, 0 failed"
+      ]
+    },
+    {
+      "test": "start-settings-ui.js",
+      "exit": 0,
+      "seconds": 9.3,
+      "last": [
+        "Start settings UI: 59 DOM/live-simulation suites passed (not browser acceptance)."
+      ]
+    },
+    {
+      "test": "start-settings.js",
+      "exit": 0,
+      "seconds": 18.28,
+      "last": [
+        "Start settings: 17 passed"
+      ]
+    },
+    {
+      "test": "tavern-ui.js",
+      "exit": 0,
+      "seconds": 0.7,
+      "last": [
+        "Tavern UI: 11 DOM and live-simulation suites passed (browser visual acceptance not performed)."
+      ]
+    },
+    {
+      "test": "terrain-presentation.js",
+      "exit": 0,
+      "seconds": 0.11,
+      "last": [
+        "Terrain presentation: 8/8 groups passed"
+      ]
+    },
+    {
+      "test": "town-hall-ui.js",
+      "exit": 0,
+      "seconds": 20.89,
+      "last": [
+        "Town hall UI: 13 interaction suites passed (DOM fixture; browser visual acceptance not performed)."
+      ]
+    },
+    {
+      "test": "town-ledger-ui.js",
+      "exit": 0,
+      "seconds": 10.62,
+      "last": [
+        "Town flow ledger UI: 9 suites passed (DOM fixture, actual summary/save APIs; browser visual acceptance not performed)."
+      ]
+    },
+    {
+      "test": "tunnel-ui.js",
+      "exit": 0,
+      "seconds": 1.81,
+      "last": [
+        "Tunnel UI: 36 DOM/input suites passed (not browser/mobile acceptance)."
+      ]
+    },
+    {
+      "test": "ui_economy.js",
+      "exit": 0,
+      "seconds": 0.14,
+      "last": [
+        "Wood exploration and autumn fuel warnings persist in the guide."
+      ]
+    },
+    {
+      "test": "warm-coats-ui.js",
+      "exit": 0,
+      "seconds": 2.16,
+      "last": [
+        "Warm coats UI: 22 DOM and live-simulation suites passed (browser visual acceptance not performed)."
+      ]
+    },
+    {
+      "test": "workforce-controls-ui.js",
+      "exit": 0,
+      "seconds": 4.16,
+      "last": [
+        "Workforce UI: 14 DOM/live-simulation suites passed (not browser/mobile)."
+      ]
+    },
+    {
+      "test": "workforce-controls.js",
+      "exit": 0,
+      "seconds": 5.91,
+      "last": [
+        "Workforce controls: 20 passed"
+      ]
+    }
+  ],
+  "finalSummary": {
+    "scripts": 65,
+    "passed": 65,
+    "scope": "Frozen-code regression selection; known baseline failures and browser blocked stages remain separately disclosed."
+  }
+}

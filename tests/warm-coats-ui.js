@@ -16,7 +16,7 @@ function fixture() {
     const handlers = {}, classes = new Set((attrs.class || '').split(/\s+/));
     let html = '', text = '';
     return {
-      tagName: tag.toUpperCase(), id: attrs.id || '', dataset: Object.fromEntries(Object.entries(attrs)
+      value: attrs.value || '', tagName: tag.toUpperCase(), id: attrs.id || '', dataset: Object.fromEntries(Object.entries(attrs)
         .filter(([key]) => key.startsWith('data-')).map(([key, value]) => [key.slice(5).replace(/-([a-z])/g, (_, c) => c.toUpperCase()), value])),
       children: [], parentNode: null, htmlWrites: 0, textWrites: 0,
       classList: { add(k) { classes.add(k); }, remove(k) { classes.delete(k); }, contains(k) { return classes.has(k); },
@@ -269,10 +269,10 @@ test('citizen work feedback follows the accepted coat rather than the newly sele
   assert.equal(G.ui.citizenStatus(c), '搬运保暖外套（送仓）');
 });
 
-test('warm coat HUD and goals use the dedicated resource, ten-unit controls, separate targets and true winter text', () => {
+test('warm coat HUD and goals use the dedicated resource, batch draft controls, separate targets and true winter text', () => {
   const f = tailor(), { G } = f;
   assert(G.RES_KEYS.includes('warmCoats')); assert(!G.FOOD_KEYS.includes('warmCoats'));
-  assert.match(G.ui.resourceIcon('warmCoats'), /assets\/icons\/res_warmCoats\.png/);
+  assert.match(G.ui.resourceIcon('warmCoats'), /aria-label="保暖外套"[\s\S]*stroke="currentColor"/);
   f.c.carry = { type: 'warmCoats', qty: 2 }; G.ui.refreshHUD();
   const title = f.doc.getElementById('res-warmCoats').title;
   assert.match(title, /另有 2 随身待入库（尚不可用）/); assert.match(title, /2 皮革 \+ 2 羊毛.*降低 70%.*再减半/);
@@ -281,7 +281,7 @@ test('warm coat HUD and goals use the dedicated resource, ten-unit controls, sep
   for (const id of ['production-goals', 'production-goal-rows', 'btn-production-goals', 'production-goals-close', 'production-goals-message']) f.mount(id);
   G.ui.initProductionGoals(); G.setProductionGoal('warmCoats', 7); G.setProductionGoal('clothes', 0); G.ui.refreshProductionGoals();
   assert(f.doc.getElementById('goal-input-warmCoats'));
-  assert.match(f.doc.getElementById('production-goal-rows').innerHTML, /data-goal="warmCoats" data-step="10"/);
+  assert.match(f.doc.getElementById('production-goal-rows').innerHTML, /data-goal="warmCoats" data-inherit="true"/);
   assert.match(f.doc.getElementById('goal-status-warmCoats').textContent, /已应用目标 7.*两类衣物目标独立.*已接批次保留/);
   assert.match(f.doc.getElementById('goal-status-clothes').textContent, /关闭新自动生产/);
 });

@@ -127,7 +127,7 @@ function town() {
 test('town hall appears in services with dedicated icon, and completed hall needs no worker', () => {
   const f = town(); f.G.ui.initToolbar();
   assert(f.G.ui.toolGroups.find(group => group.id === 'services').tools.includes('townhall'));
-  assert.match(f.G.ui.toolButton('townhall'), /assets\/icons\/tool_townhall\.png/);
+  assert.match(f.G.ui.toolButton('townhall'), /class="ui-icon"/);
   f.select(f.b);
   assert.match(f.info.textContent, /无需安排工人/);
   assert.doesNotMatch(f.info.textContent, /工人：/);

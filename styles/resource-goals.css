@@ -1,0 +1,64 @@
+/* Resource planning stays inside a bounded dialog; only its body scrolls. */
+#production-goals .production-goals-dialog {
+  width: min(920px, calc(100vw - 24px)); max-width: min(920px, calc(100vw - 24px));
+  max-height: calc(100vh - 24px); max-height: calc(100dvh - 24px);
+  padding: 0; display: flex; flex-direction: column; overflow: hidden;
+}
+.production-goals-header { padding: 18px 22px 12px; flex: 0 0 auto; border-bottom: 1px solid #6c583c; }
+#production-goals .production-goals-header h2 { margin: 0 0 6px; }
+#production-goals .production-goals-header p { margin: 0; }
+.production-goals-body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 22px 18px; }
+.goal-preset-actions, .production-goals-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+#production-goals .goal-preset-actions button, #production-goals .production-goals-actions button { margin: 0; min-height: 44px; padding: 8px 12px; }
+#goal-preset-notes { white-space: pre-line; }
+.goal-table-scroll { overflow-x: auto; margin-top: 10px; }
+.production-goal-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 13px; }
+.production-goal-table caption { text-align: left; color: #cbbb99; padding: 0 0 8px; font-size: 12px; }
+.production-goal-table thead th { text-align: left; padding: 9px 8px; color: #ffe9b0; background: #493b27; }
+.production-goal-table thead th:nth-child(1) { width: 21%; }
+.production-goal-table thead th:nth-child(2) { width: 20%; }
+.production-goal-table thead th:nth-child(3) { width: 38%; }
+.production-goal-table thead th:nth-child(4) { width: 21%; }
+#production-goals .production-goal-row { border-top: 1px solid #6c583c; padding: 0; }
+.production-goal-row th, .production-goal-row td { text-align: left; vertical-align: top; padding: 12px 8px 4px; overflow-wrap: anywhere; }
+.production-goal-row label { display: flex; align-items: center; gap: 5px; color: #ffd98a; font-weight: bold; }
+.production-goal-row small { display: block; margin-top: 5px; color: #cbbb99; font-size: 11px; line-height: 1.5; font-weight: normal; }
+.production-goal-row strong { display: block; font-variant-numeric: tabular-nums; color: #ffe9b0; font-size: 16px; }
+#production-goals .goal-controls { flex-wrap: nowrap; gap: 6px; }
+#production-goals .goal-controls input { width: 104px; min-width: 0; max-width: 100%; }
+#production-goals .goal-controls .goal-inherit { flex-basis: auto; padding: 8px; }
+#production-goals input[aria-invalid="true"] { border: 2px solid #ed977f; }
+.goal-detail-row td { padding: 0 8px 9px; }
+.goal-detail-row summary { min-height: 32px; padding: 7px 0; box-sizing: border-box; color: #cbbb99; cursor: pointer; font-size: 12px; }
+.goal-detail-row p { margin: 5px 0; }
+.goal-detail-row details[open] { padding: 0 8px 8px; border-left: 2px solid #9f8451; background: rgba(0,0,0,.14); }
+.production-goals-rules { border-top: 1px solid #6c583c; margin-top: 10px; }
+.production-goals-footer { flex: 0 0 auto; padding: 10px 22px 14px; background: #211a11; border-top: 1px solid #6c583c; }
+#production-goals-message { margin: 0 0 7px; max-height: 78px; overflow-y: auto; }
+#production-goals-message:empty { display: none; }
+#production-goals-apply { font-weight: bold; }
+#production-goals :is(button,input,summary,[tabindex]):focus-visible { outline: 3px solid #ffd98a; outline-offset: 2px; }
+@media (max-width: 560px) {
+  .production-goals-header { padding: 12px; }
+  .production-goals-body { padding: 0 10px 12px; }
+  .production-goals-footer { padding: 9px 10px; }
+  .production-goal-table { min-width: 280px; }
+  .production-goal-table thead th { font-size: 11px; padding: 8px 3px; }
+  .production-goal-row th, .production-goal-row td { padding: 9px 3px 3px; }
+  .production-goal-row label { display: block; font-size: 12px; }
+  .production-goal-row label img { display: block; margin-bottom: 3px; }
+  .production-goal-row strong { font-size: 14px; }
+  .goal-detail-row summary { min-height: 44px; padding: 12px 0; }
+  #production-goals .goal-controls { flex-wrap: wrap; gap: 3px; }
+  #production-goals .goal-controls input { width: 100%; flex: 1 1 100%; padding: 6px; }
+  #production-goals .goal-controls .goal-inherit { padding: 6px; }
+  #production-goals .production-goals-actions { gap: 5px; }
+  #production-goals .production-goals-actions button { padding: 8px; font-size: 12px; }
+}
+@media (max-height: 480px) {
+  .production-goals-header { padding: 8px 12px; }
+  #production-goals .production-goals-header h2 { font-size: 18px; }
+  #production-goals .production-goals-header p { font-size: 11px; line-height: 1.4; }
+  .production-goals-footer { padding: 6px 10px; }
+  #production-goals-message { max-height: 42px; font-size: 11px; line-height: 1.4; }
+}

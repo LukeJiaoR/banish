@@ -12,8 +12,8 @@ global.addEventListener = () => {};
 require(path.join(root, 'js/ui.js'));
 const elements = new Map();
 global.document = { addEventListener() {}, getElementById(id) {
-  if (!elements.has(id)) elements.set(id, { innerHTML: '', textContent: '', classList: { add() {}, remove() {}, contains() { return true; } },
-    addEventListener() {}, querySelectorAll() { return []; }, setAttribute() {}, getAttribute() { return null; } });
+  if (!elements.has(id)) elements.set(id, { innerHTML: '', textContent: '', classList: { add() {}, remove() {}, toggle() {}, contains() { return true; } },
+    addEventListener() {}, querySelector() { return null; }, querySelectorAll() { return []; }, setAttribute() {}, getAttribute() { return null; } });
   return elements.get(id);
 } };
 G.ui.refreshHUD = () => {};
@@ -25,11 +25,11 @@ for (const type of G.RES_KEYS) {
   assert.ok(resource.iconAsset && fs.existsSync(path.join(root, 'assets/icons', resource.iconAsset + '.png')));
   assert.ok(hud.includes(icon));
   const cost = G.ui.resourceCost({ [type]: 7 }, true);
-  assert.ok(cost.includes(icon)); assert.match(cost, />7<\/span>/);
+  assert.ok(cost.includes(icon)); assert.ok(cost.includes(`${resource.name} 7</span>`));
   assert.equal(G.ui.resourceCost({ [type]: 7 }, false), `${resource.name}×7`);
   assert.ok(icon.includes(`aria-label="${resource.name}"`));
-  assert.ok(icon.includes(`aria-hidden="true">${resource.icon}</span>`));
-  assert.ok(icon.includes('onerror="this.remove()"'), 'same emoji fallback for all resource locations');
+  assert.ok(icon.includes('class="ui-icon"'));
+  assert.ok(icon.includes('stroke="currentColor"')); assert.ok(!icon.includes('<img'), 'single-ink icons do not depend on network assets');
   passed++;
 }
 for (const type of ['house', 'stonehouse', 'school', 'mine']) {

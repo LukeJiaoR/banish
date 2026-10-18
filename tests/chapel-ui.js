@@ -128,7 +128,7 @@ test('chapel is in town services and returning to categories preserves its mount
   assert.equal(G.BDEF.chapel.jobs, 1);
   const button = f.toolbar.querySelector('[data-tool="chapel"]');
   assert(button); assert.match(button.textContent, /礼拜堂/);
-  assert.match(G.ui.toolButton('chapel'), /assets\/buildings\/chapel\.png/);
+  assert.match(G.ui.toolButton('chapel'), /class="ui-icon"/);
   G.ui.openToolCategory('services'); button.click(); assert.equal(G.tool.type, 'chapel');
   f.doc.getElementById('toolbar-back').click();
   assert.equal(G.tool, null); assert.equal(G.ui.menuCategory, null);
