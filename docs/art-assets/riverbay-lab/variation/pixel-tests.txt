@@ -1,0 +1,33 @@
+ok production entrypoint does not load the river-bay candidate
+ok installation is opt-in and preserves simulation, collision, and navigation functions
+ok repeated switches never edit the world, consume RNG, or alter paths
+ok unchanged options and warm camera frames do not rebuild cached ground
+ok interior shoreline, islands, diagonal contacts, and edge-open banks retain every boundary once
+ok closed water polygons preserve map exits, holes, narrow channels, and point contacts
+ok renderer uses shared closed curved masks and inverse land parity instead of tile water clips
+ok low-frequency color overlays preserve every original tile and meadow draw
+ok coastline caching is deterministic and invalidates only when requested
+ok settings and topology snapshots cannot leak mutable internal state
+ok same seed and same options produce identical drawing commands
+ok shore variation defaults off and preserves the 2857b94 four-toggle drawing path
+ok shore variation is a full and dirty-render no-op without shore or during winter
+ok shore variation leaves simulation, topology, collision, and RNG untouched
+ok shore width and color profiles are bounded, continuous, seeded, and fixed in world coordinates
+ok varied bands sample the shared curved mask with stable closed seams and exact map exits
+ok gradient band fills union folded offsets without holes in tiny ponds, land holes, or narrow channels
+ok open shoreline round caps cover oblique map-exit wedges on all four edges
+ok variation switches, warm frames, and local edits retain cache invalidation rules
+ok dirty repairs remain local and reuse the full-world cache
+ok new worlds, scale changes, and explicit topology edits force safe full rebuilds
+ok 128/192/256 candidates preserve the 16-million-pixel ground budget and one large cache
+ok 128/192/256 varied shores retain the 16-million-pixel budget and one large cache
+ok all-off pixels and switch round-trips exactly match the textured production renderer
+  meadow detail: energy ratio=0.741, gradient correlation=0.999
+ok low-frequency overlays retain the real meadow texture detail signal
+ok shore reconstruction stays in its coast ribbon and preserves road and rock interiors
+ok varied wet/shallow bands stay in the coast ribbon and preserve road and rock interiors
+  legacy repair audit: 51 edits, 153 byte-stable repeats; actual outside changes=0; full-reference outside max=8 pixels/2 levels; inside max=12, mean<=0.1039
+ok candidate dirty road/rock repairs stay within raster tolerance and never accumulate alpha
+  variation repair audit: 51 edits, 153 byte-stable repeats; actual outside changes=0; full-reference outside max=8 pixels/2 levels; inside max=8, mean<=0.0859
+ok varied-shore dirty repairs leave actual outside pixels exact and never accumulate alpha
+River-bay lab: 29 contract groups passed (including native pixels).
