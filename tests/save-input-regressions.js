@@ -45,7 +45,7 @@ function fixture(options = {}) {
   G.feedback = { init() {}, close() { doc.getElementById('fb').classList.add('hidden'); } };
   G.T2S = () => [0, 0]; G.cam = { x: 500, y: 350, z: 1 }; G.groundDirty = new Set(); G.markGroundDirty = () => {};
   if (!options.realAutosave) G.autosave = () => {};
-  G.frame = () => {}; G.screenToTile = (x, y) => ({ tx: x, ty: y });
+  G.frame = () => {}; G.screenToTile = G.screenToMapTile = (x, y) => ({ tx: x, ty: y });
   if (!options.skipNewGame) G.newGame(731);
   return { G, ctx, doc, els, store };
 }

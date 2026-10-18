@@ -1,0 +1,452 @@
+{
+  "engine": "@napi-rs/canvas; offline production Canvas functions, not browser/layout/device validation",
+  "base": "421793ac1a6bd073b19e0df1b46e557efb0b43a1",
+  "scene": {
+    "kind": "authored visual fixture",
+    "seed": 2685766889,
+    "size": 32,
+    "buildings": 12,
+    "citizens": 20,
+    "trees": 74
+  },
+  "results": [
+    {
+      "device": "desktop",
+      "width": 1227,
+      "height": 763,
+      "zoom": 0.75,
+      "preset": "original",
+      "filename": "desktop-z0.75-original.png",
+      "groundWidth": 1448,
+      "groundHeight": 751,
+      "coldBuildMs": 11.806,
+      "warmP50Ms": 4.254,
+      "warmP95Ms": 5.551,
+      "warmRebuilds": 0
+    },
+    {
+      "device": "desktop",
+      "width": 1227,
+      "height": 763,
+      "zoom": 0.75,
+      "preset": "study",
+      "filename": "desktop-z0.75-study.png",
+      "groundWidth": 1448,
+      "groundHeight": 751,
+      "coldBuildMs": 109.743,
+      "warmP50Ms": 1.207,
+      "warmP95Ms": 1.593,
+      "warmRebuilds": 0
+    },
+    {
+      "device": "desktop",
+      "width": 1227,
+      "height": 763,
+      "zoom": 1,
+      "preset": "original",
+      "filename": "desktop-z1-original.png",
+      "groundWidth": 1448,
+      "groundHeight": 751,
+      "coldBuildMs": 7.968,
+      "warmP50Ms": 1.257,
+      "warmP95Ms": 2.134,
+      "warmRebuilds": 0
+    },
+    {
+      "device": "desktop",
+      "width": 1227,
+      "height": 763,
+      "zoom": 1,
+      "preset": "water",
+      "filename": "desktop-z1-water.png",
+      "groundWidth": 1448,
+      "groundHeight": 751,
+      "coldBuildMs": 9.444,
+      "warmP50Ms": 1.142,
+      "warmP95Ms": 1.549,
+      "warmRebuilds": 0
+    },
+    {
+      "device": "desktop",
+      "width": 1227,
+      "height": 763,
+      "zoom": 1,
+      "preset": "shore",
+      "filename": "desktop-z1-shore.png",
+      "groundWidth": 1448,
+      "groundHeight": 751,
+      "coldBuildMs": 14.08,
+      "warmP50Ms": 1.246,
+      "warmP95Ms": 1.835,
+      "warmRebuilds": 0
+    },
+    {
+      "device": "desktop",
+      "width": 1227,
+      "height": 763,
+      "zoom": 1,
+      "preset": "study",
+      "filename": "desktop-z1-study.png",
+      "groundWidth": 1448,
+      "groundHeight": 751,
+      "coldBuildMs": 61.507,
+      "warmP50Ms": 1.116,
+      "warmP95Ms": 1.553,
+      "warmRebuilds": 0
+    },
+    {
+      "device": "desktop",
+      "width": 1227,
+      "height": 763,
+      "zoom": 2,
+      "preset": "original",
+      "filename": "desktop-z2-original.png",
+      "groundWidth": 1448,
+      "groundHeight": 751,
+      "coldBuildMs": 7.539,
+      "warmP50Ms": 0.981,
+      "warmP95Ms": 1.343,
+      "warmRebuilds": 0
+    },
+    {
+      "device": "desktop",
+      "width": 1227,
+      "height": 763,
+      "zoom": 2,
+      "preset": "study",
+      "filename": "desktop-z2-study.png",
+      "groundWidth": 1448,
+      "groundHeight": 751,
+      "coldBuildMs": 58.282,
+      "warmP50Ms": 1.069,
+      "warmP95Ms": 1.647,
+      "warmRebuilds": 0
+    },
+    {
+      "device": "phone",
+      "width": 390,
+      "height": 620,
+      "zoom": 0.75,
+      "preset": "original",
+      "filename": "phone-z0.75-original.png",
+      "groundWidth": 1448,
+      "groundHeight": 751,
+      "coldBuildMs": 6.872,
+      "warmP50Ms": 1.082,
+      "warmP95Ms": 1.696,
+      "warmRebuilds": 0
+    },
+    {
+      "device": "phone",
+      "width": 390,
+      "height": 620,
+      "zoom": 0.75,
+      "preset": "study",
+      "filename": "phone-z0.75-study.png",
+      "groundWidth": 1448,
+      "groundHeight": 751,
+      "coldBuildMs": 50.296,
+      "warmP50Ms": 1.319,
+      "warmP95Ms": 2.423,
+      "warmRebuilds": 0
+    },
+    {
+      "device": "phone",
+      "width": 390,
+      "height": 620,
+      "zoom": 1,
+      "preset": "original",
+      "filename": "phone-z1-original.png",
+      "groundWidth": 1448,
+      "groundHeight": 751,
+      "coldBuildMs": 7.084,
+      "warmP50Ms": 0.993,
+      "warmP95Ms": 1.415,
+      "warmRebuilds": 0
+    },
+    {
+      "device": "phone",
+      "width": 390,
+      "height": 620,
+      "zoom": 1,
+      "preset": "study",
+      "filename": "phone-z1-study.png",
+      "groundWidth": 1448,
+      "groundHeight": 751,
+      "coldBuildMs": 41.064,
+      "warmP50Ms": 1.039,
+      "warmP95Ms": 1.468,
+      "warmRebuilds": 0
+    },
+    {
+      "device": "phone",
+      "width": 390,
+      "height": 620,
+      "zoom": 2,
+      "preset": "original",
+      "filename": "phone-z2-original.png",
+      "groundWidth": 1448,
+      "groundHeight": 751,
+      "coldBuildMs": 8.365,
+      "warmP50Ms": 0.738,
+      "warmP95Ms": 1.2,
+      "warmRebuilds": 0
+    },
+    {
+      "device": "phone",
+      "width": 390,
+      "height": 620,
+      "zoom": 2,
+      "preset": "study",
+      "filename": "phone-z2-study.png",
+      "groundWidth": 1448,
+      "groundHeight": 751,
+      "coldBuildMs": 38.627,
+      "warmP50Ms": 0.69,
+      "warmP95Ms": 1.154,
+      "warmRebuilds": 0
+    }
+  ],
+  "sceneStateUnchanged": false,
+  "gameplayStateUnchanged": true,
+  "displayCacheChanges": [
+    {
+      "kind": "building",
+      "id": 2,
+      "field": "_chimney"
+    },
+    {
+      "kind": "building",
+      "id": 3,
+      "field": "_chimney"
+    },
+    {
+      "kind": "building",
+      "id": 4,
+      "field": "_chimney"
+    },
+    {
+      "kind": "building",
+      "id": 5,
+      "field": "_chimney"
+    },
+    {
+      "kind": "building",
+      "id": 6,
+      "field": "_chimney"
+    },
+    {
+      "kind": "building",
+      "id": 7,
+      "field": "_chimney"
+    },
+    {
+      "kind": "citizen",
+      "id": 13,
+      "field": "_psx"
+    },
+    {
+      "kind": "citizen",
+      "id": 13,
+      "field": "_fx"
+    },
+    {
+      "kind": "citizen",
+      "id": 14,
+      "field": "_psx"
+    },
+    {
+      "kind": "citizen",
+      "id": 14,
+      "field": "_fx"
+    },
+    {
+      "kind": "citizen",
+      "id": 15,
+      "field": "_psx"
+    },
+    {
+      "kind": "citizen",
+      "id": 15,
+      "field": "_fx"
+    },
+    {
+      "kind": "citizen",
+      "id": 16,
+      "field": "_psx"
+    },
+    {
+      "kind": "citizen",
+      "id": 16,
+      "field": "_fx"
+    },
+    {
+      "kind": "citizen",
+      "id": 17,
+      "field": "_psx"
+    },
+    {
+      "kind": "citizen",
+      "id": 17,
+      "field": "_fx"
+    },
+    {
+      "kind": "citizen",
+      "id": 18,
+      "field": "_psx"
+    },
+    {
+      "kind": "citizen",
+      "id": 18,
+      "field": "_fx"
+    },
+    {
+      "kind": "citizen",
+      "id": 19,
+      "field": "_psx"
+    },
+    {
+      "kind": "citizen",
+      "id": 19,
+      "field": "_fx"
+    },
+    {
+      "kind": "citizen",
+      "id": 20,
+      "field": "_psx"
+    },
+    {
+      "kind": "citizen",
+      "id": 20,
+      "field": "_fx"
+    },
+    {
+      "kind": "citizen",
+      "id": 21,
+      "field": "_psx"
+    },
+    {
+      "kind": "citizen",
+      "id": 21,
+      "field": "_fx"
+    },
+    {
+      "kind": "citizen",
+      "id": 22,
+      "field": "_psx"
+    },
+    {
+      "kind": "citizen",
+      "id": 22,
+      "field": "_fx"
+    },
+    {
+      "kind": "citizen",
+      "id": 23,
+      "field": "_psx"
+    },
+    {
+      "kind": "citizen",
+      "id": 23,
+      "field": "_fx"
+    },
+    {
+      "kind": "citizen",
+      "id": 24,
+      "field": "_psx"
+    },
+    {
+      "kind": "citizen",
+      "id": 24,
+      "field": "_fx"
+    },
+    {
+      "kind": "citizen",
+      "id": 25,
+      "field": "_psx"
+    },
+    {
+      "kind": "citizen",
+      "id": 25,
+      "field": "_fx"
+    },
+    {
+      "kind": "citizen",
+      "id": 26,
+      "field": "_psx"
+    },
+    {
+      "kind": "citizen",
+      "id": 26,
+      "field": "_fx"
+    },
+    {
+      "kind": "citizen",
+      "id": 27,
+      "field": "_psx"
+    },
+    {
+      "kind": "citizen",
+      "id": 27,
+      "field": "_fx"
+    },
+    {
+      "kind": "citizen",
+      "id": 28,
+      "field": "_psx"
+    },
+    {
+      "kind": "citizen",
+      "id": 28,
+      "field": "_fx"
+    },
+    {
+      "kind": "citizen",
+      "id": 29,
+      "field": "_psx"
+    },
+    {
+      "kind": "citizen",
+      "id": 29,
+      "field": "_fx"
+    },
+    {
+      "kind": "citizen",
+      "id": 30,
+      "field": "_psx"
+    },
+    {
+      "kind": "citizen",
+      "id": 30,
+      "field": "_fx"
+    },
+    {
+      "kind": "citizen",
+      "id": 31,
+      "field": "_psx"
+    },
+    {
+      "kind": "citizen",
+      "id": 31,
+      "field": "_fx"
+    },
+    {
+      "kind": "citizen",
+      "id": 32,
+      "field": "_psx"
+    },
+    {
+      "kind": "citizen",
+      "id": 32,
+      "field": "_fx"
+    }
+  ],
+  "displayCacheNote": "Original renderer writes chimney anchor, previous screen x and sprite-facing caches. Full scene state therefore changes; only these three audited presentation fields are excluded from gameplay comparison.",
+  "gameplaySnapshotExcludes": [
+    "_chimney",
+    "_psx",
+    "_fx"
+  ],
+  "materialCanvasPixels": 65536,
+  "modelCallsByThisRunner": 0
+}

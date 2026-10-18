@@ -79,7 +79,7 @@ function fixture(pointerEvents = false) {
   Object.assign(G.ui, { init() { this.initHarvestControls(); this.initRoadControls(); this.initHarvestRangeControls(); }, toast() {}, refreshHUD() {}, hideInfo() { G.sel = null; }, tickInfo() {} });
   G.feedback = { init() {}, close() { doc.getElementById('fb').classList.add('hidden'); } };
   G.T2S = () => [0, 0]; G.cam = { x: 0, y: 0, z: 1 }; G.groundDirty = new Set(); G.markGroundDirty = () => {};
-  G.autosave = () => {}; G.frame = () => {}; G.screenToTile = (x, y) => ({ tx: x, ty: y });
+  G.autosave = () => {}; G.frame = () => {}; G.screenToTile = G.screenToMapTile = (x, y) => ({ tx: x, ty: y });
   G._hasShownHelp = true; G.newGame(44); G.init();
   G.world.marked.clear(); G.world.markedRocks.clear();
   G.game.paused = true; G.game.speed = 2;
