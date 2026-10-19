@@ -4,7 +4,7 @@
 #coach-stage { color:#785a32; font-size:11px; }
 #coach-text { margin:5px 0; font-size:15px; font-weight:700; line-height:1.5; }
 #coach-explanation { font-size:12px; line-height:1.5; }
-#coach-explanation summary { cursor:pointer; padding:6px 0; }
+#coach-explanation summary { cursor:pointer; min-height:44px; padding:13px 0; box-sizing:border-box; }
 #coach-detail { margin:0 0 6px; }
 .coach-actions { display:flex; gap:8px; margin-top:5px; }
 #dynamic-coach button,#coach-replay { min-height:44px; padding:8px 12px; border:1px solid #b49560; border-radius:8px; color:#493721; background:#f6e7c7; cursor:pointer; }

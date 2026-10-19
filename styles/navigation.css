@@ -59,7 +59,7 @@
   #quick-pause { min-height:44px; padding:5px 8px; font-size:11px; }
   #survival-guide { left:10px; top:calc(var(--hud-height) + 8px); width:calc(100vw - 20px); padding:2px 10px 5px; }
   #survival-guide .guide-heading { min-height:34px; }
-  #guide-toggle { min-height:36px; }
+  #guide-toggle { min-height:44px; }
   #guide-list li { font-size:11px; }
   #hud[data-mode="build"] #survival-guide,#hud[data-mode="detail"] #survival-guide { width:calc(100vw - 20px); }
   #hud:not([data-mode="explore"]) #survival-guide:not(.guide-expanded) #guide-list li:not([data-level="urgent"]) { display:none; }
