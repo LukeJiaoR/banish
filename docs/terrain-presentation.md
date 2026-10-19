@@ -30,3 +30,8 @@ This is a moderate reduction of busy grass detail, not elimination of repetition
 The four files total 2,199,175 bytes, down from 2,655,092. Their decoded RGBA footprint remains exactly 4 MiB. This is an asset budget comparison, not a measured browser/mobile frame-rate claim. Source horizontal adjacent-pixel RGB differences dropped from 14.38/14.85/13.32/9.81 to 8.71/7.68/8.59/4.89 (spring through winter); this only describes reduced fine variation, not an objective score of naturalness or seam quality.
 
 Verification uses the actual half-resolution ground-cache builder and native-scale Canvas renderer in the same long-distance four-season scene with houses, storage, construction, market, road and water. Before/after images were inspected; the terrain pattern/cache/season/fallback regressions and asset size/opacity/budget checks pass. No real browser or phone acceptance was performed. Existing character animation and any other old asset remnants remain separate follow-up work.
+
+
+## 2026-10-19: minimum warm-scene refinement
+
+Summer meadow and unfrozen open water now use the reviewed #98 v2 pixels at the original runtime paths. This reduces yellow specks and fragmented white ripples while retaining original buildings, trees, people and mountain materials. Dimensions, pattern/cache/season routing and simulation are unchanged. The [production brief and 36-case offline comparison](art-assets/warm-scene/README.md) document sources, independent pixel review, exact-byte adoption and remaining stepped shore / repeated mountain limitations. #87 is not closed by this limited adoption.
