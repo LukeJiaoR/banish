@@ -1,0 +1,423 @@
+{
+  "chrome": "chrome-channel",
+  "generatedAt": "2026-10-19T13:29:55.725Z",
+  "viewports": [
+    {
+      "name": "iphone-13",
+      "label": "iPhone 13 竖屏",
+      "w": 390,
+      "h": 844,
+      "dpr": 3
+    },
+    {
+      "name": "iphone-se",
+      "label": "iPhone SE 竖屏",
+      "w": 375,
+      "h": 667,
+      "dpr": 2
+    },
+    {
+      "name": "android-360",
+      "label": "Android 360×640",
+      "w": 360,
+      "h": 640,
+      "dpr": 2
+    },
+    {
+      "name": "landscape",
+      "label": "iPhone 13 横屏",
+      "w": 844,
+      "h": 390,
+      "dpr": 3
+    }
+  ],
+  "total": 64,
+  "passed": 64,
+  "failed": 0,
+  "results": [
+    {
+      "device": "iphone-13",
+      "check": "无横向溢出",
+      "ok": true,
+      "detail": "scrollWidth=390 innerWidth=390"
+    },
+    {
+      "device": "iphone-13",
+      "check": "画布/视口未被放大",
+      "ok": true,
+      "detail": "innerWidth=390 画布CSS=390×844 位图=780×1688 dpr=3"
+    },
+    {
+      "device": "iphone-13",
+      "check": "HUD 关键控件在视口内",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "device": "iphone-13",
+      "check": "主要触控目标 ≥40×40",
+      "ok": true,
+      "detail": "8 个可点元素，0 个偏小"
+    },
+    {
+      "device": "iphone-13",
+      "check": "HUD 文字 ≥11px",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "device": "iphone-13",
+      "check": "点按「建造」展开面板",
+      "ok": true,
+      "detail": "分类数=5"
+    },
+    {
+      "device": "iphone-13",
+      "check": "面板内单指滑动可滚动",
+      "ok": true,
+      "detail": "内容未超出，跳过"
+    },
+    {
+      "device": "iphone-13",
+      "check": "触摸选中工具",
+      "ok": true,
+      "detail": "G.tool.type=gatherer"
+    },
+    {
+      "device": "iphone-13",
+      "check": "画布点按落下建筑",
+      "ok": true,
+      "detail": "建筑 1→2（落点 275,287，可点地图 20%，最后提示：归园 · 经典开局）"
+    },
+    {
+      "device": "iphone-13",
+      "check": "单指拖拽平移镜头",
+      "ok": true,
+      "detail": "cam (-125.0,-1786.0)→(-242.0,-1659.4)，可点地图 52%"
+    },
+    {
+      "device": "iphone-13",
+      "check": "拖拽不误触选中",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "device": "iphone-13",
+      "check": "双击画布不缩放页面",
+      "ok": true,
+      "detail": "visualViewport.scale 1→1"
+    },
+    {
+      "device": "iphone-13",
+      "check": "顶栏「更多」可展开",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "device": "iphone-13",
+      "check": "管理面板可展开且不越界",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "device": "iphone-13",
+      "check": "管理面板内可触达帮助入口",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "device": "iphone-13",
+      "check": "帮助弹层可打开",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "device": "iphone-13",
+      "check": "帮助弹层可关闭",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "device": "iphone-13",
+      "check": "长按画布不选中文本",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "device": "iphone-13",
+      "check": "无 JS 运行时错误",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "device": "iphone-se",
+      "check": "无横向溢出",
+      "ok": true,
+      "detail": "scrollWidth=375 innerWidth=375"
+    },
+    {
+      "device": "iphone-se",
+      "check": "画布/视口未被放大",
+      "ok": true,
+      "detail": "innerWidth=375 画布CSS=375×667 位图=750×1334 dpr=2"
+    },
+    {
+      "device": "iphone-se",
+      "check": "HUD 关键控件在视口内",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "device": "iphone-se",
+      "check": "主要触控目标 ≥40×40",
+      "ok": true,
+      "detail": "8 个可点元素，0 个偏小"
+    },
+    {
+      "device": "iphone-se",
+      "check": "HUD 文字 ≥11px",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "device": "iphone-se",
+      "check": "点按「建造」展开面板",
+      "ok": true,
+      "detail": "分类数=5"
+    },
+    {
+      "device": "iphone-se",
+      "check": "面板内单指滑动可滚动",
+      "ok": true,
+      "detail": "内容未超出，跳过"
+    },
+    {
+      "device": "iphone-se",
+      "check": "触摸选中工具",
+      "ok": true,
+      "detail": "G.tool.type=gatherer"
+    },
+    {
+      "device": "iphone-se",
+      "check": "画布点按落下建筑",
+      "ok": true,
+      "detail": "建筑 1→2（落点 9,440，可点地图 13%，最后提示：地面有岩石，需先用采石采铁工具标记清除）"
+    },
+    {
+      "device": "iphone-se",
+      "check": "单指拖拽平移镜头",
+      "ok": true,
+      "detail": "cam (-2148.5,-2210.5)→(-2261.0,-2110.5)，可点地图 35%"
+    },
+    {
+      "device": "iphone-se",
+      "check": "拖拽不误触选中",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "device": "iphone-se",
+      "check": "双击画布不缩放页面",
+      "ok": true,
+      "detail": "visualViewport.scale 1→1"
+    },
+    {
+      "device": "iphone-se",
+      "check": "顶栏「更多」可展开",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "device": "iphone-se",
+      "check": "管理面板可展开且不越界",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "device": "iphone-se",
+      "check": "管理面板内可触达帮助入口",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "device": "iphone-se",
+      "check": "帮助弹层可打开",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "device": "iphone-se",
+      "check": "帮助弹层可关闭",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "device": "iphone-se",
+      "check": "长按画布不选中文本",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "device": "iphone-se",
+      "check": "无 JS 运行时错误",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "device": "android-360",
+      "check": "无横向溢出",
+      "ok": true,
+      "detail": "scrollWidth=360 innerWidth=360"
+    },
+    {
+      "device": "android-360",
+      "check": "画布/视口未被放大",
+      "ok": true,
+      "detail": "innerWidth=360 画布CSS=360×640 位图=720×1280 dpr=2"
+    },
+    {
+      "device": "android-360",
+      "check": "HUD 关键控件在视口内",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "device": "android-360",
+      "check": "主要触控目标 ≥40×40",
+      "ok": true,
+      "detail": "8 个可点元素，0 个偏小"
+    },
+    {
+      "device": "android-360",
+      "check": "HUD 文字 ≥11px",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "device": "android-360",
+      "check": "点按「建造」展开面板",
+      "ok": true,
+      "detail": "分类数=5"
+    },
+    {
+      "device": "android-360",
+      "check": "面板内单指滑动可滚动",
+      "ok": true,
+      "detail": "内容未超出，跳过"
+    },
+    {
+      "device": "android-360",
+      "check": "触摸选中工具",
+      "ok": true,
+      "detail": "G.tool.type=gatherer"
+    },
+    {
+      "device": "android-360",
+      "check": "画布点按落下建筑",
+      "ok": true,
+      "detail": "建筑 1→2（落点 354,269，可点地图 14%，最后提示：归园 · 经典开局）"
+    },
+    {
+      "device": "android-360",
+      "check": "单指拖拽平移镜头",
+      "ok": true,
+      "detail": "cam (-140.0,-2112.0)→(-248.0,-2016.0)，可点地图 32%"
+    },
+    {
+      "device": "android-360",
+      "check": "拖拽不误触选中",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "device": "android-360",
+      "check": "双击画布不缩放页面",
+      "ok": true,
+      "detail": "visualViewport.scale 1→1"
+    },
+    {
+      "device": "android-360",
+      "check": "顶栏「更多」可展开",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "device": "android-360",
+      "check": "管理面板可展开且不越界",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "device": "android-360",
+      "check": "管理面板内可触达帮助入口",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "device": "android-360",
+      "check": "帮助弹层可打开",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "device": "android-360",
+      "check": "帮助弹层可关闭",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "device": "android-360",
+      "check": "长按画布不选中文本",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "device": "android-360",
+      "check": "无 JS 运行时错误",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "device": "landscape",
+      "check": "无横向溢出",
+      "ok": true,
+      "detail": "scrollWidth=844 innerWidth=844"
+    },
+    {
+      "device": "landscape",
+      "check": "画布/视口未被放大",
+      "ok": true,
+      "detail": "innerWidth=844 画布CSS=844×390 位图=1688×780 dpr=3"
+    },
+    {
+      "device": "landscape",
+      "check": "HUD 关键控件在视口内",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "device": "landscape",
+      "check": "主要触控目标 ≥40×40",
+      "ok": true,
+      "detail": "8 个可点元素，0 个偏小"
+    },
+    {
+      "device": "landscape",
+      "check": "HUD 文字 ≥11px",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "device": "landscape",
+      "check": "横屏可开合建造栏",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "device": "landscape",
+      "check": "无 JS 运行时错误",
+      "ok": true,
+      "detail": ""
+    }
+  ]
+}

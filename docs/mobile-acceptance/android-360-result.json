@@ -1,0 +1,135 @@
+{
+  "device": {
+    "name": "android-360",
+    "label": "Android 360×640",
+    "width": 360,
+    "height": 640,
+    "dpr": 2
+  },
+  "chrome": "155.0.8059.82",
+  "ua": "Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Mobile Safari/537.36",
+  "screenshots": [
+    "android-360-1-load.png",
+    "android-360-2-build.png",
+    "android-360-3-placed.png",
+    "android-360-4-town.png",
+    "android-360-5-help.png"
+  ],
+  "errors": [],
+  "checks": [
+    {
+      "device": "android-360",
+      "check": "无横向溢出",
+      "ok": true,
+      "detail": "scrollWidth=360 innerWidth=360"
+    },
+    {
+      "device": "android-360",
+      "check": "画布/视口未被放大",
+      "ok": true,
+      "detail": "innerWidth=360 画布CSS=360×640 位图=720×1280 dpr=2"
+    },
+    {
+      "device": "android-360",
+      "check": "HUD 关键控件在视口内",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "device": "android-360",
+      "check": "主要触控目标 ≥40×40",
+      "ok": true,
+      "detail": "8 个可点元素，0 个偏小"
+    },
+    {
+      "device": "android-360",
+      "check": "HUD 文字 ≥11px",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "device": "android-360",
+      "check": "点按「建造」展开面板",
+      "ok": true,
+      "detail": "分类数=5"
+    },
+    {
+      "device": "android-360",
+      "check": "面板内单指滑动可滚动",
+      "ok": true,
+      "detail": "内容未超出，跳过"
+    },
+    {
+      "device": "android-360",
+      "check": "触摸选中工具",
+      "ok": true,
+      "detail": "G.tool.type=gatherer"
+    },
+    {
+      "device": "android-360",
+      "check": "画布点按落下建筑",
+      "ok": true,
+      "detail": "建筑 1→2（落点 354,269，可点地图 14%，最后提示：归园 · 经典开局）"
+    },
+    {
+      "device": "android-360",
+      "check": "单指拖拽平移镜头",
+      "ok": true,
+      "detail": "cam (-140.0,-2112.0)→(-248.0,-2016.0)，可点地图 32%"
+    },
+    {
+      "device": "android-360",
+      "check": "拖拽不误触选中",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "device": "android-360",
+      "check": "双击画布不缩放页面",
+      "ok": true,
+      "detail": "visualViewport.scale 1→1"
+    },
+    {
+      "device": "android-360",
+      "check": "顶栏「更多」可展开",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "device": "android-360",
+      "check": "管理面板可展开且不越界",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "device": "android-360",
+      "check": "管理面板内可触达帮助入口",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "device": "android-360",
+      "check": "帮助弹层可打开",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "device": "android-360",
+      "check": "帮助弹层可关闭",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "device": "android-360",
+      "check": "长按画布不选中文本",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "device": "android-360",
+      "check": "无 JS 运行时错误",
+      "ok": true,
+      "detail": ""
+    }
+  ]
+}
