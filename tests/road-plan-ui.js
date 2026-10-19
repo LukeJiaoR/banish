@@ -115,14 +115,22 @@ test('mouse endpoints preview only; confirm queues construction and cannot click
   const f=roadFixture(),{G,doc}=f;f.tap(3,3);assert.equal(G.roadPlan.end,null);f.tap(8,3);assert.equal(G.world.road.some(Boolean),false);assert.equal(projects(G).length,0);
   G.ui.refreshRoadControls();const button=doc.getElementById('road-confirm');assert.equal(button.disabled,false);f.click(button);assertQueuedAt(G,5,3);assert.equal(G.roadPlan,null);
 });
-test('mouse drag previews endpoints cheaply then computes a route on release without paving',()=>{
- const f=roadFixture(),{G,doc}=f,cv=doc.getElementById('game');let calls=0;const plan=G.planRoad;G.planRoad=(...a)=>{calls++;return plan(...a);};
+test('mouse drag previews actual tiles once per crossed tile and releases one project',()=>{
+ const f=roadFixture(),{G,doc}=f,cv=doc.getElementById('game');let calls=0;const plan=G.planRoad;
+ G.planRoad=(...a)=>{calls++;assert.equal(a[3].maxExpanded,2000);return plan(...a);};
  cv.emit('mousedown',{clientX:3,clientY:3});
- for(let x=4;x<=20;x++)cv.emit('mousemove',{clientX:x,clientY:3});
- assert.equal(calls,0);assert(G.roadDrag);assert.equal(G.roadPlan,null);assert.equal(G.world.road.some(Boolean),false);assert.equal(projects(G).length,0);
+ for(let x=8;x<=20;x++)cv.emit('mousemove',{clientX:x,clientY:3});
+ assert.equal(calls,13);assert(G.roadDrag.live);assert.equal(G.roadPlan.end.x,20);
+ const shown=JSON.stringify(G.roadPlan.result.path);
+ for(let i=0;i<10;i++)cv.emit('mousemove',{clientX:20.1,clientY:3});assert.equal(calls,13);
+ assert.equal(G.world.road.some(Boolean),false);assert.equal(projects(G).length,0);
  G.ui.refreshRoadControls();assert.equal(doc.getElementById('road-confirm').disabled,true);
- cv.emit('mouseup',{clientX:20,clientY:3});assert.equal(G.roadDrag,null);assert.equal(calls,2);assert.equal(G.roadPlan.end.x,20);assert.equal(G.world.road.some(Boolean),false);assert.equal(projects(G).length,0);
- G.ui.refreshRoadControls();f.click(doc.getElementById('road-confirm'));assertQueuedAt(G,12,3);
+ const status=doc.getElementById('road-plan-status'),writes=status.textWrites;for(let i=0;i<10;i++)G.ui.refreshRoadControls();assert.equal(status.textWrites,writes);
+ cv.emit('mouseup',{clientX:20,clientY:3});assert.equal(G.roadDrag,null);assert.equal(calls,13);assert.equal(G.roadPlan,null);
+ assertQueuedAt(G,12,3);assert.equal(JSON.stringify(projects(G)[0].roadWork.cells.map(({x,y})=>({x,y}))),shown);
+ assert.equal(G.tool.kind,'road');cv.emit('mouseup',{clientX:20,clientY:3});assert.equal(projects(G).length,1);
+ cv.emit('mousedown',{clientX:20,clientY:3});cv.emit('mousemove',{clientX:20,clientY:12});cv.emit('mouseup',{clientX:20,clientY:12});
+ assert.equal(projects(G).length,2);assertQueuedAt(G,20,8);
 });
 test('native one-finger touch endpoints preview without hover or synthetic mouse',()=>{
   const{G,doc}=roadFixture(),cv=doc.getElementById('game');for(const x of [3,8]){const t={clientX:x,clientY:3};const e=cv.emit('touchstart',{touches:[t]});assert.equal(e.defaultPrevented,true);cv.emit('touchend',{changedTouches:[t]});}assert.equal(G.roadPlan.result.steps,5);assert.equal(G.world.road.some(Boolean),false);assert.equal(projects(G).length,0);
@@ -169,10 +177,11 @@ test('small repeated pointer jitter still selects road endpoints',()=>{
  assertQueuedAt(G,5,3);
 });
 test('drag interruption, stale tool generation and world changes cannot complete a route',()=>{
- for(const interrupt of ['blur','tool','world','panel']){
+ for(const interrupt of ['blur','tool','world','panel','pointercancel']){
   const f=roadFixture(),{G,doc,ctx,panel}=f,cv=doc.getElementById('game');
   cv.emit('mousedown',{clientX:3,clientY:3});cv.emit('mousemove',{clientX:12,clientY:3});assert(G.roadDrag);
   if(interrupt==='blur')ctx.emit('blur');
+  if(interrupt==='pointercancel')cv.emit('pointercancel');
   if(interrupt==='tool'){G.setTool('fell');G.setTool('road');}
   if(interrupt==='world')G.newGame(1);
   if(interrupt==='panel')ctx.emit('mousemove',{clientX:12,clientY:3,target:panel});
@@ -190,5 +199,58 @@ test('stone road UI previews upgrade cost, preserves focus and guards stale mode
 });
 test('bridge UI reports snapped banks and construction cost before committing real blocked worksite',()=>{
  const f=roadFixture(),{G,doc}=f,w=G.world;w.buildings=[];w.bmap={};w.citizens.forEach(c=>{c.x=8;c.y=10;c.job=null;c.task=null;c.pausedTask=null});for(let y=0;y<w.N;y++)for(let x=10;x<=12;x++)w.water[y*w.N+x]=1;G.setTool('bridge');f.tap(9,10);f.tap(13,11);G.ui.refreshRoadControls();assert.equal(G.roadPlan.end.y,10);assert.match(doc.getElementById('road-plan-status').textContent,/木材 20 \/ 石头 5/);const button=doc.getElementById('road-confirm');assert.equal(button.textContent,'确认建桥');f.click(button);const b=w.buildings.find(b=>b.type==='bridge');assert(b);assert.equal(b.state,'site');assert.equal(G.tileBlocked(w,11,10),true);assert.equal(G.roadPlan,null);
+});
+test('changed release endpoint is preview-only until a fresh explicit confirmation',()=>{
+ const f=roadFixture(),{G,doc}=f,cv=doc.getElementById('game');
+ cv.emit('mousedown',{clientX:3,clientY:3});cv.emit('mousemove',{clientX:12,clientY:3});cv.emit('mouseup',{clientX:15,clientY:3});
+ assert.equal(projects(G).length,0);assert.equal(G.roadPlan.end.x,15);assert.match(G.roadPlan.message,/终点已更新/);
+ f.click(doc.getElementById('road-confirm'));assertQueuedAt(G,15,3);
+});
+test('drag tree clearance remains an explicit wait and cannot become paving on release',()=>{
+ for(const change of ['none','removed','added']){
+  const f=roadFixture(),{G,doc}=f,cv=doc.getElementById('game'),i=3*G.world.N+5;
+  if(change!=='added')G.world.treeIdx[i]=7;
+  cv.emit('mousedown',{clientX:3,clientY:3});cv.emit('mousemove',{clientX:12,clientY:3});
+  if(change==='removed')G.world.treeIdx[i]=-1;if(change==='added')G.world.treeIdx[i]=7;
+  cv.emit('mouseup',{clientX:12,clientY:3});assert.equal(projects(G).length,0);
+  assert.equal(G.world.marked.has(i),change==='none');assert(G.roadPlan);
+  if(change==='none'){
+   assert.match(G.roadPlan.message,/清树后/);assert.equal(doc.getElementById('road-confirm').disabled,true);
+   G.world.treeIdx[i]=-1;G.ui.refreshRoadControls();assert.equal(projects(G).length,0);
+   f.click(doc.getElementById('road-confirm'));assertQueuedAt(G,5,3);
+  }
+ }
+});
+test('new obstacles reject the displayed route rather than silently rerouting',()=>{
+ const {G,doc}=roadFixture(),cv=doc.getElementById('game');
+ cv.emit('mousedown',{clientX:3,clientY:3});cv.emit('mousemove',{clientX:12,clientY:3});const shown=JSON.stringify(G.roadPlan.result.path);
+ G.world.rock[3*G.world.N+6]=1;cv.emit('mouseup',{clientX:12,clientY:3});
+ assert.equal(projects(G).length,0);assert.equal(JSON.stringify(G.roadPlan.result.path),shown);assert.equal(G.roadPlanStatus().ok,false);
+});
+test('right click, modal, off-canvas release and replaced game cancel live drag',()=>{
+ for(const mode of ['right','modal','outside','game']){
+  const {G,doc,ctx}=roadFixture(),cv=doc.getElementById('game');cv.emit('mousedown',{clientX:3,clientY:3});cv.emit('mousemove',{clientX:12,clientY:3});
+  if(mode==='right')cv.emit('mousedown',{button:2,clientX:12,clientY:3});
+  if(mode==='modal')doc.getElementById('help').classList.remove('hidden');
+  if(mode==='game')G.game={...G.game};
+  (mode==='outside'?ctx:cv).emit('mouseup',{clientX:12,clientY:3});
+  assert.equal(projects(G).length,0,mode);assert.equal(G.roadPlan,null,mode);assert.equal(G.roadDrag,null,mode);
+ }
+});
+test('stone drag queues real material demand without spending inventory',()=>{
+ const {G,doc}=roadFixture(),cv=doc.getElementById('game');G.setTool('stoneroad');const stone=G.game.res.stone;
+ cv.emit('mousedown',{clientX:3,clientY:3});cv.emit('mousemove',{clientX:12,clientY:3});cv.emit('mouseup',{clientX:12,clientY:3});
+ assertQueuedAt(G,5,3,'stone');assert.equal(G.game.res.stone,stone);assert.equal(projects(G)[0].construction.required.stone,10);
+});
+test('budget failures remain uncommitted errors',()=>{
+ const {G,doc}=roadFixture(),cv=doc.getElementById('game');G.planRoad=()=>({ok:false,reason:'路线计算达到预算',budgetExceeded:true});
+ cv.emit('mousedown',{clientX:3,clientY:3});cv.emit('mousemove',{clientX:12,clientY:3});cv.emit('mouseup',{clientX:12,clientY:3});
+ assert.equal(projects(G).length,0);assert.equal(G.roadPlan.result.budgetExceeded,true);assert.equal(doc.getElementById('road-confirm').disabled,true);
+});
+test('bridge drag keeps endpoint guide and requires separate confirmation',()=>{
+ const {G,doc}=roadFixture(),cv=doc.getElementById('game'),w=G.world;
+ for(let y=0;y<w.N;y++)for(let x=10;x<=15;x++)w.water[y*w.N+x]=1;
+ G.setTool('bridge');cv.emit('mousedown',{clientX:9,clientY:10});cv.emit('mousemove',{clientX:16,clientY:10});assert(!G.roadDrag.live);assert.equal(G.roadPlan,null);
+ cv.emit('mouseup',{clientX:16,clientY:10});assert(G.roadPlan);assert.equal(w.buildings.filter(b=>b.type==='bridge').length,0);
 });
 console.log(`Road plan UI: ${passed} passed (DOM/event fixtures, not real browser/mobile acceptance)`);

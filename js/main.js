@@ -1377,7 +1377,7 @@ G.selectRoadEndpoint = function (x, y) {
   G.roadPlan = { world: w, surface, start: old.start, end: point, result, message: result.ok ? '' : result.reason };
 };
 G.roadPlanStatus = function () {
-  if (G.roadDrag && G.roadDrag.world === G.world) return { ok: false, reason: '正在选择终点；松开后计算路线，再确认铺路。虚线仅表示起终点方向。' };
+  if (G.roadDrag && G.roadDrag.world === G.world && ['bridge','tunnel'].includes(G.tool?.surface)) return { ok: false, reason: '正在选择终点；松开后计算路线，再确认铺路。虚线仅表示起终点方向。' };
   const plan = G.roadPlan, w = G.world;
   if (!plan || plan.world !== w || (plan.surface||'dirt') !== (G.tool?.surface||'dirt') || !plan.end || !plan.result.ok) return { ok: false, reason: plan && plan.world === w ? plan.message : '点击起点，再点击终点预览路线' };
   if(plan.surface==='tunnel'){const result=G.planTunnel(w,plan.start,plan.end);if(!result.ok)return result;return {ok:true,trees:[],added:[],plan,materials:result.materials,tunnel:true};}
@@ -1397,6 +1397,7 @@ G.roadPlanStatus = function () {
   return {...quote,trees,added,plan};
 };
 G.confirmRoadPlan = function (intent) {
+  if (G.roadDrag) return {ok:false,reason:'请先结束拖动，再确认路线'};
   if (!G.tool || G.tool.kind !== 'road' || G.hasOpenModal()) return { ok: false };
   const status = G.roadPlanStatus();
   if (!status.ok) return status;
@@ -1523,6 +1524,7 @@ G.init = function () {
   const fixedField = () => G.tool?.kind === 'build' && ['farm', 'pasture', 'orchard'].includes(G.tool.type);
   let roadTouch = null, harvestTouch = null, roadMouse = null, farmTouch=null, farmMouse=null, pastureTouch=null, pastureMouse=null, orchardTouch=null, orchardMouse=null, cemeteryTouch=null, cemeteryMouse=null;
   function resetInput() {
+    if (G.roadDrag && !['bridge','tunnel'].includes(G.tool?.surface)) G.cancelRoadPlan();
     if (G.harvestPlan && !G.harvestPlan.frozen) G.cancelHarvestPlan();
     fixedFieldTouch = null; fixedFieldMouse = null;
     panTouch = null;
@@ -1540,7 +1542,22 @@ G.init = function () {
   const placementPanel = document.getElementById('placement-panel');
   const onPlacementPanel = e => placementPanel && placementPanel.contains && placementPanel.contains(e.target);
 
+  // Route search is bounded and runs only when the pointer enters another tile.
+  // The exact preview and its clearance intent are retained until release.
+  function previewRoadDrag(gesture, end) {
+    if (gesture.end && gesture.end.x === end.x && gesture.end.y === end.y) return;
+    gesture.end = end;
+    const result = G.planRoad(gesture.world, gesture.start, end, {maxExpanded:2000});
+    G.roadPlan = {world:gesture.world,surface:gesture.surface,start:gesture.start,end,result,
+      message:result.ok?'':result.reason};
+    if (!result.ok && /起点/.test(result.reason)) G.roadPlan.start = null;
+    G.roadDrag = {world:gesture.world,start:gesture.start,end,live:true};
+    const status = G.roadPlanStatus();
+    gesture.intent = status.ok ? {plan:G.roadPlan,mode:status.trees.length?'clear':'pave',
+      trees:status.trees.map(p=>p.y*gesture.world.N+p.x).join(',')} : null;
+  }
   G.cv.addEventListener('contextmenu', e => e.preventDefault());
+  G.cv.addEventListener('pointercancel', () => { if (roadMouse) resetInput(); });
 
   G.cv.addEventListener('mousedown', e => {
     if (G.hasOpenModal()) { resetInput(); return; }
@@ -1559,7 +1576,7 @@ G.init = function () {
     if(e.button===0&&G.isCemeteryPlanning()){const t=G.screenToMapTile(p.x,p.y);cemeteryMouse={start:G.farmPoint(t.tx,t.ty),world:G.world,generation:G.cemeteryGestureVersion};}
     if (e.button === 0 && G.tool && G.tool.kind === 'road') {
       const t = G.screenToMapTile(p.x, p.y);
-      roadMouse = { start: { x: Math.floor(t.tx), y: Math.floor(t.ty) }, world: G.world, generation: G.roadGestureVersion };
+      roadMouse = { start: { x: Math.floor(t.tx), y: Math.floor(t.ty) }, world: G.world, game:G.game, tool:G.tool, surface:G.tool.surface||'dirt', generation: G.roadGestureVersion };
     }
     if (e.button === 0 && G.tool && ['fell', 'quarry'].includes(G.tool.kind)) {
       const t = G.screenToMapTile(p.x, p.y);
@@ -1588,8 +1605,13 @@ G.init = function () {
     } else if(dragBtn===0&&G.isCemeteryPlanning()&&cemeteryMouse&&cemeteryMouse.world===G.world&&cemeteryMouse.generation===G.cemeteryGestureVersion&&dragMoved>4){
       G.cemeteryDrag={world:G.world,start:cemeteryMouse.start,end:G.farmPoint(t.tx,t.ty)};
     } else if (dragBtn === 0 && G.tool && G.tool.kind === 'road' && roadMouse && roadMouse.world === G.world && roadMouse.generation === G.roadGestureVersion && dragMoved > 4) {
-      G.roadPlan = null;
-      G.roadDrag = { world: G.world, start: roadMouse.start, end: { x: Math.floor(t.tx), y: Math.floor(t.ty) } };
+      if (roadMouse.game !== G.game || roadMouse.tool !== G.tool) { resetInput(); return; }
+      const end = {x:Math.floor(t.tx),y:Math.floor(t.ty)};
+      if (['dirt','stone'].includes(roadMouse.surface)) previewRoadDrag(roadMouse,end);
+      else {
+        G.roadPlan = null;
+        G.roadDrag = {world:G.world,start:roadMouse.start,end};
+      }
     } else if (dragBtn === 0 && G.tool && ['fell', 'quarry'].includes(G.tool.kind)) {
       const plan = G.harvestPlan;
       if (plan && !plan.frozen && plan.world === G.world && plan.kind === G.tool.kind) plan.end = G.harvestPoint(t.tx, t.ty);
@@ -1615,7 +1637,20 @@ G.init = function () {
     if(e.button===0&&G.isCemeteryPlanning()){const gesture=cemeteryMouse;cemeteryMouse=null;G.cemeteryDrag=null;if(!gesture||gesture.world!==G.world||gesture.generation!==G.cemeteryGestureVersion)return;if(dragMoved>4){G.cemeteryPlan=null;G.selectCemeteryCorner(gesture.start.x,gesture.start.y);G.selectCemeteryCorner(tx,ty);}else G.selectCemeteryCorner(tx,ty);return;}
     if (e.button === 0 && G.tool && G.tool.kind === 'road') {
       const gesture = roadMouse; roadMouse = null; G.roadDrag = null;
-      if (!gesture || gesture.world !== G.world || gesture.generation !== G.roadGestureVersion) return;
+      if (!gesture || gesture.world !== G.world || gesture.game !== G.game || gesture.tool !== G.tool || gesture.generation !== G.roadGestureVersion) { G.cancelRoadPlan(); return; }
+      if (dragMoved > 4 && ['dirt','stone'].includes(gesture.surface)) {
+        if (e.target !== G.cv) { G.cancelRoadPlan(); return; }
+        // A release without a matching displayed endpoint is preview-only.
+        // Never commit a newly computed, unseen route or silently reroute changes.
+        if (!gesture.end || gesture.end.x !== tx || gesture.end.y !== ty) {
+          previewRoadDrag(gesture,{x:tx,y:ty}); G.roadDrag=null;
+          if(G.roadPlan?.result.ok)G.roadPlan.message='终点已更新，请查看路线后确认施工';
+        } else if (gesture.intent) {
+          const result=G.confirmRoadPlan(gesture.intent);
+          if(result.reason)G.ui.toast(result.reason,'warn');
+        }
+        G.ui.refreshRoadControls(); return;
+      }
       if (dragMoved > 4) {
         G.roadPlan = null;
         G.selectRoadEndpoint(gesture.start.x, gesture.start.y);

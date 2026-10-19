@@ -282,13 +282,17 @@ function bindInput(surface) {
   const touch = (type, x, y) => { const p = point(x, y); return canvas.emit(type, { touches: type === 'touchend' ? [] : [p], changedTouches: [p] }); };
   return Object.assign(f, { mouse, touch });
 }
-test('actual canvas mouse drag and touch endpoints preview first and separately queue real roadwork', () => {
+test('actual canvas drag releases real roadwork while touch retains explicit confirmation', () => {
   for (const [mode, surface] of [['mouse', 'dirt'], ['touch', 'stone']]) {
     const f = bindInput(surface);
-    if (mode === 'mouse') { f.mouse('mousedown', 8, 8); f.mouse('mousemove', 12, 8); f.mouse('mouseup', 12, 8); }
-    else for (const x of [8, 12]) { f.touch('touchstart', x, 8); f.touch('touchend', x, 8); }
-    assert.equal(projects(f).length, 0); assert(f.G.roadPlanStatus().ok); f.G.ui.refreshRoadControls();
-    activate(f, 'road-confirm', mode === 'mouse' ? 'mousedown' : 'touchstart').click();
+    if (mode === 'mouse') {
+      f.mouse('mousedown', 8, 8); f.mouse('mousemove', 12, 8);
+      assert.equal(projects(f).length, 0); assert(f.G.roadPlan.result.ok); f.mouse('mouseup', 12, 8);
+    } else {
+      for (const x of [8, 12]) { f.touch('touchstart', x, 8); f.touch('touchend', x, 8); }
+      assert.equal(projects(f).length, 0); assert(f.G.roadPlanStatus().ok); f.G.ui.refreshRoadControls();
+      activate(f, 'road-confirm', 'touchstart').click();
+    }
     assert.equal(projects(f).length, 1); assert.equal(projects(f)[0].roadWork.surface, surface);
     assert.equal(f.G.world.road.reduce((sum, n) => sum + n, 0), 0);
   }

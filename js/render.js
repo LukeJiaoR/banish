@@ -1308,8 +1308,8 @@ G.frame = function (dtReal) {
     }
   }
 
-  // Cheap endpoint guide only; bounded route search runs once on release.
-  if (G.tool && G.tool.kind === 'road' && G.roadDrag && G.roadDrag.world === w) {
+  // Bridges/tunnels retain an endpoint guide; ordinary roads show the cached live tile route.
+  if (G.tool && G.tool.kind === 'road' && G.roadDrag && !G.roadDrag.live && G.roadDrag.world === w) {
     const a = G.T2S(G.roadDrag.start.x, G.roadDrag.start.y), b = G.T2S(G.roadDrag.end.x, G.roadDrag.end.y);
     ctx.save(); ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]);
     ctx.strokeStyle = '#f0ce84'; ctx.lineWidth = 2 / G.cam.z; ctx.setLineDash([6 / G.cam.z, 4 / G.cam.z]); ctx.stroke(); ctx.restore();

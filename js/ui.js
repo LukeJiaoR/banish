@@ -886,12 +886,13 @@ G.ui = {
       if(missing.length)message+='\n材料不足：'+missing.join(' · ')+(bridge||tunnel?'':'；仍可排队，等待可用石材');
       if (plan.message) message += '\n' + plan.message;
     }
-    message += G.tool.surface==='tunnel'?'\n点选/拖选两个洞口，终点吸附较长方向轴；两端清场陆地、中间连续山体，总长3–'+Math.min(G.world.N,128)+'格。二值山体、单端施工和游戏工时为本作适配。Esc/右键退出。':G.tool.surface==='bridge'?'\n点选/拖选两岸，终点吸附较长方向轴；需连续水面和清场桥头。Esc/右键退出。':'\n点选起终点，或鼠标拖出起终点、松开预览；树木先标记清除，再确认施工。水面、建筑和矿石需绕行。点选施工标记可暂停、优先或取消剩余铺路。Esc/右键退出。';
+    message += G.tool.surface==='tunnel'?'\n点选/拖选两个洞口，终点吸附较长方向轴；两端清场陆地、中间连续山体，总长3–'+Math.min(G.world.N,128)+'格。二值山体、单端施工和游戏工时为本作适配。Esc/右键退出。':G.tool.surface==='bridge'?'\n点选/拖选两岸，终点吸附较长方向轴；需连续水面和清场桥头。Esc/右键退出。':'\n手机或点选：选择起终点后确认。鼠标拖动预览实际路线，松开排队；有树则先标记清除，清完后再确认施工。水面、建筑和矿石需绕行。点选施工标记可暂停、优先或取消剩余铺路。Esc/右键退出。';
+    if (G.roadDrag?.live) message += '\n正在预览实际路线；松开提交，右键取消。';
     if (text.textContent !== message) text.textContent = message;
     const waiting = status.ok && status.trees.length && !status.added.length;
     button._roadIntent = status.ok ? { plan, mode: status.tunnel?'tunnel':status.bridge?'bridge':status.trees.length ? 'clear' : 'pave', trees: status.trees.map(p => p.y * G.world.N + p.x).join(',') } : null;
     button.textContent = status.ok && status.trees.length ? (waiting ? '等待工人清树' : '确认标记清树') : status.tunnel||G.tool.surface==='tunnel'?'确认建隧道':status.bridge?'确认建桥':'确认排队施工';
-    button.disabled = !status.ok || !!waiting || G.hasOpenModal();
+    button.disabled = !status.ok || !!waiting || !!G.roadDrag || G.hasOpenModal();
   },
 
   // Persistent buttons are separate from the text-only, frame-refreshed preview.
