@@ -120,14 +120,14 @@ test('physical supply never hides real public herbs behind a false shortage warn
   assert(get(f, 'res-herbs').classList.contains('resource-warning'));
 });
 
-test('urgent risks precede recommendations and only three checklist rows are visible', () => {
+test('urgent risks precede recommendations and only the highest-priority checklist row is visible', () => {
   const f = fixture(), { G } = f, c = f.resident(f.building('house'));
   c.hunger = 1; c.cold = 1; G.game.season = 3; G.game.day = 36;
   G.game.res.wood = G.game.res.firewood = 0;
   G.ui.refreshGuide();
   const shown = visibleRows(f);
-  assert.equal(shown.length, 3);
-  assert.deepEqual(Array.from(shown, row => row.dataset.guideKind), ['food', 'heating', 'cold']);
+  assert.equal(shown.length, 1);
+  assert.deepEqual(Array.from(shown, row => row.dataset.guideKind), ['food']);
   assert(shown.every(row => row.dataset.level === 'urgent'));
   assert.match(get(f, 'guide-count').textContent, /3 项紧急/);
   assert.equal(guideRow(f, 'wood').hidden, true);
@@ -142,14 +142,14 @@ test('All shows every keyed type, retains focused control, and refresh never cyc
   for (let i = 0; i < 4; i++) { G.game.h += 0.2; G.ui.refreshGuide(); }
   assert.equal(list.htmlWrites, writes); assert.equal(visibleRows(f)[0], first);
   assert.equal(get(f, 'guide-toggle'), button); assert.equal(f.doc.activeElement, button);
-  button.click(); assert.equal(visibleRows(f).length, 3); assert.equal(button.getAttribute('aria-expanded'), 'false');
+  button.click(); assert.equal(visibleRows(f).length, 1); assert.equal(button.getAttribute('aria-expanded'), 'false');
 });
 
 test('a replacement world resets the checklist expansion', () => {
   const f = fixture(); get(f, 'guide-toggle').click();
   f.G.world = { ...f.G.world }; f.G.ui.refreshGuide();
   assert.equal(get(f, 'guide-toggle').getAttribute('aria-expanded'), 'false');
-  assert(visibleRows(f).length <= 3);
+  assert(visibleRows(f).length <= 1);
 });
 
 test('normal information is gray status and autumn preparation is yellow, not a red emergency', () => {

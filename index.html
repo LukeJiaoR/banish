@@ -10,6 +10,7 @@
 <link rel="stylesheet" href="styles/resource-goals.css">
 <link rel="stylesheet" href="styles/details.css">
 <link rel="stylesheet" href="styles/readability.css">
+<link rel="stylesheet" href="styles/navigation.css">
 </head>
 <body>
   <div id="meal-transition-notice" role="status" hidden></div>
@@ -20,6 +21,7 @@
     <div id="res-row"></div>
     <div id="date">第 1 年 · 春</div>
     <div id="pop">人口 0</div>
+    <button id="quick-pause" type="button" aria-label="暂停或继续模拟">Ⅱ 暂停</button>
     <div id="speed" aria-label="模拟速度"></div>
     <div id="sys" role="group" aria-label="系统操作">
       <button id="btn-err" title="脚本错误记录" aria-label="脚本错误记录" class="hidden">错误</button>
@@ -70,6 +72,15 @@
   </div>
   <div id="toolbar" role="toolbar" aria-label="建造与管理，两级菜单，分类内可横向滚动"></div>
 
+  <section id="town-controls" hidden aria-label="小镇管理">
+    <header><h2>小镇管理</h2><button id="close-town" type="button" aria-label="关闭小镇管理">✕</button></header>
+    <div class="town-controls-body"></div>
+  </section>
+  <nav id="town-dock" aria-label="主要操作">
+    <button id="open-town" type="button" aria-expanded="false" aria-controls="town-controls">⚙ <span>管理</span></button>
+    <button id="open-build" type="button" aria-expanded="false" aria-controls="toolbar">🔨 <span>建造</span></button>
+    <button id="close-build" type="button" hidden>返回地图</button>
+  </nav>
   <div id="info" class="panel hidden"></div>
   <div id="toasts"></div>
 
@@ -299,5 +310,6 @@ window.addEventListener('unhandledrejection', e => window.__errs.push('promise: 
 <script src="js/ui.js"></script>
 <script src="js/feedback.js"></script>
 <script src="js/main.js"></script>
+<script src="js/navigation.js"></script>
 </body>
 </html>

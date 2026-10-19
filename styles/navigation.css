@@ -1,0 +1,95 @@
+/* Map-first HUD: explore, build and selected-detail are distinct contexts. */
+#hud { --surface:rgba(28,35,30,.96); --edge:rgba(201,220,195,.2); --accent:#d4c080; }
+#hud [hidden] { display:none!important; }
+#topbar { background:rgba(27,34,29,.94); border:0; border-bottom:1px solid var(--edge); box-shadow:0 4px 24px #0003; padding:8px 16px; }
+#core-resources .res { background:transparent; border-color:transparent; border-radius:0; padding:4px 10px; }
+#core-resources .res.resource-warning { border-bottom:2px solid #d3ae64; }
+#core-resources .res.resource-urgent { border-bottom:2px solid #f09a86; }
+#resource-more { background:#3c493c; border-color:var(--edge); border-radius:10px; min-height:44px; }
+#quick-pause { min-height:44px; padding:7px 12px; margin-left:auto; border:1px solid var(--edge); border-radius:10px; background:#3c493c; color:#eee9d6; cursor:pointer; }
+#secondary-resources { background:var(--surface); border-color:var(--edge); border-radius:10px; }
+#survival-guide { width:min(360px,calc(100vw - 24px)); padding:7px 12px; border:1px solid var(--edge); border-radius:12px; background:var(--surface); box-shadow:0 6px 20px #0002; }
+#survival-guide .guide-heading { margin:0; }
+#guide-toggle { min-height:44px; background:transparent; border:0; font-size:12px; }
+#survival-guide:not(.guide-expanded) #guide-list li:not(:first-child) { display:none; }
+#survival-guide:not(.guide-expanded) #guide-list li { background:transparent; padding:3px 6px; }
+#survival-guide h2 { font-size:12px; color:#b9c6b6; }
+#hud[data-mode="build"] #survival-guide:not(.guide-expanded),
+#hud[data-mode="detail"] #survival-guide:not(.guide-expanded) { width:260px; }
+#town-dock { position:absolute; right:20px; bottom:max(20px,env(safe-area-inset-bottom)); display:flex; align-items:center; gap:10px; pointer-events:auto; }
+#town-dock button { min-height:52px; padding:10px 19px; border:1px solid var(--edge); border-radius:16px; background:var(--surface); color:#ede9da; font-size:15px; box-shadow:0 6px 24px #0004; cursor:pointer; }
+#town-dock #open-build { min-width:136px; min-height:60px; font-size:19px; font-weight:700; background:#d4c080; color:#273329; border-color:#e6d69f; }
+#town-dock #close-build { font-size:13px; min-width:96px; }
+#hud[data-mode="build"] #open-build,#hud[data-mode="build"] #open-town { display:none; }
+#town-controls { position:absolute; right:20px; bottom:92px; width:min(360px,calc(100vw - 24px)); padding:16px; border:1px solid var(--edge); border-radius:18px; background:var(--surface); pointer-events:auto; box-shadow:0 12px 50px #0005; }
+#town-controls header { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+#town-controls h2 { font-size:16px; color:#ece7d9; }
+#close-town { min-width:44px; min-height:44px; border:1px solid var(--edge); border-radius:10px; background:#384338; color:#eee; }
+#town-controls #speed { display:flex; gap:6px; margin:0 0 14px; }
+#town-controls #speed button { flex:1; min-height:44px; }
+#town-controls #sys { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+#town-controls #sys button { width:auto; height:auto; min-height:48px; justify-content:flex-start; gap:8px; padding:10px; font-size:12px; border-color:var(--edge); background:#364136; border-radius:10px; }
+#town-controls #sys button span { line-height:1.4; }
+#toolbar { bottom:90px; padding:14px; gap:10px; border:1px solid var(--edge); border-radius:18px; background:var(--surface); box-shadow:0 12px 40px #0004; }
+#toolbar .tb { border:1px solid var(--edge); border-radius:12px; background:#364136; min-height:80px; }
+#toolbar .tb:hover,#toolbar .tb.active { background:#536047; border-color:#cbbb7f; }
+#toolbar .toolbar-nav { min-height:44px; border-radius:9px; background:#364136; }
+#toolbar-path { color:#e4dfcb; font-weight:600; }
+#toolbar-state { color:#c4ceb9; }
+#placement-panel { bottom:calc(var(--toolbar-height) + 105px); }
+#info.detail-inspector { top:calc(var(--hud-height) + 14px); bottom:20px; max-height:calc(100dvh - var(--hud-height) - 34px); width:380px; border:1px solid var(--edge); border-radius:18px; background:var(--surface); box-shadow:0 12px 40px #0004; }
+#info.detail-inspector > .info-head,#info.detail-inspector > .building-detail-tabs { background:#2c382e; border-color:var(--edge); }
+#info #info-close { min-width:44px; min-height:44px; background:#3c493c; border-color:var(--edge); border-radius:10px; }
+#info .building-detail-tabs button { min-height:48px; border-color:var(--edge); border-radius:8px; }
+#hud button:focus-visible { outline:3px solid #f1d985; outline-offset:3px; }
+#hud button:active { transform:translateY(1px); }
+@media(max-width:760px) {
+  #topbar { padding:6px 10px; gap:3px 7px; }
+  #res-row { gap:5px; }
+  #core-resources { grid-template-columns:repeat(3,minmax(0,1fr)); gap:1px 4px; }
+  #core-resources .res { display:flex; gap:4px; padding:3px 1px; min-height:26px; }
+  #core-resources .res b { font-size:12px; margin-left:auto; }
+  #core-resources .res-icon { width:16px; height:16px; flex-basis:16px; }
+  #core-resources .res-label { font-size:10px; }
+  #resource-more { min-width:45px; font-size:11px; padding:4px; }
+  #date { font-size:10px; }
+  #pop { flex:1 1 auto; font-size:10px; }
+  #pop small { font-size:10px; }
+  #pop .town-health { font-size:10px; }
+  #quick-pause { min-height:44px; padding:5px 8px; font-size:11px; }
+  #survival-guide { left:10px; top:calc(var(--hud-height) + 8px); width:calc(100vw - 20px); padding:2px 10px 5px; }
+  #survival-guide .guide-heading { min-height:34px; }
+  #guide-toggle { min-height:36px; }
+  #guide-list li { font-size:11px; }
+  #hud[data-mode="build"] #survival-guide,#hud[data-mode="detail"] #survival-guide { width:calc(100vw - 20px); }
+  #hud:not([data-mode="explore"]) #survival-guide:not(.guide-expanded) #guide-list li:not([data-level="urgent"]) { display:none; }
+  #hud:not([data-mode="explore"]) #survival-guide:not(.guide-expanded) { padding-bottom:0; }
+  #town-dock { right:12px; bottom:max(14px,env(safe-area-inset-bottom)); }
+  #town-dock #open-build { min-height:58px; min-width:142px; }
+  #town-controls { right:10px; bottom:88px; }
+  #toolbar { bottom:80px; left:10px; transform:none; width:calc(100vw - 20px); max-width:none; padding:12px; box-sizing:border-box; }
+  #toolbar .toolbar-items { gap:8px; }
+  #toolbar #toolbar-categories { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); overflow:visible; }
+  #toolbar .tb-category { --category-card-width:auto; width:auto; min-width:0; max-width:none; }
+  #toolbar .tb { min-height:78px; }
+  #toolbar .tool-group { max-height:230px; overflow-x:auto; }
+  #placement-panel { left:10px; right:10px; width:auto; max-width:none; bottom:calc(var(--toolbar-height) + 94px); max-height:180px; }
+  #info.detail-inspector { left:10px; right:10px; top:auto; bottom:max(12px,env(safe-area-inset-bottom)); width:auto; max-height:min(58dvh,calc(100dvh - var(--hud-height) - 70px)); }
+}
+@media(min-width:761px) {
+  #hud[data-mode="detail"] #survival-guide { left:12px; }
+  #info.detail-inspector { right:16px; left:auto; }
+}
+/* Once a tool is chosen, its cost/shortage card remains; unrelated choices recede. */
+#hud.is-placing #toolbar .tool-group .tb:not(.active) { display:none; }
+#hud.is-placing #toolbar .tool-group .tb.active { min-width:160px; }
+#hud.is-placing #toolbar .tool-group { max-height:150px; }
+/* Legacy overlap avoidance must not suppress current urgent survival warnings. */
+#hud #survival-guide { display:block !important; }
+@media(max-height:500px) and (min-width:761px) {
+  /* A short landscape screen keeps the selected building in a side inspector. */
+  #hud:has(#info:not(.hidden)) #topbar,
+  #hud:has(#info:not(.hidden)) #survival-guide { visibility:visible; }
+  #hud #info.detail-inspector { top:calc(var(--hud-height) + 10px); bottom:10px; height:auto; max-height:calc(100dvh - var(--hud-height) - 20px); }
+  #hud[data-mode="detail"] #survival-guide { width:min(300px,calc(100vw - 420px)); max-height:calc(100dvh - var(--hud-height) - 24px); }
+}

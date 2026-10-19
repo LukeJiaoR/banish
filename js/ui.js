@@ -1208,7 +1208,7 @@ G.ui = {
     rows.forEach((row, i) => {
       const node = list.querySelector(`[data-guide-kind="${row.kind}"]`);
       node.dataset.level = row.level; node.title = row.detail;
-      node.hidden = !this._guideExpanded && i >= 3;
+      node.hidden = !this._guideExpanded && i >= 1;
       node.classList.toggle('hidden', node.hidden);
       node.querySelector('[data-guide-level]').textContent = labels[row.level];
       node.querySelector('[data-guide-text]').textContent = row.text;
@@ -1218,7 +1218,7 @@ G.ui = {
     if (toggle) {
       toggle.textContent = this._guideExpanded ? '收起' : `全部 ${rows.length}`;
       toggle.setAttribute('aria-expanded', String(!!this._guideExpanded));
-      toggle.hidden = rows.length <= 3;
+      toggle.hidden = rows.length <= 1;
     }
     if (count) {
       const urgent = rows.filter(row => row.level === 'urgent').length;
