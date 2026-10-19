@@ -1,0 +1,135 @@
+{
+  "device": {
+    "name": "iphone-se",
+    "label": "iPhone SE 竖屏",
+    "width": 375,
+    "height": 667,
+    "dpr": 2
+  },
+  "chrome": "155.0.8059.82",
+  "ua": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1",
+  "screenshots": [
+    "iphone-se-1-load.png",
+    "iphone-se-2-build.png",
+    "iphone-se-3-placed.png",
+    "iphone-se-4-town.png",
+    "iphone-se-5-help.png"
+  ],
+  "errors": [],
+  "checks": [
+    {
+      "device": "iphone-se",
+      "check": "无横向溢出",
+      "ok": true,
+      "detail": "scrollWidth=375 innerWidth=375"
+    },
+    {
+      "device": "iphone-se",
+      "check": "画布/视口未被放大",
+      "ok": true,
+      "detail": "innerWidth=375 画布CSS=375×667 位图=750×1334 dpr=2"
+    },
+    {
+      "device": "iphone-se",
+      "check": "HUD 关键控件在视口内",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "device": "iphone-se",
+      "check": "主要触控目标 ≥40×40",
+      "ok": true,
+      "detail": "8 个可点元素，0 个偏小"
+    },
+    {
+      "device": "iphone-se",
+      "check": "HUD 文字 ≥11px",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "device": "iphone-se",
+      "check": "点按「建造」展开面板",
+      "ok": true,
+      "detail": "分类数=5"
+    },
+    {
+      "device": "iphone-se",
+      "check": "面板内单指滑动可滚动",
+      "ok": true,
+      "detail": "内容未超出，跳过"
+    },
+    {
+      "device": "iphone-se",
+      "check": "触摸选中工具",
+      "ok": true,
+      "detail": "G.tool.type=gatherer"
+    },
+    {
+      "device": "iphone-se",
+      "check": "画布点按落下建筑",
+      "ok": true,
+      "detail": "建筑 1→2（落点 9,440，可点地图 13%，最后提示：地面有岩石，需先用采石采铁工具标记清除）"
+    },
+    {
+      "device": "iphone-se",
+      "check": "单指拖拽平移镜头",
+      "ok": true,
+      "detail": "cam (-2148.5,-2210.5)→(-2261.0,-2110.5)，可点地图 35%"
+    },
+    {
+      "device": "iphone-se",
+      "check": "拖拽不误触选中",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "device": "iphone-se",
+      "check": "双击画布不缩放页面",
+      "ok": true,
+      "detail": "visualViewport.scale 1→1"
+    },
+    {
+      "device": "iphone-se",
+      "check": "顶栏「更多」可展开",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "device": "iphone-se",
+      "check": "管理面板可展开且不越界",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "device": "iphone-se",
+      "check": "管理面板内可触达帮助入口",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "device": "iphone-se",
+      "check": "帮助弹层可打开",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "device": "iphone-se",
+      "check": "帮助弹层可关闭",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "device": "iphone-se",
+      "check": "长按画布不选中文本",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "device": "iphone-se",
+      "check": "无 JS 运行时错误",
+      "ok": true,
+      "detail": ""
+    }
+  ]
+}

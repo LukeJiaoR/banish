@@ -1484,10 +1484,12 @@ G.init = function () {
   G.dpr = Math.min(2, window.devicePixelRatio || 1);
 
   const resize = () => {
-    G.cv.width = Math.floor(window.innerWidth * G.dpr);
-    G.cv.height = Math.floor(window.innerHeight * G.dpr);
+    // 必须先定 CSS 尺寸，再改位图尺寸。反序会让画布在手机端（DPR>1 + shrink-to-fit）
+    // 瞬间变成 dpr 倍宽，把 innerWidth 撑大后又被写回 CSS，形成 2 倍画布且无法自愈。
     G.cv.style.width = window.innerWidth + 'px';
     G.cv.style.height = window.innerHeight + 'px';
+    G.cv.width = Math.floor(window.innerWidth * G.dpr);
+    G.cv.height = Math.floor(window.innerHeight * G.dpr);
   };
   window.addEventListener('resize', resize);
   resize();
@@ -1518,11 +1520,13 @@ G.init = function () {
   /* ----- 输入 ----- */
   let dragging = false, dragBtn = -1, dragMoved = 0, lastX = 0, lastY = 0, pressX = 0, pressY = 0;
   let fixedFieldTouch = null;
+  let panTouch = null;
   const fixedField = () => G.tool?.kind === 'build' && ['pasture', 'orchard'].includes(G.tool.type);
   let roadTouch = null, harvestTouch = null, roadMouse = null, farmTouch=null, farmMouse=null, pastureTouch=null, pastureMouse=null, orchardTouch=null, orchardMouse=null, cemeteryTouch=null, cemeteryMouse=null;
   function resetInput() {
     if (G.harvestPlan && !G.harvestPlan.frozen) G.cancelHarvestPlan();
     fixedFieldTouch = null;
+    panTouch = null;
     G.keys = {};
     dragging = false; dragBtn = -1; dragMoved = 0;
     roadTouch = null; harvestTouch = null; roadMouse = null; G.roadDrag = null;farmTouch=null;farmMouse=null;G.farmDrag=null;pastureTouch=null;pastureMouse=null;G.pastureDrag=null;orchardTouch=null;orchardMouse=null;G.orchardDrag=null;cemeteryTouch=null;cemeteryMouse=null;G.cemeteryDrag=null;
@@ -1632,6 +1636,29 @@ G.init = function () {
       }
     }
   });
+
+  // 单指平移：与鼠标左键拖动同一门槛——无工具、无规划、无弹窗时才平移。
+  // 位移 ≤6px 视为点按，不拦截默认行为，选址/选中仍走兼容鼠标事件；
+  // 超过门槛后 preventDefault，既止住页面手势，也抑制这次点按的选中。
+  G.cv.addEventListener('touchstart', e => {
+    if (G.hasOpenModal() || G.tool || G.isFarmPlanning() || G.isPasturePlanning() ||
+        G.isOrchardPlanning() || G.isCemeteryPlanning()) { panTouch = null; return; }
+    if (e.touches.length !== 1) { panTouch = null; return; }
+    const p = toLocal(e.touches[0]);
+    panTouch = { x: p.x, y: p.y, moved: 0 };
+  }, { passive: true });
+  G.cv.addEventListener('touchmove', e => {
+    if (!panTouch || e.touches.length !== 1) return;
+    const p = toLocal(e.touches[0]);
+    const dx = p.x - panTouch.x, dy = p.y - panTouch.y;
+    panTouch.moved += Math.abs(dx) + Math.abs(dy);
+    if (panTouch.moved <= 6) return;
+    e.preventDefault();
+    G.cam.x += dx; G.cam.y += dy;
+    panTouch.x = p.x; panTouch.y = p.y;
+  }, { passive: false });
+  G.cv.addEventListener('touchend', () => { panTouch = null; }, { passive: true });
+  G.cv.addEventListener('touchcancel', () => { panTouch = null; }, { passive: true });
 
   // A single mobile tap stamps the same 6x6 field as a mouse click. Suppress
   // compatibility mouse events; moving, multitouch or interrupted taps do not build.

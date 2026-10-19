@@ -1,0 +1,60 @@
+{
+  "device": {
+    "name": "landscape",
+    "label": "iPhone 13 横屏",
+    "width": 844,
+    "height": 390,
+    "dpr": 3
+  },
+  "chrome": "155.0.8059.82",
+  "ua": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1",
+  "screenshots": [
+    "landscape-1-load.png",
+    "landscape-2-landscape-build.png"
+  ],
+  "errors": [],
+  "checks": [
+    {
+      "device": "landscape",
+      "check": "无横向溢出",
+      "ok": true,
+      "detail": "scrollWidth=844 innerWidth=844"
+    },
+    {
+      "device": "landscape",
+      "check": "画布/视口未被放大",
+      "ok": true,
+      "detail": "innerWidth=844 画布CSS=844×390 位图=1688×780 dpr=3"
+    },
+    {
+      "device": "landscape",
+      "check": "HUD 关键控件在视口内",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "device": "landscape",
+      "check": "主要触控目标 ≥40×40",
+      "ok": true,
+      "detail": "8 个可点元素，0 个偏小"
+    },
+    {
+      "device": "landscape",
+      "check": "HUD 文字 ≥11px",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "device": "landscape",
+      "check": "横屏可开合建造栏",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "device": "landscape",
+      "check": "无 JS 运行时错误",
+      "ok": true,
+      "detail": ""
+    }
+  ]
+}
