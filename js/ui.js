@@ -1285,11 +1285,49 @@ G.ui = {
       this._placementWorld = G.world;
       this._placementKey = key;
       this._placement = G.placementInfo(type, x, y);
-      el.textContent = this._placement.text + (this.mineralBuildRisk(type) ? '\n' + this.mineralBuildRisk(type) : '');
+      this.renderPlacementPreview(el, type, this._placement.text + (this.mineralBuildRisk(type) ? '\n' + this.mineralBuildRisk(type) : ''));
       el.dataset.state = !this._placement.ok ? 'blocked' : this._placement.warning ? 'warning' : 'ready';
     }
     el.classList.remove('hidden');
     return this._placement;
+  },
+
+  // Keep the full authoritative preview available, with a compact mobile cost row.
+  renderPlacementPreview: function (el, type, text) {
+    if (!el.replaceChildren || !document.createElement) { el.textContent = text; return; }
+    let details = el.querySelector('details');
+    if (!details) {
+      details = document.createElement('details');
+      details.className = 'placement-disclosure';
+      const summary = document.createElement('summary');
+      const body = document.createElement('div');
+      body.className = 'placement-full';
+      details.append(summary, body);
+      el.replaceChildren(details);
+      if (this._placementViewport) {
+        const old = this._placementViewport;
+        if (old.query.removeEventListener) old.query.removeEventListener('change', old.listener);
+        else if (old.query.removeListener) old.query.removeListener(old.listener);
+      }
+      const viewport = window.matchMedia('(max-width:760px), (max-height:500px)');
+      const syncViewport = function (event) { details.open = !event.matches; };
+      if (viewport.addEventListener) viewport.addEventListener('change', syncViewport);
+      else if (viewport.addListener) viewport.addListener(syncViewport);
+      this._placementViewport = { query: viewport, listener: syncViewport };
+    }
+    // Update in place so regular preview refreshes do not steal focus or close it.
+    const compact = window.matchMedia('(max-width:760px), (max-height:500px)').matches;
+    if (details.dataset.tool !== type) details.open = !compact;
+    if (!compact) details.open = true;
+    details.dataset.tool = type;
+    const cost = G.BDEF[type].cost;
+    const parts = Object.keys(cost).map(k => {
+      const missing = Math.max(0, cost[k] - Math.floor(G.game.res[k]));
+      return `${G.RES[k].name}${cost[k]}${missing ? `（缺${missing}）` : ''}`;
+    });
+    const summary = details.querySelector('summary');
+    summary.textContent = (parts.join(' · ') || '无需建材') + ' · 详情';
+    details.querySelector('.placement-full').textContent = text;
   },
 
   /* ---------- 信息面板 ---------- */

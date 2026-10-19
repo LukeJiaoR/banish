@@ -1,0 +1,29 @@
+/* Presentation only: preserve every placement warning in an explicit disclosure. */
+.placement-disclosure > summary { display:none; }
+.placement-disclosure > .placement-full { display:block; }
+@media (max-width:760px), (max-height:500px) {
+  #placement-info { padding:0 8px; }
+  .placement-disclosure { white-space:normal; }
+  .placement-disclosure > summary { display:list-item; min-height:44px; line-height:44px; white-space:nowrap; overflow-x:auto; cursor:pointer; }
+  .placement-disclosure:not([open]) > .placement-full { display:none; }
+  .placement-full { white-space:pre-line; padding:4px 0 8px; }
+  /* Toasts occupy the free bottom-left lane, below the build panel. */
+  #hud #toasts,
+  #hud:has(#placement-info:not(.hidden)) #toasts,
+  #hud:has(#road-controls:not(.hidden)) #toasts { left:10px; right:auto; bottom:10px; max-width:calc(100vw - 280px); max-height:60px; }
+  #hud[data-mode="build"] #toasts,
+  #hud[data-mode="build"]:has(#placement-info:not(.hidden)) #toasts,
+  #hud[data-mode="build"]:has(#road-controls:not(.hidden)) #toasts { max-width:calc(100vw - 140px); }
+  /* Exploration has no build panel: use the full lane above both dock buttons. */
+  #hud[data-mode="explore"] #toasts { bottom:90px; max-width:calc(100vw - 20px); }
+  #hud .toast { margin-top:0; padding:6px 8px; font-size:11px; }
+}
+@media (max-height:500px) and (min-width:761px) {
+  /* Side-by-side lanes keep the survival heading reachable in landscape. */
+  #hud[data-mode="build"] #survival-guide { left:10px; top:calc(var(--hud-height) + 8px); width:260px; max-height:calc(100dvh - var(--hud-height) - 80px); }
+  #hud[data-mode="build"] #toolbar { left:282px; right:10px; transform:none; width:auto; max-width:none; top:calc(var(--hud-height) + 8px); bottom:80px; overflow-y:auto; box-sizing:border-box; }
+  #hud[data-mode="build"] #toolbar .toolbar-items { flex-wrap:wrap; overflow:visible; }
+  #hud[data-mode="build"] #toolbar .tb-category { flex:1 0 100px; }
+  #hud.is-placing #toolbar { top:auto; max-height:130px; }
+  #hud[data-mode="build"] #placement-panel { left:282px; right:10px; width:auto; bottom:calc(var(--toolbar-height) + 90px); max-height:calc(100dvh - var(--hud-height) - var(--toolbar-height) - 108px); }
+}
