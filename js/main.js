@@ -1219,20 +1219,19 @@ G.paintRockLine = function (x0, y0, x1, y1) {
 /* ---------- 建造 ---------- */
 G.tryPlace = function (tx, ty) {
   const type = G.tool.type;
-  if(type==='farm'){G.selectFarmCorner(tx,ty);return;}
   if(type==='cemetery'){G.selectCemeteryCorner(tx,ty);return;}
   const def = G.BDEF[type];
   const ox = tx - ((def.w - 1) >> 1), oy = ty - ((def.h - 1) >> 1);
-  const r = G.addBuilding(type, ox, oy);
+  const r = G.addBuilding(type, ox, oy, type==='farm'?{farmSize:[8,8]}:{});
   if (!r.ok) G.ui.toast(r.reason, 'warn');
   G.ui.refreshHUD();
 };
 
 G.paintRoad = function(x0,y0,x1,y1){const q=G.planRoad(G.world,{x:x0,y:y0},{x:x1,y:y1});return q.ok?G.addRoadWork(q.path,'dirt'):q;};
 
-/* Farm placement is a transient rectangle, not an immediate stamp. */
+/* New farms stamp 8x8 while keeping area-save staffing and traversal semantics. */
 G.farmPlan=null;G.farmDrag=null;G.farmGestureVersion=0;
-G.isFarmPlanning=()=>G.tool?.kind==='build'&&G.tool.type==='farm';
+G.isFarmPlanning=()=>false;
 G.cancelFarmPlan=function(){G.farmPlan=null;G.farmDrag=null;G.farmGestureVersion++;};
 G.farmPoint=(x,y)=>Number.isFinite(x)&&Number.isFinite(y)?{x:Math.floor(x),y:Math.floor(y)}:null;
 G.farmBounds=function(p){if(!p?.start||!p.end)return null;return {x:Math.min(p.start.x,p.end.x),y:Math.min(p.start.y,p.end.y),w:Math.abs(p.end.x-p.start.x)+1,h:Math.abs(p.end.y-p.start.y)+1};};
@@ -1519,13 +1518,13 @@ G.init = function () {
 
   /* ----- 输入 ----- */
   let dragging = false, dragBtn = -1, dragMoved = 0, lastX = 0, lastY = 0, pressX = 0, pressY = 0;
-  let fixedFieldTouch = null;
+  let fixedFieldTouch = null, fixedFieldMouse = null;
   let panTouch = null;
-  const fixedField = () => G.tool?.kind === 'build' && ['pasture', 'orchard'].includes(G.tool.type);
+  const fixedField = () => G.tool?.kind === 'build' && ['farm', 'pasture', 'orchard'].includes(G.tool.type);
   let roadTouch = null, harvestTouch = null, roadMouse = null, farmTouch=null, farmMouse=null, pastureTouch=null, pastureMouse=null, orchardTouch=null, orchardMouse=null, cemeteryTouch=null, cemeteryMouse=null;
   function resetInput() {
     if (G.harvestPlan && !G.harvestPlan.frozen) G.cancelHarvestPlan();
-    fixedFieldTouch = null;
+    fixedFieldTouch = null; fixedFieldMouse = null;
     panTouch = null;
     G.keys = {};
     dragging = false; dragBtn = -1; dragMoved = 0;
@@ -1549,6 +1548,10 @@ G.init = function () {
     if (e.button === 2 && G.tool) { G.setTool(null); return; } // 右键取消工具
     dragging = true; dragBtn = e.button; dragMoved = 0;
     lastX = pressX = p.x; lastY = pressY = p.y;
+    fixedFieldMouse = e.button===0 && fixedField() ? {
+      tool:G.tool, world:G.world, game:G.game, farmVersion:G.farmGestureVersion,
+      pastureVersion:G.pastureGestureVersion, orchardVersion:G.orchardGestureVersion
+    } : null;
     roadMouse = null;farmMouse=null;pastureMouse=null;orchardMouse=null;cemeteryMouse=null;
     if(e.button===0&&G.isFarmPlanning()){const t=G.screenToMapTile(p.x,p.y);farmMouse={start:G.farmPoint(t.tx,t.ty),world:G.world,generation:G.farmGestureVersion};}
     if(e.button===0&&G.isPasturePlanning()){const t=G.screenToMapTile(p.x,p.y);pastureMouse={start:G.farmPoint(t.tx,t.ty),world:G.world,generation:G.pastureGestureVersion};}
@@ -1597,6 +1600,11 @@ G.init = function () {
     if (G.hasOpenModal() || onPlacementPanel(e)) { resetInput(); return; }
     if (!dragging) return;
     dragging = false;
+    const stamp=fixedFieldMouse; fixedFieldMouse=null;
+    if(e.button===0 && (stamp || fixedField()) && (!stamp || !fixedField() ||
+        stamp.tool!==G.tool || stamp.world!==G.world || stamp.game!==G.game ||
+        stamp.farmVersion!==G.farmGestureVersion || stamp.pastureVersion!==G.pastureGestureVersion ||
+        stamp.orchardVersion!==G.orchardGestureVersion)) return;
     const p = toLocal(e);
     const t = G.screenToMapTile(p.x, p.y);
     const tx = Math.floor(t.tx), ty = Math.floor(t.ty);
@@ -1660,14 +1668,14 @@ G.init = function () {
   G.cv.addEventListener('touchend', () => { panTouch = null; }, { passive: true });
   G.cv.addEventListener('touchcancel', () => { panTouch = null; }, { passive: true });
 
-  // A single mobile tap stamps the same 6x6 field as a mouse click. Suppress
+  // A single mobile tap stamps the same fixed field as a mouse click. Suppress
   // compatibility mouse events; moving, multitouch or interrupted taps do not build.
   G.cv.addEventListener('touchstart', e => {
     if (!fixedField()) return;
     e.preventDefault(); resetInput();
     if (!G.hasOpenModal() && e.touches.length === 1) fixedFieldTouch = {
       x:e.touches[0].clientX, y:e.touches[0].clientY, world:G.world, game:G.game,
-      tool:G.tool, pastureVersion:G.pastureGestureVersion, orchardVersion:G.orchardGestureVersion
+      tool:G.tool, farmVersion:G.farmGestureVersion, pastureVersion:G.pastureGestureVersion, orchardVersion:G.orchardGestureVersion
     };
   }, {passive:false});
   G.cv.addEventListener('touchmove', e => {
@@ -1680,7 +1688,7 @@ G.init = function () {
     if (!tap) return;
     e.preventDefault();
     if (fixedField() && tap.tool===G.tool && tap.world===G.world && tap.game===G.game &&
-        tap.pastureVersion===G.pastureGestureVersion && tap.orchardVersion===G.orchardGestureVersion &&
+        tap.farmVersion===G.farmGestureVersion && tap.pastureVersion===G.pastureGestureVersion && tap.orchardVersion===G.orchardGestureVersion &&
         !G.hasOpenModal() && e.touches.length===0 && e.changedTouches.length===1) {
       const p=toLocal(e.changedTouches[0]), t=G.screenToMapTile(p.x,p.y);
       G.tryPlace(Math.floor(t.tx),Math.floor(t.ty));

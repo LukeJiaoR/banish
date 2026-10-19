@@ -367,8 +367,8 @@ G.ui = {
     };
     const def = G.BDEF[t], action = special[t];
     const name = action ? action.name : def.name, icon = action ? action.icon : def.icon;
-    const cost = action ? action.cost : t === 'road' ? '免材料 · 每格1工时' : t === 'stoneroad' ? '每格1石 · 1工时' : t === 'tunnel' ? '每格4石 · 3工时' : t === 'pasture' ? '6×6 · 30木 · 1名牧人' : t === 'orchard' ? '6×6 · 12木 · 9株' : t === 'cemetery' ? '7–20格 · 按墓位规划' : this.resourceCost(def.cost, true);
-    const tip = action ? action.tip : t === 'tunnel' ? '隧道：选两个已清场陆地洞口，沿一个网格轴穿过连续山体；每格4石、3游戏施工小时（含两端）。只在首选洞口实运材料并施工，完工后按土路速度通行' : t === 'cemetery' ? '墓园：每边7–20格，选两个角或拖出矩形；预览实际墓位、石材和工时，确认后实运施工。拆围栏不清除墓碑' : t === 'pasture' ? '牧场：点击地图放置固定6×6；羊12头、牛10头或鸡24只，1名牧人，30木、50工时' : t === 'orchard' ? '果园：点击地图放置固定6×6；9株、2名农夫，12木、36工时' : ['road', 'stoneroad'].includes(t) ? `${t === 'stoneroad' ? '石路每个新铺/升级格需1石' : '土路无需材料'}：点选或拖出起终点预览连通路线，清树后再确认施工；每格1基础游戏施工小时为本作适配。确认排队，逐格实运施工后才提速；原道路仍可走` :
+    const cost = action ? action.cost : t === 'road' ? '免材料 · 每格1工时' : t === 'stoneroad' ? '每格1石 · 1工时' : t === 'tunnel' ? '每格4石 · 3工时' : t === 'farm' ? '8×8 · 免费 · 初始2人' : t === 'pasture' ? '6×6 · 30木 · 1名牧人' : t === 'orchard' ? '6×6 · 12木 · 9株' : t === 'cemetery' ? '7–20格 · 按墓位规划' : this.resourceCost(def.cost, true);
+    const tip = action ? action.tip : t === 'tunnel' ? '隧道：选两个已清场陆地洞口，沿一个网格轴穿过连续山体；每格4石、3游戏施工小时（含两端）。只在首选洞口实运材料并施工，完工后按土路速度通行' : t === 'cemetery' ? '墓园：每边7–20格，选两个角或拖出矩形；预览实际墓位、石材和工时，确认后实运施工。拆围栏不清除墓碑' : t === 'farm' ? '农田：点击地图放置固定8×8；初始2名农夫，可调整0–4人；免费、12工时，先清场施工再播种' : t === 'pasture' ? '牧场：点击地图放置固定6×6；羊12头、牛10头或鸡24只，1名牧人，30木、50工时' : t === 'orchard' ? '果园：点击地图放置固定6×6；9株、2名农夫，12木、36工时' : ['road', 'stoneroad'].includes(t) ? `${t === 'stoneroad' ? '石路每个新铺/升级格需1石' : '土路无需材料'}：点选或拖出起终点预览连通路线，清树后再确认施工；每格1基础游戏施工小时为本作适配。确认排队，逐格实运施工后才提速；原道路仍可走` :
       `${def.name}（${this.resourceCost(def.cost, false)}${def.jobs ? ' · 岗位×' + def.jobs : ''}）— ${def.desc}`;
     const shortage = this.toolMaterialShortage(t);
     return `<button type="button" class="tb${shortage ? ' is-short' : ''}" data-tool="${t}" title="${this.escHtml(tip)}" aria-pressed="false"><span class="ic" aria-hidden="true">${this.icon(t)}</span><span class="lb">${name}</span><span class="cost">${cost}</span><span class="material-badge${shortage ? '' : ' hidden'}" data-material-shortage="${t}">${shortage ? '缺料 · 可选址' : ''}</span></button>`;
@@ -430,7 +430,7 @@ G.ui = {
     if (status) {
       const t = G.tool && (G.tool.kind === 'build' ? G.tool.type : G.tool.kind==='road' ? (G.tool.surface==='tunnel'?'tunnel':G.tool.surface==='bridge'?'bridge':G.tool.surface==='stone'?'stoneroad':'road') : G.tool.kind);
       const names = { fell: '砍伐', quarry: '采石采铁', demolish: '拆除', road: '铺路' };
-      status.textContent = t ? `当前：${names[t] || G.BDEF[t].name} · ${t === 'demolish' ? '点击建筑或道路拆除；已开采的有限矿点须确认永久废坑' : ['fell', 'quarry'].includes(t) ? '框选范围后确认标记' : ['road','stoneroad','bridge','tunnel'].includes(t) ? '选起终点后预览并确认' : t==='farm'?'选两个角或拖出矩形，再确认开田' : t==='pasture'||t==='orchard'?'点击地图放置固定6×6，可连续建造' : t==='cemetery'?'选两个角或拖出矩形，再确认建园' : '点击地图放置，可连续建造'} · Esc / 右键取消${this.mineralBuildRisk(t) ? '\n' + this.mineralBuildRisk(t) : ''}` :
+      status.textContent = t ? `当前：${names[t] || G.BDEF[t].name} · ${t === 'demolish' ? '点击建筑或道路拆除；已开采的有限矿点须确认永久废坑' : ['fell', 'quarry'].includes(t) ? '框选范围后确认标记' : ['road','stoneroad','bridge','tunnel'].includes(t) ? '选起终点后预览并确认' : t==='farm'?'点击地图放置固定8×8，可连续建造' : t==='pasture'||t==='orchard'?'点击地图放置固定6×6，可连续建造' : t==='cemetery'?'选两个角或拖出矩形，再确认建园' : '点击地图放置，可连续建造'} · Esc / 右键取消${this.mineralBuildRisk(t) ? '\n' + this.mineralBuildRisk(t) : ''}` :
         group ? '未选择工具。点击一项开始；返回分类可切换功能。' : '选择分类，再选择建筑或操作。';
     }
   },
@@ -5357,7 +5357,7 @@ G.foodForestBounds = function (w) {
 /* Placement facts use exactly the same origin and square work bounds as production. */
 G.placementInfo = function (type, x, y) {
   const w = G.world, def = G.BDEF[type], p = G.PROD[type] || {};
-  const check = G.canPlace(w, type, x, y);
+  const check = G.canPlace(w, type, x, y, type==='farm'?[8,8]:undefined);
   const affordable = Object.keys(def.cost).every(k => G.game.res[k] >= def.cost[k]);
   const result = { ok: check.ok && affordable, affordable, radius: type === 'market' ? G.SUPPLY.marketRadius : p.radius || p.waterR || 0, warning: false };
   result.bounds = [Math.max(0,x-result.radius), Math.max(0,y-result.radius), Math.min(w.N,x+result.radius+1), Math.min(w.N,y+result.radius+1)];

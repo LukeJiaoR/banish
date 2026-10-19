@@ -1251,7 +1251,7 @@ G.frame = function (dtReal) {
   if (G.tool && G.tool.kind === 'build' && G.hover.tx >= 0 && !(G.isFarmPlanning&&G.isFarmPlanning()) && !(G.isPasturePlanning&&G.isPasturePlanning()) && !(G.isOrchardPlanning&&G.isOrchardPlanning()) && !(G.isCemeteryPlanning&&G.isCemeteryPlanning())) {
     const def = G.BDEF[G.tool.type];
     const ox = G.hover.tx - ((def.w - 1) >> 1), oy = G.hover.ty - ((def.h - 1) >> 1);
-    const chk = G.canPlace(w, G.tool.type, ox, oy);
+    const chk = G.canPlace(w, G.tool.type, ox, oy, G.tool.type==='farm'?[8,8]:undefined);
     const preview = G.ui.refreshPlacement(G.tool.type, ox, oy);
     const radius = preview && preview.radius;
     if (radius) {
