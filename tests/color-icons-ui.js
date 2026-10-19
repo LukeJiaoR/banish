@@ -1,33 +1,48 @@
-/* Pigment/markup regression only. Real browser evidence is recorded separately. */
+/* Original asset/markup regression. Real browser evidence is recorded separately. */
 'use strict';
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const root = path.resolve(__dirname, '..');
-const context = { G: {}, window: {}, document: {} };
-vm.runInNewContext(fs.readFileSync(path.join(root, 'js/ui.js'), 'utf8'), context);
-const icon = name => context.G.ui.icon(name);
-const tones = new Set(['ochre','copper','moss','slate','berry','plum']);
-const colored = ['wood','stone','iron','coal','tools','steelTools','food','meat','eggs','vegetables','grain','apples','pears','firewood','leather','wool','clothes','warmCoats','herbs','ale','homes','industry','services','land','farm','save','folder','sprout','mail','help','settings'];
-for (const name of colored) {
-  const svg = icon(name), tone = svg.match(/data-tone="([a-z]+)"/);
-  assert(tone && tones.has(tone[1]), name + ' must use the shared palette');
-  assert.match(svg, /class="icon-pigment"/);
-  assert.match(svg, /aria-hidden="true" focusable="false"/);
-  assert.match(svg, /viewBox="0 0 24 24" fill="none" stroke="currentColor"/);
-  assert(!/<img|<image|https?:|onload=/.test(svg));
+const context = { console };
+context.window = context;
+vm.createContext(context);
+for (const file of ['core', 'defs', 'ui']) vm.runInContext(fs.readFileSync(path.join(root, 'js', file + '.js'), 'utf8'), context);
+const { G } = context, icon = name => G.ui.icon(name);
+function asset(name, file, fallback) {
+  const markup = icon(name);
+  assert(markup.includes(`src="${file}"`), name);
+  assert(fs.existsSync(path.join(root, file)), file);
+  assert(markup.includes(`<span class="icon-fallback">${fallback}</span>`));
+  assert.match(markup, /class="ui-icon" aria-hidden="true"/);
+  assert.match(markup, /alt="" onerror="this.remove\(\)"/);
+  assert(!/<svg|data-tone=|https?:/.test(markup));
 }
-for (const name of ['alert','check','close','chevronDown','demolish','pause','play','fast','fastest']) {
-  const svg = icon(name);
-  assert(!svg.includes('data-tone='), name + ' must retain inherited state color');
-  assert(!svg.includes('icon-pigment'));
+for (const [name, r] of Object.entries(G.RES)) asset(name, `assets/icons/${r.iconAsset}.png`, r.icon);
+const tools = ['stonehouse','boarding','mine','stonequarry','blacksmith','hunting','house','storage','stockpile','gatherer','forester','woodcutter','dock','school','herbalist','hospital','townhall','tavern','farm','road','stoneroad','bridge','demolish'];
+for (const name of tools) asset(name, `assets/icons/tool_${name}.png`, name === 'demolish' ? '🚫' : G.BDEF[name].icon);
+for (const name of ['tailor','tradingpost','pasture','orchard','chapel']) asset(name, `assets/buildings/${name}.png`, G.BDEF[name].icon);
+for (const name of ['market','well','cemetery','tunnel']) {
+  assert(icon(name).includes(G.BDEF[name].icon));
+  assert(!icon(name).includes('<img'));
 }
-for (const [alias, original] of [['house','building'],['hunting','meat'],['settings','tools'],['gatherer','vegetables'],['orchard','apples']]) assert.equal(icon(alias), icon(original));
-for (const name of ['unknown', '__proto__', 'constructor', '" onload="bad']) assert.equal(icon(name), icon('building'));
+for (const [name, symbol] of Object.entries({save:'💾',folder:'📂',sprout:'🌱',mail:'📮',help:'❓',people:'👥',pause:'⏸',play:'▶',fast:'⏩',fastest:'⏭',fell:'🪚',quarry:'⛏'})) {
+  assert(icon(name).includes(symbol)); assert(!/<img|<svg/.test(icon(name)));
+}
+for (const [name, symbol] of Object.entries({homes:'🏠',food:'🌾',industry:'⚒️',services:'🏘️',land:'🛣️',other:'🔨'})) {
+  const markup = G.ui.toolCategoryButton({id:name,name:'分类',icon:symbol});
+  assert(markup.includes(G.ui.iconMarkup(symbol))); assert(!/<img|<svg/.test(markup));
+}
+for (const name of ['alert','check','close','chevronDown','clock','settings','citizen']) {
+  assert.match(icon(name), /stroke="currentColor"/);
+  assert(!icon(name).includes('data-tone='));
+}
+for (const name of ['unknown','__proto__','constructor','" onload="bad']) assert.equal(icon(name), G.ui.iconMarkup('🏠'));
+assert(!G.ui.iconMarkup('<x>', 'local"bad').includes('<x>'));
+assert(G.ui.iconMarkup('<x>', 'local"bad').includes('src="local&quot;bad"'));
 const css = fs.readFileSync(path.join(root, 'styles/readability.css'), 'utf8');
-assert.match(css, /@media \(forced-colors: active\)/);
-assert.match(css, /\.ui-icon\[data-tone\] \{ color: inherit; \}/);
-assert.match(css, /\.ui-icon \.icon-pigment, \.ui-icon \.icon-highlight \{ fill: none; \}/);
+assert.match(css, /\.ui-icon > img \+ \.icon-fallback \{ display: none; \}/);
+assert(!css.includes('data-tone'));
 assert.match(css, /button:focus-visible/);
-console.log('Colored icons: 31 palette mappings, 9 state glyphs, aliases, safe fallback and forced-color contracts passed.');
+console.log('Original icons: 20 resource PNGs, 23 tool PNGs, 5 building thumbnails, historical emoji, neutral controls and safe fallback passed.');

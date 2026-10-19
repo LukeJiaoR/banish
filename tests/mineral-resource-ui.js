@@ -29,7 +29,7 @@ for (const type of G.RES_KEYS) {
   assert.equal(G.ui.resourceCost({ [type]: 7 }, false), `${resource.name}×7`);
   assert.ok(icon.includes(`aria-label="${resource.name}"`));
   assert.ok(icon.includes('class="ui-icon"'));
-  assert.ok(icon.includes('stroke="currentColor"')); assert.ok(!icon.includes('<img'), 'single-ink icons do not depend on network assets');
+  assert.ok(icon.includes(`src="assets/icons/${resource.iconAsset}.png"`)); assert.ok(icon.includes(resource.icon), 'original registry emoji remains the load-failure fallback');
   passed++;
 }
 for (const type of ['house', 'stonehouse', 'school', 'mine']) {

@@ -1,22 +1,13 @@
 /* Shared readable woodcut UI. No simulation or world-art changes. */
 :root { --ui-body: 12px; --ui-secondary: 11px; --ui-title: 16px; }
 body { font-size: var(--ui-body); }
-.ui-icon { width: 24px; height: 24px; display: inline-block; flex: none; vertical-align: middle; }
-/* Pigments describe the object, never its stock/selection/alert state. */
-.ui-icon[data-tone] { color: var(--icon-ink); }
-.ui-icon[data-tone="ochre"] { --icon-ink: #e7c78f; --icon-pigment: #a57943; --icon-highlight: #cda263; }
-.ui-icon[data-tone="copper"] { --icon-ink: #efb595; --icon-pigment: #a6593e; --icon-highlight: #cf8052; }
-.ui-icon[data-tone="moss"] { --icon-ink: #c2d89a; --icon-pigment: #65804b; --icon-highlight: #96ad6b; }
-.ui-icon[data-tone="slate"] { --icon-ink: #b8d0d4; --icon-pigment: #587c87; --icon-highlight: #86a5ad; }
-.ui-icon[data-tone="berry"] { --icon-ink: #efb7ac; --icon-pigment: #a24e48; --icon-highlight: #c97865; }
-.ui-icon[data-tone="plum"] { --icon-ink: #d5bde0; --icon-pigment: #806389; --icon-highlight: #ad8db5; }
-.ui-icon .icon-pigment { fill: var(--icon-pigment); }
-.ui-icon .icon-highlight { fill: var(--icon-highlight); }
-/* System high-contrast colors retain all original outlines and labels. */
-@media (forced-colors: active) {
-  .ui-icon[data-tone] { color: inherit; }
-  .ui-icon .icon-pigment, .ui-icon .icon-highlight { fill: none; }
-}
+.ui-icon { width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; flex: none; vertical-align: middle; }
+.ui-icon > img { width: 100%; height: 100%; object-fit: contain; }
+.ui-icon > .icon-fallback { font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif; font-size: 20px; line-height: 1; }
+/* Restore the registry fallback on image failure, without duplicate silhouettes. */
+.ui-icon > img + .icon-fallback { display: none; }
+.res-icon .icon-fallback, #sys .icon-fallback { font-size: 16px; }
+.res-cost .icon-fallback, #speed .icon-fallback, #pop .icon-fallback { font-size: 12px; }
 .res-icon .ui-icon { width: 100%; height: 100%; }
 #hud button, #hud input, #hud select, #hud textarea { font-family: inherit; }
 #hud button:focus-visible, #hud input:focus-visible, #hud select:focus-visible,

@@ -15,7 +15,7 @@ const snapshot=()=>JSON.stringify(G.serializeGame());
 const before=snapshot();
 const markup=ui.toolButton('house');
 assert.match(markup,/木材 16/);assert.match(markup,/石头 8/);assert.match(markup,/class="ui-icon"/);
-assert(!markup.includes('<img'));assert(!markup.includes('disabled'));
+assert(markup.includes('assets/icons/tool_house.png')); assert(!markup.includes('disabled'));
 assert.equal(snapshot(),before);
 G.game.res.wood=0;G.game.res.stone=0;
 assert.match(ui.toolMaterialShortage('house'),/木材缺16、石头缺8/);
@@ -38,8 +38,8 @@ G.tryPlace(position.x,position.y);assert.equal(G.world.buildings.length,building
 // Distributed/held stock is not added to public affordability.
 G.game.res.wood=0;G.supplyInventory=()=>({available:{wood:999,stone:999}});
 assert.match(ui.toolMaterialShortage('house'),/木材缺16/);
-for(const key of G.RES_KEYS){const icon=ui.resourceIcon(key);assert.match(icon,/aria-label=/);assert.match(icon,/stroke="currentColor"/);assert(!icon.includes('<img'));}
+for(const key of G.RES_KEYS){const icon=ui.resourceIcon(key);assert.match(icon,/aria-label=/);assert(icon.includes(`assets/icons/${G.RES[key].iconAsset}.png`));}
 for(const type of ['farm','pasture','orchard','cemetery','road','stoneroad','bridge','tunnel'])assert.equal(ui.toolMaterialShortage(type),'');
 const css=fs.readFileSync(path.join(__dirname,'../styles/readability.css'),'utf8');
 assert.match(css,/--ui-body: 12px/);assert.match(css,/--ui-secondary: 11px/);assert.match(css,/focus-visible/);
-console.log('Build affordability, mono resource icons and typography: 15 contract groups passed.');
+console.log('Build affordability, original resource icons and typography: 15 contract groups passed.');
