@@ -11,6 +11,8 @@
 <link rel="stylesheet" href="styles/details.css">
 <link rel="stylesheet" href="styles/readability.css">
 <link rel="stylesheet" href="styles/navigation.css">
+<link rel="stylesheet" href="styles/warm-skin.css">
+<link rel="stylesheet" href="styles/onboarding.css">
 </head>
 <body>
   <div id="meal-transition-notice" role="status" hidden></div>
@@ -38,6 +40,12 @@
   <section id="survival-guide" aria-label="生存清单">
     <div class="guide-heading"><h2>生存清单</h2><span id="guide-count" hidden></span><button type="button" id="guide-toggle" aria-expanded="false" aria-controls="guide-list">全部</button></div>
     <ul id="guide-list"></ul>
+    <section id="dynamic-coach" hidden aria-label="动态引导">
+      <span id="coach-stage"></span>
+      <p id="coach-text" role="status" aria-live="polite"></p>
+      <details id="coach-explanation"><summary>为什么？</summary><p id="coach-detail"></p></details>
+      <div class="coach-actions"><button type="button" id="coach-action">查看</button><button type="button" id="coach-skip">跳过引导</button></div>
+    </section>
   </section>
   <div id="placement-panel">
     <div id="harvest-range-controls" class="hidden" role="group" aria-label="采集范围预览">
@@ -88,6 +96,9 @@
     <div class="dialog">
       <h2>归园 · 放逐小镇 <small>Banished 复刻原型</small></h2>
       <p>一群被放逐者来到荒野，你要帮他们在第一场寒冬来临前活下来，并把小镇延续下去。</p>
+      <button type="button" id="coach-replay">跟着做 · 动态短引导</button>
+      <p>一次只提示一个动作，随时可跳过。</p>
+      <details class="help-reference"><summary>操作与生存手册（按需查看）</summary>
       <h3>首冬路线 · 阅读时已暂停</h3>
       <p>先在近仓森林建立持续食物收入，再备柴、逐步安家。五间木屋会花光开局的 80 木，别把采集屋材料全用掉。资源栏下方的清单会持续提示下一步。</p>
       <h3>操作</h3>
@@ -118,7 +129,8 @@
         <li>👶 有房有粮的夫妇约 2~3 年生一胎（每家至多 8 人）；孩子满 10 岁开始工作（或入学）；成年后与非近亲伴侣成家，需要空屋才能迁出</li>
         <li>⚠️ 中难度开局：5 个家庭无家可归，只有一辆储物车（木80 石48 食500 柴50）。未开工取消全退已付建材；开工后拆除退一半。占地树木由工人清场搬运，取消保留未砍树</li>
       </ul>
-      <button id="help-close">开始游戏</button>
+      </details>
+      <button id="help-close">返回小镇</button>
     </div>
   </div>
 
@@ -308,6 +320,7 @@ window.addEventListener('unhandledrejection', e => window.__errs.push('promise: 
 <script src="js/sprites.js"></script>
 <script src="js/render.js"></script>
 <script src="js/ui.js"></script>
+<script src="js/onboarding.js"></script>
 <script src="js/feedback.js"></script>
 <script src="js/main.js"></script>
 <script src="js/navigation.js"></script>

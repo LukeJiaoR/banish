@@ -1,0 +1,163 @@
+/* Warm village skin. Presentation only: the navigation/state/focus model stays intact.
+   Solid painted surfaces, parchment cards and soft bevels replace transparent outlines.
+   No world-art filters, external fonts, textures or layout-changing press animations. */
+#hud {
+  --ui-body:13px; --ui-secondary:12px; --ui-title:17px;
+  --surface:#352b23; --edge:#796346; --accent:#e4b966;
+  --paint:linear-gradient(160deg,#514235,#362c24 75%);
+  --paper:linear-gradient(155deg,#fff3d8,#ead5ab);
+  --raised:inset 0 1px 0 #fff5d62e,0 3px 0 #211b16,0 7px 16px #17120c30;
+  --panel-shadow:inset 0 1px 0 #f9dfad35,0 12px 30px #20170e52;
+  color:#f2e5ce;
+}
+#hud button { transition:background-color .12s,box-shadow .12s,border-color .12s; }
+/* Press feedback never moves a target out from under a finger. */
+#hud button:active { transform:none; box-shadow:inset 0 3px 7px #1e170c55; }
+#hud button:focus-visible,#hud input:focus-visible,#hud select:focus-visible,
+#hud textarea:focus-visible,#hud summary:focus-visible { outline:3px solid #ffda7c; outline-offset:3px; }
+#topbar {
+  background:linear-gradient(180deg,#514232,#352c24);
+  border-bottom:3px solid #a28350; box-shadow:0 4px 16px #20170e55;
+  padding:10px 16px; gap:8px 12px;
+}
+#core-resources { gap:7px; }
+#core-resources .res {
+  background:linear-gradient(180deg,#2f2821,#403529); border:1px solid #796345;
+  border-radius:11px; min-height:38px; padding:6px 9px;
+  box-shadow:inset 0 2px 4px #1b160d48,0 1px 0 #ffebc215;
+}
+#core-resources .res.resource-warning { background:#574024; border-color:#d8aa58; }
+#core-resources .res.resource-urgent { background:#66362b; border-color:#e9987c; }
+#res-row .res-label { color:#e3d1ae; font-size:12px; }
+#res-row .res b { color:#fff4dc; font-size:15px; }
+#res-row .res-icon { width:24px; height:24px; flex-basis:24px; }
+#secondary-resources { background:#30271f; border-color:#8c714b; padding:12px; gap:8px; border-radius:12px; }
+#secondary-resources .res { padding:7px; background:#44372b; border-radius:8px; }
+#date { color:#f0cd88; }
+#pop small { color:#d5c3a4; }
+#quick-pause,#resource-more,#close-town,#info #info-close {
+  background:linear-gradient(#786046,#58432e); border:1px solid #ae8b57;
+  color:#fff0d1; box-shadow:var(--raised); font-size:12px;
+}
+#quick-pause:hover,#resource-more:hover,#close-town:hover,#info #info-close:hover { background:#856a47; }
+#survival-guide { background:var(--paint); border:1px solid #9b8056; box-shadow:var(--panel-shadow); padding:9px 12px; border-radius:16px; }
+#survival-guide h2 { color:#e8ce99; font-size:13px; letter-spacing:.05em; }
+#guide-toggle { color:#f4dfb4; font-size:12px; border-radius:9px; }
+#guide-toggle:hover { background:#67513a; }
+#survival-guide #guide-list li { border-radius:8px; padding:7px 9px; background:#2c261f; color:#e2d5c0; }
+#survival-guide #guide-list li[data-level="recommend"] { background:#5a452b; color:#ffe0a0; }
+#survival-guide #guide-list li[data-level="urgent"] { background:#62362e; color:#ffd8c9; }
+#guide-list li[data-level="urgent"] .guide-level { color:#ffc5b2; }
+#guide-list li[data-level="recommend"] .guide-level { color:#ffcf81; }
+#town-dock button { background:var(--paint); border:1px solid #b2915e; box-shadow:var(--raised); color:#f9e7c4; border-radius:18px; }
+#town-dock #open-build {
+  background:linear-gradient(175deg,#ffe1a0,#dcaa53 65%,#c58c36);
+  border:1px solid #ffe9b7; border-bottom:4px solid #8e5b26;
+  color:#49301b; text-shadow:0 1px #fff1c7; box-shadow:inset 0 2px 0 #fff4cf,0 7px 18px #24160955;
+  font-size:20px; letter-spacing:.06em;
+}
+#town-dock #open-build:hover { background:linear-gradient(#ffedbd,#e9bc66); }
+#toolbar,#town-controls,#info.detail-inspector { background:var(--paint); border-color:#a08253; box-shadow:var(--panel-shadow); border-radius:20px; }
+#toolbar { padding:16px; gap:12px; }
+#toolbar .toolbar-heading { gap:9px; }
+#toolbar-path { font-size:15px; color:#ffe4af; letter-spacing:.03em; }
+#toolbar-state { color:#e0ceb0; font-size:12px; line-height:1.6; }
+#toolbar .toolbar-nav { background:linear-gradient(#786044,#56402d); border-color:#ac8a58; box-shadow:var(--raised); color:#ffedca; padding:7px 12px; }
+#toolbar .toolbar-items { gap:10px; padding:4px 3px 8px; scrollbar-color:#c69e60 #32271c; }
+#toolbar .tb {
+  background:var(--paper); border:1px solid #fff0c8; border-bottom:4px solid #a48756;
+  color:#503a24; border-radius:15px; box-shadow:inset 0 2px 0 #fff9e8,0 4px 8px #1e160c40;
+  gap:6px; padding:10px; min-height:112px;
+}
+#toolbar .tb-category { height:112px; min-height:112px; max-height:none; }
+#toolbar .tb .lb { color:#503a24; font-size:14px; font-weight:700; line-height:1.4; }
+#toolbar .tb .ic,#toolbar .tb-category .ic {
+  width:46px; height:46px; min-width:46px; flex:0 0 46px; line-height:46px;
+  background:radial-gradient(ellipse at 45% 35%,#fffaf0,#dfc797);
+  border-radius:50%; box-shadow:inset 0 1px 3px #94734126,0 1px 0 #fff8e5;
+}
+#toolbar .tb .ic .ui-icon,#toolbar .tb-category .ic .ui-icon { width:36px; height:36px; }
+#toolbar .tb .ic .icon-fallback { font-size:30px; }
+#toolbar .tb .cost { color:#715336; font-size:12px; line-height:1.5; }
+#toolbar .tb .res-cost { font-size:12px; }
+#toolbar .tb .res-cost .res-icon { width:17px; height:17px; }
+#toolbar .tb:hover { background:linear-gradient(#fff9e8,#f4deb0); border-color:#ffedb1; border-bottom-color:#a48756; }
+#toolbar .tb.active { background:linear-gradient(#f4d591,#dcae58); border-color:#ffe6a0; border-bottom-color:#865a2d; box-shadow:inset 0 0 0 2px #b27b30,0 4px 8px #1e160c40; }
+#toolbar .tb.is-short { border-color:#c39d63; }
+#toolbar .material-badge { background:#80502e; color:#fff1d6; border-radius:7px; padding:3px 7px; font-size:12px; }
+#town-controls h2 { color:#ffe2a8; }
+#town-controls #sys button,#town-controls #speed button { background:linear-gradient(#6e5941,#51412f); border:1px solid #a38658; color:#ffebc7; box-shadow:var(--raised); }
+#town-controls #speed button.active { background:linear-gradient(#edca81,#c6994b); color:#3d2a17; }
+#placement-info,#harvest-cancel,#harvest-range-controls,#farm-plan-controls,#cemetery-plan-controls,#road-controls {
+  background:var(--paint); border-color:#af905f; border-radius:14px; padding:12px 14px; box-shadow:var(--panel-shadow); color:#f5e5c9; line-height:1.65;
+}
+#placement-info[data-state="blocked"] { background:#51342b; border-left-color:#edab89; }
+#placement-info[data-state="warning"] { background:#514027; }
+#info.detail-inspector > .info-head { padding:15px 16px 12px; background:linear-gradient(#645039,#49392a); border-color:#94754b; }
+#info .detail-title { color:#ffe5b4; font-size:18px; }
+#info .detail-title > .ui-icon { width:34px; height:34px; }
+#info.detail-inspector > .building-detail-tabs { background:#30271e; padding:9px; gap:6px; border-color:#7b6242; }
+#info .building-detail-tabs button { background:#514332; color:#e9d6b3; border-color:#806846; font-size:13px; }
+#info .building-detail-tabs button[aria-pressed="true"] { background:linear-gradient(#f3d291,#d8ad61); color:#49301a; border-color:#ffe0a1; box-shadow:inset 0 1px 0 #fff0cb,0 2px 0 #95703c; }
+#info .detail-scroll { padding:14px 16px 16px; }
+#info .building-facts,#info .citizen-survival dl { gap:9px; }
+#info .building-facts > div,#info .survival-fact { background:linear-gradient(145deg,#594735,#443729); border:1px solid #806849; border-radius:11px; padding:10px 12px; box-shadow:inset 0 1px 0 #ffe7ba16; }
+#info .building-facts dt,#info .survival-fact dt { color:#dcc9a7; }
+#info .building-facts dd,#info .survival-fact dd { color:#fff0d2; font-size:15px; margin-top:5px; }
+#info .building-status { background:#5b482d; border-radius:9px; padding:10px 12px; }
+#info .detail-chip { background:#605137; color:#f5e4c0; border:0; border-radius:7px; padding:3px 8px; }
+#info .detail-chip.is-warning,#info .survival-fact.is-warning { background:#704830; color:#ffe0ad; }
+#info .detail-actions { background:#30261d; border-color:#816642; padding:10px 16px 14px; }
+#info .building-quick-actions button { min-height:44px; background:linear-gradient(#756046,#55422f); border-color:#ad8e5b; border-radius:10px; box-shadow:var(--raised); }
+#hud .overlay { background:#19150fc4; }
+#hud .dialog { background:var(--paint); border:1px solid #ab8956; border-radius:20px; box-shadow:inset 0 1px 0 #ffe5b54d,0 24px 64px #120d0870; }
+#hud .dialog button { border-radius:10px; box-shadow:var(--raised); }
+#hud .dialog input,#hud .dialog select,#info input,#info select { background:#2c241c; color:#fae9ca; border-color:#a2865e; border-radius:8px; min-height:40px; padding:8px; }
+#hud .start-settings-header,#hud .production-goals-header { background:linear-gradient(#645039,#49392a); border-color:#94754b; }
+#hud .start-settings-footer { background:#30261d; border-color:#94754b; }
+#new-game-settings .start-primary-action,#production-goals #production-goals-apply { background:linear-gradient(#f3d291,#d8ad61); color:#49301a; border-color:#ffe0a1; }
+#hud .toast { background:#443628; border:1px solid #b8955e; border-radius:12px; box-shadow:var(--panel-shadow); }
+@media(max-width:760px) {
+  #topbar { padding:7px 9px; gap:5px 7px; }
+  #core-resources { gap:4px; }
+  #core-resources .res { padding:4px; gap:3px; min-height:30px; border-radius:8px; }
+  #core-resources .res-label { font-size:11px; }
+  #core-resources .res b { font-size:13px; }
+  #core-resources .res-icon { width:18px; height:18px; flex-basis:18px; }
+  #date,#pop,#pop small,#pop .town-health { font-size:11px; }
+  #survival-guide { padding:5px 10px 8px; }
+  #survival-guide h2 { font-size:12px; }
+  #survival-guide #guide-list li { font-size:12px; padding:5px 7px; }
+  #toolbar { padding:12px; gap:9px; }
+  #toolbar-path { font-size:14px; }
+  #toolbar .toolbar-nav { padding:6px 9px; }
+  #toolbar .toolbar-items { gap:8px; }
+  #toolbar #toolbar-categories { display:flex; overflow-x:auto; overflow-y:hidden; }
+  #toolbar #toolbar-categories .tb-category { --category-card-width:102px; flex:0 0 102px; width:102px; min-width:102px; max-width:102px; }
+  #toolbar .tb-category { height:104px; min-height:104px; padding:8px 5px; }
+  #toolbar .tb .lb { font-size:13px; }
+  #toolbar .tb-category .ic { width:42px; height:42px; min-width:42px; flex-basis:42px; }
+  #toolbar .tb-category .ic .ui-icon { width:33px; height:33px; }
+  #info .detail-scroll { padding:12px; }
+  #info.detail-inspector > .info-head { padding:12px; }
+}
+@media(max-height:600px) {
+  #toolbar { padding:8px 12px; gap:6px; }
+  #toolbar .tb-category { height:76px; min-height:76px; gap:4px; }
+  #toolbar .tb-category .ic { width:30px; height:30px; min-width:30px; flex-basis:30px; }
+  #toolbar .tb-category .ic .ui-icon { width:26px; height:26px; }
+  #toolbar .tb:not(.tb-category) { min-height:76px; }
+}
+@media(prefers-reduced-motion:reduce) { #hud button { transition:none; } }
+
+/* Keep contrast for availability status and override every raised/selected button. */
+#toolbar .tb.is-short .cost { color:#715336; }
+#toolbar .tb .res-cost.is-short,#toolbar .tb .res-cost.neg,
+#toolbar .tb .res-cost [data-shortage="true"] { color:#9b3327; font-weight:700; }
+#toolbar .tb.is-short .material-badge { background:#8b3e2c; color:#fff3df; }
+#hud #toolbar .tb:active,#hud #toolbar .toolbar-nav:active,
+#hud #town-dock button:active,#hud #town-controls button:active,
+#hud #info button:active,#hud .dialog button:active,
+#hud #quick-pause:active,#hud #resource-more:active {
+  transform:none; box-shadow:inset 0 3px 8px #38210f66,inset 0 0 0 2px #b58c50;
+}

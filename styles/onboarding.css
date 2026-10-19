@@ -1,0 +1,17 @@
+/* Small, non-modal coach; no screen mask or moving target. */
+#dynamic-coach[hidden] { display:none; }
+#dynamic-coach { margin-top:8px; padding:12px; border-radius:10px; background:var(--paper,#f1dfbb); color:#493721; border:1px solid #c8aa73; }
+#coach-stage { color:#785a32; font-size:11px; }
+#coach-text { margin:5px 0; font-size:15px; font-weight:700; line-height:1.5; }
+#coach-explanation { font-size:12px; line-height:1.5; }
+#coach-explanation summary { cursor:pointer; padding:6px 0; }
+#coach-detail { margin:0 0 6px; }
+.coach-actions { display:flex; gap:8px; margin-top:5px; }
+#dynamic-coach button,#coach-replay { min-height:44px; padding:8px 12px; border:1px solid #b49560; border-radius:8px; color:#493721; background:#f6e7c7; cursor:pointer; }
+#dynamic-coach #coach-action:disabled { display:none; }
+#dynamic-coach #coach-skip { margin-left:auto; background:transparent; font-size:12px; }
+#hud .coach-target { outline:3px solid var(--accent,#e4b966); outline-offset:3px; box-shadow:0 0 0 6px #e4b96633; }
+.help-reference { margin:15px 0; }
+.help-reference > summary { cursor:pointer; min-height:44px; padding:10px 0; }
+@media(max-width:760px) { #dynamic-coach { padding:8px 10px; } #coach-text { font-size:13px; } }
+#survival-guide.coach-running:not(.guide-expanded) #guide-list li:not([data-level="urgent"]) { display:none; }

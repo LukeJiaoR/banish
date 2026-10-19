@@ -1003,6 +1003,7 @@ G.ui = {
   },
 
   initGuideHUD: function () {
+    G.onboarding?.init();
     const button = this.el.guide?.querySelector?.('#guide-toggle');
     if (!button || button._guideBound) return;
     button._guideBound = true;
@@ -1147,6 +1148,7 @@ G.ui = {
   },
 
   refreshGuide: function () {
+    G.onboarding?.refresh();
     const el = this.el.guide;
     if (!el || !G.world) return;
     const g = G.game, w = G.world, physical = G.supplyEnabled && G.supplyEnabled(), supplies = physical ? G.supplyInventory().available : g.res;

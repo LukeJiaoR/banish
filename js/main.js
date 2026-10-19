@@ -128,10 +128,8 @@ G.newGame = function (seed, options) {
   G.cam.x=window.innerWidth/2-sx*G.cam.z;G.cam.y=window.innerHeight/2-sy*G.cam.z;
   G.needGround=true;G.groundDirty.clear();
   G.ui.toast('归园 · '+quote.presetSummary.name,'good');
-  G.ui.toast(quote.config.preset==='hard'?'无种子困难开局：先采集食物、采伐建材，再补住房与柴火；农田须买到种子才能播种':'先保食物：把采集小屋建在成熟森林旁，再补住房与柴火；别一口气盖满五间木屋耗光材料','warn');
-  G.ui.toast('岩石给石头、锈色铁矿给铁 · 入冬前备好柴火（木屋每年约 30，石屋省一半）','info');
+  G.onboarding?.newTown(options);
   G.ui.refreshHUD();
-  if(!G._hasShownHelp&&G.ui.toggleHelp){G._hasShownHelp=true;G.ui.toggleHelp(true);}
   return {ok:true,config:{...candidate.config}};
 };
 
