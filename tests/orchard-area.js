@@ -51,13 +51,13 @@ test('bounds, wrong types and invalid placement preserve the world and material 
   for(const kind of ['water','rock','bgrid']){const i=24*w.N+24,before=w[kind][i];w[kind][i]=kind==='bgrid'?9:1;assert(!G.canPlace(w,'orchard',10,10,[15,15]).ok);w[kind][i]=before;}
   assert(G.canPlace(w,'orchard',10,10,[15,15]).ok);
 });
-test('preview is read-only, stale costs and tree clearing require re-review, confirm builds once',()=>{
-  const G=fresh(),w=G.world;G.setTool('orchard');const before=JSON.stringify(saved(G));G.selectOrchardCorner(24,13);G.selectOrchardCorner(10,10);
-  const first=G.orchardPlanStatus();assert(first.ok);assert.equal(first.count,16);assert.equal(first.workers,1);assert.equal(first.cost.wood,19);assert.equal(first.work,60);assert.equal(JSON.stringify(saved(G)),before);
-  G.game.res.wood--;assert(!G.confirmOrchardPlan(first).ok);const next=G.orchardPlanStatus();
-  const tree={x:24,y:13,i:13*w.N+24,b:-48};w.trees.push(tree);w.treeIdx[tree.i]=0;assert(!G.confirmOrchardPlan(next).ok);
-  const final=G.orchardPlanStatus();assert.equal(final.trees,1);const result=G.confirmOrchardPlan(final);assert(result.ok);assert.equal(result.b.orchardTrees.length,16);assert.deepEqual(clone(result.b.orchardSize),[15,4]);
-  const count=w.buildings.length,wood=G.game.res.wood;assert(!G.confirmOrchardPlan(final).ok);assert.equal(w.buildings.length,count);assert.equal(G.game.res.wood,wood);assert.equal(G.orchardPlan,null);
+test('new orchard placement is fixed while retired corner confirmation cannot build',()=>{
+  const G=fresh(),w=G.world;G.setTool('orchard');const before=JSON.stringify(saved(G));
+  G.selectOrchardCorner(24,13);G.selectOrchardCorner(10,10);
+  assert.equal(G.orchardPlan,null);assert.equal(JSON.stringify(saved(G)),before);
+  assert(!G.confirmOrchardPlan().ok);const count=w.buildings.length;G.tryPlace(12,12);
+  assert.equal(w.buildings.length,count+1);const b=w.buildings.at(-1);
+  assert.equal(b.w,6);assert.equal(b.h,6);assert.equal(b.orchardSize,undefined);assert.equal(G.orchardTreeCount(b),9);
 });
 test('two and three farmers physically clear, construct, plant, care four years, then harvest and haul exactly once',()=>{
   for(const [size,n] of [[[9,9],2],[[15,15],3]]){

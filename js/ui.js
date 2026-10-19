@@ -367,8 +367,8 @@ G.ui = {
     };
     const def = G.BDEF[t], action = special[t];
     const name = action ? action.name : def.name, icon = action ? action.icon : def.icon;
-    const cost = action ? action.cost : t === 'road' ? '免材料 · 每格1工时' : t === 'stoneroad' ? '每格1石 · 1工时' : t === 'tunnel' ? '每格4石 · 3工时' : t === 'pasture' ? '7–20格 · 按面积圈地' : t === 'orchard' ? '4–15格 · 按树列开园' : t === 'cemetery' ? '7–20格 · 按墓位规划' : this.resourceCost(def.cost, true);
-    const tip = action ? action.tip : t === 'tunnel' ? '隧道：选两个已清场陆地洞口，沿一个网格轴穿过连续山体；每格4石、3游戏施工小时（含两端）。只在首选洞口实运材料并施工，完工后按土路速度通行' : t === 'cemetery' ? '墓园：每边7–20格，选两个角或拖出矩形；预览实际墓位、石材和工时，确认后实运施工。拆围栏不清除墓碑' : t === 'pasture' ? '牧场：每边7–20格，选两个角或拖出矩形；预览羊、牛、鸡容量和建材用工，确认后清场施工' : t === 'orchard' ? '果园：每边4–15格，选两个角或拖矩形；按东西2格/南北3格树距预览株数、成本与农夫用工，确认后清场施工' : ['road', 'stoneroad'].includes(t) ? `${t === 'stoneroad' ? '石路每个新铺/升级格需1石' : '土路无需材料'}：点选或拖出起终点预览连通路线，清树后再确认施工；每格1基础游戏施工小时为本作适配。确认排队，逐格实运施工后才提速；原道路仍可走` :
+    const cost = action ? action.cost : t === 'road' ? '免材料 · 每格1工时' : t === 'stoneroad' ? '每格1石 · 1工时' : t === 'tunnel' ? '每格4石 · 3工时' : t === 'pasture' ? '6×6 · 30木 · 1名牧人' : t === 'orchard' ? '6×6 · 12木 · 9株' : t === 'cemetery' ? '7–20格 · 按墓位规划' : this.resourceCost(def.cost, true);
+    const tip = action ? action.tip : t === 'tunnel' ? '隧道：选两个已清场陆地洞口，沿一个网格轴穿过连续山体；每格4石、3游戏施工小时（含两端）。只在首选洞口实运材料并施工，完工后按土路速度通行' : t === 'cemetery' ? '墓园：每边7–20格，选两个角或拖出矩形；预览实际墓位、石材和工时，确认后实运施工。拆围栏不清除墓碑' : t === 'pasture' ? '牧场：点击地图放置固定6×6；羊12头、牛10头或鸡24只，1名牧人，30木、50工时' : t === 'orchard' ? '果园：点击地图放置固定6×6；9株、2名农夫，12木、36工时' : ['road', 'stoneroad'].includes(t) ? `${t === 'stoneroad' ? '石路每个新铺/升级格需1石' : '土路无需材料'}：点选或拖出起终点预览连通路线，清树后再确认施工；每格1基础游戏施工小时为本作适配。确认排队，逐格实运施工后才提速；原道路仍可走` :
       `${def.name}（${this.resourceCost(def.cost, false)}${def.jobs ? ' · 岗位×' + def.jobs : ''}）— ${def.desc}`;
     const shortage = this.toolMaterialShortage(t);
     return `<button type="button" class="tb${shortage ? ' is-short' : ''}" data-tool="${t}" title="${this.escHtml(tip)}" aria-pressed="false"><span class="ic" aria-hidden="true">${this.icon(t)}</span><span class="lb">${name}</span><span class="cost">${cost}</span><span class="material-badge${shortage ? '' : ' hidden'}" data-material-shortage="${t}">${shortage ? '缺料 · 可选址' : ''}</span></button>`;
@@ -430,7 +430,7 @@ G.ui = {
     if (status) {
       const t = G.tool && (G.tool.kind === 'build' ? G.tool.type : G.tool.kind==='road' ? (G.tool.surface==='tunnel'?'tunnel':G.tool.surface==='bridge'?'bridge':G.tool.surface==='stone'?'stoneroad':'road') : G.tool.kind);
       const names = { fell: '砍伐', quarry: '采石采铁', demolish: '拆除', road: '铺路' };
-      status.textContent = t ? `当前：${names[t] || G.BDEF[t].name} · ${t === 'demolish' ? '点击建筑或道路拆除；已开采的有限矿点须确认永久废坑' : ['fell', 'quarry'].includes(t) ? '框选范围后确认标记' : ['road','stoneroad','bridge','tunnel'].includes(t) ? '选起终点后预览并确认' : t==='farm'?'选两个角或拖出矩形，再确认开田' : t==='pasture'?'选两个角或拖出矩形，再确认圈地' : t==='orchard'?'选两个角或拖出矩形，再确认开园' : t==='cemetery'?'选两个角或拖出矩形，再确认建园' : '点击地图放置，可连续建造'} · Esc / 右键取消${this.mineralBuildRisk(t) ? '\n' + this.mineralBuildRisk(t) : ''}` :
+      status.textContent = t ? `当前：${names[t] || G.BDEF[t].name} · ${t === 'demolish' ? '点击建筑或道路拆除；已开采的有限矿点须确认永久废坑' : ['fell', 'quarry'].includes(t) ? '框选范围后确认标记' : ['road','stoneroad','bridge','tunnel'].includes(t) ? '选起终点后预览并确认' : t==='farm'?'选两个角或拖出矩形，再确认开田' : t==='pasture'||t==='orchard'?'点击地图放置固定6×6，可连续建造' : t==='cemetery'?'选两个角或拖出矩形，再确认建园' : '点击地图放置，可连续建造'} · Esc / 右键取消${this.mineralBuildRisk(t) ? '\n' + this.mineralBuildRisk(t) : ''}` :
         group ? '未选择工具。点击一项开始；返回分类可切换功能。' : '选择分类，再选择建筑或操作。';
     }
   },
@@ -4179,7 +4179,7 @@ G.ui = {
       <details class="building-task"><summary>放入已购牲畜</summary><form id="pasture-stock-form" class="economy-form"><h3>放入已购同种牲畜</h3><p data-economy-live="sheep-bank"></p>
         <label for="pasture-stock-quantity">放入数量</label><input id="pasture-stock-quantity" type="number" min="1" max="${G.pastureCapacity(b, G.pastureTypeOf(b))}" step="1" value="2" inputmode="numeric"><button type="submit" id="pasture-stock">放入牧场</button></form></details>
       <details class="building-task"><summary>繁殖与保留数量</summary><form id="pasture-target-form" class="economy-form"><h3>繁殖与保留数量</h3><label for="pasture-target-quantity" data-economy-live="pasture-target-range"></label><input id="pasture-target-quantity" type="number" min="2" max="${G.pastureCapacity(b, G.pastureTypeOf(b))}" step="1" value="${Number(b.animalTarget) || 8}" inputmode="numeric"><button type="submit">应用保留数量</button>
-        <p class="desc" data-economy-live="pasture-rule"></p><p class="desc">至少2只/头同种牲畜且牧人实际照料才繁殖。保留数只控制超额屠宰。新圈牧场按面积计算容量，旧6×6场保留旧版容量适配；鸡蛋独立库存，与肉类同属一个营养组。产物逐批实背送仓后才可使用，库存满则保留；牧场内待送产物未搬空不能拆场。</p></form></details>
+        <p class="desc" data-economy-live="pasture-rule"></p><p class="desc">至少2只/头同种牲畜且牧人实际照料才繁殖。保留数只控制超额屠宰。新建固定6×6牧场采用原版容量；已建面积牧场保留各自容量；鸡蛋独立库存，与肉类同属一个营养组。产物逐批实背送仓后才可使用，库存满则保留；牧场内待送产物未搬空不能拆场。</p></form></details>
       <details class="building-task"><summary>分群扩场</summary><section data-pasture-split><h3>分群扩场</h3>
         <label for="pasture-split-target">同种空牧场（确认时检查通路）</label><select id="pasture-split-target"></select>
         <p class="desc" data-pasture-split-status></p>
@@ -4684,7 +4684,7 @@ G.ui = {
       const d=G.pastureSummary(b),bank=G.game.livestock,unit=d.type==='chicken'?'只':'头';
       const dimensions = d.dimensions || [b.w, b.h], area = d.area ?? b.w * b.h;
       set('[data-economy-live="pasture-area"]', `牧场 ${dimensions[0]}×${dimensions[1]} · ${area}格 · 本场牧人上限 ${G.workerMaximumOf(b)} 人（上限不保证配足）`);
-      set('[data-economy-live="pasture-capacity-rule"]', d.capacityRule === 'area' ? `原版面积密度：牛20格/头、羊16格/头、鸡6格/只，容量向下取整。本场最多羊 ${G.pastureCapacity(b, 'sheep')} 头 / 牛 ${G.pastureCapacity(b, 'cattle')} 头 / 鸡 ${G.pastureCapacity(b, 'chicken')} 只，不能混养。` : '旧版6×6小地图容量适配：羊12头 / 牛10头 / 鸡24只，旧场默认保留8只/头；保留旧场容量、建材与用工，不按新面积规则缩减。');
+      set('[data-economy-live="pasture-capacity-rule"]', d.capacityRule === 'area' ? `原版面积密度：牛20格/头、羊16格/头、鸡6格/只，容量向下取整。本场最多羊 ${G.pastureCapacity(b, 'sheep')} 头 / 牛 ${G.pastureCapacity(b, 'cattle')} 头 / 鸡 ${G.pastureCapacity(b, 'chicken')} 只，不能混养。` : '固定6×6牧场容量：羊12头 / 牛10头 / 鸡24只，默认保留8只/头；容量、建材与用工沿用旧版。');
       set('[data-economy-live="pasture-cattle-warning"]', d.capacityRule === 'area' && d.type === 'cattle' && d.cap === 2 ? '本场最多2头牛，只适合保种或转场；保留量最低2头，无法靠繁殖产生超额屠宰的肉和皮革。' : '');
       set('[data-economy-live="animals"]', `${d.name}群 ${d.animals}/${d.cap} ${unit} · 当前保留 ${d.target} ${unit}`);
       const products=d.type==='chicken'?`场内待取鸡蛋 ${Math.floor(d.eggs||0)} / ${G.CHICKEN.eggCap} · 未成蛋进度 ${Math.floor((d.eggProgress||0)*100)}% · 已屠宰待送：肉 ${d.meat}`:d.type==='sheep'?`待剪羊毛 ${Math.floor(d.wool)}`:`已屠宰待送：肉 ${d.meat} · 皮革 ${d.leather}`;
@@ -4707,8 +4707,8 @@ G.ui = {
     } else {
       const d=G.orchardSummary(b), types=G.ORCHARD_TYPES, chosen=types[G.orchardTypeOf(b)], trees=b.orchardTrees||[];
       const layout=G.orchardLayout(b);
-      set('[data-economy-live="orchard-area"]',`果园 ${b.w}×${b.h} · ${b.w*b.h}格 · ${layout.count}树位 · 农夫上限可设0–${G.workerMaximumOf(b)}人${layout.legacy?'（旧场适配）':''}`);
-      set('[data-economy-live="orchard-area-rule"]',layout.legacy?'旧6×6果园保留原9株、3×3树位、2岗位和原12木/36工时；不会因加载新版本重新排树。':`新树距：东西${layout.columns}列，每2格一树；南北${layout.rows}行，每3格一行。成本按周长、工时按面积、岗位最多3人为本作适配；大园仍受实际劳动和秋收搬运限制。`);
+      set('[data-economy-live="orchard-area"]',`果园 ${b.w}×${b.h} · ${b.w*b.h}格 · ${layout.count}树位 · 农夫上限可设0–${G.workerMaximumOf(b)}人${layout.legacy?'（固定容量）':''}`);
+      set('[data-economy-live="orchard-area-rule"]',layout.legacy?'固定6×6果园：9株、3×3树位、2岗位和12木/36工时；已有果园不会重新排树。':`已建面积果园：东西${layout.columns}列，每2格一树；南北${layout.rows}行，每3格一行。成本按周长、工时按面积、岗位最多3人为本作适配；大园仍受实际劳动和秋收搬运限制。`);
 
       set('[data-economy-live="orchard-age"]',`种子：${Object.values(types).map(type => `${type.name}${G.game.unlocks?.[type.unlock]?'已永久解锁':'尚未购买'}`).join(' · ')} · 空位 ${d.empty} / 幼树 ${d.young} / 成树 ${d.mature}（共${G.orchardTreeCount(b)}位）`);
       const composition=Object.entries(types).map(([type,def])=>{const planted=trees.filter(t=>t.planted&&G.orchardTreeType(t)===type);return `${def.name} ${planted.length}株 · 待采${G.RES[def.output].name} ${this.supplyNumber(planted.reduce((n,t)=>n+(t.fruit||0),0))}`;}).join('；');

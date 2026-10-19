@@ -1222,8 +1222,6 @@ G.paintRockLine = function (x0, y0, x1, y1) {
 G.tryPlace = function (tx, ty) {
   const type = G.tool.type;
   if(type==='farm'){G.selectFarmCorner(tx,ty);return;}
-  if(type==='pasture'){G.selectPastureCorner(tx,ty);return;}
-  if(type==='orchard'){G.selectOrchardCorner(tx,ty);return;}
   if(type==='cemetery'){G.selectCemeteryCorner(tx,ty);return;}
   const def = G.BDEF[type];
   const ox = tx - ((def.w - 1) >> 1), oy = ty - ((def.h - 1) >> 1);
@@ -1268,7 +1266,8 @@ G.confirmFarmPlan=function(intent){
 
 /* Area pasture planning is transient. Old no-size pens keep their saved rules. */
 G.pasturePlan=null;G.pastureDrag=null;G.pastureGestureVersion=0;
-G.isPasturePlanning=()=>G.tool?.kind==='build'&&G.tool.type==='pasture';
+// New fields use the original fixed footprint; keep area data/APIs for existing saves.
+G.isPasturePlanning=()=>false;
 G.cancelPasturePlan=function(){G.pasturePlan=null;G.pastureDrag=null;G.pastureGestureVersion++;};
 G.selectPastureCorner=function(x,y){
   if(!G.world||!G.isPasturePlanning()||G.hasOpenModal())return;
@@ -1299,7 +1298,7 @@ G.confirmPasturePlan=function(intent){
 
 /* Area orchard planning is transient. Missing size remains a legacy orchard. */
 G.orchardPlan=null;G.orchardDrag=null;G.orchardGestureVersion=0;
-G.isOrchardPlanning=()=>G.tool?.kind==='build'&&G.tool.type==='orchard';
+G.isOrchardPlanning=()=>false;
 G.cancelOrchardPlan=function(){G.orchardPlan=null;G.orchardDrag=null;G.orchardGestureVersion++;};
 G.selectOrchardCorner=function(x,y){
   if(!G.world||!G.isOrchardPlanning()||G.hasOpenModal())return;
@@ -1520,9 +1519,12 @@ G.init = function () {
 
   /* ----- 输入 ----- */
   let dragging = false, dragBtn = -1, dragMoved = 0, lastX = 0, lastY = 0, pressX = 0, pressY = 0;
+  let fixedFieldTouch = null;
+  const fixedField = () => G.tool?.kind === 'build' && ['pasture', 'orchard'].includes(G.tool.type);
   let roadTouch = null, harvestTouch = null, roadMouse = null, farmTouch=null, farmMouse=null, pastureTouch=null, pastureMouse=null, orchardTouch=null, orchardMouse=null, cemeteryTouch=null, cemeteryMouse=null;
   function resetInput() {
     if (G.harvestPlan && !G.harvestPlan.frozen) G.cancelHarvestPlan();
+    fixedFieldTouch = null;
     G.keys = {};
     dragging = false; dragBtn = -1; dragMoved = 0;
     roadTouch = null; harvestTouch = null; roadMouse = null; G.roadDrag = null;farmTouch=null;farmMouse=null;G.farmDrag=null;pastureTouch=null;pastureMouse=null;G.pastureDrag=null;orchardTouch=null;orchardMouse=null;G.orchardDrag=null;cemeteryTouch=null;cemeteryMouse=null;G.cemeteryDrag=null;
@@ -1633,6 +1635,33 @@ G.init = function () {
     }
   });
 
+  // A single mobile tap stamps the same 6x6 field as a mouse click. Suppress
+  // compatibility mouse events; moving, multitouch or interrupted taps do not build.
+  G.cv.addEventListener('touchstart', e => {
+    if (!fixedField()) return;
+    e.preventDefault(); resetInput();
+    if (!G.hasOpenModal() && e.touches.length === 1) fixedFieldTouch = {
+      x:e.touches[0].clientX, y:e.touches[0].clientY, world:G.world, game:G.game,
+      tool:G.tool, pastureVersion:G.pastureGestureVersion, orchardVersion:G.orchardGestureVersion
+    };
+  }, {passive:false});
+  G.cv.addEventListener('touchmove', e => {
+    if (!fixedFieldTouch) return;
+    e.preventDefault();
+    if (e.touches.length !== 1 || Math.abs(e.touches[0].clientX-fixedFieldTouch.x)+Math.abs(e.touches[0].clientY-fixedFieldTouch.y)>10) fixedFieldTouch=null;
+  }, {passive:false});
+  G.cv.addEventListener('touchend', e => {
+    const tap=fixedFieldTouch; fixedFieldTouch=null;
+    if (!tap) return;
+    e.preventDefault();
+    if (fixedField() && tap.tool===G.tool && tap.world===G.world && tap.game===G.game &&
+        tap.pastureVersion===G.pastureGestureVersion && tap.orchardVersion===G.orchardGestureVersion &&
+        !G.hasOpenModal() && e.touches.length===0 && e.changedTouches.length===1) {
+      const p=toLocal(e.changedTouches[0]), t=G.screenToMapTile(p.x,p.y);
+      G.tryPlace(Math.floor(t.tx),Math.floor(t.ty));
+    }
+  }, {passive:false});
+
   G.cv.addEventListener('touchstart',e=>{if(!G.isFarmPlanning())return;e.preventDefault();resetInput();farmTouch=!G.hasOpenModal()&&e.touches.length===1?{x:e.touches[0].clientX,y:e.touches[0].clientY,world:G.world,generation:G.farmGestureVersion}:null;},{passive:false});
   G.cv.addEventListener('touchmove',e=>{if(!G.isFarmPlanning())return;e.preventDefault();if(!farmTouch||e.touches.length!==1||Math.abs(e.touches[0].clientX-farmTouch.x)+Math.abs(e.touches[0].clientY-farmTouch.y)>10)farmTouch=null;},{passive:false});
   G.cv.addEventListener('touchend',e=>{if(!G.isFarmPlanning()){farmTouch=null;return;}e.preventDefault();if(farmTouch&&farmTouch.world===G.world&&farmTouch.generation===G.farmGestureVersion&&e.changedTouches.length===1&&!G.hasOpenModal()){const p=toLocal(e.changedTouches[0]),t=G.screenToMapTile(p.x,p.y);G.selectFarmCorner(t.tx,t.ty);}farmTouch=null;},{passive:false});
@@ -1676,7 +1705,7 @@ G.init = function () {
     e.preventDefault();
     if (e.touches.length !== 1 || !roadTouch || Math.abs(e.touches[0].clientX - roadTouch.x) + Math.abs(e.touches[0].clientY - roadTouch.y) > 10) roadTouch = null;
   }, { passive: false });
-  G.cv.addEventListener('touchcancel', () => { roadTouch = null; harvestTouch = null; G.cancelRoadPlan(); G.cancelHarvestPlan(); G.cancelFarmPlan(); G.cancelPasturePlan();G.cancelOrchardPlan();G.cancelCemeteryPlan(); });
+  G.cv.addEventListener('touchcancel', () => { fixedFieldTouch = null; roadTouch = null; harvestTouch = null; G.cancelRoadPlan(); G.cancelHarvestPlan(); G.cancelFarmPlan(); G.cancelPasturePlan();G.cancelOrchardPlan();G.cancelCemeteryPlan(); });
   G.cv.addEventListener('touchend', e => {
     if (!G.tool || G.tool.kind !== 'road') { roadTouch = null; return; }
     e.preventDefault();
