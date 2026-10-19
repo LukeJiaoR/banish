@@ -159,7 +159,7 @@ python3 dev-server.py 8613     # 禁用缓存的开发服务器
 零依赖、无需数据库，一个 Python 标准库脚本搞定静态托管 + 反馈落盘：
 
 ```bash
-# 把 index.html / style.css / js/ / assets/ / server.py 上传到服务器任意目录
+# 把 index.html / style.css / styles/ / js/ / assets/ / server.py 上传到服务器任意目录
 python3 server.py 8613                    # 绑定 0.0.0.0，浏览器访问 http://服务器IP:8613
 nohup python3 server.py 8613 > server.log 2>&1 &   # 或用 systemd 常驻
 ```
@@ -182,7 +182,38 @@ python3 tools/fb_extract.py --id p-xxxx      # 按玩家抽快照 → feedback/r
 - 数值补丁发布时递增 `js/core.js` 的 `G.VERSION`，反馈自动归因到版本。
 - 在线查看：反馈接口仅在管理员安全配置 `FEEDBACK_TOKEN` 后开放，并要求鉴权；未配置时接口关闭，管理员可在服务器本地查看反馈文件。本文不提供令牌值或含令牌的访问链接。凭证只在运行环境安全设置，不写入文档、命令历史或仓库。
 - 防滥用：每 IP 每 10 分钟最多 6 条；单条 ≤1.5MB；月文件超 50MB 拒收；目录列表禁用。静态服务仅开放游戏首页、样式、脚本及 assets；反馈目录（包括盐值）、存档目录和服务器源码不通过静态 GET/HEAD 暴露。
-- 反代（可选）：nginx `location / { proxy_set_header Host $http_host; proxy_pass http://127.0.0.1:8613; }`。必须保留浏览器请求的 Host（包括非默认端口），否则存档接口的同源校验会拒绝写入/删除。
+- 公网试玩请按下方 HTTPS 反代配置；必须保留浏览器请求的 Host（包括非默认端口），否则存档接口的同源校验会拒绝写入/删除。
+
+### 5–10 人各自试玩的部署说明
+
+游戏模拟与渲染在每位玩家的浏览器运行；服务器提供页面、素材、匿名浏览器隔离的存档和反馈，并不运行共享村庄。支持多人同时各自玩，尚无账号登录、跨设备自动同步或同村实时联机。
+
+Python 标准库 `http.server` [不推荐直接作为生产服务器](https://docs.python.org/3/library/http.server.html)。少量朋友试玩也应通过已配置 TLS 的 nginx 等反代访问；下例仅为配置说明，不会自动部署或修改主机设置：
+
+```bash
+# 后端仅监听本机；仅信任同机 nginx 的实际连接来源
+BIND_HOST=127.0.0.1 TRUSTED_PROXY_IPS=127.0.0.1 COOKIE_SECURE=1 python3 server.py 8613
+```
+
+在已有 HTTPS server 块中使用：
+
+```nginx
+location / {
+    client_max_body_size 8m;
+    proxy_set_header Host $http_host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For "";
+    proxy_pass http://127.0.0.1:8613;
+}
+```
+
+- `TRUSTED_PROXY_IPS` 默认空，所有转发头均不受信任；可配置逗号分隔的**精确 IP**，不接受主机名或 CIDR。仅当 TCP 对端匹配时才使用一个合法的 `X-Real-IP`，缺失、重复或非法值均回退到 TCP 对端。始终忽略 `X-Forwarded-For`。
+- nginx 必须用 `$remote_addr` **覆盖** `X-Real-IP`，不能原样转发客户端提交的值。不要把任意用户地址列为可信代理；若使用其他拓扑或上游 CDN，应单独核实可信边界，不能照抄成信任整个网络。
+- 保留原限流：存档每真实来源 IP 每 10 分钟最多 90 次，反馈最多 6 次。不同代理后玩家不再被误算为同一个 nginx IP；共用一个公网出口的玩家仍共用该 IP 的配额。90 秒定时自动档每位玩家约 7 次/10 分钟，季节切换和离开页面会额外保存。
+- 试玩配置估算：5 人可从 1 vCPU / 1 GB 起步；10 人更建议 2 vCPU / 2 GB、20 GB SSD 留出系统及备份空间。当前静态资源约 13.5 MB，首次集中打开或刷新时主要看出口带宽，建议 20–50 Mbps。当前 `no-store` 会让刷新重新下载；这只是资源和请求模型估算，**没有压测得出的承载保证**。
+- 单次存档请求上限 8,000,000 字节；自动档同名覆盖，命名存档与备份会累计。`SAVES_DIR`、`FEEDBACK_DIR` 推荐置于站点根目录外并定期备份。不要静态公开整个仓库、存档或反馈目录。
+
+本机轻量验证：`python3 tests/server_deployment.py` 覆盖 CSS GET/HEAD、可信/伪造代理头、实际限流，以及 10 个独立浏览器会话并行写入同名存档。使用合成数据，不代表真实玩家压力测试。
 
 注意：file:// 或接口不可用时，前端自动降级为「复制反馈内容手动发给开发者」，不会丢反馈。
 
@@ -348,9 +379,10 @@ assets/         切出的精灵单件 PNG（地表纹理 / 树木岩石 / 建筑
 ## 本地回归检查
 
 ```bash
-python3 -m py_compile server.py tests/server_smoke.py tests/server_security.py
+python3 -m py_compile server.py tests/server_smoke.py tests/server_security.py tests/server_deployment.py
 python3 tests/server_smoke.py
 python3 tests/server_security.py
+python3 tests/server_deployment.py
 node tests/smoke.js
 node tests/bench.js
 node tests/opening.js

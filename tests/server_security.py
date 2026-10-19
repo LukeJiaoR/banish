@@ -31,7 +31,7 @@ class Page(HTMLParser):
 with tempfile.TemporaryDirectory(prefix='banish-security-') as tmp:
     root = Path(tmp)
     for f in ('index.html', 'style.css'): shutil.copyfile(ROOT / f, root / f)
-    for d in ('js', 'assets'): shutil.copytree(ROOT / d, root / d)
+    for d in ('js', 'assets', 'styles'): shutil.copytree(ROOT / d, root / d)
     fb, saves = root / 'feedback', root / 'saves'
     fb.mkdir(); saves.mkdir()
     legacy = b'{"synthetic":"legacy-keep"}'
@@ -98,7 +98,7 @@ with tempfile.TemporaryDirectory(prefix='banish-security-') as tmp:
         for path in private:
             for method in ('GET','HEAD'): assert anon.req(path, method)[0] == 404, (path,method)
         # Implicit indexes must receive the same checks as direct file paths.
-        for directory in ('js', 'assets'):
+        for directory in ('js', 'assets', 'styles'):
             index = root / directory / 'index.html'
             index.symlink_to(fb / '.salt')
             for method in ('GET', 'HEAD'):

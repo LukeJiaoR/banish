@@ -20,6 +20,7 @@
 """
 import functools
 import hashlib
+import ipaddress
 import secrets
 from http.cookies import SimpleCookie
 import json
@@ -33,6 +34,7 @@ import urllib.parse
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8613
+BIND_HOST = os.environ.get('BIND_HOST', '0.0.0.0')
 TOKEN = os.environ.get('FEEDBACK_TOKEN', '')
 ROOT = os.path.dirname(os.path.abspath(__file__))
 FB_DIR = os.environ.get('FEEDBACK_DIR') or os.path.join(ROOT, 'feedback')
@@ -46,13 +48,29 @@ MAX_TEXT = 2000             # 反馈正文上限（字符），与前端一致
 MAX_MONTH_BYTES = 50 * 1024 * 1024   # 单月反馈文件上限，防刷盘
 RATE_WINDOW = 600           # 每 IP 每 10 分钟
 RATE_MAX = 6
-SAVE_RATE_MAX = 90          # 存档限频放宽：自动档每 90s 镜像一次 ≈ 40 次/10 分钟
+SAVE_RATE_MAX = 90          # 每 IP 每 10 分钟；90s 定时自动档约 7 次/玩家，另有季节/离页保存
 SAVE_NAME_RE = re.compile(
     r'^[\u4e00-\u9fffA-Za-z0-9][\u4e00-\u9fffA-Za-z0-9_\- ··()（）]{0,39}$')
 
 _lock = threading.Lock()
 _hits = {}                   # ip -> [timestamp, ...]（反馈）
 _save_hits = {}              # ip -> [timestamp, ...]（存档写入）
+
+
+def _canonical_ip(value):
+    """Only one literal IP, never a forwarding chain, port, CIDR or scoped address."""
+    value = value.strip()
+    if '%' in value:
+        raise ValueError('scoped IP addresses are not accepted')
+    address = ipaddress.ip_address(value)
+    if isinstance(address, ipaddress.IPv6Address) and address.ipv4_mapped:
+        address = address.ipv4_mapped
+    return str(address)
+
+
+# Explicit opt-in only. Invalid deployment configuration fails closed at startup.
+TRUSTED_PROXY_IPS = frozenset(_canonical_ip(ip) for ip in
+                            os.environ.get('TRUSTED_PROXY_IPS', '').split(',') if ip.strip())
 
 
 def _month_file():
@@ -146,7 +164,7 @@ class Handler(SimpleHTTPRequestHandler):
                 return False
         rel = os.path.relpath(real, root)
         return (rel in ('.', 'index.html', 'style.css') or
-                rel.split(os.sep)[0] in ('js', 'assets'))
+                rel.split(os.sep)[0] in ('js', 'assets', 'styles'))
 
     def translate_path(self, path):
         """Apply to GET and inherited HEAD, including aliases and directory indexes."""
@@ -214,9 +232,25 @@ class Handler(SimpleHTTPRequestHandler):
         else:
             self.send_error(404)
 
+    def _client_ip(self):
+        """Trust a single overwritten X-Real-IP only from an explicitly trusted peer.
+
+        X-Forwarded-For is deliberately ignored: accepting an arbitrary chain can
+        let direct clients or a misconfigured proxy manufacture fresh rate keys.
+        """
+        peer = _canonical_ip(self.client_address[0])
+        if peer in TRUSTED_PROXY_IPS:
+            values = self.headers.get_all('X-Real-IP', [])
+            if len(values) == 1:
+                try:
+                    return _canonical_ip(values[0])
+                except ValueError:
+                    pass
+        return peer
+
     def _rate_hit(self, table, max_hits, msg):
         """每 IP 滑动窗口限频；超限返回 True（并已回复 429）。"""
-        ip = self.client_address[0]
+        ip = self._client_ip()
         with _lock:
             now = time.time()
             hits = [t for t in table.get(ip, ()) if now - t < RATE_WINDOW]
@@ -270,7 +304,7 @@ class Handler(SimpleHTTPRequestHandler):
             return
         t = data.get('t')
         t = t if isinstance(t, (int, float)) else time.time() * 1000
-        ip = self.client_address[0]  # 限频在 _rate_hit 内，这里取一次做哈希
+        ip = self._client_ip()  # 与限频使用相同的可信来源 IP；这里只保存盐值哈希
         entry = {
             # 稳定 id：pid|时间|正文 的哈希——供 GET /api/feedback/<id>/save 定位与闭环清单登记
             'id': 'f' + hashlib.sha256(f"{data.get('pid')}|{t}|{text}".encode('utf-8')).hexdigest()[:10],
@@ -522,6 +556,6 @@ class Handler(SimpleHTTPRequestHandler):
 
 if __name__ == '__main__':
     os.chdir(ROOT)  # 静态文件以脚本所在目录为根，与启动位置无关
-    print(f'归园 · 放逐小镇: http://0.0.0.0:{PORT}  反馈落盘 → {FB_DIR}  存档目录 → {SAVES_DIR}'
+    print(f'归园 · 放逐小镇: http://{BIND_HOST}:{PORT}  反馈落盘 → {FB_DIR}  存档目录 → {SAVES_DIR}'
           + (f'  在线查看: /api/feedback?token=***' if TOKEN else ''), flush=True)
-    ThreadingHTTPServer(('', PORT), functools.partial(Handler, directory=ROOT)).serve_forever()
+    ThreadingHTTPServer((BIND_HOST, PORT), functools.partial(Handler, directory=ROOT)).serve_forever()
