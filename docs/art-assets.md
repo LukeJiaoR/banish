@@ -1,5 +1,7 @@
 # 美术资源清单（供 AI 生成）
 
+当前可执行画风以 [暖色手绘 brief 与样板](art-assets/warm-scene/README.md) 为准；下方保留原始生成规格与来源记录。
+
 对应游戏现有实体（`js/defs.js`）。**当前状态：精灵图已接入**（2026-10）——
 
 - `assets/` 下的 82 张 PNG 由 `tools/slice_assets.py` 从 `art/` 的两张 AI 生成整图切出：

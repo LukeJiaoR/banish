@@ -1,0 +1,372 @@
+{
+  "engine": "@napi-rs/canvas, offline production renderer; not browser or physical phone validation",
+  "scene": {
+    "kind": "authored visual fixture",
+    "buildings": 12,
+    "citizens": 20,
+    "trees": 60,
+    "mountainTiles": 54
+  },
+  "cases": [
+    {
+      "season": 1,
+      "viewport": "desktop",
+      "width": 1227,
+      "height": 763,
+      "zoom": 0.75,
+      "choice": "original",
+      "filename": "desktop-s1-z0.75-original.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 1,
+      "viewport": "desktop",
+      "width": 1227,
+      "height": 763,
+      "zoom": 0.75,
+      "choice": "water",
+      "filename": "desktop-s1-z0.75-water.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 1,
+      "viewport": "desktop",
+      "width": 1227,
+      "height": 763,
+      "zoom": 0.75,
+      "choice": "both",
+      "filename": "desktop-s1-z0.75-both.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 1,
+      "viewport": "desktop",
+      "width": 1227,
+      "height": 763,
+      "zoom": 1,
+      "choice": "original",
+      "filename": "desktop-s1-z1-original.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 1,
+      "viewport": "desktop",
+      "width": 1227,
+      "height": 763,
+      "zoom": 1,
+      "choice": "water",
+      "filename": "desktop-s1-z1-water.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 1,
+      "viewport": "desktop",
+      "width": 1227,
+      "height": 763,
+      "zoom": 1,
+      "choice": "both",
+      "filename": "desktop-s1-z1-both.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 1,
+      "viewport": "desktop",
+      "width": 1227,
+      "height": 763,
+      "zoom": 2,
+      "choice": "original",
+      "filename": "desktop-s1-z2-original.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 1,
+      "viewport": "desktop",
+      "width": 1227,
+      "height": 763,
+      "zoom": 2,
+      "choice": "water",
+      "filename": "desktop-s1-z2-water.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 1,
+      "viewport": "desktop",
+      "width": 1227,
+      "height": 763,
+      "zoom": 2,
+      "choice": "both",
+      "filename": "desktop-s1-z2-both.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 1,
+      "viewport": "narrow",
+      "width": 390,
+      "height": 620,
+      "zoom": 0.75,
+      "choice": "original",
+      "filename": "narrow-s1-z0.75-original.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 1,
+      "viewport": "narrow",
+      "width": 390,
+      "height": 620,
+      "zoom": 0.75,
+      "choice": "water",
+      "filename": "narrow-s1-z0.75-water.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 1,
+      "viewport": "narrow",
+      "width": 390,
+      "height": 620,
+      "zoom": 0.75,
+      "choice": "both",
+      "filename": "narrow-s1-z0.75-both.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 1,
+      "viewport": "narrow",
+      "width": 390,
+      "height": 620,
+      "zoom": 1,
+      "choice": "original",
+      "filename": "narrow-s1-z1-original.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 1,
+      "viewport": "narrow",
+      "width": 390,
+      "height": 620,
+      "zoom": 1,
+      "choice": "water",
+      "filename": "narrow-s1-z1-water.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 1,
+      "viewport": "narrow",
+      "width": 390,
+      "height": 620,
+      "zoom": 1,
+      "choice": "both",
+      "filename": "narrow-s1-z1-both.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 1,
+      "viewport": "narrow",
+      "width": 390,
+      "height": 620,
+      "zoom": 2,
+      "choice": "original",
+      "filename": "narrow-s1-z2-original.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 1,
+      "viewport": "narrow",
+      "width": 390,
+      "height": 620,
+      "zoom": 2,
+      "choice": "water",
+      "filename": "narrow-s1-z2-water.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 1,
+      "viewport": "narrow",
+      "width": 390,
+      "height": 620,
+      "zoom": 2,
+      "choice": "both",
+      "filename": "narrow-s1-z2-both.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 3,
+      "viewport": "desktop",
+      "width": 1227,
+      "height": 763,
+      "zoom": 0.75,
+      "choice": "original",
+      "filename": "desktop-s3-z0.75-original.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 3,
+      "viewport": "desktop",
+      "width": 1227,
+      "height": 763,
+      "zoom": 0.75,
+      "choice": "water",
+      "filename": "desktop-s3-z0.75-water.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 3,
+      "viewport": "desktop",
+      "width": 1227,
+      "height": 763,
+      "zoom": 0.75,
+      "choice": "both",
+      "filename": "desktop-s3-z0.75-both.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 3,
+      "viewport": "desktop",
+      "width": 1227,
+      "height": 763,
+      "zoom": 1,
+      "choice": "original",
+      "filename": "desktop-s3-z1-original.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 3,
+      "viewport": "desktop",
+      "width": 1227,
+      "height": 763,
+      "zoom": 1,
+      "choice": "water",
+      "filename": "desktop-s3-z1-water.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 3,
+      "viewport": "desktop",
+      "width": 1227,
+      "height": 763,
+      "zoom": 1,
+      "choice": "both",
+      "filename": "desktop-s3-z1-both.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 3,
+      "viewport": "desktop",
+      "width": 1227,
+      "height": 763,
+      "zoom": 2,
+      "choice": "original",
+      "filename": "desktop-s3-z2-original.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 3,
+      "viewport": "desktop",
+      "width": 1227,
+      "height": 763,
+      "zoom": 2,
+      "choice": "water",
+      "filename": "desktop-s3-z2-water.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 3,
+      "viewport": "desktop",
+      "width": 1227,
+      "height": 763,
+      "zoom": 2,
+      "choice": "both",
+      "filename": "desktop-s3-z2-both.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 3,
+      "viewport": "narrow",
+      "width": 390,
+      "height": 620,
+      "zoom": 0.75,
+      "choice": "original",
+      "filename": "narrow-s3-z0.75-original.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 3,
+      "viewport": "narrow",
+      "width": 390,
+      "height": 620,
+      "zoom": 0.75,
+      "choice": "water",
+      "filename": "narrow-s3-z0.75-water.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 3,
+      "viewport": "narrow",
+      "width": 390,
+      "height": 620,
+      "zoom": 0.75,
+      "choice": "both",
+      "filename": "narrow-s3-z0.75-both.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 3,
+      "viewport": "narrow",
+      "width": 390,
+      "height": 620,
+      "zoom": 1,
+      "choice": "original",
+      "filename": "narrow-s3-z1-original.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 3,
+      "viewport": "narrow",
+      "width": 390,
+      "height": 620,
+      "zoom": 1,
+      "choice": "water",
+      "filename": "narrow-s3-z1-water.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 3,
+      "viewport": "narrow",
+      "width": 390,
+      "height": 620,
+      "zoom": 1,
+      "choice": "both",
+      "filename": "narrow-s3-z1-both.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 3,
+      "viewport": "narrow",
+      "width": 390,
+      "height": 620,
+      "zoom": 2,
+      "choice": "original",
+      "filename": "narrow-s3-z2-original.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 3,
+      "viewport": "narrow",
+      "width": 390,
+      "height": 620,
+      "zoom": 2,
+      "choice": "water",
+      "filename": "narrow-s3-z2-water.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 3,
+      "viewport": "narrow",
+      "width": 390,
+      "height": 620,
+      "zoom": 2,
+      "choice": "both",
+      "filename": "narrow-s3-z2-both.png",
+      "gameplayUnchanged": true
+    }
+  ]
+}
