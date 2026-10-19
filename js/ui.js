@@ -7,7 +7,7 @@ G.ui = {
   el: {},
   infoT: 0,
 
-  // Original single-ink, 24px line icons. UI-only: world artwork is unchanged.
+  // Original 24px linework with a small, shared pigment palette. UI-only.
   icon: function (name) {
     const paths = {
       wood:'M5 5h11a4 7 0 0 1 0 14H5a4 7 0 0 1 0-14Zm0 0a4 7 0 0 1 0 14m1-9v4m4-7h5m-5 10h5',
@@ -55,8 +55,47 @@ G.ui = {
       demolish:'m4 4 16 16M4 20 20 4M2 12a10 10 0 1 0 20 0 10 10 0 1 0-20 0Z',
     };
     const aliases = {settings:'tools',house:'building',stonehouse:'building',boarding:'building',homes:'building',services:'building',industry:'tools',land:'road',other:'tools',mine:'tools',stonequarry:'stone',blacksmith:'tools',hunting:'meat',stockpile:'wood',market:'food',gatherer:'vegetables',forester:'tree',woodcutter:'wood',dock:'fish',school:'building',herbalist:'herbs',hospital:'cross',townhall:'building',tavern:'ale',stoneroad:'road',tunnel:'bridge',tailor:'clothes',tradingpost:'bridge',pasture:'wool',orchard:'apples',chapel:'cross',well:'storage',cemetery:'cross',fell:'wood',quarry:'tools',burntruins:'firewood',mineralpit:'stone'};
-    const key = paths[name] ? name : aliases[name] || 'building';
-    return `<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="${paths[key]}"></path></svg>`;
+    const key = Object.hasOwn(paths, name) ? name : Object.hasOwn(aliases, name) ? aliases[name] : 'building';
+    // Closed color shapes sit behind the unchanged linework. Open strokes are
+    // never implicitly filled; status/navigation glyphs keep the caller's ink.
+    const paints = {
+      wood:['ochre', 'M5 5h11a4 7 0 0 1 0 14H5a4 7 0 0 1 0-14Z', 'M5 5a4 7 0 0 1 0 14 4 7 0 0 1 0-14Z'],
+      stone:['slate', 'm3 15 4-9 9-2 5 9-4 7H7Z', 'm7 6 9-2 5 9H11Z'],
+      iron:['copper', 'm3 16 4-8h11l3 8-5 4H8Z', 'm7 8 3 8h11l-3-8Z'],
+      coal:['slate', 'm4 16 2-9 9-3 6 10-5 6H9Z', 'm6 7 9-3 6 10-7-3Z'],
+      tools:['slate', 'm10 4 4 2 4-1 3 3-5 2-1 4-2-3Z'],
+      steelTools:['slate', 'm10 4 4 2 4-1 3 3-5 2-1 4-2-3Z'],
+      food:['ochre', 'M4 10h16l-2 10H6Z', 'M6 11h12l-1 3H7Z'],
+      meat:['berry', 'M8 7c4-7 15-2 11 6-2 4-6 4-9 2l-4 5-3-3 5-4c-2-2-2-4 0-6Z'],
+      eggs:['ochre', 'M5 14C5 8 10 3 12 3s7 5 7 11a7 7 0 0 1-14 0Z'],
+      vegetables:['moss', 'M12 21C1 16 1 7 7 7c-1-6 9-6 10 0 7 0 6 11-5 14Z'],
+      grain:['ochre', 'M12 10C5 10 4 6 5 4c5 0 7 3 7 6Zm0 6c-7 0-8-4-7-6 5 0 7 3 7 6Zm0-9c6 0 7-4 6-6-4 0-6 3-6 6Zm0 7c7 0 8-4 7-6-5 0-7 3-7 6Z'],
+      apples:['berry', 'M12 8c-8-5-12 3-7 10 3 4 5 2 7 2s5 2 7-2c5-7 1-15-7-10Z'],
+      pears:['moss', 'M9 5h6c-2 5 3 6 4 10 2 8-16 8-14 0 1-4 6-5 4-10Z'],
+      firewood:['copper', 'M7 14c-3-5 2-7 3-11 4 4 1 7 5 8l2-5c4 6 6 14-5 15-4 0-8-3-5-7Z', 'M11 21c-4-4 0-5 1-8 4 4 4 6-1 8Z'],
+      leather:['ochre', paths.leather], wool:['ochre', 'M6 7c0-5 7-5 8-1 6-3 10 4 5 7 2 7-6 10-9 6-6 2-10-5-5-8-2-2-2-4 1-4Z'],
+      clothes:['slate', paths.clothes], warmCoats:['plum', paths.clothes],
+      herbs:['moss', 'M9 16c-8-1-8-7-7-9 7 0 9 5 7 9Zm4-6c0-7 6-9 9-8-1 7-5 9-9 8Zm0 7c7 1 9-3 9-6-6-1-10 3-9 6Z'],
+      ale:['ochre', 'M5 5h12v16H5Z', 'M5 5c-3-5 5-6 6-3 3-3 8 0 6 3Z'],
+      building:['copper', 'M5 8v13h14V8l-7-6Z', 'm2 10 10-8 10 8Z'],
+      storage:['ochre', 'm3 9 9-6 9 6v12H3Z', 'm3 9 9-6 9 6Z'],
+      tree:['moss', paths.tree], farm:['moss', 'M3 15l5-5 5 5 5-5 3 3v7H3Z'],
+      road:['slate', 'M8 2 3 22h18L16 2Z'], bridge:['ochre', 'M2 8h20v4H2Z'],
+      fish:['slate', 'M4 12C8 3 18 3 22 12c-4 9-14 9-18 0Zm0 0-3-5v10Z'],
+      cross:['moss', paths.cross],
+      citizen:['ochre', 'M8 6a4 4 0 1 0 8 0 4 4 0 1 0-8 0ZM4 22v-4a8 8 0 0 1 16 0v4Z'],
+      people:['ochre', 'M6 7a3 3 0 1 0 6 0 3 3 0 1 0-6 0ZM2 21v-3a7 7 0 0 1 14 0v3Z'],
+      clock:['ochre', 'M2 12a10 10 0 1 0 20 0 10 10 0 1 0-20 0Z'],
+      save:['slate', 'M3 3h15l3 3v15H3Z', 'M7 14h10v7H7Z'],
+      folder:['ochre', 'M2 6h8l2 3h10l-3 12H2Z', 'M2 9V3h7l3 3h8v3Z'],
+      sprout:['moss', 'M12 15C3 15 2 10 2 6c7-1 10 2 10 9Zm0-4C11 3 16 1 22 2c0 7-3 10-10 9Z'],
+      mail:['ochre', 'M2 4h20v16H2Z', 'M2 4h20l-10 9Z'],
+      help:['slate', 'M2 12a10 10 0 1 0 20 0 10 10 0 1 0-20 0Z'],
+    };
+    const paint = paints[key];
+    const color = paint ? ` data-tone="${paint[0]}"` : '';
+    const layers = paint ? `<g stroke="none"><path class="icon-pigment" d="${paint[1]}"></path>${paint[2] ? `<path class="icon-highlight" d="${paint[2]}"></path>` : ''}</g>` : '';
+    return `<svg class="ui-icon" data-icon="${key}"${color} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${layers}<path d="${paths[key]}"></path></svg>`;
   },
 
   resourceIcon: function (type) {
