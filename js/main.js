@@ -767,7 +767,7 @@ G.prepareSaveData = function (d) {
       const validVariety=(type,field)=>{if(typeof type!=='string'||!Object.hasOwn(G.ORCHARD_TYPES,type)||type!=='legacy'&&!G.orchardUnlocked(type,g))bad(field);return type;};
       b.orchardType=bd.orchardType===undefined?'legacy':validVariety(bd.orchardType,'果园补种品种');
       const age=bd.orchardAge===undefined?0:integer(bd.orchardAge,'果树养护年龄',0,G.ORCHARD.matureDays);
-      let fruit=bd.orchardYield===undefined?0:number(bd.orchardYield,'待收果实',0,G.orchardTreeCount(b)*G.ORCHARD.fruit);
+      let fruit=bd.orchardYield===undefined?0:number(bd.orchardYield,'待收果实',0,G.orchardTreeCount(b)*(bd.orchardTrees===undefined?G.LEGACY_ORCHARD_FRUIT:G.ORCHARD.fruit));
       const season=bd.orchardSeason===undefined?0:integer(bd.orchardSeason,'果树产季',1,g.year);
       if(bd.orchardReplant!==undefined&&typeof bd.orchardReplant!=='boolean')bad('果园补种开关');
       b.orchardReplant=bd.orchardReplant!==false;
@@ -782,7 +782,7 @@ G.prepareSaveData = function (d) {
         G.syncOrchardTotals(b);if(b.orchardAge!==age||Math.abs(b.orchardYield-fruit)>1e-7)bad('果园汇总与树株不符');
       }else{
         const tended=bd.tendedDay===undefined?-1:integer(bd.tendedDay,'旧果园照料日',0,g.day);
-        b.orchardTrees=Array.from({length:G.ORCHARD.count},()=>{const n=Math.min(G.ORCHARD.fruit,fruit);fruit-=n;return {type:'legacy',planted:true,age,fruit:n,season,tendedDay:tended,cycle:0};});
+        b.orchardTrees=Array.from({length:G.ORCHARD.count},()=>{const n=Math.min(G.LEGACY_ORCHARD_FRUIT,fruit);fruit-=n;return {type:'legacy',planted:true,age,fruit:n,season,tendedDay:tended,cycle:0};});
         b.orchardDay=g.day;G.syncOrchardTotals(b);
       }
       if(bd.orchardWarnYear!==undefined)b.orchardWarnYear=integer(bd.orchardWarnYear,'果园预警年份',1,g.year);

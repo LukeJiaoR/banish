@@ -63,6 +63,9 @@ test('two and three farmers physically clear, construct, plant, care four years,
   for(const [size,n] of [[[9,9],2],[[15,15],3]]){
     const G=fresh(),w=G.world,[width,height]=size,tree={x:10+width-1,y:10+height-1,b:-48};tree.i=tree.y*w.N+tree.x;w.trees.push(tree);w.treeIdx[tree.i]=0;G.bumpNavigation(w);
     G.addBuilding('storage',30,2,{instant:true,free:true});
+    // Forty 50-fruit trees need capacity for 2000; preserve normal warehouse capacity.
+    G.addBuilding('storage',36,2,{instant:true,free:true});
+    G.addBuilding('storage',42,2,{instant:true,free:true});
     const b=plot(G,size,false),count=G.orchardTreeCount(b),cs=workers(G,b,n);
     assert.equal(G.siteTrees(b).length,1);assert.equal(G.game.res.wood,500);assert.deepEqual(clone(b.construction.required),{wood:width+height});assert.deepEqual(clone(b.construction.onsite),{});assert.equal(b.totalWork,width*height);G.finishBuilding(b);assert.equal(b.state,'site');
     until(G,cs,()=>G.siteTrees(b).length===0);assert.equal(b.workLeft,width*height);
@@ -76,14 +79,14 @@ test('two and three farmers physically clear, construct, plant, care four years,
       until(G,cs,()=>b.orchardTrees.every(t=>t.age>=G.ORCHARD.matureDays||t.tendedDay===day));
       assert.equal(b.orchardYield,0,'no fruit before the first mature autumn');
     }
-    assert(b.orchardTrees.every(t=>t.age>=G.ORCHARD.matureDays));clockAt(G,216);G.advanceOrchard(b);assert.equal(b.orchardYield,count*20);
+    assert(b.orchardTrees.every(t=>t.age>=G.ORCHARD.matureDays));clockAt(G,216);G.advanceOrchard(b);assert.equal(b.orchardYield,count*G.ORCHARD.fruit);
     const production={};for(const type of ['apples','vegetables'])production[type]=inventory(G,b,type);
     for(const c of cs)G.requestTask(c);assert.equal(new Set(cs.map(c=>c.task.ti)).size,n);
     const accepted=cs.map(c=>c.task);until(G,cs,()=>b.orchardYield===0&&cs.every(c=>!c.carry));
     for(let i=0;i<cs.length;i++)G.completeOrchardTask(cs[i],accepted[i]);
-    near(G.game.res.apples+G.game.res.vegetables,count*20);near(G.game.res.food,count*20);
+    near(G.game.res.apples+G.game.res.vegetables,count*G.ORCHARD.fruit);near(G.game.res.food,count*G.ORCHARD.fruit);
     for(const type of ['apples','vegetables'])near(inventory(G,b,type),production[type]);
-    console.log(JSON.stringify({area:size,workers:n,trees:count,firstHarvestDay:216,fruitDelivered:count*20}));
+    console.log(JSON.stringify({area:size,workers:n,trees:count,firstHarvestDay:216,fruitDelivered:count*G.ORCHARD.fruit}));
   }
 });
 test('all forty lifespans remain twelve to twenty years and update only the expired slot',()=>{
@@ -97,17 +100,17 @@ test('variety changes only future tasks; forty trees and picked cargo survive ro
   assert(G.setOrchardType(b,'pear'));assert(G.setOrchardReplant(b,false));until(G,cs,()=>accepted.every(t=>t.tree.planted));
   for(const t of accepted)assert.equal(t.tree.type,'legacy');assert.equal(b.orchardTrees.filter(t=>t.planted).length,3);
   for(const c of cs)G.releaseWorker(c);fullFruit(G,b,'pear');G.setWorkerLimit(b,3);for(const c of cs)G.assignWorker(b,c);
-  until(G,cs,()=>cs.every(c=>!!c.carry));const budget=inventory(G,b,'pears');assert.equal(budget,800);
+  until(G,cs,()=>cs.every(c=>!!c.carry));const budget=inventory(G,b,'pears');assert.equal(budget,40*G.ORCHARD.fruit);
   const snapshot=saved(G),stored=snapshot.buildings.find(x=>x.id===b.id);assert.deepEqual(stored.orchardSize,[15,15]);assert.equal(stored.w,15);assert.equal(stored.h,15);
   for(let i=0;i<3;i++)G.applySaveData(saved(G));const loaded=G.world.bmap[b.id];assert.equal(loaded.orchardTrees.length,40);assert.equal(G.workerMaximumOf(loaded),3);near(inventory(G,loaded,'pears'),budget);
   for(const id of ids)assert.equal(G.world.cmap[id].carry.type,'pears');
 });
 test('picked fruit remains conserved through full-store partial hauling, zero staffing, demolition and reload',()=>{
   const G=fresh(),b=plot(G),cs=workers(G,b,3);for(const c of cs)G.releaseWorker(c);fullFruit(G,b);for(const c of cs)G.assignWorker(b,c);
-  until(G,cs,()=>cs.every(c=>c.carry?.qty===20));assert.equal(b.orchardYield,740);G.setWorkerLimit(b,0);
-  G.game.res.grain=G.game.res.food=G.storageCap()-7;G.game.townLedger=G.newTownLedger(G.game);until(G,cs,()=>cs.every(c=>c.state==='waitStorage'));near(G.game.res.apples,7);near(cs.reduce((n,c)=>n+c.carry.qty,0),53);
-  G.removeBuilding(b);for(let i=0;i<2;i++)G.applySaveData(saved(G));const loaded=cs.map(c=>G.world.cmap[c.id]);assert.equal(G.world.bmap[b.id],undefined);near(loaded.reduce((n,c)=>n+c.carry.qty,0),53);
-  G.game.res.grain-=53;G.game.res.food-=53;G.reconcileFood(G.game);until(G,loaded,()=>loaded.every(c=>!c.carry));near(G.game.res.apples,60);near(G.townLedgerSummary().current.totals.apples.received,60);
+  until(G,cs,()=>cs.every(c=>c.carry?.qty===G.ORCHARD.fruit));assert.equal(b.orchardYield,37*G.ORCHARD.fruit);G.setWorkerLimit(b,0);
+  G.game.res.grain=G.game.res.food=G.storageCap()-7;G.game.townLedger=G.newTownLedger(G.game);until(G,cs,()=>cs.every(c=>c.state==='waitStorage'));near(G.game.res.apples,7);near(cs.reduce((n,c)=>n+c.carry.qty,0),3*G.ORCHARD.fruit-7);
+  G.removeBuilding(b);for(let i=0;i<2;i++)G.applySaveData(saved(G));const loaded=cs.map(c=>G.world.cmap[c.id]);assert.equal(G.world.bmap[b.id],undefined);near(loaded.reduce((n,c)=>n+c.carry.qty,0),3*G.ORCHARD.fruit-7);
+  G.game.res.grain-=3*G.ORCHARD.fruit-7;G.game.res.food-=3*G.ORCHARD.fruit-7;G.reconcileFood(G.game);until(G,loaded,()=>loaded.every(c=>!c.carry));near(G.game.res.apples,3*G.ORCHARD.fruit);near(G.townLedgerSummary().current.totals.apples.received,3*G.ORCHARD.fruit);
 });
 test('area cost, construction progress and cancellation refund survive saves without gifting wood',()=>{
   const G=fresh(),size=[15,15],b=plot(G,size,false);size[0]=4;assert.equal(b.w,15);assert.equal(b.orchardSize[0],15);assert.equal(b.paidCost.wood,30);
@@ -118,7 +121,7 @@ test('area cost, construction progress and cancellation refund survive saves wit
 });
 test('malformed area records reject atomically, including shape-stripped dense-legacy forgeries',()=>{
   const G=fresh(),b=plot(G),base=saved(G),world=G.world,game=G.game;
-  const edits=[q=>q.orchardSize=null,q=>q.orchardSize='15,15',q=>q.orchardSize=[15,16],q=>q.orchardSize=[15,15,15],q=>q.orchardSize=['15',15],q=>q.w='15',q=>q.h=14,q=>delete q.w,q=>delete q.h,q=>q.totalWork=36,q=>q.workLeft=1,q=>q.progress=.9,q=>q.paidCost.wood=12,q=>q.paidCost.stone=1,q=>delete q.paidCost,q=>q.workerLimit=4,q=>q.orchardTrees.pop(),q=>q.orchardTrees=null,q=>delete q.orchardTrees,q=>q.orchardTrees[39].age=G.orchardLifetime(39),q=>q.orchardTrees[0].planted='false',q=>q.orchardYield=801,q=>{delete q.orchardSize;delete q.w;delete q.h;},q=>{delete q.orchardSize;delete q.w;delete q.h;q.orchardTrees=q.orchardTrees.slice(0,9);},q=>{delete q.orchardSize;delete q.w;delete q.h;delete q.orchardTrees;}];
+  const edits=[q=>q.orchardSize=null,q=>q.orchardSize='15,15',q=>q.orchardSize=[15,16],q=>q.orchardSize=[15,15,15],q=>q.orchardSize=['15',15],q=>q.w='15',q=>q.h=14,q=>delete q.w,q=>delete q.h,q=>q.totalWork=36,q=>q.workLeft=1,q=>q.progress=.9,q=>q.paidCost.wood=12,q=>q.paidCost.stone=1,q=>delete q.paidCost,q=>q.workerLimit=4,q=>q.orchardTrees.pop(),q=>q.orchardTrees=null,q=>delete q.orchardTrees,q=>q.orchardTrees[39].age=G.orchardLifetime(39),q=>q.orchardTrees[0].planted='false',q=>q.orchardYield=40*G.ORCHARD.fruit+1,q=>{delete q.orchardSize;delete q.w;delete q.h;},q=>{delete q.orchardSize;delete q.w;delete q.h;q.orchardTrees=q.orchardTrees.slice(0,9);},q=>{delete q.orchardSize;delete q.w;delete q.h;delete q.orchardTrees;}];
   for(const edit of edits){const d=clone(base);edit(d.buildings.find(q=>q.id===b.id));assert.throws(()=>G.applySaveData(d));assert.equal(G.world,world);assert.equal(G.game,game);}
   const d=clone(base);d.buildings[0].orchardSize=[4,4];assert.throws(()=>G.applySaveData(d));assert.equal(G.world,world);
   const site=plot(G,[4,4],false,30,30),sd=saved(G),q=sd.buildings.find(q=>q.id===site.id);q.orchardTrees[0].planted=true;assert.throws(()=>G.applySaveData(sd));assert.equal(G.world,world);

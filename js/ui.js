@@ -726,7 +726,7 @@ G.ui = {
     if (s.cost && Number.isFinite(s.work)) lines.push(`建材 ${this.resourceCost(s.cost, false)} · 施工 ${s.work} 工时（本作适配）；先清 ${s.trees || 0} 棵树，工人实际砍伐搬木后施工`);
     if (Number.isFinite(s.workers)) lines.push(`本园农夫上限 ${s.workers} 人：每72格增加一岗，最多3人（本作适配）；可调低，上限不保证配足，不直接增加每株产量。`);
     if (s.reason) lines.push(s.reason);
-    lines.push('买对应种子后逐株种植，4年有效养护成熟；每株秋收最多20果，实际采收送仓。旧6×6果园保留9株和2岗位，不按此新树距改排。');
+    lines.push(`买对应种子后逐株种植，4年有效养护成熟；每株未来秋季最多${G.ORCHARD.fruit}果，已结旧果不补发，实际采收送仓。固定6×6果园保留9株和2岗位，不按此新树距改排。`);
     lines.push('鼠标拖矩形或点两个角；手机点两个角。每边4–15格，确认创建工地，不预扣/预留材料；到仓领取时扣除，送齐才施工。重选不撤销已确认工地；Esc / 右键退出。');
     const message = lines.join('\n'); if (text.textContent !== message) text.textContent = message;
     button._orchardIntent = s.ok ? { plan: s.plan, signature: s.signature, ...panel._orchardContext } : null;
@@ -4257,7 +4257,7 @@ G.ui = {
       <details class="building-task"><summary>补种设置</summary><form id="orchard-replant-form" class="economy-form"><label for="orchard-replant">空位补种</label><select id="orchard-replant"><option value="on"${b.orchardReplant!==false?' selected':''}>允许农夫补种</option><option value="off"${b.orchardReplant===false?' selected':''}>暂停新补种</option></select><button type="submit">应用补种设置</button></form></details>
       <details class="building-help"><summary>果树生长与品种规则</summary>      <p class="desc">苹果和梨种子各2500，分别购买一次永久解锁；购买后仍需在此明确应用，只改变以后新接的种植任务。旧通用果树种子仅解锁旧通用树，继续产蔬菜，不赠苹果、梨或新种子。已有树的品种、年龄、待采果实和已接任务/在途货不改换；买新果种不必先买通用种子。</p>
       <p class="desc">苹果与梨独立存量、贸易和生产目标；实际送仓后可食用或酿酒。营养都归蔬菜组，与肉类（含鸡蛋）、主食合为三组，不增加第四组。</p>
-      <p class="desc">每株由农夫实际到达后种植、照料或采收。秋季先采果，再种空位和养幼树；暂停补种只影响新任务，已开始的单株工作照常完成。4年有效养护成熟，每株每秋最多20果，搬运后才入库；满仓携果保留，冬季未采果损失。</p>
+      <p class="desc">每株由农夫实际到达后种植、照料或采收。秋季先采果，再种空位和养幼树；暂停补种只影响新任务，已开始的单株工作照常完成。4年有效养护成熟，每株未来秋季最多${G.ORCHARD.fruit}果，已结旧果不补发，搬运后才入库；满仓携果保留，冬季未采果损失。</p>
       <p class="desc">树龄达到12–20年时按株错峰枯尽，届时该株未采果实一起损失（不计为已产出）；一年内将枯尽会预警，应优先采收。补种重新养4年。本作适配寿命，不是原版精确数值。旧成熟园从4岁迁移，至少还有8年宽限；不影响已有在途果实。</p>
       </details><details class="building-help"><summary>逐株树龄与产量</summary><p class="desc" data-economy-live="orchard-trees" style="white-space:pre-line"></p></details><p class="economy-message" data-economy-message role="status" aria-live="polite"></p>
     </section>`;
