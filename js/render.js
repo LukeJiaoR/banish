@@ -587,6 +587,21 @@ function quadFill(ctx, x1, y1, x2, y2, x3, y3, x4, y4, col) {
   ctx.fill();
 }
 
+// A preview is only artwork, not a temporary building/site. In particular it
+// never enters activity, job, smoke, ownership or world-building collections.
+G.drawPendingBuildingPreview = function (ctx, pending) {
+  const def = G.BDEF[pending.type], type = pending.type;
+  const [x,y] = G.T2S(pending.ox+def.w,pending.oy+def.h);
+  // Use the same sprite scale and transparent-foot compensation as completed
+  // buildings (including the dock's six-pixel platform foot).
+  const width = (def.w+def.h)*32*(G.BUILD_SPR_W[type]||1.08);
+  const offset = (type==='tradingpost'||type==='market')?1.5:type==='mineralpit'?2:
+    type==='burntruins'?2.5:type==='well'?1:(type==='chapel'||type==='dock')?6:0;
+  ctx.save(); ctx.globalAlpha=.65;
+  G.sprDraw(ctx,type,x,y+offset,{w:width,omitSmokeAir:true});
+  ctx.restore();
+};
+
 G.drawBuilding = function (ctx, b, time) {
   const w = G.world;
   const T = G.T2S(b.x, b.y);
@@ -1259,9 +1274,11 @@ G.frame = function (dtReal) {
 
   // 建造幽灵：贴着地面画、在建筑之前——后面的建筑/树会正确把它挡住，
   // 不会出现“绿色预览浮在已有建筑上”的误导
-  if (G.tool && G.tool.kind === 'build' && G.hover.tx >= 0 && !(G.isFarmPlanning&&G.isFarmPlanning()) && !(G.isPasturePlanning&&G.isPasturePlanning()) && !(G.isOrchardPlanning&&G.isOrchardPlanning()) && !(G.isCemeteryPlanning&&G.isCemeteryPlanning())) {
+  const pendingBuilding = G.currentBuildingPlacement?.();
+  if (G.tool && G.tool.kind === 'build' && (pendingBuilding || G.hover.tx >= 0) && !(G.isFarmPlanning&&G.isFarmPlanning()) && !(G.isPasturePlanning&&G.isPasturePlanning()) && !(G.isOrchardPlanning&&G.isOrchardPlanning()) && !(G.isCemeteryPlanning&&G.isCemeteryPlanning())) {
     const def = G.BDEF[G.tool.type];
-    const ox = G.hover.tx - ((def.w - 1) >> 1), oy = G.hover.ty - ((def.h - 1) >> 1);
+    const ox = pendingBuilding ? pendingBuilding.ox : G.hover.tx - ((def.w - 1) >> 1),
+      oy = pendingBuilding ? pendingBuilding.oy : G.hover.ty - ((def.h - 1) >> 1);
     const chk = G.canPlace(w, G.tool.type, ox, oy, G.tool.type==='farm'?[8,8]:undefined);
     const preview = G.ui.refreshPlacement(G.tool.type, ox, oy);
     const radius = preview && preview.radius;
@@ -1373,6 +1390,11 @@ G.frame = function (dtReal) {
     if (cx < tx0 - 3 || cx > tx1 + 3 || cy < ty0 - 3 || cy > ty1 + 3) continue;
     items.push({ d: b.x + b.y + b.w + b.h - 2 - 0.5, k: 1, b });
   }
+  if (pendingBuilding && G.buildingPlacementStatus().ok) {
+    const def=G.BDEF[pendingBuilding.type],cx=pendingBuilding.ox+def.w/2,cy=pendingBuilding.oy+def.h/2;
+    if(cx>=tx0-3&&cx<=tx1+3&&cy>=ty0-3&&cy<=ty1+3)
+      items.push({d:pendingBuilding.ox+pendingBuilding.oy+def.w+def.h-2-.5,k:10,pending:pendingBuilding});
+  }
   // 市民：只为屏内的休息者构建住房索引，不触碰离屏人物状态。
   let citizenHomes = null;
   for (const c of w.citizens) {
@@ -1410,6 +1432,7 @@ G.frame = function (dtReal) {
     else if (it.k === 7) G.drawDeer(ctx,it.deer);
     else if (it.k === 8) G.drawMountain(ctx,w,it.x,it.y);
     else if(it.k===9)G.drawTunnelPortal(ctx,it.b,it.p,it.first);
+    else if(it.k===10)G.drawPendingBuildingPreview(ctx,it.pending);
     else if (it.k === 1) {
       if(it.b.type==='farm')G.drawFarmPestBadge(ctx,it.b);
       if(it.b.type==='pasture')G.drawPasturePestBadge(ctx,it.b);

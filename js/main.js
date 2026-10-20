@@ -8,6 +8,8 @@ G.ctx = null;
 G.dpr = 1;
 G.tool = null;                 // null | {kind:'build',type} | {kind:'road'|'fell'|'quarry'|'demolish'}
 G.hover = { tx: -1, ty: -1 };
+G.pendingBuildingPlacement = null;
+G.buildingPlacementGestureVersion = 0;
 G.sel = null;
 G.keys = {};
 G.autosaveBlocked = false;
@@ -117,7 +119,7 @@ G.newGame = function (seed, options) {
   try {candidate=G.prepareNewGame(quote.config);}catch(e){return {ok:false,reason:'新局生成失败：'+e.message};}
   G.world=candidate.world;G.game=candidate.game;G.rng=candidate.rng;G.setUid(candidate.nextUid);
   G.autosaveBlocked=!!options.preserveSaves;
-  G.sel=null;G.tool=null;G.cancelRoadPlan();G.cancelHarvestPlan();G.cancelFarmPlan();G.cancelPasturePlan();G.cancelOrchardPlan();G.cancelCemeteryPlan();
+  G.sel=null;G.tool=null;G.cancelBuildingPlacement();G.cancelRoadPlan();G.cancelHarvestPlan();G.cancelFarmPlan();G.cancelPasturePlan();G.cancelOrchardPlan();G.cancelCemeteryPlan();
   G.smoke=[];G.flakes=null;G.keys={};
   if(!options.preserveSaves){
     try {localStorage.removeItem(G.AUTOSAVE_KEY);}catch(e){G.ui.toast('无法清理本机旧自动档：'+e.message,'warn');}
@@ -1088,7 +1090,7 @@ G.applySaveData = function (d) {
   const candidate = G.prepareSaveData(d);
   G.world = candidate.world; G.game = candidate.game; G.rng = candidate.rng; G.setUid(candidate.nextUid);
   if (G._recoveryBackedUp) G.autosaveBlocked = false;
-  G.sel = null; G.tool = null; G.cancelRoadPlan(); G.cancelHarvestPlan(); G.cancelFarmPlan(); G.cancelPasturePlan();G.cancelOrchardPlan();G.cancelCemeteryPlan(); G.smoke = []; G.flakes = null; G.keys = {};
+  G.sel = null; G.tool = null; G.cancelBuildingPlacement(); G.cancelRoadPlan(); G.cancelHarvestPlan(); G.cancelFarmPlan(); G.cancelPasturePlan();G.cancelOrchardPlan();G.cancelCemeteryPlan(); G.smoke = []; G.flakes = null; G.keys = {};
   G.ui.hideInfo(); G.ui.setToolActive();
   document.getElementById('over').classList.add('hidden');
   // All cargo is validated and owned by the candidate; now resume its deliveries.
@@ -1194,7 +1196,7 @@ G.clampCam = function () {
 
 /* ---------- 工具模式 ---------- */
 G.setTool = function (t) {
-  G.cancelRoadPlan(); G.cancelHarvestPlan(); G.cancelFarmPlan(); G.cancelPasturePlan();G.cancelOrchardPlan();G.cancelCemeteryPlan();
+  G.cancelBuildingPlacement(); G.cancelRoadPlan(); G.cancelHarvestPlan(); G.cancelFarmPlan(); G.cancelPasturePlan();G.cancelOrchardPlan();G.cancelCemeteryPlan();
   if (t == null) { G.tool = null; }
   else if (t === 'demolish') G.tool = { kind: 'demolish' };
   else if (['road','stoneroad','bridge','tunnel'].includes(t)) G.tool = { kind: 'road', surface:t==='stoneroad'?'stone':t==='bridge'?'bridge':t==='tunnel'?'tunnel':'dirt' };
@@ -1235,6 +1237,57 @@ G.paintRockLine = function (x0, y0, x1, y1) {
 };
 
 /* ---------- 建造 ---------- */
+// Ordinary buildings keep a transient map position until explicitly confirmed.
+// Fixed fields and existing area/road planners retain their original input flow.
+G.isBuildingPlacementPlanning = () => G.tool?.kind === 'build' &&
+  !!G.BDEF[G.tool.type] && !['farm','pasture','orchard','cemetery'].includes(G.tool.type);
+G.cancelBuildingPlacement = function () {
+  G.pendingBuildingPlacement = null;
+  G.buildingPlacementGestureVersion++;
+};
+G.currentBuildingPlacement = function () {
+  const p = G.pendingBuildingPlacement;
+  return p && G.isBuildingPlacementPlanning() && p.world === G.world &&
+    p.game === G.game && p.tool === G.tool && p.type === G.tool.type ? p : null;
+};
+G.stageBuildingPlacement = function (tx, ty) {
+  if (!G.world || !G.isBuildingPlacementPlanning() || G.hasOpenModal())
+    return {ok:false,reason:'先关闭弹窗并选择建筑'};
+  if (!Number.isFinite(tx) || !Number.isFinite(ty)) return {ok:false,reason:'请选择地图上的位置'};
+  tx = Math.floor(tx); ty = Math.floor(ty);
+  const type = G.tool.type, def = G.BDEF[type];
+  G.pendingBuildingPlacement = {
+    type, tx, ty, ox:tx-((def.w-1)>>1), oy:ty-((def.h-1)>>1),
+    world:G.world, game:G.game, tool:G.tool
+  };
+  const status = G.buildingPlacementStatus();
+  if (!status.ok) G.ui.toast(status.reason,'warn');
+  return status;
+};
+G.buildingPlacementStatus = function () {
+  const pending = G.currentBuildingPlacement();
+  if (!pending) return {ok:false,reason:'请先点击地图选择位置',pending:null};
+  const def = G.BDEF[pending.type], check = G.canPlace(G.world,pending.type,pending.ox,pending.oy);
+  if (!check.ok) return {...check,pending};
+  for (const k in def.cost) if (G.game.res[k] < def.cost[k])
+    return {ok:false,reason:`${G.RES[k].name}不足（需要 ${def.cost[k]}）`,pending};
+  return {ok:true,pending};
+};
+G.confirmBuildingPlacement = function (expectedPending) {
+  if (!G.isBuildingPlacementPlanning() || G.hasOpenModal())
+    return {ok:false,reason:'先关闭弹窗并回到建筑选址'};
+  const status = G.buildingPlacementStatus(), pending = status.pending;
+  if (expectedPending !== undefined && expectedPending !== pending)
+    return {ok:false,reason:'位置已更新，请查看预览后重新确认'};
+  if (!status.ok) return status;
+  // Consume before calling the authoritative placement path so repeated clicks
+  // (or reentrant UI callbacks) cannot create a second site.
+  G.pendingBuildingPlacement = null;
+  const result = G.tryPlace(pending.tx,pending.ty);
+  if (!result.ok && !G.pendingBuildingPlacement && pending.world === G.world &&
+      pending.game === G.game && pending.tool === G.tool) G.pendingBuildingPlacement = pending;
+  return result;
+};
 G.tryPlace = function (tx, ty) {
   const type = G.tool.type;
   if(type==='cemetery'){G.selectCemeteryCorner(tx,ty);return;}
@@ -1243,6 +1296,7 @@ G.tryPlace = function (tx, ty) {
   const r = G.addBuilding(type, ox, oy, type==='farm'?{farmSize:[8,8]}:{});
   if (!r.ok) G.ui.toast(r.reason, 'warn');
   G.ui.refreshHUD();
+  return r;
 };
 
 G.paintRoad = function(x0,y0,x1,y1){const q=G.planRoad(G.world,{x:x0,y:y0},{x:x1,y:y1});return q.ok?G.addRoadWork(q.path,'dirt'):q;};
@@ -1528,7 +1582,7 @@ G.init = function () {
   window.addEventListener('beforeunload', () => G.autosave());
   window.addEventListener('pagehide', () => G.autosave());
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') { resetInput(); G.cancelRoadPlan(); G.cancelHarvestPlan(); G.cancelFarmPlan(); G.cancelPasturePlan();G.cancelOrchardPlan();G.cancelCemeteryPlan(); G.autosave(); }
+    if (document.visibilityState === 'hidden') { resetInput(); G.cancelBuildingPlacement(); G.cancelRoadPlan(); G.cancelHarvestPlan(); G.cancelFarmPlan(); G.cancelPasturePlan();G.cancelOrchardPlan();G.cancelCemeteryPlan(); G.autosave(); }
   });
   // 定时自动存档：每 90 秒（游戏进行中）
   setInterval(() => G.autosave(), 90000);
@@ -1536,6 +1590,7 @@ G.init = function () {
   /* ----- 输入 ----- */
   let dragging = false, dragBtn = -1, dragMoved = 0, lastX = 0, lastY = 0, pressX = 0, pressY = 0;
   let fixedFieldTouch = null, fixedFieldMouse = null;
+  let buildingTouch = null, buildingMouse = null;
   let panTouch = null;
   const fixedField = () => G.tool?.kind === 'build' && ['farm', 'pasture', 'orchard'].includes(G.tool.type);
   let roadTouch = null, harvestTouch = null, roadMouse = null, farmTouch=null, farmMouse=null, pastureTouch=null, pastureMouse=null, orchardTouch=null, orchardMouse=null, cemeteryTouch=null, cemeteryMouse=null;
@@ -1543,12 +1598,13 @@ G.init = function () {
     if (G.roadDrag && !['bridge','tunnel'].includes(G.tool?.surface)) G.cancelRoadPlan();
     if (G.harvestPlan && !G.harvestPlan.frozen) G.cancelHarvestPlan();
     fixedFieldTouch = null; fixedFieldMouse = null;
+    buildingTouch = null; buildingMouse = null;
     panTouch = null;
     G.keys = {};
     dragging = false; dragBtn = -1; dragMoved = 0;
     roadTouch = null; harvestTouch = null; roadMouse = null; G.roadDrag = null;farmTouch=null;farmMouse=null;G.farmDrag=null;pastureTouch=null;pastureMouse=null;G.pastureDrag=null;orchardTouch=null;orchardMouse=null;G.orchardDrag=null;cemeteryTouch=null;cemeteryMouse=null;G.cemeteryDrag=null;
   }
-  window.addEventListener('blur', () => { resetInput(); roadTouch = null; G.cancelRoadPlan(); G.cancelHarvestPlan(); G.cancelFarmPlan(); G.cancelPasturePlan();G.cancelOrchardPlan();G.cancelCemeteryPlan(); });
+  window.addEventListener('blur', () => { resetInput(); roadTouch = null; G.cancelBuildingPlacement(); G.cancelRoadPlan(); G.cancelHarvestPlan(); G.cancelFarmPlan(); G.cancelPasturePlan();G.cancelOrchardPlan();G.cancelCemeteryPlan(); });
   document.addEventListener('focusin', e => { if (G.isInputTarget(e.target)) resetInput(); });
 
   const toLocal = (e) => {
@@ -1573,7 +1629,7 @@ G.init = function () {
       trees:status.trees.map(p=>p.y*gesture.world.N+p.x).join(','),rocks:G.roadRockSignature(status)} : null;
   }
   G.cv.addEventListener('contextmenu', e => e.preventDefault());
-  G.cv.addEventListener('pointercancel', () => { if (roadMouse) resetInput(); });
+  G.cv.addEventListener('pointercancel', () => { if (roadMouse || buildingMouse) resetInput(); });
 
   G.cv.addEventListener('mousedown', e => {
     if (G.hasOpenModal()) { resetInput(); return; }
@@ -1584,6 +1640,9 @@ G.init = function () {
     fixedFieldMouse = e.button===0 && fixedField() ? {
       tool:G.tool, world:G.world, game:G.game, farmVersion:G.farmGestureVersion,
       pastureVersion:G.pastureGestureVersion, orchardVersion:G.orchardGestureVersion
+    } : null;
+    buildingMouse = e.button===0 && G.isBuildingPlacementPlanning() ? {
+      tool:G.tool, world:G.world, game:G.game, generation:G.buildingPlacementGestureVersion
     } : null;
     roadMouse = null;farmMouse=null;pastureMouse=null;orchardMouse=null;cemeteryMouse=null;
     if(e.button===0&&G.isFarmPlanning()){const t=G.screenToMapTile(p.x,p.y);farmMouse={start:G.farmPoint(t.tx,t.ty),world:G.world,generation:G.farmGestureVersion};}
@@ -1639,6 +1698,11 @@ G.init = function () {
     if (!dragging) return;
     dragging = false;
     const stamp=fixedFieldMouse; fixedFieldMouse=null;
+    const buildingGesture=buildingMouse; buildingMouse=null;
+    if(e.button===0 && (buildingGesture || G.isBuildingPlacementPlanning()) &&
+        (!buildingGesture || !G.isBuildingPlacementPlanning() || e.target!==G.cv ||
+         buildingGesture.tool!==G.tool || buildingGesture.world!==G.world || buildingGesture.game!==G.game ||
+         buildingGesture.generation!==G.buildingPlacementGestureVersion)) return;
     if(e.button===0 && (stamp || fixedField()) && (!stamp || !fixedField() ||
         stamp.tool!==G.tool || stamp.world!==G.world || stamp.game!==G.game ||
         stamp.farmVersion!==G.farmGestureVersion || stamp.pastureVersion!==G.pastureGestureVersion ||
@@ -1680,7 +1744,8 @@ G.init = function () {
       return;
     }
     if (e.button === 0 && dragMoved <= 4) {
-      if (G.tool && G.tool.kind === 'build') G.tryPlace(tx, ty);
+      if (G.isBuildingPlacementPlanning()) G.stageBuildingPlacement(tx, ty);
+      else if (G.tool && G.tool.kind === 'build') G.tryPlace(tx, ty);
       else if (G.tool && G.tool.kind === 'demolish') {
         const w = G.world, i = ty * w.N + tx;
         // Keep the legacy demolishAt API; this UI action only targets built objects.
@@ -1718,6 +1783,33 @@ G.init = function () {
   }, { passive: false });
   G.cv.addEventListener('touchend', () => { panTouch = null; }, { passive: true });
   G.cv.addEventListener('touchcancel', () => { panTouch = null; }, { passive: true });
+
+  // Mobile building taps stage the same explicit confirmation as mouse clicks.
+  // Suppress compatibility mouse events and discard interrupted gestures.
+  G.cv.addEventListener('touchstart', e => {
+    if (!G.isBuildingPlacementPlanning()) return;
+    e.preventDefault(); resetInput();
+    if (!G.hasOpenModal() && e.touches.length === 1) buildingTouch = {
+      x:e.touches[0].clientX, y:e.touches[0].clientY, world:G.world, game:G.game,
+      tool:G.tool, generation:G.buildingPlacementGestureVersion
+    };
+  }, {passive:false});
+  G.cv.addEventListener('touchmove', e => {
+    if (!buildingTouch) return;
+    e.preventDefault();
+    if (e.touches.length !== 1 || Math.abs(e.touches[0].clientX-buildingTouch.x)+Math.abs(e.touches[0].clientY-buildingTouch.y)>10) buildingTouch=null;
+  }, {passive:false});
+  G.cv.addEventListener('touchend', e => {
+    const tap=buildingTouch; buildingTouch=null;
+    if (!tap) return;
+    e.preventDefault();
+    if (G.isBuildingPlacementPlanning() && tap.tool===G.tool && tap.world===G.world && tap.game===G.game &&
+        tap.generation===G.buildingPlacementGestureVersion && !G.hasOpenModal() &&
+        e.touches.length===0 && e.changedTouches.length===1) {
+      const p=toLocal(e.changedTouches[0]), t=G.screenToMapTile(p.x,p.y);
+      G.stageBuildingPlacement(t.tx,t.ty);
+    }
+  }, {passive:false});
 
   // A single mobile tap stamps the same fixed field as a mouse click. Suppress
   // compatibility mouse events; moving, multitouch or interrupted taps do not build.
@@ -1789,7 +1881,7 @@ G.init = function () {
     e.preventDefault();
     if (e.touches.length !== 1 || !roadTouch || Math.abs(e.touches[0].clientX - roadTouch.x) + Math.abs(e.touches[0].clientY - roadTouch.y) > 10) roadTouch = null;
   }, { passive: false });
-  G.cv.addEventListener('touchcancel', () => { fixedFieldTouch = null; roadTouch = null; harvestTouch = null; G.cancelRoadPlan(); G.cancelHarvestPlan(); G.cancelFarmPlan(); G.cancelPasturePlan();G.cancelOrchardPlan();G.cancelCemeteryPlan(); });
+  G.cv.addEventListener('touchcancel', () => { fixedFieldTouch = null; buildingTouch = null; roadTouch = null; harvestTouch = null; G.cancelBuildingPlacement(); G.cancelRoadPlan(); G.cancelHarvestPlan(); G.cancelFarmPlan(); G.cancelPasturePlan();G.cancelOrchardPlan();G.cancelCemeteryPlan(); });
   G.cv.addEventListener('touchend', e => {
     if (!G.tool || G.tool.kind !== 'road') { roadTouch = null; return; }
     e.preventDefault();

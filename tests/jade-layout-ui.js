@@ -26,6 +26,8 @@ function fixture() {
   }
   const window = new Target(), document = new Target();
   document.activeElement = null;
+  document.visibilityState = 'visible';
+  Object.defineProperty(document,'hidden',{get:()=>document.visibilityState==='hidden'});
   function dispatch(target, type, props = {}) {
     const event = {type, target, repeat: false, defaultPrevented: false, ...props,
       preventDefault() { this.defaultPrevented = true; },
@@ -186,21 +188,35 @@ function fixture() {
   mount('dynamic-coach', guide).hidden = true; mount('coach-text', guide);
   let modal = false, hudReads = 0, saves = 0;
   const G = {game: {paused: false, res: {wood: 80, stone: 48}}, tool: null, sel: null,
+    world: {buildings:[]}, pendingBuildingPlacement:null, buildingPlacementGestureVersion:0,
     RES: {wood: {name: '木材', icon: '🪵'}, stone: {name: '石材', icon: '🪨'}},
     BDEF: Object.fromEntries(['house', 'stonehouse', 'gatherer', 'storage'].map(type =>
-      [type, {name: type, icon: '🏠', cost: {wood: 16, stone: 8}, jobs: 0, desc: '测试建筑'}])),
+      [type, {name: type, icon: '🏠', w:2, h:2, cost: {wood: 16, stone: 8}, jobs: 0, desc: '测试建筑'}])),
     hasOpenModal: () => modal, topModal: () => modal ? {id: 'help'} : null,
     isEditingTarget: target => /^(INPUT|SELECT|TEXTAREA)$/.test(target?.tagName || '')};
+  // Execute the production staging/confirmation APIs against a tiny validated
+  // world. The full simulation/input/render path is covered separately by
+  // building-placement-confirm.js; this fixture checks the real UI handoff.
+  G.canPlace = (world,type,x,y) => x<0||y<0||world.buildings.some(b=>b.x===x&&b.y===y)
+    ? {ok:false,reason:'位置被占用'} : {ok:true};
+  G.addBuilding = (type,x,y) => {
+    const check=G.canPlace(G.world,type,x,y); if(!check.ok)return check;
+    const b={type,x,y,state:'site'};G.world.buildings.push(b);return {ok:true,b};
+  };
   const ctx = vm.createContext({window, document, G, console});
   vm.runInContext(read('js/ui.js'), ctx, {filename: 'ui.js'});
+  const main=read('js/main.js');
+  vm.runInContext(main.slice(main.indexOf('// Ordinary buildings keep'),main.indexOf('G.paintRoad =')),ctx,{filename:'main.js (placement APIs)'});
   const ui = G.ui;
   ui.el = {hud, toolbar, info, guide};
   ui.refreshHUD = () => { hudReads++; return 'hud-result'; };
   ui.showInfo = () => info.classList.remove('hidden');
   ui.hideInfo = () => { G.sel = null; info.classList.add('hidden'); };
+  const toasts=[];ui.toast=(...args)=>toasts.push(args);
   for (const name of ['refreshHarvestControls', 'refreshHarvestRangeControls', 'refreshRoadControls',
     'refreshFarmPlanControls', 'refreshPasturePlanControls', 'refreshOrchardPlanControls', 'refreshCemeteryPlanControls']) ui[name] = () => {};
   G.setTool = type => {
+    G.cancelBuildingPlacement();
     G.tool = type ? ['fell', 'quarry', 'demolish'].includes(type) ? {kind: type} : {kind: 'build', type} : null;
     ui.setToolActive();
   };
@@ -225,8 +241,11 @@ function fixture() {
   vm.runInContext(read('js/jade-layout.js'), ctx, {filename: 'jade-layout.js'});
   dispatch(document, 'DOMContentLoaded');
   originals.cancel = originalCancel;
-  return {G, ui, hud, toolbar, document, originals, mount,
+  return {G, ui, hud, toolbar, document, originals, mount, toasts,
     get: id => document.getElementById(id),
+    event: (target,type,props={}) => dispatch(target,type,props),
+    windowEvent: (type,props={}) => dispatch(window,type,props),
+    documentEvent: (type,props={}) => dispatch(document,type,props),
     key: (key, props = {}) => dispatch(document.activeElement || body, 'keydown', {key, ...props}),
     modal: value => { modal = value; }, hudReads: () => hudReads, saves: () => saves};
 }
@@ -341,6 +360,121 @@ test('icon-only tools retain stable names and More Escape preserves the active t
   assert.equal(f.ui._resourceExpanded,false);assert.equal(f.G.tool,tool);
   assert.equal(f.document.activeElement,f.get('resource-more'));
   assert.equal(house.getAttribute('aria-label'),f.G.BDEF.house.name);
+});
+
+function selectHouse(f) {
+  f.get('open-build').click();
+  f.toolbar.querySelector('[data-category="homes"]').click();
+  f.toolbar.querySelector('[data-tool="house"]').click();
+}
+function stage(f,x=10,y=10) {
+  const result=f.G.stageBuildingPlacement(x,y);f.ui.refreshHUD();return result;
+}
+
+test('click-only semantic confirmation builds the staged site exactly once', f => {
+  selectHouse(f);const confirm=f.get('jade-build-confirm'),stocks={...f.G.game.res};
+  assert.equal(confirm.hidden,false);assert.equal(confirm.disabled,true);
+  assert.equal(confirm.textContent,'选择位置');
+  assert(stage(f).ok);assert.equal(f.G.world.buildings.length,0);
+  assert.equal(confirm.disabled,false);assert.equal(confirm.textContent,'确认建造');
+  confirm.click();
+  assert.equal(f.G.world.buildings.length,1);assert.equal(f.G.world.buildings[0].x,10);
+  assert.equal(f.G.pendingBuildingPlacement,null);assert.equal(confirm.disabled,true);
+  confirm.click();assert.equal(f.G.world.buildings.length,1);
+  assert.deepEqual(f.G.game.res,stocks);
+});
+
+for(const event of ['pointerdown','mousedown','Enter',' '])test(event+' captures the exact pending position and rejects a later position', f=>{
+  selectHouse(f);stage(f);const confirm=f.get('jade-build-confirm'),old=f.G.pendingBuildingPlacement;
+  if(event==='Enter'||event===' '){confirm.focus();f.key(event);}
+  else f.event(confirm,event,{button:0});
+  stage(f,20,20);assert.notEqual(f.G.pendingBuildingPlacement,old);
+  confirm.click();assert.equal(f.G.world.buildings.length,0);
+  assert.match(f.toasts.at(-1)[0],/位置已更新/);
+  f.event(confirm,'pointerdown',{button:0});confirm.click();
+  assert.equal(f.G.world.buildings.length,1);assert.equal(f.G.world.buildings[0].x,20);
+});
+
+test('blocked placement shows its current reason and disabled action, then recovers with stock',f=>{
+  selectHouse(f);f.G.game.res.wood=0;stage(f);
+  const confirm=f.get('jade-build-confirm'),benefit=f.get('jade-build-benefit');
+  assert.equal(confirm.disabled,true);assert.match(benefit.textContent,/木材不足/);
+  assert(benefit.classList.contains('is-blocked'));assert.match(f.get('jade-build-costs').innerHTML,/is-short/);
+  confirm.click();assert.equal(f.G.world.buildings.length,0);
+  f.G.game.res.wood=80;f.ui.refreshHUD();
+  assert.equal(confirm.disabled,false);assert(!benefit.classList.contains('is-blocked'));
+  confirm.click();assert.equal(f.G.world.buildings.length,1);
+});
+
+test('details Escape closes only the details and Back restores categories with correct aria',f=>{
+  selectHouse(f);stage(f);
+  const title=f.get('jade-build-title'),head=f.get('jade-build-header');
+  const tool=f.G.tool,pending=f.G.pendingBuildingPlacement;
+  title.click();assert(head.classList.contains('jade-details-open'));
+  assert.equal(title.getAttribute('aria-expanded'),'true');
+  const event=f.key('Escape');assert(event.immediate);assert(event.defaultPrevented);
+  assert(!head.classList.contains('jade-details-open'));assert.equal(title.getAttribute('aria-expanded'),'false');
+  assert.equal(f.G.tool,tool);assert.equal(f.G.pendingBuildingPlacement,pending);
+  assert.equal(f.document.activeElement,title);
+  title.click();f.get('jade-back-categories').click();
+  assert(!head.classList.contains('jade-details-open'));assert.equal(title.getAttribute('aria-expanded'),'false');
+  assert.equal(f.G.tool,null);assert.equal(f.G.pendingBuildingPlacement,null);assert.equal(f.ui.menuCategory,null);
+});
+
+test('switching tools closes details and discards the earlier pending position',f=>{
+  selectHouse(f);stage(f);const title=f.get('jade-build-title');
+  title.click();f.G.setTool('stonehouse');
+  assert.equal(title.getAttribute('aria-expanded'),'false');
+  assert(!f.get('jade-build-header').classList.contains('jade-details-open'));
+  assert.equal(f.G.pendingBuildingPlacement,null);assert.equal(f.get('jade-build-confirm').disabled,true);
+});
+
+test('modal guards block confirmation, details toggles, Back and details Escape',f=>{
+  selectHouse(f);stage(f);const title=f.get('jade-build-title'),head=f.get('jade-build-header');
+  title.click();const pending=f.G.pendingBuildingPlacement,tool=f.G.tool;
+  f.modal(true);
+  f.get('jade-build-confirm').click();title.click();f.get('jade-back-categories').click();f.key('Escape');
+  assert.equal(f.G.world.buildings.length,0);assert.equal(f.G.tool,tool);
+  assert.equal(f.G.pendingBuildingPlacement,pending);assert(head.classList.contains('jade-details-open'));
+  assert.equal(title.getAttribute('aria-expanded'),'true');
+  f.modal(false);f.get('jade-build-confirm').click();assert.equal(f.G.world.buildings.length,1);
+});
+
+for(const interrupt of ['pointercancel','touchcancel','blur','hidden'])test(interrupt+' does not turn a cancelled activation into a fresh click-only confirmation',f=>{
+  selectHouse(f);stage(f);const confirm=f.get('jade-build-confirm');
+  f.event(confirm,'pointerdown',{button:0});
+  if(interrupt==='blur')f.windowEvent('blur');
+  else if(interrupt==='hidden'){f.document.visibilityState='hidden';f.documentEvent('visibilitychange');f.document.visibilityState='visible';}
+  else f.event(confirm,interrupt);
+  confirm.click();assert.equal(f.G.world.buildings.length,0);
+  stage(f,20,20);
+  f.event(confirm,'pointerdown',{button:0});confirm.click();assert.equal(f.G.world.buildings.length,1);
+});
+
+for(const key of ['Enter',' '])test('held '+(key===' '?'Space':key)+' cannot confirm a newly staged position through repeat clicks',f=>{
+  selectHouse(f);stage(f);const confirm=f.get('jade-build-confirm');
+  confirm.focus();f.key(key);confirm.click();
+  assert.equal(f.G.world.buildings.length,1);
+  stage(f,20,20);const pending=f.G.pendingBuildingPlacement;
+  const repeated=f.key(key,{repeat:true});assert(repeated.defaultPrevented);
+  confirm.click();assert.equal(f.G.world.buildings.length,1);
+  assert.equal(f.G.pendingBuildingPlacement,pending);
+  // Even an extra non-repeat keydown without release is not a fresh action.
+  assert(f.key(key).defaultPrevented);confirm.click();
+  assert.equal(f.G.world.buildings.length,1);
+  f.event(confirm,'keyup',{key});
+  f.key(key);confirm.click();assert.equal(f.G.world.buildings.length,2);
+  assert.equal(f.G.world.buildings[1].x,20);
+});
+
+test('Space release keeps the original captured position and a fresh press can retry',f=>{
+  selectHouse(f);stage(f);const confirm=f.get('jade-build-confirm');
+  confirm.focus();f.key(' ');
+  stage(f,20,20);f.event(confirm,'keyup',{key:' '});confirm.click();
+  assert.equal(f.G.world.buildings.length,0);
+  assert.match(f.toasts.at(-1)[0],/位置已更新/);
+  f.key(' ');f.event(confirm,'keyup',{key:' '});confirm.click();
+  assert.equal(f.G.world.buildings.length,1);assert.equal(f.G.world.buildings[0].x,20);
 });
 
 console.log(`Jade composition: ${passed} behavioral groups passed (real toolbar/navigation/layout scripts; minimal DOM, no browser hit-testing).`);
