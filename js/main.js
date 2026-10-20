@@ -165,7 +165,7 @@ G.serializeGame = function () {
       supplyMode:g.supplyMode,mealRuleVersion:g.mealRuleVersion,mealTransitionStart:g.mealTransitionStart,mealTransitionEnd:g.mealTransitionEnd,clothingSupply:g.clothingSupply,supplyStartedDay:g.supplyStartedDay,supplyUsed:g.supplyUsed,supplyLost:g.supplyLost,
       huntingLost:{...g.huntingLost},
       constructionVersion:1,constructionLost:{...g.constructionLost},
-      heating:g.heating, fishingRules:g.fishingRules, fireDisasters:g.fireDisasters, farmPests:g.farmPests, pasturePests:g.pasturePests, townLedger:g.townLedger, challenges:g.challenges, hist: g.hist, buildLog: g.buildLog, toolMode:g.toolMode,toolRemainders:g.toolRemainders,toolWear: g.toolWear, steelToolWear: g.steelToolWear, healthStartDay: g.healthStartDay, nomads:g.nomads, unlocks: g.unlocks, livestock: g.livestock,
+      heating:g.heating, fishingRules:g.fishingRules, fireDisasters:g.fireDisasters, farmPests:g.farmPests, pasturePests:g.pasturePests, townLedger:g.townLedger, industryLedger:G.industryLedgerForSave(g), challenges:g.challenges, hist: g.hist, buildLog: g.buildLog, toolMode:g.toolMode,toolRemainders:g.toolRemainders,toolWear: g.toolWear, steelToolWear: g.steelToolWear, healthStartDay: g.healthStartDay, nomads:g.nomads, unlocks: g.unlocks, livestock: g.livestock,
       productionGoals: g.productionGoals && { ...g.productionGoals }, productionPaused: g.productionPaused && { ...g.productionPaused },
     },
     deer:deerWorld.deer.map(d=>({...d})),
@@ -469,6 +469,19 @@ G.prepareSaveData = function (d) {
     if(days.length?days[days.length-1].day!==g.day-1:g.day!==startDay)bad('流水日期缺失');
     if(days.length<48&&days.length&&days[0].day!==startDay)bad('流水起始记录缺失');
     g.townLedger={v:1,startDay,startHour,current:bucket(l.current,false),days};
+  }
+
+  if(gd.industryLedger===undefined)g.industryLedger=G.newIndustryLedger(g);
+  else {
+    const l=record(gd.industryLedger,'工业事件账');
+    if(l.v!==1)bad('工业事件账版本');
+    const startDay=integer(l.startDay,'工业记账起始日',0,g.day),startHour=number(l.startHour,'工业记账起始小时',0,G.DAY_H);
+    if(startHour>=G.DAY_H||startDay===g.day&&startHour>g.h||l.day!==g.day)bad('工业事件账日期');
+    const flows=(value,label)=>{record(value,label);if(Object.keys(value).length!==G.INDUSTRY_RES.length||Object.keys(value).some(k=>!G.INDUSTRY_RES.includes(k)))bad(label+'资源');
+      return Object.fromEntries(G.INDUSTRY_RES.map(k=>{const row=record(value[k],label+'计量');if(Object.keys(row).length!==G.INDUSTRY_METRICS.length||Object.keys(row).some(m=>!G.INDUSTRY_METRICS.includes(m)))bad(label+'字段');return [k,Object.fromEntries(G.INDUSTRY_METRICS.map(m=>[m,number(row[m],label+'数量',0)]))];}));};
+    const totals=flows(l.totals,'工业累计'),today=flows(l.today,'工业今日');
+    for(const k of G.INDUSTRY_RES)for(const m of G.INDUSTRY_METRICS)if(today[k][m]>totals[k][m]||startDay===g.day&&today[k][m]!==totals[k][m])bad('工业今日与累计不符');
+    g.industryLedger={v:1,startDay,startHour,day:g.day,totals,today};
   }
 
   g.toolWear = Number.isFinite(gd.toolWear) && gd.toolWear >= 0 ? gd.toolWear : 0;

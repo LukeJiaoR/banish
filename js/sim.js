@@ -3,6 +3,30 @@
  * sim.js —— 游戏状态、时间、市民 AI、职业调度、经济与生死
  * ============================================================ */
 
+/* Independent event counters: different stages are never added into a stock
+ * balance. Legacy villages begin observing now, never infer historic events. */
+G.INDUSTRY_RES=G.RES_KEYS.filter(k=>k!=='food');
+G.INDUSTRY_METRICS=['produced','received','withdrawn','processed','imported','exported'];
+G.emptyIndustryFlows=()=>Object.fromEntries(G.INDUSTRY_RES.map(k=>[k,Object.fromEntries(G.INDUSTRY_METRICS.map(m=>[m,0]))]));
+G.newIndustryLedger=g=>({v:1,startDay:g.day,startHour:g.h,day:g.day,totals:G.emptyIndustryFlows(),today:G.emptyIndustryFlows()});
+G.advanceIndustryLedger=function(g=G.game){
+  if(!g.industryLedger)g.industryLedger=G.newIndustryLedger(g);
+  if(g.industryLedger.day!==g.day){g.industryLedger.day=g.day;g.industryLedger.today=G.emptyIndustryFlows();}
+  return g.industryLedger;
+};
+G.industryRecord=function(metric,type,qty){
+  if(type==='food')type='grain';
+  if(!G.INDUSTRY_RES.includes(type)||!G.INDUSTRY_METRICS.includes(metric)||!Number.isFinite(qty)||qty<=0)return;
+  const l=G.advanceIndustryLedger();l.totals[type][metric]+=qty;l.today[type][metric]+=qty;
+};
+G.industryLedgerForSave=function(g=G.game){const l=g.industryLedger;return l&&l.day!==g.day?{...l,day:g.day,today:G.emptyIndustryFlows()}:l;};
+G.industryLedgerSummary=function(){
+  const l=G.game.industryLedger;if(!l)return null;
+  return {startDay:l.startDay,startHour:l.startHour,day:G.game.day,hour:G.game.h,
+    todayFromHour:l.startDay===G.game.day?l.startHour:0,
+    totals:JSON.parse(JSON.stringify(l.totals)),today:l.day===G.game.day?JSON.parse(JSON.stringify(l.today)):G.emptyIndustryFlows()};
+};
+
 /* Measured town flows: bounded observations, never an economy controller.
  * Food total is derived from three groups; held goods are not warehouse stock. */
 G.LEDGER_RES=[...G.FOOD_KEYS,'firewood'];
@@ -16,6 +40,7 @@ G.ensureTownLedger=function(g=G.game){
   return g.townLedger;
 };
 G.ledgerRecord=function(metric,type,qty){
+  if(metric==='received'||metric==='withdrawn')G.industryRecord(metric,type,qty);
   if(type==='food')type='grain';
   if(!G.LEDGER_RES.includes(type)||!G.LEDGER_METRICS.includes(metric)||!Number.isFinite(qty)||qty<=0)return;
   G.ensureTownLedger().current.flows[type][metric]+=qty;
@@ -99,7 +124,7 @@ G.newGameState = function (startConfig = null) {
     g.res.food=G.FOOD_KEYS.reduce((sum,k)=>sum+g.res[k],0);
     g.unlocks.wheat=preset.wheat;
   }
-  g.townLedger=G.newTownLedger(g);return g;
+  g.townLedger=G.newTownLedger(g);g.industryLedger=G.newIndustryLedger(g);return g;
 };
 G.game = G.newGameState();
 
@@ -134,6 +159,7 @@ G.endDay = function () {
   // Midnight meals/heating below belong to the new day, not the closed one.
   G.closeTownLedgerDay();
   g.day++;
+  G.advanceIndustryLedger(g);
   G.advanceDeer();
   G.advanceMemorials();
   const born0 = g.stats.born, died0 = g.stats.died; // 当日生死增量（进滚动日志）
@@ -1135,7 +1161,8 @@ G.completeSmithTask=function(c,t){
     if(!G.sendTo(c,t.tx,t.ty,spot.route))G.returnSmithBatch(c);return;
   }
   if(t.phase!=='process'||!G.smithCargoMatches(c,t)){G.returnSmithBatch(c);return;}
-  c.carry={type:t.yield.type,qty:t.yield.qty};G.startHaul(c);
+  for(const item of t.consume)G.industryRecord('processed',item.type,item.qty);
+  c.carry={type:t.yield.type,qty:t.yield.qty};G.recordProduction(t.b,t.yield.type,t.yield.qty);G.startHaul(c);
 };
 
 /* Fuel inputs are a distinct bounded batch. Tailor batches below separately
@@ -1168,6 +1195,7 @@ G.completeFuelTask=function(c,t){
   }
   const cargo=c.carry;
   if(t.phase!=='process'||!cargo||cargo!==t.inputCargo||!cargo.fuelInput||!cargo.staffingReturn||cargo.type!=='wood'||cargo.qty!==t.consume.qty||cargo.extra){G.returnSmithBatch(c);return;}
+  G.industryRecord('processed','wood',t.consume.qty);
   t.completed=true;c.carry={type:'firewood',qty:t.yield.qty,firewoodId:t.b.id};G.recordProduction(t.b,'firewood',t.yield.qty);G.startHaul(c);
 };
 
@@ -1200,6 +1228,7 @@ G.completeTailorTask=function(c,t){
   }
   const cargo=c.carry,contents=cargo?{[cargo.type]:cargo.qty,...(cargo.extra||{})}:{};
   if(t.phase!=='process'||!cargo||cargo!==t.inputCargo||cargo.coatInput!==t.b.id||!cargo.staffingReturn||Object.keys(contents).length!==t.consume.length||t.consume.some(x=>contents[x.type]!==x.qty)){G.returnSmithBatch(c);return;}
+  for(const item of t.consume)G.industryRecord('processed',item.type,item.qty);
   t.completed=true;c.carry={type:t.yield.type,qty:t.yield.qty,tailorId:t.b.id};G.recordProduction(t.b,t.yield.type,t.yield.qty);G.startHaul(c);
 };
 
@@ -1608,6 +1637,7 @@ G.taskLogYield = function (c) { return c.educated ? G.PROD.forester.eduLogsYield
 /* 产出时点按建筑累计（建筑详情「累计产出」行）：任务完成即计，与是否送达仓库无关；
  * 散工砍树/清石无建筑归属，不计入任何建筑 */
 G.recordProduction = function (b, type, qty) {
+  G.industryRecord('produced',type,qty);
   if (!b) return;
   if (!b.produced) b.produced = {};
   b.produced[type] = (b.produced[type] || 0) + qty;
@@ -1977,6 +2007,7 @@ G.completeTask = function (c) {
       if (G.world.rock[i] === t.rock) {
         G.clearRock(G.world, t.tx, t.ty);
         c.carry = { type: t.rock === 2 ? 'iron' : 'stone', qty: G.taskYield(t.rock === 2 ? G.ROCK_IRON : G.ROCK_STONE,t) };
+        G.industryRecord('produced',c.carry.type,c.carry.qty);
       }
       break;
     }
@@ -1991,10 +2022,10 @@ G.completeTask = function (c) {
       if (t.consume) {
         const cons = Array.isArray(t.consume) ? t.consume : [t.consume];
         if (cons.some(c2 => G.game.res[c2.type] < c2.qty)) break; // 材料在干活的这几个小时里被同行用掉，本次白干
-        for (const c2 of cons) G.game.res[c2.type] -= c2.qty;
+        for (const c2 of cons) {G.game.res[c2.type] -= c2.qty;G.industryRecord('processed',c2.type,c2.qty);}
       }
       if (t.yield) { c.carry = { type: t.yield.type, qty: t.yield.qty };
-        if(G.LEDGER_RES.includes(t.yield.type))G.recordProduction(b,t.yield.type,t.yield.qty);
+        if(G.LEDGER_RES.includes(t.yield.type))G.recordProduction(b,t.yield.type,t.yield.qty);else G.industryRecord('produced',t.yield.type,t.yield.qty);
         if (t.extra) c.carry.extra = { ...t.extra };
       }
       break;
@@ -2008,9 +2039,9 @@ G.completeTask = function (c) {
       if(b?.type==='tailor'&&(G.world.bmap[b.id]!==b||b.state!=='ok'||c.job!==b.id||!G.atMedicalDoor(c,b)||G.d2(c.x,c.y,t.tx,t.ty)>.04))break;
       const ingredients=G.taskIngredients(t);
       if(ingredients.some(item=>G.game.res[item.type]<item.qty))break; // all-or-nothing, no partial wool/leather charge
-      for(const item of ingredients)G.withdrawResource(item.type,item.qty);
+      for(const item of ingredients){G.withdrawResource(item.type,item.qty);G.industryRecord('processed',item.type,item.qty);}
       c.carry = { type: t.yield.type, qty: t.yield.qty };
-      if(b?.type==='tailor'||G.LEDGER_RES.includes(t.yield.type))G.recordProduction(b,t.yield.type,t.yield.qty);
+      if(b?.type==='tailor'||G.LEDGER_RES.includes(t.yield.type))G.recordProduction(b,t.yield.type,t.yield.qty);else G.industryRecord('produced',t.yield.type,t.yield.qty);
       break;
     }
     case 'sow': {
@@ -2869,6 +2900,7 @@ G.executeTrade = function(b,good,qty,payment,expectedMerchant){
   if(expectedMerchant!==undefined&&!G.currentMerchant(b,expectedMerchant))return {ok:false,reason:'商人已离港或已经换船，请重新查看'};
   const q=G.tradeQuote(b,good,qty,payment);if(!q.ok)return q;
   b.tradeInventory[payment]-=q.cost;b.merchant.stock[good]-=qty;
+  G.industryRecord('exported',payment,q.cost);G.industryRecord('imported',good,qty);
   if(G.isLivestockType(good))G.game.livestock[good]=(G.game.livestock[good]||0)+qty;
   else if(G.seedUnlockKey(good))G.game.unlocks[G.seedUnlockKey(good)]=true;
   else b.tradeInventory[good]=(b.tradeInventory[good]||0)+qty;
@@ -3605,6 +3637,7 @@ G.completeBrew=function(c,t){
     return;
   }
   if(t.phase!=='process'||!G.atMedicalDoor(c,b)||!c.carry?.brewIngredient||c.carry.type!==recipe.inputType||c.carry.qty!==recipe.inputQty||!G.tavernBrewStatus(b,true,recipe).ok){G.returnBrewGrain(c);return;}
+  G.industryRecord('processed',recipe.inputType,recipe.inputQty);
   t.completed=true;c.carry={type:'ale',qty:recipe.outputQty};G.recordProduction(b,'ale',recipe.outputQty);G.startHaul(c);
 };
 G.validLeisureTask=function(c){

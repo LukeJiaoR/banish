@@ -2446,6 +2446,29 @@ G.ui = {
       </details>
     </details>`;
   },
+  industryLedgerInfoData:function(){
+    const s=G.industryLedgerSummary?.(),data={};
+    const hour=h=>`${String(Math.floor(h)).padStart(2,'0')}:${String(Math.floor((h%1)*60+1e-7)).padStart(2,'0')}`;
+    data.industryCoverage=s?`自第 ${s.startDay+1} 天 ${hour(s.startHour)} 起的累计事件；更早历史未记录。今日从 ${hour(s.todayFromHour)} 至 ${hour(s.hour)}，未折算全天。`:'工业事件尚未记录；不能从已有库存推算历史。';
+    for(const resource of G.INDUSTRY_RES)for(const metric of G.INDUSTRY_METRICS)for(const period of ['totals','today']){
+      const n=s?.[period]?.[resource]?.[metric];data[`industry-${resource}-${period}-${metric}`]=!Number.isFinite(n)?'未记录':n===0?'0':n<.01?'<0.01':String(Number(n.toFixed(2)));
+    }
+    return data;
+  },
+  industryLedgerInfoMarkup:function(data){
+    const text=key=>`<span data-townhall="${key}">${this.escHtml(data[key])}</span>`;
+    const labels={produced:'制成/采获',received:'公共入库',withdrawn:'公共领出',processed:'加工耗料',imported:'贸易买入',exported:'贸易付出'};
+    const table=resources=>`<div class="townledger-table-wrap" tabindex="0" role="region" aria-label="工业贸易事件表，可横向滚动"><table class="townledger-table"><thead><tr><th scope="col">物资</th>${G.INDUSTRY_METRICS.map(m=>`<th scope="col">${labels[m]}<br>累计 / 今日</th>`).join('')}</tr></thead><tbody>${resources.map(k=>`<tr><th scope="row">${G.RES[k].name}</th>${G.INDUSTRY_METRICS.map(m=>`<td>${text(`industry-${k}-totals-${m}`)} / ${text(`industry-${k}-today-${m}`)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+    return `<details data-industry-ledger><summary>工业与贸易事件账</summary>
+      <p data-townhall="industryCoverage">${this.escHtml(data.industryCoverage)}</p>
+      <p>这是各阶段的实际事件，不是完整库存平账。同行各列不能相加：制成后入库、领料后加工、贸易买入后运回都会分别记录。</p>
+      ${table(G.INDUSTRY_RES.filter(k=>!G.FOOD_KEYS.includes(k)))}
+      <details data-industry-food><summary>展开粮果加工与食物贸易</summary>${table(G.FOOD_KEYS)}</details>
+      <p>制成/采获在实际完成时计，公共入库只计仓库接收；公共领出仍可能在途或退回，不等于耗掉。加工耗料仅在批次成功转成产品时计，取消退料不计。</p>
+      <p>贸易买入/付出在本站成交时计，订货、报价和未成交自动规则不计；种子解锁与活畜不在资源事件表。未记录的历史不能当作零，0仅表示本段已记录事件为零。</p>
+      <p>公共领出也可能来自施工或家庭配送，不能当作工业耗料。本表不统计建筑最终投入/拆除回收、居民衣物工具使用/磨损、取暖与休闲消耗或全部损失，不能据此推算总库存净变或在途库存。粮柴生活消耗仍查看原流水。</p>
+    </details>`;
+  },
   townChallengeInfoData:function(){
     const f=G.townChallengeFacts(),done=G.game.challenges?.completed||{};
     const status=key=>done[key]!==undefined?`已确认：第 ${done[key]} 天`:(f[key].ready?'当前已满足，待下次日界确认':'进行中');
@@ -2479,7 +2502,7 @@ G.ui = {
       historySummary: rows.length ? `第 ${rows[0].d}–${rows[rows.length - 1].d} 天：出生 ${born} · 死亡 ${died}；人口 ${rows[0].pop} → ${rows[rows.length - 1].pop}` : '尚无每日记录；结束第一天后开始记账。',
       historyRows: rows.map(row => `第 ${row.d} 天 · 人口 ${Number(row.pop) || 0} · 出生 ${Number(row.born) || 0} · 死亡 ${Number(row.died) || 0} · ${[['food','粮'],['firewood','柴'],['wood','木'],['stone','石'],['iron','铁']].map(([key,label]) => label + (Number.isFinite(row[key]) ? row[key] : '—')).join(' / ')}`).join('\n'),
     };
-    Object.assign(data, this.townLedgerInfoData(), this.townChallengeInfoData());
+    Object.assign(data, this.townLedgerInfoData(), this.industryLedgerInfoData(), this.townChallengeInfoData());
     const offer = s.offer;
     if (offer) {
       const needed = s.offerFamilies + s.homelessFamilies, free = s.freeHomes + s.boardingSlots;
@@ -2507,6 +2530,7 @@ G.ui = {
         <p class="desc">日界首次观察满足后永久记录本次确认日；旧档不追溯历史完成日。产出可仍在搬运，贸易运回不算自产，统计不保证库存足够、均衡饮食或下一季继续自给。</p>
       </details>
       ${this.townLedgerInfoMarkup(data)}
+      ${this.industryLedgerInfoMarkup(data)}
       <details class="townhall-ledger"><summary data-townhall="historyTitle">${this.escHtml(data.historyTitle)}</summary>
         <p data-townhall="historySummary">${this.escHtml(data.historySummary)}</p>
         <div class="townhall-ledger-rows" data-townhall="historyRows">${this.escHtml(data.historyRows)}</div>

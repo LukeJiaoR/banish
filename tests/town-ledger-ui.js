@@ -311,7 +311,7 @@ test('same-ID actual save reload restores its ledger; legacy reload clears previ
   assert.equal(flow(f, 'food', 'recent', 'produced'), '30');
   assert.equal(flow(f, 'food', 'current', 'produced'), '0');
   const restored = f.info.querySelector('[data-townledger-panel]');
-  const legacy = JSON.parse(json(saved)); delete legacy.game.townLedger;
+  const legacy = JSON.parse(json(saved)); delete legacy.game.townLedger; delete legacy.game.industryLedger;
   legacy.game.day = 31; legacy.game.season = 2; legacy.game.h = 11.75;
   load(f, legacy);
   assert.notEqual(f.info.querySelector('[data-townledger-panel]'), restored);
@@ -331,6 +331,22 @@ test('retained windows use their actual year/season ranges and never claim the f
   assert.equal(flow(f, 'food', 'recent', 'produced'), '12');
   assert.equal(flow(f, 'food', 'previous', 'produced'), '12');
   assert.equal(flow(f, 'food', 'difference', 'produced'), '0');
+});
+
+test('industrial stages have separate readable counters and a stable collapsed panel', () => {
+  const f=town(),{G}=f;f.select(f.b);
+  const panel=f.info.querySelector('[data-industry-ledger]');assert(panel);panel.open=true;
+  G.industryRecord('produced','ale',10);G.industryRecord('received','ale',3);
+  G.industryRecord('withdrawn','apples',30);G.industryRecord('processed','apples',30);
+  G.industryRecord('imported','stone',8);G.industryRecord('exported','ale',7);G.ui.renderInfo();
+  assert.equal(f.info.querySelector('[data-industry-ledger]'),panel);assert.equal(panel.open,true);
+  for(const [key,n]of [['industry-ale-totals-produced','10'],['industry-ale-totals-received','3'],['industry-stone-totals-imported','8'],['industry-stone-totals-received','0'],['industry-apples-totals-processed','30']])assert.equal(live(f,key).textContent,n);
+  assert.match(f.info.textContent,/不是完整库存平账.*同行各列不能相加/s);
+  assert.match(live(f,'industryCoverage').textContent,/更早历史未记录/);
+  const before=json(G.serializeGame());for(let i=0;i<5;i++)G.ui.renderInfo();assert.equal(json(G.serializeGame()),before);
+  const legacy=JSON.parse(before);delete legacy.game.industryLedger;load(f,legacy);
+  assert.equal(live(f,'industry-ale-totals-produced').textContent,'0');assert.match(live(f,'industryCoverage').textContent,/更早历史未记录/);
+  G.industryLedgerSummary=()=>null;G.ui.renderInfo();assert.equal(live(f,'industry-ale-totals-produced').textContent,'未记录');
 });
 
 console.log(`Town flow ledger UI: ${passed} suites passed (DOM fixture, actual summary/save APIs; browser visual acceptance not performed).`);
