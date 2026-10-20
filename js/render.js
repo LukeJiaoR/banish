@@ -4,6 +4,17 @@
  * 坐标系：tile(z=1) 屏幕 = ((tx-ty)*32, (tx+ty)*16) + 相机
  * ============================================================ */
 
+// Cached road previews distinguish clearable resources from hard terrain blockers.
+G.roadPreviewFill = function(w,x,y,surface,hover=false){
+ const i=y*w.N+x,ordinary=!['bridge','tunnel'].includes(surface);
+ const blocked=x<0||y<0||x>=w.N||y>=w.N||w.bgrid[i]>=0||
+   (w.water[i]===1&&(hover||surface!=='bridge'))||
+   (G.isMountain(w,x,y)&&(hover||surface!=='tunnel'))||(!ordinary&&w.rock[i]);
+ return blocked?(hover?'rgba(230,90,80,0.4)':'rgba(230,90,80,.6)'):
+   (w.treeIdx[i]>=0||ordinary&&w.rock[i])?(hover?'rgba(235,180,65,0.4)':'rgba(235,180,65,.6)'):
+   hover?'rgba(120,230,140,0.4)':'rgba(120,230,140,.5)';
+};
+
 G.cam = { x: 0, y: 0, z: 1 };
 G.groundScale = 0.5;   // 地面缓存画布降采样
 G.CACHE_MAX_PX = 16000000; // 地面缓存画布像素上限（Safari 单画布约 1677 万像素，超出会静默空白）
@@ -1322,7 +1333,7 @@ G.frame = function (dtReal) {
       const px = sx * G.cam.z + G.cam.x, py = sy * G.cam.z + G.cam.y;
       if (px < -40 * G.cam.z || px > cv.clientWidth + 40 * G.cam.z || py < -20 * G.cam.z || py > cv.clientHeight + 20 * G.cam.z) continue;
       G.diamondPath(ctx, sx, sy);
-      ctx.fillStyle = (w.water[i] === 1 && plan.surface!=='bridge') || (plan.surface!=='tunnel'&&G.isMountain&&G.isMountain(w,p.x,p.y)) || w.rock[i] || w.bgrid[i] >= 0 ? 'rgba(230,90,80,.6)' : w.treeIdx[i] >= 0 ? 'rgba(235,180,65,.6)' : 'rgba(120,230,140,.5)';
+      ctx.fillStyle = G.roadPreviewFill(w,p.x,p.y,plan.surface);
       ctx.fill();
     }
   }
@@ -1330,8 +1341,7 @@ G.frame = function (dtReal) {
   if (G.tool && G.tool.kind === 'road' && G.hover.tx >= 0) {
     const [sx, sy] = G.T2S(G.hover.tx, G.hover.ty);
     G.diamondPath(ctx, sx, sy);
-    const hx = G.hover.tx, hy = G.hover.ty, hi = hy * w.N + hx;
-    ctx.fillStyle = hx >= 0 && hy >= 0 && hx < w.N && hy < w.N && w.water[hi] !== 1 && !(G.isMountain&&G.isMountain(w,hx,hy)) && !w.rock[hi] && w.bgrid[hi] < 0 ? 'rgba(120,230,140,0.4)' : 'rgba(230,90,80,0.4)';
+    ctx.fillStyle = G.roadPreviewFill(w,G.hover.tx,G.hover.ty,G.tool.surface,true);
     ctx.fill();
   }
 

@@ -849,9 +849,9 @@ G.planRoad = function (w, start, end, options) {
   const N = w.N, valid = p => p && Number.isInteger(p.x) && Number.isInteger(p.y) && p.x >= 0 && p.y >= 0 && p.x < N && p.y < N;
   if (!valid(start) || !valid(end)) return { ok: false, reason: '起终点必须在地图内' };
   const usable = (x, y) => x >= 0 && y >= 0 && x < N && y < N &&
-    !G.isMountain(w, x, y) && w.water[y * N + x] !== 1 && !w.rock[y * N + x] && w.bgrid[y * N + x] < 0;
-  if (!usable(start.x, start.y)) return { ok: false, reason: '起点被水面、建筑或矿石挡住' };
-  if (!usable(end.x, end.y)) return { ok: false, reason: '终点被水面、建筑或矿石挡住' };
+    !G.isMountain(w, x, y) && w.water[y * N + x] !== 1 && w.bgrid[y * N + x] < 0;
+  if (!usable(start.x, start.y)) return { ok: false, reason: '起点被水面、建筑或山体挡住' };
+  if (!usable(end.x, end.y)) return { ok: false, reason: '终点被水面、建筑或山体挡住' };
   const distance = (x, y, p) => Math.abs(x - p.x) + Math.abs(y - p.y);
   const direct = distance(start.x, start.y, end), maxSteps = Math.ceil(direct * 1.75) + 16;
   const maxExpanded = Math.max(1, Math.min(20000, Number.isFinite(options.maxExpanded) ? Math.floor(options.maxExpanded) : 12000));
@@ -917,14 +917,15 @@ G.planRoad = function (w, start, end, options) {
   const path = search(true) || (!budgetExceeded ? search(false) : null);
   if (!path) return { ok: false, reason: budgetExceeded ? '路线计算达到预算，请选择较近端点分段规划' : '没有连通路线，或绕行过远；请分段规划或先清障', expanded, maxSteps, budgetExceeded };
   let turns = 0, previous = null, newTiles = 0, reusedTiles = 0;
-  const clearTrees = [];
+  const clearTrees = [], clearRocks = [];
   for (let j = 0; j < path.length; j++) {
     const p = path[j], i = p.y * N + p.x;
     if (w.road[i]) reusedTiles++; else newTiles++;
     if (w.treeIdx[i] >= 0) clearTrees.push({ x: p.x, y: p.y });
+    if (w.rock[i]) clearRocks.push({ x: p.x, y: p.y, rock: w.rock[i] });
     if (j) { const d = [p.x - path[j - 1].x, p.y - path[j - 1].y]; if (previous && (d[0] !== previous[0] || d[1] !== previous[1])) turns++; previous = d; }
   }
-  return { ok: true, path, steps: path.length - 1, turns, newTiles, reusedTiles, clearTrees, materials: { wood: 0, stone: 0 }, expanded, maxSteps };
+  return { ok: true, path, steps: path.length - 1, turns, newTiles, reusedTiles, clearTrees, clearRocks, materials: { wood: 0, stone: 0 }, expanded, maxSteps };
 };
 
 /* Bridges occupy ordinary building footprints but open water only on completion.
@@ -1032,7 +1033,7 @@ G.roadWorkPlanQuote=function(w,path,surface){
  if(!['dirt','stone'].includes(surface)||!Array.isArray(path)||!path.length||path.length>w.N*w.N)return {ok:false,reason:'铺路计划无效'};
  const target=surface==='stone'?2:1,cells=[],seen=new Set();let reused=0,alreadyQueued=0;
  for(const p of path){if(!p||!Number.isInteger(p.x)||!Number.isInteger(p.y)||p.x<0||p.y<0||p.x>=w.N||p.y>=w.N)return {ok:false,reason:'路线超出地图'};const i=p.y*w.N+p.x;if(seen.has(i))return {ok:false,reason:'路线重复经过同一格'};seen.add(i);
-  if(G.isMountain(w,p.x,p.y)||w.water[i]===1||w.rock[i]||w.bgrid[i]>=0)return {ok:false,reason:'路线已被地形或建筑占用，请重新规划'};
+  if(G.isMountain(w,p.x,p.y)||w.water[i]===1||w.bgrid[i]>=0)return {ok:false,reason:'路线已被地形或建筑占用，请重新规划'};
   if(w.road[i]>=target){reused++;continue;}const owner=G.roadWorkAt(w,p.x,p.y);if(owner){if(owner.roadWork.surface!==surface)return {ok:false,reason:'该格已有另一种铺路工程，请先完成或取消它'};alreadyQueued++;continue;}
   cells.push({x:p.x,y:p.y,base:w.road[i],target,workLeft:G.ROAD_WORK_H,used:false,done:false});
  }

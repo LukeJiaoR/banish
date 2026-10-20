@@ -217,10 +217,21 @@ test('drag queues clearing and construction together but rejects changed tree in
   if(change==='none'){assert.equal(G.roadPlan,null);assertQueuedAt(G,5,3);assert.match(doc.getElementById('road-plan-status').textContent,/自动施工/);}else assert(G.roadPlan);
  }
 });
+test('mouse mineral drag confirms exactly the shown mineral types on release',()=>{
+ for(const changed of [false,true]){
+  const {G,doc}=roadFixture(),cv=doc.getElementById('game'),w=G.world;
+  w.rock[3*w.N+5]=1;w.rock[3*w.N+8]=2;
+  cv.emit('mousedown',{clientX:3,clientY:3});cv.emit('mousemove',{clientX:12,clientY:3});
+  assert.equal(G.roadPlan.result.clearRocks.length,2);assert.equal(w.markedRocks.size,0);
+  if(changed)w.rock[3*w.N+5]=2;
+  cv.emit('mouseup',{clientX:12,clientY:3});assert.equal(projects(G).length,changed?0:1);
+  assert.equal(w.markedRocks.size,changed?0:2);assert.equal(w.road.some(Boolean),false);
+ }
+});
 test('new obstacles reject the displayed route rather than silently rerouting',()=>{
  const {G,doc}=roadFixture(),cv=doc.getElementById('game');
  cv.emit('mousedown',{clientX:3,clientY:3});cv.emit('mousemove',{clientX:12,clientY:3});const shown=JSON.stringify(G.roadPlan.result.path);
- G.world.rock[3*G.world.N+6]=1;cv.emit('mouseup',{clientX:12,clientY:3});
+ G.world.water[3*G.world.N+6]=1;cv.emit('mouseup',{clientX:12,clientY:3});
  assert.equal(projects(G).length,0);assert.equal(JSON.stringify(G.roadPlan.result.path),shown);assert.equal(G.roadPlanStatus().ok,false);
 });
 test('right click, modal, off-canvas release and replaced game cancel live drag',()=>{

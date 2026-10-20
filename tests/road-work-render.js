@@ -4,4 +4,15 @@ test('staging stones only appear when actually onsite, and drawing is state neut
 test('offscreen pending cells and staging are culled in map space',()=>{const {calls,ctx}=record();G.drawRoadWorkGround(ctx,b,{tx0:30,ty0:30,tx1:40,ty1:40});assert(!calls.some(c=>['moveTo','ellipse','fillText','fillRect'].includes(c[0])));});
 test('completed cells lose pending outlines, but staging remains visible until remaining work ends',()=>{b.roadWork.cells[1].done=true;b.roadWork.cells[1].workLeft=0;const {calls,ctx}=record();G.drawRoadWorkGround(ctx,b);assert.equal(calls.filter(c=>c[0]==='setLineDash'&&c[1]?.length).length,2);assert.equal(calls.filter(c=>c[0]==='fillRect').length,1);b.roadWork.cells[1].done=false;b.roadWork.cells[1].workLeft=1;});
 test('selected staging has a small label, unselected has none and no new pointer layer exists',()=>{for(const selected of [false,true]){G.sel=selected?{kind:'b',id:b.id}:null;const {calls,ctx}=record();G.drawRoadWorkGround(ctx,b);assert.equal(calls.filter(c=>c[0]==='fillText').length,selected?1:0);}const source=fs.readFileSync(path.join(root,'js/render.js'),'utf8');assert(source.includes("['bridge','graveremnant','roadwork'].includes(b.type)"));assert(source.includes("c.task?.kind==='roadPave'&&c.task.phase==='load'"));});
+test('dirt and stone mineral previews and hover are amber; bridges, tunnels and hard obstacles remain red',()=>{
+ const w=G.world,x=20,y=20,i=y*w.N+x;
+ for(const rock of [1,2])for(const surface of ['dirt','stone'])for(const hover of [false,true]){
+  w.rock[i]=rock;assert.match(G.roadPreviewFill(w,x,y,surface,hover),/235,180,65/);
+  for(const special of ['bridge','tunnel'])assert.match(G.roadPreviewFill(w,x,y,special,hover),/230,90,80/);
+  w.water[i]=1;assert.match(G.roadPreviewFill(w,x,y,surface,hover),/230,90,80/);w.water[i]=0;
+  w.mountain[i]=1;assert.match(G.roadPreviewFill(w,x,y,surface,hover),/230,90,80/);w.mountain[i]=0;
+  w.bgrid[i]=999;assert.match(G.roadPreviewFill(w,x,y,surface,hover),/230,90,80/);w.bgrid[i]=-1;
+ }
+ w.rock[i]=0;assert.match(G.roadPreviewFill(w,x,y,'dirt'),/120,230,140/);
+});
 console.log(`Road work render: ${passed} offline suites passed.`);

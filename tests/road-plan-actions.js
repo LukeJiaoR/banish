@@ -21,7 +21,7 @@ test('endpoint preview does not pave, clear, mark or spend; explicit confirm que
   const r=G.confirmRoadPlan();assertQueued(G,w,r);assert.equal(JSON.stringify(G.game.res),res);assert.equal(G.roadPlan,null);
   assert.equal(projects(G).length,1);
 });
-test('new obstruction rejects whole route with no partial paving',()=>{const{G,w}=setup();w.rock[3*w.N+6]=2;assert.equal(G.confirmRoadPlan().ok,false);assert.equal(w.road.some(Boolean),false);assert.equal(projects(G).length,0)});
+test('new obstruction rejects whole route with no partial paving',()=>{const{G,w}=setup();w.water[3*w.N+6]=1;assert.equal(G.confirmRoadPlan().ok,false);assert.equal(w.road.some(Boolean),false);assert.equal(projects(G).length,0)});
 test('tree confirmation queues once without removing trees or creating wood',()=>{
  const {G,w}=setup(),i=3*w.N+5;w.treeIdx[i]=7;const wood=G.game.res.wood;
  const result=G.confirmRoadPlan();assertQueued(G,w,result);assert.equal(result.clearing,true);assert(w.marked.has(i));assert.equal(w.treeIdx[i],7);assert.equal(G.game.res.wood,wood);assert.equal(G.roadPlan,null);

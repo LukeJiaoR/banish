@@ -368,7 +368,7 @@ G.ui = {
     const def = G.BDEF[t], action = special[t];
     const name = action ? action.name : def.name, icon = action ? action.icon : def.icon;
     const cost = action ? action.cost : t === 'road' ? '免材料 · 每格1工时' : t === 'stoneroad' ? '每格1石 · 1工时' : t === 'tunnel' ? '每格4石 · 3工时' : t === 'farm' ? '8×8 · 免费 · 初始2人' : t === 'pasture' ? '6×6 · 30木 · 1名牧人' : t === 'orchard' ? '6×6 · 12木 · 9株' : t === 'cemetery' ? '7–20格 · 按墓位规划' : this.resourceCost(def.cost, true);
-    const tip = action ? action.tip : t === 'tunnel' ? '隧道：选两个已清场陆地洞口，沿一个网格轴穿过连续山体；每格4石、3游戏施工小时（含两端）。只在首选洞口实运材料并施工，完工后按土路速度通行' : t === 'cemetery' ? '墓园：每边7–20格，选两个角或拖出矩形；预览实际墓位、石材和工时，确认后实运施工。拆围栏不清除墓碑' : t === 'farm' ? '农田：点击地图放置固定8×8；初始2名农夫，可调整0–4人；免费、12工时，先清场施工再播种' : t === 'pasture' ? '牧场：点击地图放置固定6×6；羊12头、牛10头或鸡24只，1名牧人，30木、50工时' : t === 'orchard' ? '果园：点击地图放置固定6×6；9株、2名农夫，12木、36工时' : ['road', 'stoneroad'].includes(t) ? `${t === 'stoneroad' ? '石路每个新铺/升级格需1石' : '土路无需材料'}：点选或拖出起终点预览连通路线，确认清树与施工，清完自动接续；每格1基础游戏施工小时为本作适配。确认排队，逐格实运施工后才提速；原道路仍可走` :
+    const tip = action ? action.tip : t === 'tunnel' ? '隧道：选两个已清场陆地洞口，沿一个网格轴穿过连续山体；每格4石、3游戏施工小时（含两端）。只在首选洞口实运材料并施工，完工后按土路速度通行' : t === 'cemetery' ? '墓园：每边7–20格，选两个角或拖出矩形；预览实际墓位、石材和工时，确认后实运施工。拆围栏不清除墓碑' : t === 'farm' ? '农田：点击地图放置固定8×8；初始2名农夫，可调整0–4人；免费、12工时，先清场施工再播种' : t === 'pasture' ? '牧场：点击地图放置固定6×6；羊12头、牛10头或鸡24只，1名牧人，30木、50工时' : t === 'orchard' ? '果园：点击地图放置固定6×6；9株、2名农夫，12木、36工时' : ['road', 'stoneroad'].includes(t) ? `${t === 'stoneroad' ? '石路每个新铺/升级格需1石' : '土路无需材料'}：点选或拖出起终点预览连通路线，确认清场与施工，清完自动接续；每格1基础游戏施工小时为本作适配。确认排队，逐格实运施工后才提速；原道路仍可走` :
       `${def.name}（${this.resourceCost(def.cost, false)}${def.jobs ? ' · 岗位×' + def.jobs : ''}）— ${def.desc}`;
     const shortage = this.toolMaterialShortage(t);
     return `<button type="button" class="tb${shortage ? ' is-short' : ''}" data-tool="${t}" title="${this.escHtml(tip)}" aria-pressed="false"><span class="ic" aria-hidden="true">${this.icon(t)}</span><span class="lb">${name}</span><span class="cost">${cost}</span><span class="material-badge${shortage ? '' : ' hidden'}" data-material-shortage="${t}">${shortage ? '缺料 · 可选址' : ''}</span></button>`;
@@ -856,7 +856,7 @@ G.ui = {
       if (result.reason) this.toast(result.reason, 'warn');
       else if (result.tunnel && result.ok) this.toast('隧道工地已确认；材料只送首选洞口并在此施工，完工前山内不可通行', 'good');
       else if (result.bridge && result.ok) this.toast('木桥工地已确认；工人完工前不可通行', 'good');
-      else if (result.clearing && result.ok) this.toast(`已确认清树并排队 ${result.queued} 格施工；待铺路格清完自动接续，木材仍须实运入仓；暂停或取消铺路保留清树标记`, 'good');
+      else if (result.clearing && result.ok) this.toast(`已确认清场并排队 ${result.queued} 格施工；待铺路格清完自动接续，采集物仍须实运入仓；暂停或取消铺路保留清场标记`, 'good');
       else if (result.queued != null) this.toast(result.queued > 0 ? `已排队 ${result.queued} 格${result.surface==='stone'?'石路':'土路'}施工；逐格完工后才提速，原道路仍可走` : '路线已铺好或已安排施工，无需重复排队', 'good');
       this.refreshRoadControls();
     });
@@ -882,16 +882,16 @@ G.ui = {
       const changed=status.queued ?? (stone?status.materials.stone:r.newTiles);
       const reused=status.reused ?? r.path?.length-changed, alreadyQueued=status.alreadyQueued || 0;
       message = tunnel ? `隧道 ${r.length} 格（含两端） · ${r.axis==='x'?'东西':'南北'}直线穿山\n首选洞口 (${r.start.x},${r.start.y}) → 远端洞口 (${r.end.x},${r.end.y})\n材料：石头 ${status.materials.stone} · 建造 ${r.length*3} 游戏施工小时\n确认只建工地，不预扣或预留材料；材料只实运至首选洞口，并在此施工。原洞口道路仍可走，山内完工前不可通行\n完工后沿隧道轴按土路速度实际步行和搬运；无常驻岗位` : bridge ? `木桥 ${r.path.length} 格 · 直线跨水\n桥头 (${plan.start.x},${plan.start.y}) → (${plan.end.x},${plan.end.y})\n材料：木材 ${status.materials.wood} / 石头 ${status.materials.stone} · 建造 ${r.path.length*3} 工时\n确认只建工地；材料从仓实运到岸边，送齐才施工，完工前不可通行` :
-        `路线 ${r.path.length} 格 · 待排施工 ${changed} · 复用已成路 ${reused} · 已排队 ${alreadyQueued} · 转弯 ${r.turns} 次\n${stone?'石路每个新铺/升级格1石，合计 '+status.materials.stone+' 石':'土路材料消耗：0'} · 尚需清树 ${status.trees.length} 棵\n新增建造 ${status.work ?? changed} 基础游戏施工小时（每格1小时，为本作适配）\n确认只排队，不预扣或预留材料；原道路仍可走，每格实际完工后才提速。${stone?'石材先实运到临时堆料点，再由铺路工背至施工格。':''}`;
+        `路线 ${r.path.length} 格 · 待排施工 ${changed} · 复用已成路 ${reused} · 已排队 ${alreadyQueued} · 转弯 ${r.turns} 次\n${stone?'石路每个新铺/升级格1石，合计 '+status.materials.stone+' 石':'土路材料消耗：0'} · 尚需清树 ${status.trees.length} 棵、采石 ${(status.rocks||[]).filter(p=>p.rock===1).length} 处、采铁 ${(status.rocks||[]).filter(p=>p.rock===2).length} 处\n新增建造 ${status.work ?? changed} 基础游戏施工小时（每格1小时，为本作适配）；清场另需实际采伐与搬运，受工具和仓容影响\n确认只排队，不预扣或预留材料；原道路仍可走，每格实际完工后才提速。${stone?'石材先实运到临时堆料点，再由铺路工背至施工格。':''}`;
       const missing=Object.entries(status.materials).filter(([k,q])=>G.game.res[k]<q).map(([k,q])=>`${G.RES[k].name}差${Math.ceil(q-G.game.res[k])}`);
       if(missing.length)message+='\n材料不足：'+missing.join(' · ')+(bridge||tunnel?'':'；仍可排队，等待可用石材');
       if (plan.message) message += '\n' + plan.message;
     }
-    message += G.tool.surface==='tunnel'?'\n点选/拖选两个洞口，终点吸附较长方向轴；两端清场陆地、中间连续山体，总长3–'+Math.min(G.world.N,128)+'格。二值山体、单端施工和游戏工时为本作适配。Esc/右键退出。':G.tool.surface==='bridge'?'\n点选/拖选两岸，终点吸附较长方向轴；需连续水面和清场桥头。Esc/右键退出。':'\n手机或点选：选择起终点后确认。鼠标拖动预览实际路线，松开排队；有树则同时标记清除，清完自动施工，无需二次确认。暂停或取消铺路保留独立清树标记，可在砍伐工具撤销。水面、建筑和矿石需绕行。点选施工标记可暂停、优先或取消剩余铺路。Esc/右键退出。';
+    message += G.tool.surface==='tunnel'?'\n点选/拖选两个洞口，终点吸附较长方向轴；两端清场陆地、中间连续山体，总长3–'+Math.min(G.world.N,128)+'格。二值山体、单端施工和游戏工时为本作适配。Esc/右键退出。':G.tool.surface==='bridge'?'\n点选/拖选两岸，终点吸附较长方向轴；需连续水面和清场桥头。Esc/右键退出。':'\n手机或点选：选择起终点后确认。鼠标拖动预览实际路线，松开排队；有树或矿物则同时标记清除，清完自动施工，无需二次确认。暂停或取消铺路保留独立清场标记，可在砍伐/采石采铁工具撤销。水面、山体和建筑需绕行；石头/铁矿可选作端点或经过，清完再铺。点选施工标记可暂停、优先或取消剩余铺路。Esc/右键退出。';
     if (G.roadDrag?.live) message += '\n正在预览实际路线；松开提交，右键取消。';
     if (text.textContent !== message) text.textContent = message;
-    button._roadIntent = status.ok ? { plan, mode: status.tunnel?'tunnel':status.bridge?'bridge':status.trees.length ? 'clear' : 'pave', trees: status.trees.map(p => p.y * G.world.N + p.x).join(',') } : null;
-    button.textContent = status.ok && status.trees.length ? '确认清树并排队施工' : status.tunnel||G.tool.surface==='tunnel'?'确认建隧道':status.bridge?'确认建桥':'确认排队施工';
+    button._roadIntent = status.ok ? { plan, mode: status.tunnel?'tunnel':status.bridge?'bridge':(status.trees.length || status.rocks?.length) ? 'clear' : 'pave', trees: status.trees.map(p => p.y * G.world.N + p.x).join(','), rocks:G.roadRockSignature(status) } : null;
+    button.textContent = status.ok && (status.trees.length || status.rocks?.length) ? '确认清场并排队施工' : status.tunnel||G.tool.surface==='tunnel'?'确认建隧道':status.bridge?'确认建桥':'确认排队施工';
     button.disabled = !status.ok || !!G.roadDrag || G.hasOpenModal();
   },
 
@@ -1493,8 +1493,8 @@ G.ui = {
       materials: material || '土路无需建材；每格仍须由工人实际施工。',
       progress: `剩余 ${number(s.workLeft)} / 总计 ${number(s.totalWork)} 基础游戏施工小时。每格1基础小时为本作适配，实际速度受工具和居民状态影响。`,
       delivery: `工程首格是临时堆料点 (${b.x},${b.y})，该格完工后仍保留至工程结束，可点选管理；其他完工格释放。确认不预扣或预留公共库存；到仓领取时才出库。${s.surface === 'stone' ? `仓库→堆料点携带 ${number(s.fetchCarried)} 石，堆料点→施工格携带 ${number(s.pavingCarried)} 石（两项合计为上方携带数，不重复计入到场或已投入）。石材送到施工格才投入。` : ''}施工标记不封路，已有路面和速度保持，每格完工后才按新路面提速。`,
-      losses: '暂停保留已完工路面、已做工时和未用到场石材；已领随身材料仍须实际退仓，满仓保留。恢复后继续剩余铺路，不重复扣料。暂停或取消铺路不撤销独立清树标记；若也要停砍，请在砍伐工具撤销清树标记（会撤销全图此类标记）。',
-      refund: `取消剩余铺路：当前可立即返还 ${refund}，只含堆料点未用建材，直接返公共库存。携带中的材料另行实运退仓，不计入此数；尚未领出的计划不退款，已投入石材不返还。已完工路面和原有道路保留，已砍树不恢复；独立清树标记仍保留，可在砍伐工具撤销。`,
+      losses: '暂停保留已完工路面、已做工时和未用到场石材；已领随身材料仍须实际退仓，满仓保留。恢复后继续剩余铺路，不重复扣料。暂停或取消铺路不撤销独立清场标记；若也要停清场，请在砍伐/采石采铁工具撤销对应标记（会撤销全图此类标记）。',
+      refund: `取消剩余铺路：当前可立即返还 ${refund}，只含堆料点未用建材，直接返公共库存。携带中的材料另行实运退仓，不计入此数；尚未领出的计划不退款，已投入石材不返还。已完工路面和原有道路保留，已采树木矿物不恢复；独立清场标记仍保留，可在砍伐/采石采铁工具撤销。`,
     };
   },
   siteInfoMarkup: function (data) {

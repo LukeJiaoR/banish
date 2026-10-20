@@ -183,14 +183,25 @@ test('dirt plan consumes no materials and queues actual work without an instant 
   assert.equal(JSON.stringify(f.G.game.res), before); assert.equal(f.G.world.road.reduce((sum, n) => sum + n, 0), 0);
   assert.match(f.toasts.at(-1)[0], /已排队 5 格土路施工/);
 });
+test('mineral route preview names stone and iron; armed type change cannot submit', () => {
+  for (const changed of [false, true]) {
+    const f=planning(),{G}=f,w=G.world;
+    w.rock[8*w.N+8]=1;w.rock[8*w.N+10]=2;preview(f);
+    assert.equal(input(f,'road-confirm').textContent,'确认清场并排队施工');
+    assert.match(input(f,'road-plan-status').textContent,/采石 1 处、采铁 1 处/);
+    const button=activate(f);if(changed)w.rock[8*w.N+8]=2;button.click();
+    assert.equal(projects(f).length,changed?0:1);assert.equal(w.markedRocks.size,changed?0:2);
+    assert.equal(w.rock[8*w.N+8],changed?2:1);assert.equal(w.road[8*w.N+8],0);
+  }
+});
 test('tree clearing and road construction share one explicit confirmation', () => {
   const f = planning(), { G } = f, w = G.world, index = 8 * w.N + 8;
   w.trees.push({ x: 8, y: 8, age: 12, alive: true }); w.treeIdx[index] = 0;
-  preview(f); assert.equal(input(f, 'road-confirm').textContent, '确认清树并排队施工');
-  assert.match(input(f, 'road-plan-status').textContent,/暂停或取消铺路保留独立清树标记/);
+  preview(f); assert.equal(input(f, 'road-confirm').textContent, '确认清场并排队施工');
+  assert.match(input(f, 'road-plan-status').textContent,/暂停或取消铺路保留独立清场标记/);
   activate(f).click(); assert(w.marked.has(index)); assert.equal(projects(f).length, 1);assert.equal(G.roadPlan,null);
   assert(input(f, 'road-confirm').disabled);assert.equal(w.road[index],0);
-  const info=G.ui.roadWorkInfoData(projects(f)[0]);assert.match(info.status,/等待散工/);assert.match(info.losses,/暂停或取消铺路不撤销独立清树标记/);
+  const info=G.ui.roadWorkInfoData(projects(f)[0]);assert.match(info.status,/等待散工/);assert.match(info.losses,/暂停或取消铺路不撤销独立清场标记/);
 });
 for (const mode of ['plan', 'world', 'tool', 'modal', 'pointercancel', 'touchcancel', 'blur']) test('stale or interrupted road confirmation cannot queue after ' + mode, () => {
   const f = planning(); preview(f); const button = activate(f);

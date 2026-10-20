@@ -34,11 +34,11 @@ test('duplicate plan does not create duplicate clearing orders or material entit
 test('tree mark cap rejects atomically without reserving ground or scheduling any clearing',()=>{
  const {G,w}=fresh();for(let i=0;w.marked.size<300;i++)w.marked.add(i);G.addTree(w,20,20,-200);const count=w.buildings.length;assert.equal(G.addRoadWork([{x:20,y:20}],'stone').ok,false);assert.equal(w.buildings.length,count);assert.equal(w.marked.size,300);assert.equal(G.roadWorkAt(w,20,20),null);
 });
-test('save rejects forged work beneath living trees, mineral/water conflicts and duplicate ownership atomically',()=>{
+test('save rejects forged work beneath living trees, water conflicts and duplicate ownership atomically',()=>{
  const {G,b}=fresh(),good=copy(G.serializeGame());const row=d=>d.buildings.find(x=>x.id===b.id);
- for(const mutate of [d=>{row(d).construction.onsite.stone=1;},d=>{row(d).roadWork.cells[1].used=true;row(d).constructionStarted=true;},d=>{d.citizens[0].carry={type:'stone',qty:1,constructionId:b.id,staffingReturn:true};},d=>{d.terrain.rock[10*d.N+9]=1;},d=>{d.terrain.water[10*d.N+9]=1;},d=>{const r=row(d);r.roadWork.cells[0].used=true;r.roadWork.cells[0].workLeft=.5;r.workLeft-=.5;r.progress=.5/r.totalWork;r.constructionStarted=true;},d=>{row(d).roadWork.cells[0].done=true;row(d).roadWork.cells[0].used=true;row(d).roadWork.cells[0].workLeft=0;},d=>{row(d).roadWork.cells[1].x=8;}]){const bad=copy(good);mutate(bad);assert.throws(()=>G.applySaveData(bad));assert.deepEqual(copy(G.serializeGame()),good);}
- // Runtime changed obstacles cannot be silently removed or receive materials.
- G.world.rock[10*G.world.N+9]=1;assert.equal(G.addRoadWork(b.roadWork.cells,'stone').ok,false);assert.equal(G.world.rock[10*G.world.N+9],1);assert.equal(G.game.res.stone,100);
+ for(const mutate of [d=>{row(d).construction.onsite.stone=1;},d=>{row(d).roadWork.cells[1].used=true;row(d).constructionStarted=true;},d=>{d.citizens[0].carry={type:'stone',qty:1,constructionId:b.id,staffingReturn:true};},d=>{d.terrain.water[10*d.N+9]=1;},d=>{const r=row(d);r.roadWork.cells[0].used=true;r.roadWork.cells[0].workLeft=.5;r.workLeft-=.5;r.progress=.5/r.totalWork;r.constructionStarted=true;},d=>{row(d).roadWork.cells[0].done=true;row(d).roadWork.cells[0].used=true;row(d).roadWork.cells[0].workLeft=0;},d=>{row(d).roadWork.cells[1].x=8;}]){const bad=copy(good);mutate(bad);assert.throws(()=>G.applySaveData(bad));assert.deepEqual(copy(G.serializeGame()),good);}
+ // A new mineral becomes an explicit clearing command, never a free removal.
+ G.world.rock[10*G.world.N+9]=1;assert.equal(G.addRoadWork(b.roadWork.cells,'stone').ok,true);assert(G.world.markedRocks.has(10*G.world.N+9));assert.equal(G.world.rock[10*G.world.N+9],1);assert.equal(G.game.res.stone,100);
 });
 test('trees on reused roads are included in the confirmed clearing command without duplicate road costs',()=>{
  for(const allReused of [false,true]){const {G,w,b}=fresh('dirt');G.cancelRoadWork(b);G.cancelResourceMarks('trees');for(const p of b.roadWork.cells)if(allReused||p.x===8)G.setRoad(w,p.x,p.y,1);
