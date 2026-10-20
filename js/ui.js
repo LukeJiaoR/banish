@@ -1040,6 +1040,12 @@ G.ui = {
       add('herbs', '草药暂无储备；可补充保健用药，诊所治疗不消耗草药');
     if (w.buildings.some(b => b.type === 'blacksmith' && b.state === 'ok' && G.blacksmithOutput?.(b) === 'steelTools') && g.res.coal < 1)
       add('coal', '钢工具配方缺煤；铁工具不需要煤');
+    // If a compact skin moves fuel into More, carry over the existing survival
+    // warning verbatim instead of hiding it or inventing a new threshold.
+    if (this.hudVisibleResources) {
+      const heat = this.el.guide?.querySelector?.('[data-guide-kind="heating"]');
+      if (heat && ['urgent','recommend'].includes(heat.dataset.level)) add('firewood', heat.title, heat.dataset.level === 'urgent');
+    }
     for (const key of G.RES_KEYS) {
       if (hauling.carry[key] > 0 && !['tools', 'steelTools'].includes(key) && g.res[key] >= G.storageCap(key))
         add(key, `${G.RES[key].name}仓满，随身产出等待入库`);
@@ -1051,7 +1057,7 @@ G.ui = {
         chip.setAttribute?.('aria-label', chip.title);
       }
     }
-    const core = this.hudCoreResources(), hidden = Object.keys(warnings).filter(k => !core.includes(k));
+    const core = this.hudVisibleResources?.() || this.hudCoreResources(), hidden = Object.keys(warnings).filter(k => !core.includes(k));
     const badge = document.getElementById('resource-warning-count');
     if (badge) { badge.textContent = String(hidden.length); badge.hidden = !hidden.length; }
     button.classList.toggle('has-warning', !!hidden.length);
@@ -1305,21 +1311,10 @@ G.ui = {
       body.className = 'placement-full';
       details.append(summary, body);
       el.replaceChildren(details);
-      if (this._placementViewport) {
-        const old = this._placementViewport;
-        if (old.query.removeEventListener) old.query.removeEventListener('change', old.listener);
-        else if (old.query.removeListener) old.query.removeListener(old.listener);
-      }
-      const viewport = window.matchMedia('(max-width:760px), (max-height:500px)');
-      const syncViewport = function (event) { details.open = !event.matches; };
-      if (viewport.addEventListener) viewport.addEventListener('change', syncViewport);
-      else if (viewport.addListener) viewport.addListener(syncViewport);
-      this._placementViewport = { query: viewport, listener: syncViewport };
     }
-    // Update in place so regular preview refreshes do not steal focus or close it.
-    const compact = window.matchMedia('(max-width:760px), (max-height:500px)').matches;
-    if (details.dataset.tool !== type) details.open = !compact;
-    if (!compact) details.open = true;
+    // The tray and side inspector both expose a summary. Preserve user choice
+    // across live refresh and orientation; a newly selected tool starts compact.
+    if (details.dataset.tool !== type) details.open = false;
     details.dataset.tool = type;
     const cost = G.BDEF[type].cost;
     const parts = Object.keys(cost).map(k => {

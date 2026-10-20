@@ -1,0 +1,221 @@
+/* Jade / ivory UI. Presentation only: stock, placement, simulation and art stay real.
+   Loaded last deliberately: this is the single skin override for legacy panels. */
+#hud {
+  --ink:#183f43; --muted:#526861; --jade:#287e68; --edge:#c8d3bc;
+  --surface:#faf8ed; --paper:linear-gradient(150deg,#fffdf4,#f3f0df);
+  --paint:var(--paper); --accent:#287e68;
+  --raised:inset 0 1px 0 #fffef8,0 2px 4px #183f4312;
+  --panel-shadow:inset 0 1px 0 #fffef8,0 6px 24px #183f4326;
+  color:var(--ink);
+}
+#hud button:focus-visible,#hud input:focus-visible,#hud select:focus-visible,
+#hud textarea:focus-visible,#hud summary:focus-visible { outline:3px solid #187d68; outline-offset:2px; }
+#hud #topbar {
+  top:max(10px,env(safe-area-inset-top)); left:max(10px,env(safe-area-inset-left)); right:max(10px,env(safe-area-inset-right));
+  padding:7px 12px; gap:4px 12px; border:1px solid var(--edge); border-radius:22px;
+  background:var(--paper); box-shadow:var(--panel-shadow);
+}
+#core-resources .res { background:transparent; border:1px solid transparent; box-shadow:none; border-radius:9px; padding:3px 6px; min-height:32px; }
+#res-row .res-label,#pop small,#pop .town-health,#date { color:var(--muted); }
+#res-row .res b { color:var(--ink); font-size:14px; }
+#res-row .res-icon { width:23px; height:23px; flex-basis:23px; }
+#res-row .res-total { background:#eef2df; }
+#res-row .res.resource-warning { background:#fff0d1; border-color:#ba8b36; }
+#res-row .res.resource-urgent { background:#fbe6dd; border-color:#bc6048; }
+#res-row .res i.neg,#hud .warn-txt { color:#a1402b; }
+#res-row .res i.pos { color:#26734c; }
+#secondary-resources { background:#f3f3e7; border-color:var(--edge); }
+#secondary-resources .res { background:#fffdf4; }
+#hud #quick-pause,#hud #resource-more,#hud #close-town,#hud #info-close,
+#toolbar .toolbar-nav,#town-controls #sys button,#town-controls #speed button {
+  min-height:44px; border:1px solid var(--edge); border-radius:14px; background:#fffdf5; color:var(--ink); box-shadow:var(--raised);
+}
+#quick-pause:hover,#resource-more:hover,#toolbar .toolbar-nav:hover { background:#e6efdf; }
+#hud #survival-guide { top:calc(var(--hud-height) + max(10px,env(safe-area-inset-top)) + 8px); left:max(10px,env(safe-area-inset-left)); background:var(--paper); border-color:var(--edge); box-shadow:var(--panel-shadow); border-radius:17px; padding:3px 10px; }
+#survival-guide h2,#guide-toggle,#toolbar-path,#toolbar-state { color:var(--ink); }
+#survival-guide #guide-list li { background:transparent; color:var(--muted); }
+#survival-guide #guide-list li[data-level="recommend"] { background:#f5ecd1; color:#755421; }
+#survival-guide #guide-list li[data-level="urgent"] { background:#fbe6dd; color:#963c2a; }
+#guide-list li[data-level="urgent"] .guide-level { color:#963c2a; }
+#guide-list li[data-level="recommend"] .guide-level { color:#755421; }
+#guide-toggle:hover { background:#e7efdf; }
+#town-dock { right:max(12px,env(safe-area-inset-right)); bottom:max(12px,env(safe-area-inset-bottom)); }
+#town-dock button { color:var(--ink); background:var(--paper); border:1px solid var(--edge); box-shadow:var(--panel-shadow); min-height:48px; }
+#town-dock #open-build,#town-controls #speed button.active {
+  background:linear-gradient(#418e75,#27755f); color:#fffef3; border:1px solid #246a57; text-shadow:none; box-shadow:inset 0 1px 0 #b7dbc2,0 3px 8px #183f4326;
+}
+#town-dock #open-build { min-height:52px; min-width:120px; font-size:17px; }
+#town-dock #open-build:hover { background:#246e58; }
+#town-controls { bottom:76px; background:var(--paper); border-color:var(--edge); }
+#town-controls h2 { color:var(--ink); }
+#hud #toolbar { padding:10px; gap:5px; bottom:max(70px,calc(env(safe-area-inset-bottom) + 58px)); background:var(--paper); border-color:var(--edge); border-radius:20px; box-shadow:var(--panel-shadow); }
+#toolbar .toolbar-heading { gap:6px; }
+#toolbar-path { font-size:13px; }
+#toolbar .toolbar-nav { font-size:12px; padding:5px 10px; }
+#toolbar .toolbar-items { gap:8px; padding:2px 1px 4px; scrollbar-color:#94af97 #eeeddf; }
+#toolbar .tb,#toolbar .tb-category {
+  background:#fffdf4; color:var(--ink); border:1px solid #d9dcc8; border-radius:14px; box-shadow:none;
+  min-height:88px; height:auto; padding:7px; gap:4px;
+}
+#toolbar .tb:not(.tb-category) { min-width:128px; max-width:144px; }
+#toolbar .tb .lb { color:var(--ink); font-size:13px; }
+#toolbar .tb .ic,#toolbar .tb-category .ic { display:flex; width:36px; height:36px; min-width:36px; flex:0 0 36px; line-height:36px; background:none; box-shadow:none; }
+#toolbar .tb .ic .ui-icon,#toolbar .tb-category .ic .ui-icon { width:36px; height:36px; }
+#toolbar .tb .cost,#toolbar .tb.is-short .cost { color:var(--muted); font-size:11px; gap:2px 5px; }
+#toolbar .tb .res-cost { font-size:11px; gap:2px; }
+#toolbar .tb .res-cost .res-icon { width:15px; height:15px; }
+#toolbar .tb:hover { background:#edf4e5; border-color:#79a58a; }
+#toolbar .tb.active,#toolbar .tb.is-short.active { background:#e4f0dd; border-color:#338368; box-shadow:inset 0 0 0 1px #338368; }
+#toolbar .tb.is-short { border-color:#c39a58; }
+#toolbar .tb .res-cost.is-short,#toolbar .tb .res-cost.neg,#toolbar .tb .res-cost [data-shortage="true"] { color:#a1402b; }
+#toolbar .tb.is-short .material-badge { background:#f8e3d5; color:#963c2a; padding:2px 5px; }
+#hud.is-placing #toolbar .tool-group .tb:not(.active) { display:flex; }
+#hud.is-placing #toolbar .tool-group .tb.active { min-width:128px; }
+#hud #toolbar .tool-group { max-height:160px; flex-wrap:nowrap; overflow-x:auto; overflow-y:auto; }
+#toolbar-state { font-size:11px; line-height:1.5; max-height:34px; overflow-y:auto; }
+#hud #placement-panel { bottom:calc(var(--toolbar-height) + max(70px,calc(env(safe-area-inset-bottom) + 58px)) + 8px); left:max(10px,env(safe-area-inset-left)); }
+#placement-info,#harvest-cancel,#harvest-range-controls,#farm-plan-controls,#cemetery-plan-controls,#road-controls { background:var(--paper); color:var(--ink); border-color:var(--edge); box-shadow:var(--panel-shadow); padding:8px 10px; }
+#placement-info[data-state="blocked"] { background:#fcebe1; border-color:#c0785f; color:#893d2b; }
+#placement-info[data-state="warning"] { background:#fff2d9; color:#735020; }
+#hud #info.detail-inspector { top:calc(var(--hud-height) + max(10px,env(safe-area-inset-top)) + 8px); right:max(10px,env(safe-area-inset-right)); bottom:max(10px,env(safe-area-inset-bottom)); max-height:calc(100dvh - var(--hud-height) - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); width:340px; background:var(--paper); border-color:var(--edge); color:var(--ink); box-shadow:var(--panel-shadow); }
+#info.detail-inspector > .info-head,#info.detail-inspector > .building-detail-tabs,#info .detail-actions { background:#f0f2e4; border-color:var(--edge); }
+#info .detail-title,#info h3,#info .building-facts dd,#info .survival-fact dd,#info .inventory-item b { color:var(--ink); }
+#info .building-detail-tabs button,#info .building-quick-actions button { background:#fffdf4; color:var(--ink); border-color:var(--edge); box-shadow:none; min-height:44px; }
+#info .building-detail-tabs button[aria-pressed="true"] { background:#dcebd6; color:#20583f; border-color:#529275; box-shadow:none; }
+#info .building-facts > div,#info .survival-fact,#info .inventory-item { background:#fffdf4; color:var(--ink); border-color:#d9dcc8; box-shadow:none; }
+#info .building-facts dt,#info .survival-fact dt,#info .desc,#info .inventory-label,#info .inventory-present,#info .inventory-none,#info .inventory-empty p,#info .inventory-empty summary,#info .building-help summary { color:var(--muted); }
+#info .building-status,#info .detail-chip { background:#e9efdf; color:#386349; }
+#info .detail-chip.is-warning,#info .survival-fact.is-warning { background:#fff0d1; color:#795222; }
+#info .survival-fact.is-warning dd { color:#795222; }
+#info input,#info select { background:#fffdf4; color:var(--ink); border-color:var(--edge); }
+#info .danger { color:#963c2a; background:#fbe6dd; border-color:#cb8e76; }
+#hud .toast { background:#faf8ed; color:var(--ink); border-color:var(--edge); box-shadow:var(--panel-shadow); }
+#hud .toast.warn { background:#fff0d1; color:#795222; }
+#hud #toolbar .tb:active,#hud #toolbar .toolbar-nav:active,#hud #town-dock button:active,#hud #town-controls button:active,#hud #info button:active,#hud #quick-pause:active,#hud #resource-more:active { transform:none; box-shadow:inset 0 2px 5px #183f4330; }
+/* Dialogs remain the existing warm high-contrast scheme in this first HUD slice. */
+#hud .dialog { --paint:linear-gradient(160deg,#514235,#362c24 75%); color:#f2e5ce; }
+@media(max-width:760px) {
+  #hud #topbar { padding:5px 8px; gap:2px 7px; border-radius:18px; }
+  #core-resources { gap:1px 4px; }
+  #core-resources .res { padding:2px; min-height:28px; gap:3px; }
+  #res-row .res-icon { width:19px; height:19px; flex-basis:19px; }
+  #res-row .res b { font-size:12px; }
+  #res-row .res-label { font-size:10px; }
+  #pop { flex:1 1 auto; }
+  #pop,#pop small,#pop .town-health,#date { font-size:10px; }
+  #quick-pause { padding:4px 7px; }
+  #hud #survival-guide,#hud[data-mode="build"] #survival-guide,#hud[data-mode="detail"] #survival-guide { width:calc(100vw - 20px - env(safe-area-inset-left) - env(safe-area-inset-right)); }
+  #hud #toolbar { left:max(8px,env(safe-area-inset-left)); right:max(8px,env(safe-area-inset-right)); width:auto; max-width:none; transform:none; padding:8px; }
+  #toolbar #toolbar-categories { display:flex; overflow-x:auto; }
+  #toolbar #toolbar-categories .tb-category { flex:0 0 94px; width:94px; min-width:94px; max-width:94px; height:84px; min-height:84px; }
+  #hud #placement-panel { right:max(8px,env(safe-area-inset-right)); width:auto; max-height:112px; }
+  #hud #info.detail-inspector { top:auto; left:max(8px,env(safe-area-inset-left)); right:max(8px,env(safe-area-inset-right)); bottom:max(8px,env(safe-area-inset-bottom)); width:auto; max-height:min(56dvh,calc(100dvh - var(--hud-height) - 80px)); }
+}
+/* Wide and short screens put the inspector in its own lane, never over the palette. */
+@media(min-width:761px) {
+  #hud[data-mode="build"] #toolbar { left:max(10px,env(safe-area-inset-left)); right:auto; transform:none; width:min(620px,calc(100vw - 380px - env(safe-area-inset-left) - env(safe-area-inset-right))); max-width:none; }
+  #hud.is-placing #placement-panel { top:calc(var(--hud-height) + max(10px,env(safe-area-inset-top)) + 8px); bottom:max(76px,calc(env(safe-area-inset-bottom) + 64px)); right:max(10px,env(safe-area-inset-right)); left:auto; width:340px; max-height:calc(100dvh - var(--hud-height) - 104px); }
+  #hud.is-placing #placement-info { min-height:160px; }
+  #hud.is-placing .placement-disclosure > summary { display:none; }
+  #hud.is-placing .placement-disclosure > .placement-full { display:block; white-space:pre-line; }
+  #hud[data-mode="detail"] #survival-guide { width:min(320px,calc(100vw - 380px)); }
+}
+@media(max-height:500px) and (min-width:761px) {
+  #hud #topbar { padding:4px 8px; }
+  #hud #res-row { flex:1 1 auto; }
+  #core-resources { grid-template-columns:repeat(6,minmax(0,1fr)); gap:2px; }
+  #core-resources .res { padding:2px; gap:3px; }
+  #core-resources .res-label { display:none; }
+  #hud #pop { flex:0 0 auto; }
+  #pop small,#pop .town-health { display:none; }
+  #date { font-size:10px; }
+  #hud #survival-guide { max-height:90px; }
+  #hud[data-mode="build"] #survival-guide { width:260px; }
+  #hud[data-mode="build"] #toolbar { top:auto; bottom:max(10px,env(safe-area-inset-bottom)); padding:7px; max-height:190px; overflow-y:auto; }
+  #hud[data-mode="build"] #toolbar .toolbar-items { flex-wrap:nowrap; overflow-x:auto; }
+  #toolbar .tb-category { flex:0 0 86px; min-width:86px; height:76px; min-height:76px; }
+  #toolbar .tb:not(.tb-category) { min-height:88px; }
+  #hud #toolbar .tb .ic { display:flex; }
+  #hud.is-placing #placement-panel { bottom:72px; max-height:calc(100dvh - var(--hud-height) - 100px); }
+  #hud:has(#info:not(.hidden)) #topbar,#hud:has(#info:not(.hidden)) #survival-guide { visibility:visible; }
+  #hud #info.detail-inspector { top:calc(var(--hud-height) + max(10px,env(safe-area-inset-top)) + 8px); height:auto; }
+}
+/* Match legacy detail selectors explicitly so pale ink never survives on ivory. */
+#info .building-detail-panel h3,#info .citizen-survival h3 { color:var(--ink); }
+#info [data-building-activity],#info .building-debug-facts dt { color:var(--muted); }
+#info .building-task > summary { color:var(--ink); min-height:44px; padding-block:10px; }
+#info .building-help summary,#info .inventory-empty summary { min-height:44px; padding-block:10px; }
+#info .building-detail-tabs button:focus-visible,#info .building-quick-actions button:focus-visible,#info .building-help summary:focus-visible { outline:3px solid #187d68; outline-offset:2px; }
+#info .building-alert { background:#fff0d1; color:#795222; border-color:#ba8b36; }
+#harvest-cancel-hint,#harvest-cancel-status:not(:empty) { color:var(--muted); }
+#guide-count { color:#a1402b; }
+#guide-list .guide-level { color:var(--muted); }
+#hud #resource-more.has-warning { border-color:#ba8b36; }
+#hud #resource-more.has-urgent { border-color:#bc6048; }
+#hud #quick-pause:hover,#hud #resource-more:hover { background:#e6efdf; }
+#info .economy-form { background:#edf0e1; border-color:var(--edge); }
+#info .economy-form label,#info .economy-message,#info .townledger-table thead th,
+#info .townledger-stock,#info .townledger-note,#info .house-upgrade-materials thead th,
+#info .house-upgrade-details .house-upgrade-note,#info .house-upgrade-secondary summary { color:var(--muted); }
+#info .trade-quote,#info .trade-inventory summary,#info .townhall-ledger summary,
+#info .townledger-table caption,#info .farm-details [data-farm="current"],#info .farm-details [data-farm="choice"],
+#info .workforce-overview summary,#info .house-upgrade-materials caption,#info .house-upgrade-details h4,
+#info .house-upgrade-materials td:last-child,#info .house-upgrade-materials thead th:last-child { color:var(--ink); }
+#info .townhall-choice-note,#info .house-upgrade-warning,#info .house-upgrade-confirm { background:#fff0d1; color:#795222; border-color:#ba8b36; }
+#info .house-upgrade-warning h4 { color:#795222; }
+#info .economy-form button,#info .tavern-actions button,#info .mini-tog { min-height:44px; min-width:44px; background:#f9faef; color:var(--ink); border-color:#97b49d; }
+#info .economy-form select,#info .economy-form input { min-height:44px; }
+#info .economy-form select option { background:#fffdf4; color:var(--ink); }
+#info .townledger-table-wrap:focus-visible { outline:3px solid #187d68; outline-offset:2px; }
+#info .trade-inventory summary,#info .townhall-ledger summary,#info .workforce-overview summary,
+#info .house-upgrade-secondary summary,#info .townledger-flows summary { min-height:44px; padding-block:10px; }
+#pasture-plan-controls,#orchard-plan-controls { background:var(--paper); color:var(--ink); border-color:var(--edge); }
+#dynamic-coach { background:#eef3e5; color:var(--ink); border-color:#bdcdb3; margin-top:4px; }
+#coach-stage { color:var(--muted); }
+#dynamic-coach button { background:#fffdf4; color:var(--ink); border-color:#a3bea6; border-radius:12px; }
+#dynamic-coach #coach-action { background:#2c7c64; color:#fffdf4; border-color:#266b57; }
+#hud .coach-target { box-shadow:0 0 0 6px #287e6826; }
+#info .mini-tog.off { opacity:1; background:#edf0e6; color:#526861; border-style:dashed; }
+#hud .dialog button:focus-visible,#hud .dialog input:focus-visible,#hud .dialog select:focus-visible,
+#hud .dialog textarea:focus-visible,#hud .dialog summary:focus-visible { outline:3px solid #ffda7c; outline-offset:2px; }
+#hud #info-close:hover { background:#e6efdf; color:var(--ink); }
+@media(max-height:500px) and (min-width:761px) {
+  #hud[data-mode="build"] #toolbar .tb-category { flex:0 0 86px; }
+}
+#hud #save-status { color:#795222; background:#fff0d1; border-color:#ba8b36; border-radius:7px; }
+#info .danger:hover { background:#f5d5c8; color:#873522; border-color:#b86c52; }
+/* Short portrait: preserve a usable map between the status strip and build tray.
+   Detailed cost stays in the live placement disclosure; off-screen cards do not
+   stretch the entire row with their multi-material recipes. */
+@media(max-width:760px) and (max-height:680px) {
+  #hud #topbar { display:grid; grid-template-columns:minmax(0,1fr) auto; column-gap:7px; row-gap:0; padding:4px 7px; }
+  #res-row { grid-column:1 / -1; min-width:0; }
+  #core-resources { grid-template-columns:repeat(3,minmax(0,1fr)); gap:0 3px; }
+  #core-resources .res { min-height:24px; padding:1px 2px; }
+  #core-resources .res-label { display:none; }
+  #core-resources .res b { margin-left:auto; }
+  #hud #resource-more { min-height:48px; }
+  #date { grid-column:1; grid-row:2; min-width:0; font-size:10px; }
+  #pop { grid-column:1; grid-row:3; min-width:0; gap:2px 4px; font-size:10px; }
+  #pop small,#pop .town-health { font-size:10px; }
+  #hud #quick-pause { grid-column:2; grid-row:2 / 4; margin-left:0; min-height:44px; }
+  #hud #save-status { grid-column:1 / -1; }
+  #hud #toolbar { gap:3px; padding:7px; }
+  #toolbar .toolbar-heading { gap:4px; }
+  #toolbar-path { font-size:11px; }
+  #toolbar .toolbar-nav { padding:4px 7px; }
+  #hud #toolbar .tool-group { max-height:100px; }
+  #hud #toolbar .tb:not(.tb-category) { min-height:88px; height:88px; min-width:104px; max-width:112px; padding:5px; gap:3px; }
+  #hud.is-placing #toolbar .tool-group .tb.active { min-width:104px; }
+  #hud #toolbar .tb .ic { flex-basis:30px; width:30px; height:30px; min-width:30px; }
+  #toolbar .tb .ic .ui-icon { width:30px; height:30px; }
+  #toolbar .tb:not(.active) .cost,#toolbar .tb.active .cost { display:none; }
+  #toolbar .tb .lb { font-size:12px; }
+  #toolbar .material-badge { font-size:10px; margin-top:0; }
+  #toolbar-state { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-height:17px; }
+  #hud #placement-info { padding:0 9px; }
+  #hud #placement-panel { max-height:96px; }
+}
+/* Defensive disclosure fallback: a closed native details must always expose its
+   summary, even if restored browser state predates the responsive script. */
+#hud.is-placing .placement-disclosure:not([open]) > summary { display:list-item; min-height:44px; line-height:44px; cursor:pointer; }

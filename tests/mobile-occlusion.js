@@ -5,9 +5,6 @@ const {loadGame}=require('./helpers/playability');
 const path=require('node:path'),fs=require('node:fs');
 const G=loadGame(path.resolve(__dirname,'..'));
 global.window=global;global.G=G;require('../js/ui.js');
-let compact=true;
-let viewportChange;
-global.matchMedia=()=>({matches:compact,addEventListener:(name,fn)=>{viewportChange=fn;}});
 class Element {
   constructor(tag){this.tag=tag;this.children=[];this.dataset={};this.open=false;this.textContent='';}
   append(...nodes){this.children.push(...nodes);}
@@ -27,11 +24,10 @@ G.ui.renderPlacementPreview(el,'gatherer','刷新完整预览');
 assert.equal(el.querySelector('details'),d);assert.equal(d.querySelector('summary'),summary);
 assert.equal(d.open,true);assert.doesNotMatch(summary.textContent,/木材30（缺/);
 G.ui.renderPlacementPreview(el,'house','住宅预览');assert.equal(d.open,false);
-d.open=false;viewportChange({matches:false});assert.equal(d.open,true);
-viewportChange({matches:true});assert.equal(d.open,false);
-compact=false;G.ui.renderPlacementPreview(el,'house','桌面完整预览');assert.equal(d.open,true);
+d.open=false;G.ui.renderPlacementPreview(el,'house','关闭详情后实时刷新');assert.equal(d.open,false);
+d.open=true;G.ui.renderPlacementPreview(el,'house','展开详情后实时刷新');assert.equal(d.open,true);
 const css=fs.readFileSync(path.join(__dirname,'../styles/mobile-occlusion.css'),'utf8');
 assert.match(css,/max-height:500px\) and \(min-width:761px/);
 assert.match(css,/left:282px/);assert.match(css,/max-height:60px/);
 assert.match(css,/min-height:44px/);
-console.log('PASS mobile preview content, shortages, disclosure persistence, desktop default, and stylesheet contracts (not visual QA)');
+console.log('PASS mobile preview content, shortages, disclosure persistence, explicit open/closed persistence, and stylesheet contracts (not visual QA)');

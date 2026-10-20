@@ -1,0 +1,26 @@
+'use strict';
+// Reuse the existing HUD DOM fixture, not its unrelated winter-budget assertion.
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const source=fs.readFileSync('tests/hud-guidance-ui.js','utf8').split('let passed = 0;')[0];
+const context={require,console,__dirname:require('node:path').resolve('tests'),module:{exports:{}}};
+vm.runInNewContext(source+'\nmodule.exports=fixture;',context);
+const f=context.module.exports(),G=f.G,get=id=>f.doc.getElementById(id);
+const original=G.harvestFeedback.bind(G);
+G.harvestFeedback=()=>{const out=original();out.carry.iron=2;return out;};
+G.game.res.iron=G.storageCap('iron');
+G.ui.refreshHUD();
+assert(get('res-iron').classList.contains('resource-warning'));
+const before=Number(get('resource-warning-count').textContent);
+G.ui.hudVisibleResources=()=>['food','wood','stone'];
+G.ui.refreshHUD();
+assert.equal(Number(get('resource-warning-count').textContent),before+1,'relocated iron warning is counted in More');
+f.resident(f.building('house'));
+G.game.season=3;G.game.day=G.SEASON_DAYS*3;G.game.res.firewood=0;
+G.ui.refreshHUD();
+const heat=f.guide.querySelector('[data-guide-kind="heating"]');
+assert(heat,'existing survival guide exposes a heating warning');
+assert(get('res-firewood').classList.contains('resource-urgent'));
+assert(get('resource-more').classList.contains('has-urgent'));
+assert(get('resource-more').title.includes(heat.title),'existing fuel warning is copied verbatim');
+assert.equal(get('res-tools').querySelector('b').textContent,String(Math.floor(G.game.res.tools)),'actual tools remain readable');
+console.log('PASS compact resource warning count, urgent fuel badge, verbatim existing warning, and retained tool quantity.');
