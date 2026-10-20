@@ -210,6 +210,7 @@ G.serializeGame = function () {
       x: c.x, y: c.y, familyId: c.familyId, job: c.job,
       partnerId: c.partnerId, parentIds: c.parentIds, grandparentIds: c.grandparentIds, ancestorIds: c.ancestorIds, birthFamilyId: c.birthFamilyId,
       student: c.student ? 1 : 0, educated: c.educated ? 1 : 0, school: c.school != null ? c.school : null, studyHours:G.studyHoursOf(c),studyToday:G.studyTodayOf(c),studyDay:g.day,
+      warmthSeeking:c.warmthSeeking===true,
       lastMealDay:c.lastMealDay,toolType:c.toolType,toolHours:c.toolHours,arrivalHallId:c.arrivalHallId, hunger: c.hunger, cold: c.cold, clothingLeft: c.clothingLeft, clothingType:c.clothingType, dietVariety: c.dietVariety, dietScore: c.dietScore, happiness: c.happiness, leisureDays:c.leisureDays, chapelDays:c.chapelDays, chapelId:c.chapelId, grief:c.grief, health: c.health, sickDays: c.sickDays, immunityDays: c.immunityDays, herbCooldown: c.herbCooldown, careHours: c.careHours, camped: c.camped ? 1 : 0, carry: c.carry,
     })),
     supplyCaches:(w.supplyCaches||[]).map(b=>({id:b.id,x:b.x,y:b.y,w:b.w,h:b.h,supplyStock:b.supplyStock})),
@@ -980,6 +981,7 @@ G.prepareSaveData = function (d) {
     const toolType=cd.toolType??null,toolHours=cd.toolHours===undefined?0:number(cd.toolHours,'个人工具余寿',0,toolType===null?0:G.toolLifeHours(toolType));
     if(toolType!==null&&!G.isTool(toolType)||!!toolType!==(toolHours>0)||toolType!==null&&(g.toolMode!=='individual'||!cd.adult||cd.student))bad('个人工具装备');
     if(cd.clothingType!=null&&!['basic','warm'].includes(cd.clothingType))bad('穿着衣物类型');
+    if(cd.warmthSeeking!==undefined&&typeof cd.warmthSeeking!=='boolean')bad('取暖需求');
     const c = {
       id: uniqueId(cd.id, '市民 ID'), name: cd.name, sex: cd.sex, age: number(cd.age, '年龄', 0), adult: !!cd.adult,
       x: number(cd.x, '市民 x', 0, Math.min(oldN, w.N) - 1), y: number(cd.y, '市民 y', 0, Math.min(oldN, w.N) - 1),
@@ -996,7 +998,7 @@ G.prepareSaveData = function (d) {
       arrivalHallId:nullableId(cd.arrivalHallId,'入村登记点'), task: null, pausedTask: null, carry, state: 'idle', walkKind: '', path: null, pi: 0, camped: !!cd.camped,
       lastMealDay:legacyPhysicalMeals?(cd.hunger>0?null:g.day):(cd.lastMealDay==null?null:integer(cd.lastMealDay,'最近进食日',0,g.day)),
       wanderT: 0, hunger: cd.hunger === undefined ? 0 : number(cd.hunger, '饥饿', 0),
-      cold: cd.cold === undefined ? 0 : number(cd.cold, '寒冷', 0), animT: 0, dead: false,
+      cold: cd.cold === undefined ? 0 : number(cd.cold, '寒冷', 0), warmthSeeking:cd.warmthSeeking===true, animT: 0, dead: false,
       clothingLeft: cd.clothingLeft === undefined ? 0 : number(cd.clothingLeft, '衣物耐久天数', 0, G.YEAR_DAYS),
       clothingType:cd.clothingType??(cd.clothingLeft>0?'basic':null),
       toolType,toolHours,

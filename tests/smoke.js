@@ -123,7 +123,7 @@ G.ui = { toast() {}, refreshHUD() {} };
   check('儿童户外满 24h 受冻 ×1.5', Math.abs(kid.cold - G.LIFE.coldOutdoor * G.LIFE.coldChildMul) < 1e-9);
   // 暖屋过夜：一夜 8h 恢复 0.5（warmRecover 1.5/天）
   warm.cold = 1; warm.state = 'rest'; warm.camped = false;
-  warm.x = house.x + 1; warm.y = house.y + 1;
+  warm.x = house.x - 1; warm.y = house.y; // 实际可走的门口，不以 rest 标签冒充到家
   G.coldStep(warm, 8);
   check('暖屋睡 8h 恢复 0.5', Math.abs(warm.cold - 0.5) < 1e-9);
   // 暖屋工人一天净账：白天 16h 户外累积 0.267，夜里恢复 0.5 → 归零
@@ -135,6 +135,7 @@ G.ui = { toast() {}, refreshHUD() {} };
   const { house: h2 } = houseWith(G.world, coldHome);
   h2.unheated = true;
   coldHome.cold = 1; coldHome.state = 'rest'; coldHome.camped = false;
+  coldHome.x = h2.x - 1; coldHome.y = h2.y;
   G.coldStep(coldHome, 8);
   check('冷屋睡 8h 累积 +0.1', Math.abs(coldHome.cold - 1.1) < 1e-9);
   // 露宿（有房但 camped，如护林人远岗）：整夜户外照常累积

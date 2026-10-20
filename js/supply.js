@@ -322,6 +322,7 @@ G.recordHouseholdMeal=function(c,groups,day=G.game.day){
 };
 G.finishMealJourney=function(c){
  c.mealJourney=null;c.path=null;c.state='idle';c.walkKind='';c.mealRetryH=2;c.wanderT=0;
+ if(G.tryWarmthJourney(c))return;
  if(c.pausedTask&&G.resumeTask(c))return;
  if(c.carry)G.startHaul(c);
 };
@@ -350,7 +351,7 @@ G.tryMealJourney=function(c,boundary=false){
  if(!spot){c.mealWaitReason='用餐目标断路：等待道路、桥或隧道恢复';c.mealRetryH=2;return false;}
  const eta=spot.route.eta/(G.isWinter() ? 0.75 : 1)/(c.carry ? 0.9 : 1);
  if(busy&&c.hunger<1&&eta+G.MEAL_HOURS<G.DAY_H-G.game.h){c.mealRetryH=2;return false;}
- if(c.task)c.pausedTask=c.task;c.task=null;c.mealJourney={};c.mealWaitReason='';
+ if(c.task)c.pausedTask=c.task;c.task=null;c.warmthJourney=null;c.mealJourney={};c.mealWaitReason='';
  return G.planMealJourney(c,spot);
 };
 G.stepHouseholdMeal=function(c,dt){
