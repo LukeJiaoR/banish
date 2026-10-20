@@ -703,7 +703,10 @@ G.prepareSaveData = function (d) {
     }
     if(bd.unheated!==undefined){if(def.warmWoodPerYear==null||b.state!=='ok'||typeof bd.unheated!=='boolean')bad('住宅供暖状态');b.unheated=bd.unheated;}
     if(bd.lastHeating!==undefined){
-      if(def.warmWoodPerYear==null||b.state!=='ok')bad('住宅取暖记录');const r=record(bd.lastHeating,'取暖记录'),day=integer(r.day,'取暖日期',0,g.day),need=def.warmWoodPerYear/G.SEASON_DAYS;
+      if(def.warmWoodPerYear==null||b.state!=='ok')bad('住宅取暖记录');const r=record(bd.lastHeating,'取暖记录'),day=integer(r.day,'取暖日期',0,g.day),currentNeed=def.warmWoodPerYear/G.SEASON_DAYS;
+      // Keep the exact historical bill: pre-balance stone homes burned 15/year.
+      // No retroactive charge or warmth change; the next winter day uses currentNeed.
+      const need=bd.type==='stonehouse'&&r.need===15/G.SEASON_DAYS?r.need:currentNeed;
       if(G.seasonOf(day)!==3||r.need!==need)bad('取暖季节或需求');const wood=number(r.wood,'已烧柴火',0,need),coal=number(r.coal,'已烧煤',0,need/G.COAL_HEAT);
       if(wood+coal*G.COAL_HEAT>need+1e-8)bad('超额取暖记录');b.lastHeating={day,need,wood,coal};
       if(bd.unheated===undefined)b.unheated=g.season===3&&day===g.day&&wood+coal*G.COAL_HEAT+1e-8<need;

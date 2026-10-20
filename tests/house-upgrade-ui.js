@@ -146,7 +146,7 @@ test('review shows exact cost, actual salvage, net payment, displacement and qua
   assert.match(live(f, 'displaced'), /1 户 \/ 1 人/);
   assert.match(live(f, 'housing'), /空屋 0 户.*宿舍空位 0 户.*未核实.*可达.*不会预留/);
   assert.match(live(f, 'cold'), /受冻.*不能保证入住/);
-  assert.match(live(f, 'fuel'), /本作.*有人入住.*每年约 30 → 15 柴火/);
+  assert.match(live(f, 'fuel'), /本作.*有人入住.*每年约 30 → 20 柴火.*省三分之一/);
   assert.match(f.info.textContent, /原屋永久消失.*取消升级工地也不会还原木屋/);
   f.b.paidCost = { wood: 10, stone: 6 }; f.G.ui.renderInfo();
   assert.deepEqual(['wood', 'stone'].map(r => live(f, 'salvage-' + r)), ['5', '3']);

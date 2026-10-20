@@ -158,10 +158,10 @@ test('empty homes and sites are excluded; stone homes and boarding are charged p
   const boarding = f.building('boarding'); f.resident(boarding); f.resident(boarding);
   assert.equal(boarding.family, null, 'boarding occupancy uses family.houseId');
   const expected = G.BDEF.house.warmWoodPerYear + G.BDEF.stonehouse.warmWoodPerYear + G.BDEF.boarding.warmWoodPerYear;
-  assert.equal(G.ui.heatDemand().fullWinter, expected); assert.equal(expected, 120);
-  assertSharedText(f); assert.match(f.node('heat').textContent, /120/);
+  assert.equal(G.ui.heatDemand().fullWinter, expected); assert.equal(expected, 125);
+  assertSharedText(f); assert.match(f.node('heat').textContent, /125/);
   G.world.families = G.world.families.filter(family => family.houseId !== boarding.id);
-  assert.equal(G.ui.heatDemand().fullWinter, 45);
+  assert.equal(G.ui.heatDemand().fullWinter, 50);
 });
 
 test('winter day 36 excludes the first charge, day 47 has zero future charges, next year uses full budget', () => {
@@ -186,36 +186,36 @@ test('winter day 36 excludes the first charge, day 47 has zero future charges, n
 test('fractional stone-home future heating stays exact in calculations and rounds up only for display', () => {
   const f = fixture(), { G } = f; f.resident(f.building('stonehouse'));
   Object.assign(G.game, { day: 36, season: 3 });
-  assert.equal(G.ui.heatDemand().fullWinter, 15); assert.equal(G.ui.heatDemand().futureWinter, 13.75);
-  assert.match(G.ui.heatDemandText(G.ui.heatDemand()), /本冬此后约需 14/);
-  G.game.day = 46; assert.equal(G.ui.heatDemand().futureWinter, 1.25);
+  assert.equal(G.ui.heatDemand().fullWinter, 20); assert.equal(G.ui.heatDemand().futureWinter, 20*11/12);
+  assert.match(G.ui.heatDemandText(G.ui.heatDemand()), /本冬此后约需 19/);
+  G.game.day = 46; assert.equal(G.ui.heatDemand().futureWinter, 20/12);
   assert.match(G.ui.heatDemandText(G.ui.heatDemand()), /本冬此后约需 2/);
   G.game.day = 47; assert.equal(G.ui.heatDemand().futureWinter, 0);
 });
 
 test('fractional sufficient stocks never trigger a rounded-budget shortage and pay every real future charge', () => {
-  for (const [day, stock] of [[36, 13.75], [46, 1.25], [46, 1.75]]) {
+  for (const [day, stock] of [[36, 20*11/12], [46, 20/12], [46, 20/12 + 0.5]]) {
     const f = fixture(), { G } = f; const home = f.building('stonehouse'); f.resident(home);
     const cutter = f.building('woodcutter'); f.select(cutter);
-    // Enter the test day through real endDay charging, including its own 1.25.
+    // Enter the test day through real endDay charging, including its own 20/12.
     Object.assign(G.game, { day: day - 1, season: G.seasonOf(day - 1), h: 12 });
     G.game.res.food = 10000; G.game.res.firewood = stock + G.BDEF.stonehouse.warmWoodPerYear / G.SEASON_DAYS;
-    G.endDay(); assert.equal(G.game.day, day); assert.equal(G.game.res.firewood, stock);
+    G.endDay(); assert.equal(G.game.day, day); assert.ok(Math.abs(G.game.res.firewood-stock)<1e-8);
     const need = G.ui.heatDemand().futureWinter; assert.ok(stock >= need);
     assertSharedText(f); assert.doesNotMatch(f.guide.textContent, /柴火不足/); assert.doesNotMatch(f.node('gap').textContent, /少约/);
     while (G.game.day < 47) { G.endDay(); assert.equal(home.unheated, false); }
-    assert.equal(G.game.res.firewood, stock - need);
+    assert.ok(Math.abs(G.game.res.firewood-(stock-need))<1e-8);
   }
 });
 
 test('slightly insufficient fractional stocks warn using the raw gap and fail the final real charge', () => {
-  for (const [day, stock, gap] of [[36, 13.5, 0.25], [36, 12.875, 0.875], [46, 1, 0.25], [46, 0.375, 0.875]]) {
+  for (const [day, stock, gap] of [[36, 20*11/12-0.25, 0.25], [36, 20*11/12-0.875, 0.875], [46, 20/12-0.25, 0.25], [46, 20/12-0.875, 0.875]]) {
     const f = fixture(), { G } = f; const home = f.building('stonehouse'); f.resident(home);
     const cutter = f.building('woodcutter'); f.select(cutter);
     Object.assign(G.game, { day: day - 1, season: G.seasonOf(day - 1), h: 12 });
     G.game.res.food = 10000; G.game.res.firewood = stock + G.BDEF.stonehouse.warmWoodPerYear / G.SEASON_DAYS;
-    G.endDay(); assert.equal(G.game.res.firewood, stock);
-    assert.equal(G.ui.heatDemand().futureWinter - stock, gap);
+    G.endDay(); assert.ok(Math.abs(G.game.res.firewood-stock)<1e-8);
+    assert.ok(Math.abs(G.ui.heatDemand().futureWinter-stock-gap)<1e-8);
     assertSharedText(f); assert.match(f.guide.textContent, /柴火不足/); assert.match(f.node('gap').textContent, /少约 1/);
     while (G.game.day < 47) G.endDay();
     assert.equal(home.unheated, true); assert.equal(G.game.res.firewood, 0);
@@ -288,7 +288,7 @@ test('repeated and focused refreshes update quantities/status/workers without re
   assert.match(nodes.status.textContent, /等待可用工人/, 'stale simulation warning must not imply current cutoff');
   const worker = G.world.citizens[0]; worker.name = '<img onerror=bad()>'; b.workers.push(worker.id);
   f.resident(f.building('stonehouse')); G.ui.tickInfo(0.5);
-  assert.match(nodes.heat.textContent, /135/); assert.match(nodes.status.textContent, /运作中/);
+  assert.match(nodes.heat.textContent, /140/); assert.match(nodes.status.textContent, /运作中/);
   assert.equal(nodes.workers.textContent, worker.name); assert.equal(nodes.workers.children.length, 0);
   assert.equal(f.info.htmlWrites, writes); assert.equal(f.doc.activeElement, plus); assert.equal(f.button(50), plus);
   for (const [key, el] of Object.entries(nodes)) assert.equal(f.node(key), el);

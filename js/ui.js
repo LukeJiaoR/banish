@@ -2189,7 +2189,7 @@ G.ui = {
       displaced: `开始后搬出：${quote.families} 户 / ${quote.people} 人；施工期间不能住在这里。`,
       housing: `全镇其余空屋 ${quote.freeHomes} 户 · 宿舍空位 ${quote.boardingSlots} 户。仅为全镇统计，未核实对住户是否可达，也不会预留床位。`,
       cold: `${quote.winter ? '⚠ 当前正值寒冬。' : '冬季风险：'}搬出后若无可达住处和柴火，住户可能受冻；即使全镇有空位也不能保证入住。`,
-      fuel: `本作取暖：有人入住时，每屋每年约 ${quote.oldFuel} → ${quote.newFuel} 柴火（冬季集中消耗，省一半）。`,
+      fuel: `本作取暖：有人入住时，每屋每年约 ${quote.oldFuel} → ${quote.newFuel} 柴火（冬季集中消耗，省三分之一）。`,
       reason: quote.ok ? '当前库存和可达建筑工人满足开始条件，补料运到场后才能施工；其他工地可能先领取库存。' : `暂不能升级：${quote.reason || '请检查建材和可用建筑工人。'}`,
     } };
   },

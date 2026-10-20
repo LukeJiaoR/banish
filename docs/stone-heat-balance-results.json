@@ -1,0 +1,6125 @@
+{
+  "baselineCommit": "9c521bf20552c2ac876888f111bc5d70c5be7c6c",
+  "scope": "Stone-home heat only. Winter fixture provisioned, opening runs use ordinary player actions.",
+  "fixtureBefore": {
+    "fixture": "seed5 five occupied homes; provisioned stocks; ordinary fuel target50",
+    "results": [
+      {
+        "options": {
+          "type": "stonehouse",
+          "fuel": 50,
+          "cutter": true
+        },
+        "sourceHash": "287678385ddd4b1a956f0c0dce5343264b2977d291b40ad36607885868c10cd9",
+        "perHomeWinter": 15,
+        "receivedFuel": 78,
+        "withdrawnLogs": 26,
+        "cuttingHours": 45.500000000000355,
+        "deliveries": 13,
+        "coldHomeDays": 0,
+        "deaths": [],
+        "daily": [
+          {
+            "day": 36,
+            "firewood": 43.75,
+            "wood": 100,
+            "bills": [
+              {
+                "day": 36,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 36,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 36,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 36,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 36,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              }
+            ]
+          },
+          {
+            "day": 37,
+            "firewood": 49.5,
+            "wood": 96,
+            "bills": [
+              {
+                "day": 37,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 37,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 37,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 37,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 37,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              }
+            ]
+          },
+          {
+            "day": 38,
+            "firewood": 49.25,
+            "wood": 94,
+            "bills": [
+              {
+                "day": 38,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 38,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 38,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 38,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 38,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              }
+            ]
+          },
+          {
+            "day": 39,
+            "firewood": 49,
+            "wood": 92,
+            "bills": [
+              {
+                "day": 39,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 39,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 39,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 39,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 39,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              }
+            ]
+          },
+          {
+            "day": 40,
+            "firewood": 48.75,
+            "wood": 90,
+            "bills": [
+              {
+                "day": 40,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 40,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 40,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 40,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 40,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              }
+            ]
+          },
+          {
+            "day": 41,
+            "firewood": 48.5,
+            "wood": 88,
+            "bills": [
+              {
+                "day": 41,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 41,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 41,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 41,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 41,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              }
+            ]
+          },
+          {
+            "day": 42,
+            "firewood": 48.25,
+            "wood": 86,
+            "bills": [
+              {
+                "day": 42,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 42,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 42,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 42,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 42,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              }
+            ]
+          },
+          {
+            "day": 43,
+            "firewood": 48,
+            "wood": 84,
+            "bills": [
+              {
+                "day": 43,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 43,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 43,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 43,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 43,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              }
+            ]
+          },
+          {
+            "day": 44,
+            "firewood": 47.75,
+            "wood": 82,
+            "bills": [
+              {
+                "day": 44,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 44,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 44,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 44,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 44,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              }
+            ]
+          },
+          {
+            "day": 45,
+            "firewood": 47.5,
+            "wood": 80,
+            "bills": [
+              {
+                "day": 45,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 45,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 45,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 45,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 45,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              }
+            ]
+          },
+          {
+            "day": 46,
+            "firewood": 47.25,
+            "wood": 78,
+            "bills": [
+              {
+                "day": 46,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 46,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 46,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 46,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 46,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              }
+            ]
+          },
+          {
+            "day": 47,
+            "firewood": 47,
+            "wood": 76,
+            "bills": [
+              {
+                "day": 47,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 47,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 47,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 47,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 47,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              }
+            ]
+          }
+        ],
+        "final": {
+          "day": 48,
+          "population": 5,
+          "firewood": 53,
+          "wood": 74
+        },
+        "burnedFuel": 75
+      },
+      {
+        "options": {
+          "type": "house",
+          "fuel": 50,
+          "cutter": true
+        },
+        "sourceHash": "287678385ddd4b1a956f0c0dce5343264b2977d291b40ad36607885868c10cd9",
+        "perHomeWinter": 30,
+        "receivedFuel": 150,
+        "withdrawnLogs": 50,
+        "cuttingHours": 87.49999999999928,
+        "deliveries": 25,
+        "coldHomeDays": 0,
+        "deaths": [],
+        "daily": [
+          {
+            "day": 36,
+            "firewood": 37.5,
+            "wood": 100,
+            "bills": [
+              {
+                "day": 36,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 36,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 36,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 36,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 36,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              }
+            ]
+          },
+          {
+            "day": 37,
+            "firewood": 37,
+            "wood": 94,
+            "bills": [
+              {
+                "day": 37,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 37,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 37,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 37,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 37,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              }
+            ]
+          },
+          {
+            "day": 38,
+            "firewood": 36.5,
+            "wood": 90,
+            "bills": [
+              {
+                "day": 38,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 38,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 38,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 38,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 38,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              }
+            ]
+          },
+          {
+            "day": 39,
+            "firewood": 42,
+            "wood": 86,
+            "bills": [
+              {
+                "day": 39,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 39,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 39,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 39,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 39,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              }
+            ]
+          },
+          {
+            "day": 40,
+            "firewood": 41.5,
+            "wood": 82,
+            "bills": [
+              {
+                "day": 40,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 40,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 40,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 40,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 40,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              }
+            ]
+          },
+          {
+            "day": 41,
+            "firewood": 41,
+            "wood": 78,
+            "bills": [
+              {
+                "day": 41,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 41,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 41,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 41,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 41,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              }
+            ]
+          },
+          {
+            "day": 42,
+            "firewood": 40.5,
+            "wood": 74,
+            "bills": [
+              {
+                "day": 42,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 42,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 42,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 42,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 42,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              }
+            ]
+          },
+          {
+            "day": 43,
+            "firewood": 40,
+            "wood": 70,
+            "bills": [
+              {
+                "day": 43,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 43,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 43,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 43,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 43,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              }
+            ]
+          },
+          {
+            "day": 44,
+            "firewood": 39.5,
+            "wood": 66,
+            "bills": [
+              {
+                "day": 44,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 44,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 44,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 44,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 44,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              }
+            ]
+          },
+          {
+            "day": 45,
+            "firewood": 39,
+            "wood": 62,
+            "bills": [
+              {
+                "day": 45,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 45,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 45,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 45,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 45,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              }
+            ]
+          },
+          {
+            "day": 46,
+            "firewood": 38.5,
+            "wood": 58,
+            "bills": [
+              {
+                "day": 46,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 46,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 46,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 46,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 46,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              }
+            ]
+          },
+          {
+            "day": 47,
+            "firewood": 38,
+            "wood": 54,
+            "bills": [
+              {
+                "day": 47,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 47,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 47,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 47,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 47,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              }
+            ]
+          }
+        ],
+        "final": {
+          "day": 48,
+          "population": 5,
+          "firewood": 50,
+          "wood": 50
+        },
+        "burnedFuel": 150
+      },
+      {
+        "options": {
+          "type": "stonehouse",
+          "fuel": 75,
+          "cutter": false
+        },
+        "sourceHash": "287678385ddd4b1a956f0c0dce5343264b2977d291b40ad36607885868c10cd9",
+        "perHomeWinter": 15,
+        "receivedFuel": 0,
+        "withdrawnLogs": 0,
+        "cuttingHours": 0,
+        "deliveries": 0,
+        "coldHomeDays": 0,
+        "deaths": [],
+        "daily": [
+          {
+            "day": 36,
+            "firewood": 68.75,
+            "wood": 100,
+            "bills": [
+              {
+                "day": 36,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 36,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 36,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 36,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 36,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              }
+            ]
+          },
+          {
+            "day": 37,
+            "firewood": 62.5,
+            "wood": 100,
+            "bills": [
+              {
+                "day": 37,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 37,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 37,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 37,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 37,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              }
+            ]
+          },
+          {
+            "day": 38,
+            "firewood": 56.25,
+            "wood": 100,
+            "bills": [
+              {
+                "day": 38,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 38,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 38,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 38,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 38,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              }
+            ]
+          },
+          {
+            "day": 39,
+            "firewood": 50,
+            "wood": 100,
+            "bills": [
+              {
+                "day": 39,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 39,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 39,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 39,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 39,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              }
+            ]
+          },
+          {
+            "day": 40,
+            "firewood": 43.75,
+            "wood": 100,
+            "bills": [
+              {
+                "day": 40,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 40,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 40,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 40,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 40,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              }
+            ]
+          },
+          {
+            "day": 41,
+            "firewood": 37.5,
+            "wood": 100,
+            "bills": [
+              {
+                "day": 41,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 41,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 41,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 41,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 41,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              }
+            ]
+          },
+          {
+            "day": 42,
+            "firewood": 31.25,
+            "wood": 100,
+            "bills": [
+              {
+                "day": 42,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 42,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 42,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 42,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 42,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              }
+            ]
+          },
+          {
+            "day": 43,
+            "firewood": 25,
+            "wood": 100,
+            "bills": [
+              {
+                "day": 43,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 43,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 43,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 43,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 43,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              }
+            ]
+          },
+          {
+            "day": 44,
+            "firewood": 18.75,
+            "wood": 100,
+            "bills": [
+              {
+                "day": 44,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 44,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 44,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 44,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 44,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              }
+            ]
+          },
+          {
+            "day": 45,
+            "firewood": 12.5,
+            "wood": 100,
+            "bills": [
+              {
+                "day": 45,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 45,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 45,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 45,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 45,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              }
+            ]
+          },
+          {
+            "day": 46,
+            "firewood": 6.25,
+            "wood": 100,
+            "bills": [
+              {
+                "day": 46,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 46,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 46,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 46,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 46,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              }
+            ]
+          },
+          {
+            "day": 47,
+            "firewood": 0,
+            "wood": 100,
+            "bills": [
+              {
+                "day": 47,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 47,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 47,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 47,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              },
+              {
+                "day": 47,
+                "wood": 1.25,
+                "coal": 0,
+                "need": 1.25,
+                "unheated": false
+              }
+            ]
+          }
+        ],
+        "final": {
+          "day": 48,
+          "population": 5,
+          "firewood": 0,
+          "wood": 100
+        },
+        "burnedFuel": 75
+      }
+    ]
+  },
+  "fixtureAfter": {
+    "fixture": "seed5 five occupied homes; provisioned stocks; ordinary fuel target50",
+    "results": [
+      {
+        "options": {
+          "type": "stonehouse",
+          "fuel": 50,
+          "cutter": true
+        },
+        "sourceHash": "b146b6230017959082feb27e99df0edf71778694a3e594e78090d2cae4a7be1c",
+        "perHomeWinter": 20,
+        "receivedFuel": 102,
+        "withdrawnLogs": 34,
+        "cuttingHours": 59.500000000000554,
+        "deliveries": 17,
+        "coldHomeDays": 0,
+        "deaths": [],
+        "daily": [
+          {
+            "day": 36,
+            "firewood": 41.66666666666668,
+            "wood": 100,
+            "bills": [
+              {
+                "day": 36,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 36,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 36,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 36,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 36,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              }
+            ]
+          },
+          {
+            "day": 37,
+            "firewood": 45.33333333333336,
+            "wood": 96,
+            "bills": [
+              {
+                "day": 37,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 37,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 37,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 37,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 37,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              }
+            ]
+          },
+          {
+            "day": 38,
+            "firewood": 43.000000000000036,
+            "wood": 94,
+            "bills": [
+              {
+                "day": 38,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 38,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 38,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 38,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 38,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              }
+            ]
+          },
+          {
+            "day": 39,
+            "firewood": 46.666666666666714,
+            "wood": 90,
+            "bills": [
+              {
+                "day": 39,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 39,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 39,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 39,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 39,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              }
+            ]
+          },
+          {
+            "day": 40,
+            "firewood": 44.33333333333339,
+            "wood": 88,
+            "bills": [
+              {
+                "day": 40,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 40,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 40,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 40,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 40,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              }
+            ]
+          },
+          {
+            "day": 41,
+            "firewood": 42.00000000000007,
+            "wood": 86,
+            "bills": [
+              {
+                "day": 41,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 41,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 41,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 41,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 41,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              }
+            ]
+          },
+          {
+            "day": 42,
+            "firewood": 45.66666666666675,
+            "wood": 82,
+            "bills": [
+              {
+                "day": 42,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 42,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 42,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 42,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 42,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              }
+            ]
+          },
+          {
+            "day": 43,
+            "firewood": 43.33333333333343,
+            "wood": 80,
+            "bills": [
+              {
+                "day": 43,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 43,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 43,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 43,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 43,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              }
+            ]
+          },
+          {
+            "day": 44,
+            "firewood": 47.00000000000011,
+            "wood": 76,
+            "bills": [
+              {
+                "day": 44,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 44,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 44,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 44,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 44,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              }
+            ]
+          },
+          {
+            "day": 45,
+            "firewood": 44.666666666666785,
+            "wood": 74,
+            "bills": [
+              {
+                "day": 45,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 45,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 45,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 45,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 45,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              }
+            ]
+          },
+          {
+            "day": 46,
+            "firewood": 42.333333333333464,
+            "wood": 72,
+            "bills": [
+              {
+                "day": 46,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 46,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 46,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 46,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 46,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              }
+            ]
+          },
+          {
+            "day": 47,
+            "firewood": 46.00000000000014,
+            "wood": 68,
+            "bills": [
+              {
+                "day": 47,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 47,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 47,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 47,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 47,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              }
+            ]
+          }
+        ],
+        "final": {
+          "day": 48,
+          "population": 5,
+          "firewood": 52.00000000000014,
+          "wood": 66
+        },
+        "burnedFuel": 99.99999999999999
+      },
+      {
+        "options": {
+          "type": "house",
+          "fuel": 50,
+          "cutter": true
+        },
+        "sourceHash": "b146b6230017959082feb27e99df0edf71778694a3e594e78090d2cae4a7be1c",
+        "perHomeWinter": 30,
+        "receivedFuel": 150,
+        "withdrawnLogs": 50,
+        "cuttingHours": 87.49999999999928,
+        "deliveries": 25,
+        "coldHomeDays": 0,
+        "deaths": [],
+        "daily": [
+          {
+            "day": 36,
+            "firewood": 37.5,
+            "wood": 100,
+            "bills": [
+              {
+                "day": 36,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 36,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 36,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 36,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 36,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              }
+            ]
+          },
+          {
+            "day": 37,
+            "firewood": 37,
+            "wood": 94,
+            "bills": [
+              {
+                "day": 37,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 37,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 37,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 37,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 37,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              }
+            ]
+          },
+          {
+            "day": 38,
+            "firewood": 36.5,
+            "wood": 90,
+            "bills": [
+              {
+                "day": 38,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 38,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 38,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 38,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 38,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              }
+            ]
+          },
+          {
+            "day": 39,
+            "firewood": 42,
+            "wood": 86,
+            "bills": [
+              {
+                "day": 39,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 39,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 39,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 39,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 39,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              }
+            ]
+          },
+          {
+            "day": 40,
+            "firewood": 41.5,
+            "wood": 82,
+            "bills": [
+              {
+                "day": 40,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 40,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 40,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 40,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 40,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              }
+            ]
+          },
+          {
+            "day": 41,
+            "firewood": 41,
+            "wood": 78,
+            "bills": [
+              {
+                "day": 41,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 41,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 41,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 41,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 41,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              }
+            ]
+          },
+          {
+            "day": 42,
+            "firewood": 40.5,
+            "wood": 74,
+            "bills": [
+              {
+                "day": 42,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 42,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 42,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 42,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 42,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              }
+            ]
+          },
+          {
+            "day": 43,
+            "firewood": 40,
+            "wood": 70,
+            "bills": [
+              {
+                "day": 43,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 43,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 43,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 43,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 43,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              }
+            ]
+          },
+          {
+            "day": 44,
+            "firewood": 39.5,
+            "wood": 66,
+            "bills": [
+              {
+                "day": 44,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 44,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 44,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 44,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 44,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              }
+            ]
+          },
+          {
+            "day": 45,
+            "firewood": 39,
+            "wood": 62,
+            "bills": [
+              {
+                "day": 45,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 45,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 45,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 45,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 45,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              }
+            ]
+          },
+          {
+            "day": 46,
+            "firewood": 38.5,
+            "wood": 58,
+            "bills": [
+              {
+                "day": 46,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 46,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 46,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 46,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 46,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              }
+            ]
+          },
+          {
+            "day": 47,
+            "firewood": 38,
+            "wood": 54,
+            "bills": [
+              {
+                "day": 47,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 47,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 47,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 47,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              },
+              {
+                "day": 47,
+                "wood": 2.5,
+                "coal": 0,
+                "need": 2.5,
+                "unheated": false
+              }
+            ]
+          }
+        ],
+        "final": {
+          "day": 48,
+          "population": 5,
+          "firewood": 50,
+          "wood": 50
+        },
+        "burnedFuel": 150
+      },
+      {
+        "options": {
+          "type": "stonehouse",
+          "fuel": 75,
+          "cutter": false
+        },
+        "sourceHash": "b146b6230017959082feb27e99df0edf71778694a3e594e78090d2cae4a7be1c",
+        "perHomeWinter": 20,
+        "receivedFuel": 0,
+        "withdrawnLogs": 0,
+        "cuttingHours": 0,
+        "deliveries": 0,
+        "coldHomeDays": 15,
+        "deaths": [],
+        "daily": [
+          {
+            "day": 36,
+            "firewood": 66.66666666666664,
+            "wood": 100,
+            "bills": [
+              {
+                "day": 36,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 36,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 36,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 36,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 36,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              }
+            ]
+          },
+          {
+            "day": 37,
+            "firewood": 58.333333333333314,
+            "wood": 100,
+            "bills": [
+              {
+                "day": 37,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 37,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 37,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 37,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 37,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              }
+            ]
+          },
+          {
+            "day": 38,
+            "firewood": 49.99999999999999,
+            "wood": 100,
+            "bills": [
+              {
+                "day": 38,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 38,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 38,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 38,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 38,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              }
+            ]
+          },
+          {
+            "day": 39,
+            "firewood": 41.66666666666667,
+            "wood": 100,
+            "bills": [
+              {
+                "day": 39,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 39,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 39,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 39,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 39,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              }
+            ]
+          },
+          {
+            "day": 40,
+            "firewood": 33.33333333333335,
+            "wood": 100,
+            "bills": [
+              {
+                "day": 40,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 40,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 40,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 40,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 40,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              }
+            ]
+          },
+          {
+            "day": 41,
+            "firewood": 25.00000000000001,
+            "wood": 100,
+            "bills": [
+              {
+                "day": 41,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 41,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 41,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 41,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 41,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              }
+            ]
+          },
+          {
+            "day": 42,
+            "firewood": 16.66666666666667,
+            "wood": 100,
+            "bills": [
+              {
+                "day": 42,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 42,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 42,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 42,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 42,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              }
+            ]
+          },
+          {
+            "day": 43,
+            "firewood": 8.333333333333341,
+            "wood": 100,
+            "bills": [
+              {
+                "day": 43,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 43,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 43,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 43,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 43,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              }
+            ]
+          },
+          {
+            "day": 44,
+            "firewood": 6.661338147750939e-15,
+            "wood": 100,
+            "bills": [
+              {
+                "day": 44,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 44,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 44,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 44,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              },
+              {
+                "day": 44,
+                "wood": 1.6666666666666667,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": false
+              }
+            ]
+          },
+          {
+            "day": 45,
+            "firewood": 0,
+            "wood": 100,
+            "bills": [
+              {
+                "day": 45,
+                "wood": 6.661338147750939e-15,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": true
+              },
+              {
+                "day": 45,
+                "wood": 0,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": true
+              },
+              {
+                "day": 45,
+                "wood": 0,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": true
+              },
+              {
+                "day": 45,
+                "wood": 0,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": true
+              },
+              {
+                "day": 45,
+                "wood": 0,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": true
+              }
+            ]
+          },
+          {
+            "day": 46,
+            "firewood": 0,
+            "wood": 100,
+            "bills": [
+              {
+                "day": 46,
+                "wood": 0,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": true
+              },
+              {
+                "day": 46,
+                "wood": 0,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": true
+              },
+              {
+                "day": 46,
+                "wood": 0,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": true
+              },
+              {
+                "day": 46,
+                "wood": 0,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": true
+              },
+              {
+                "day": 46,
+                "wood": 0,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": true
+              }
+            ]
+          },
+          {
+            "day": 47,
+            "firewood": 0,
+            "wood": 100,
+            "bills": [
+              {
+                "day": 47,
+                "wood": 0,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": true
+              },
+              {
+                "day": 47,
+                "wood": 0,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": true
+              },
+              {
+                "day": 47,
+                "wood": 0,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": true
+              },
+              {
+                "day": 47,
+                "wood": 0,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": true
+              },
+              {
+                "day": 47,
+                "wood": 0,
+                "coal": 0,
+                "need": 1.6666666666666667,
+                "unheated": true
+              }
+            ]
+          }
+        ],
+        "final": {
+          "day": 48,
+          "population": 5,
+          "firewood": 0,
+          "wood": 100
+        },
+        "burnedFuel": 75
+      }
+    ]
+  },
+  "openingBefore": {
+    "scriptHash": "1dc0b3bfd180160fc8ec7b10066bf29aba63111439468e45291ded25ca96db66",
+    "policySourceHash": "dce776357ca33d4cdd807018059c65e249b0359defc19addbed0230da60b2188",
+    "results": [
+      {
+        "seed": 5,
+        "scenario": "baseline",
+        "sourceHash": "287678385ddd4b1a956f0c0dce5343264b2977d291b40ad36607885868c10cd9",
+        "policyHash": "da1e08551d35d6eb33c53e17b5413a998d1b6e5cc2a19d82ff4ffc9506ffa111",
+        "years": 1,
+        "final": {
+          "day": 48,
+          "hour": 6,
+          "pop": 15,
+          "adults": 10,
+          "res": {
+            "wood": 30,
+            "stone": 32,
+            "iron": 0,
+            "tools": 11,
+            "food": 468.8,
+            "meat": 0,
+            "eggs": 0,
+            "vegetables": 468.8,
+            "grain": 0,
+            "apples": 0,
+            "pears": 0,
+            "firewood": 98,
+            "leather": 0,
+            "wool": 0,
+            "clothes": 0,
+            "herbs": 0,
+            "coal": 0,
+            "steelTools": 0,
+            "ale": 0,
+            "warmCoats": 0
+          },
+          "foodDays": 15,
+          "foodNet": 0,
+          "homeless": 2,
+          "unhousedChildren": 0,
+          "unheated": 0,
+          "warmNeed": 90,
+          "marks": [
+            2,
+            0
+          ],
+          "buildings": [
+            {
+              "id": 1,
+              "type": "storage",
+              "state": "ok",
+              "workers": 0,
+              "target": null,
+              "progress": 1
+            },
+            {
+              "id": 22,
+              "type": "gatherer",
+              "state": "ok",
+              "workers": 2,
+              "target": null,
+              "progress": 1
+            },
+            {
+              "id": 23,
+              "type": "woodcutter",
+              "state": "ok",
+              "workers": 1,
+              "target": 100,
+              "progress": 1
+            },
+            {
+              "id": 24,
+              "type": "gatherer",
+              "state": "ok",
+              "workers": 2,
+              "target": null,
+              "progress": 1
+            },
+            {
+              "id": 25,
+              "type": "house",
+              "state": "ok",
+              "workers": 0,
+              "target": null,
+              "progress": 1
+            },
+            {
+              "id": 26,
+              "type": "house",
+              "state": "ok",
+              "workers": 0,
+              "target": null,
+              "progress": 1
+            },
+            {
+              "id": 27,
+              "type": "house",
+              "state": "ok",
+              "workers": 0,
+              "target": null,
+              "progress": 1
+            }
+          ],
+          "jobs": {
+            "gatherer": 4,
+            "laborer": 5,
+            "woodcutter": 1
+          }
+        },
+        "deaths": [],
+        "shortages": {
+          "hungryCitizenDays": 0,
+          "toolDays": 0,
+          "coldHouseDays": 0
+        }
+      },
+      {
+        "seed": 49,
+        "scenario": "baseline",
+        "sourceHash": "287678385ddd4b1a956f0c0dce5343264b2977d291b40ad36607885868c10cd9",
+        "policyHash": "da1e08551d35d6eb33c53e17b5413a998d1b6e5cc2a19d82ff4ffc9506ffa111",
+        "years": 1,
+        "final": {
+          "day": 48,
+          "hour": 6,
+          "pop": 18,
+          "adults": 11,
+          "res": {
+            "wood": 28,
+            "stone": 52,
+            "iron": 0,
+            "tools": 11,
+            "food": 392.1,
+            "meat": 0,
+            "eggs": 0,
+            "vegetables": 392.1,
+            "grain": 0,
+            "apples": 0,
+            "pears": 0,
+            "firewood": 104,
+            "leather": 0,
+            "wool": 0,
+            "clothes": 0,
+            "herbs": 0,
+            "coal": 0,
+            "steelTools": 0,
+            "ale": 0,
+            "warmCoats": 0
+          },
+          "foodDays": 10.46,
+          "foodNet": -7.5,
+          "homeless": 2,
+          "unhousedChildren": 0,
+          "unheated": 0,
+          "warmNeed": 90,
+          "marks": [
+            2,
+            0
+          ],
+          "buildings": [
+            {
+              "id": 1,
+              "type": "storage",
+              "state": "ok",
+              "workers": 0,
+              "target": null,
+              "progress": 1
+            },
+            {
+              "id": 22,
+              "type": "gatherer",
+              "state": "ok",
+              "workers": 2,
+              "target": null,
+              "progress": 1
+            },
+            {
+              "id": 23,
+              "type": "woodcutter",
+              "state": "ok",
+              "workers": 0,
+              "target": 100,
+              "progress": 1
+            },
+            {
+              "id": 24,
+              "type": "gatherer",
+              "state": "ok",
+              "workers": 2,
+              "target": null,
+              "progress": 1
+            },
+            {
+              "id": 25,
+              "type": "house",
+              "state": "ok",
+              "workers": 0,
+              "target": null,
+              "progress": 1
+            },
+            {
+              "id": 26,
+              "type": "house",
+              "state": "ok",
+              "workers": 0,
+              "target": null,
+              "progress": 1
+            },
+            {
+              "id": 28,
+              "type": "house",
+              "state": "ok",
+              "workers": 0,
+              "target": null,
+              "progress": 1
+            }
+          ],
+          "jobs": {
+            "laborer": 7,
+            "gatherer": 4
+          }
+        },
+        "deaths": [],
+        "shortages": {
+          "hungryCitizenDays": 0,
+          "toolDays": 0,
+          "coldHouseDays": 0
+        }
+      }
+    ]
+  },
+  "openingAfter": {
+    "scriptHash": "1dc0b3bfd180160fc8ec7b10066bf29aba63111439468e45291ded25ca96db66",
+    "policySourceHash": "dce776357ca33d4cdd807018059c65e249b0359defc19addbed0230da60b2188",
+    "results": [
+      {
+        "seed": 5,
+        "scenario": "baseline",
+        "sourceHash": "b146b6230017959082feb27e99df0edf71778694a3e594e78090d2cae4a7be1c",
+        "policyHash": "da1e08551d35d6eb33c53e17b5413a998d1b6e5cc2a19d82ff4ffc9506ffa111",
+        "years": 1,
+        "final": {
+          "day": 48,
+          "hour": 6,
+          "pop": 15,
+          "adults": 10,
+          "res": {
+            "wood": 30,
+            "stone": 32,
+            "iron": 0,
+            "tools": 11,
+            "food": 468.8,
+            "meat": 0,
+            "eggs": 0,
+            "vegetables": 468.8,
+            "grain": 0,
+            "apples": 0,
+            "pears": 0,
+            "firewood": 98,
+            "leather": 0,
+            "wool": 0,
+            "clothes": 0,
+            "herbs": 0,
+            "coal": 0,
+            "steelTools": 0,
+            "ale": 0,
+            "warmCoats": 0
+          },
+          "foodDays": 15,
+          "foodNet": 0,
+          "homeless": 2,
+          "unhousedChildren": 0,
+          "unheated": 0,
+          "warmNeed": 90,
+          "marks": [
+            2,
+            0
+          ],
+          "buildings": [
+            {
+              "id": 1,
+              "type": "storage",
+              "state": "ok",
+              "workers": 0,
+              "target": null,
+              "progress": 1
+            },
+            {
+              "id": 22,
+              "type": "gatherer",
+              "state": "ok",
+              "workers": 2,
+              "target": null,
+              "progress": 1
+            },
+            {
+              "id": 23,
+              "type": "woodcutter",
+              "state": "ok",
+              "workers": 1,
+              "target": 100,
+              "progress": 1
+            },
+            {
+              "id": 24,
+              "type": "gatherer",
+              "state": "ok",
+              "workers": 2,
+              "target": null,
+              "progress": 1
+            },
+            {
+              "id": 25,
+              "type": "house",
+              "state": "ok",
+              "workers": 0,
+              "target": null,
+              "progress": 1
+            },
+            {
+              "id": 26,
+              "type": "house",
+              "state": "ok",
+              "workers": 0,
+              "target": null,
+              "progress": 1
+            },
+            {
+              "id": 27,
+              "type": "house",
+              "state": "ok",
+              "workers": 0,
+              "target": null,
+              "progress": 1
+            }
+          ],
+          "jobs": {
+            "gatherer": 4,
+            "laborer": 5,
+            "woodcutter": 1
+          }
+        },
+        "deaths": [],
+        "shortages": {
+          "hungryCitizenDays": 0,
+          "toolDays": 0,
+          "coldHouseDays": 0
+        }
+      },
+      {
+        "seed": 49,
+        "scenario": "baseline",
+        "sourceHash": "b146b6230017959082feb27e99df0edf71778694a3e594e78090d2cae4a7be1c",
+        "policyHash": "da1e08551d35d6eb33c53e17b5413a998d1b6e5cc2a19d82ff4ffc9506ffa111",
+        "years": 1,
+        "final": {
+          "day": 48,
+          "hour": 6,
+          "pop": 18,
+          "adults": 11,
+          "res": {
+            "wood": 28,
+            "stone": 52,
+            "iron": 0,
+            "tools": 11,
+            "food": 392.1,
+            "meat": 0,
+            "eggs": 0,
+            "vegetables": 392.1,
+            "grain": 0,
+            "apples": 0,
+            "pears": 0,
+            "firewood": 104,
+            "leather": 0,
+            "wool": 0,
+            "clothes": 0,
+            "herbs": 0,
+            "coal": 0,
+            "steelTools": 0,
+            "ale": 0,
+            "warmCoats": 0
+          },
+          "foodDays": 10.46,
+          "foodNet": -7.5,
+          "homeless": 2,
+          "unhousedChildren": 0,
+          "unheated": 0,
+          "warmNeed": 90,
+          "marks": [
+            2,
+            0
+          ],
+          "buildings": [
+            {
+              "id": 1,
+              "type": "storage",
+              "state": "ok",
+              "workers": 0,
+              "target": null,
+              "progress": 1
+            },
+            {
+              "id": 22,
+              "type": "gatherer",
+              "state": "ok",
+              "workers": 2,
+              "target": null,
+              "progress": 1
+            },
+            {
+              "id": 23,
+              "type": "woodcutter",
+              "state": "ok",
+              "workers": 0,
+              "target": 100,
+              "progress": 1
+            },
+            {
+              "id": 24,
+              "type": "gatherer",
+              "state": "ok",
+              "workers": 2,
+              "target": null,
+              "progress": 1
+            },
+            {
+              "id": 25,
+              "type": "house",
+              "state": "ok",
+              "workers": 0,
+              "target": null,
+              "progress": 1
+            },
+            {
+              "id": 26,
+              "type": "house",
+              "state": "ok",
+              "workers": 0,
+              "target": null,
+              "progress": 1
+            },
+            {
+              "id": 28,
+              "type": "house",
+              "state": "ok",
+              "workers": 0,
+              "target": null,
+              "progress": 1
+            }
+          ],
+          "jobs": {
+            "laborer": 7,
+            "gatherer": 4
+          }
+        },
+        "deaths": [],
+        "shortages": {
+          "hungryCitizenDays": 0,
+          "toolDays": 0,
+          "coldHouseDays": 0
+        }
+      }
+    ]
+  },
+  "negativeBefore": {
+    "strategyHash": "df44de0137ace15c5aa3e08102cad72a86fb19c223c25c82760403c69ff59979",
+    "sourceHash": "287678385ddd4b1a956f0c0dce5343264b2977d291b40ad36607885868c10cd9",
+    "results": [
+      {
+        "seed": 5,
+        "strategy": "neglect",
+        "sourceHash": "287678385ddd4b1a956f0c0dce5343264b2977d291b40ad36607885868c10cd9",
+        "tuning": {},
+        "years": 1,
+        "day": 20,
+        "population": 0,
+        "born": 0,
+        "died": 15,
+        "causes": {
+          "饿死": 15
+        },
+        "resources": {
+          "wood": 80,
+          "stone": 48,
+          "iron": 0,
+          "tools": 14,
+          "food": 0,
+          "meat": 0,
+          "eggs": 0,
+          "vegetables": 0,
+          "grain": 0,
+          "apples": 0,
+          "pears": 0,
+          "firewood": 50,
+          "leather": 0,
+          "wool": 0,
+          "clothes": 0,
+          "herbs": 0,
+          "coal": 0,
+          "steelTools": 0,
+          "ale": 0,
+          "warmCoats": 0
+        },
+        "minima": {
+          "food": 1.7559287357471476e-12,
+          "firewood": 50,
+          "tools": 14,
+          "wood": 80
+        },
+        "winterMinima": {},
+        "shortages": {
+          "hungryCitizenDays": 45,
+          "toolDays": 0,
+          "unheatedHomeDays": 0
+        },
+        "production": {},
+        "staffingHours": {
+          "storage": 0
+        },
+        "assignments": {},
+        "interruptions": {},
+        "deaths": [
+          {
+            "day": 20,
+            "age": 34.4,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": null,
+            "food": 0,
+            "fuel": 50,
+            "wood": 80
+          },
+          {
+            "day": 20,
+            "age": 18.4,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": null,
+            "food": 0,
+            "fuel": 50,
+            "wood": 80
+          },
+          {
+            "day": 20,
+            "age": 3.4,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": null,
+            "food": 0,
+            "fuel": 50,
+            "wood": 80
+          },
+          {
+            "day": 20,
+            "age": 2.4,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": null,
+            "food": 0,
+            "fuel": 50,
+            "wood": 80
+          },
+          {
+            "day": 20,
+            "age": 22.4,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": null,
+            "food": 0,
+            "fuel": 50,
+            "wood": 80
+          },
+          {
+            "day": 20,
+            "age": 26.4,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": null,
+            "food": 0,
+            "fuel": 50,
+            "wood": 80
+          },
+          {
+            "day": 20,
+            "age": 7.4,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": null,
+            "food": 0,
+            "fuel": 50,
+            "wood": 80
+          },
+          {
+            "day": 20,
+            "age": 4.4,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": null,
+            "food": 0,
+            "fuel": 50,
+            "wood": 80
+          },
+          {
+            "day": 20,
+            "age": 29.4,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": null,
+            "food": 0,
+            "fuel": 50,
+            "wood": 80
+          },
+          {
+            "day": 20,
+            "age": 19.4,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": null,
+            "food": 0,
+            "fuel": 50,
+            "wood": 80
+          },
+          {
+            "day": 20,
+            "age": 5.4,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": null,
+            "food": 0,
+            "fuel": 50,
+            "wood": 80
+          },
+          {
+            "day": 20,
+            "age": 37.4,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": null,
+            "food": 0,
+            "fuel": 50,
+            "wood": 80
+          },
+          {
+            "day": 20,
+            "age": 31.4,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": null,
+            "food": 0,
+            "fuel": 50,
+            "wood": 80
+          },
+          {
+            "day": 20,
+            "age": 27.4,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": null,
+            "food": 0,
+            "fuel": 50,
+            "wood": 80
+          },
+          {
+            "day": 20,
+            "age": 25.4,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": null,
+            "food": 0,
+            "fuel": 50,
+            "wood": 80
+          }
+        ],
+        "snapshots": [
+          {
+            "day": 0,
+            "pop": 15,
+            "wood": 80,
+            "stone": 48,
+            "iron": 0,
+            "tools": 15,
+            "food": 500,
+            "meat": 0,
+            "eggs": 0,
+            "vegetables": 0,
+            "grain": 500,
+            "apples": 0,
+            "pears": 0,
+            "firewood": 50,
+            "leather": 0,
+            "wool": 0,
+            "clothes": 0,
+            "herbs": 0,
+            "coal": 0,
+            "steelTools": 0,
+            "ale": 0,
+            "warmCoats": 0,
+            "deaths": 0,
+            "buildings": "storage:ok:0"
+          },
+          {
+            "day": 12,
+            "pop": 15,
+            "wood": 80,
+            "stone": 48,
+            "iron": 0,
+            "tools": 14,
+            "food": 125,
+            "meat": 0,
+            "eggs": 0,
+            "vegetables": 0,
+            "grain": 125,
+            "apples": 0,
+            "pears": 0,
+            "firewood": 50,
+            "leather": 0,
+            "wool": 0,
+            "clothes": 0,
+            "herbs": 0,
+            "coal": 0,
+            "steelTools": 0,
+            "ale": 0,
+            "warmCoats": 0,
+            "deaths": 0,
+            "buildings": "storage:ok:0"
+          }
+        ],
+        "buildLog": [],
+        "buildings": [
+          {
+            "type": "storage",
+            "state": "ok",
+            "workers": 0
+          }
+        ]
+      },
+      {
+        "seed": 49,
+        "strategy": "neglect",
+        "sourceHash": "287678385ddd4b1a956f0c0dce5343264b2977d291b40ad36607885868c10cd9",
+        "tuning": {},
+        "years": 1,
+        "day": 20,
+        "population": 0,
+        "born": 0,
+        "died": 15,
+        "causes": {
+          "饿死": 15
+        },
+        "resources": {
+          "wood": 80,
+          "stone": 48,
+          "iron": 0,
+          "tools": 14,
+          "food": 0,
+          "meat": 0,
+          "eggs": 0,
+          "vegetables": 0,
+          "grain": 0,
+          "apples": 0,
+          "pears": 0,
+          "firewood": 50,
+          "leather": 0,
+          "wool": 0,
+          "clothes": 0,
+          "herbs": 0,
+          "coal": 0,
+          "steelTools": 0,
+          "ale": 0,
+          "warmCoats": 0
+        },
+        "minima": {
+          "food": 1.7559287357471476e-12,
+          "firewood": 50,
+          "tools": 14,
+          "wood": 80
+        },
+        "winterMinima": {},
+        "shortages": {
+          "hungryCitizenDays": 45,
+          "toolDays": 0,
+          "unheatedHomeDays": 0
+        },
+        "production": {},
+        "staffingHours": {
+          "storage": 0
+        },
+        "assignments": {},
+        "interruptions": {},
+        "deaths": [
+          {
+            "day": 20,
+            "age": 29.4,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": null,
+            "food": 0,
+            "fuel": 50,
+            "wood": 80
+          },
+          {
+            "day": 20,
+            "age": 21.4,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": null,
+            "food": 0,
+            "fuel": 50,
+            "wood": 80
+          },
+          {
+            "day": 20,
+            "age": 6.4,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": null,
+            "food": 0,
+            "fuel": 50,
+            "wood": 80
+          },
+          {
+            "day": 20,
+            "age": 6.4,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": null,
+            "food": 0,
+            "fuel": 50,
+            "wood": 80
+          },
+          {
+            "day": 20,
+            "age": 28.4,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": null,
+            "food": 0,
+            "fuel": 50,
+            "wood": 80
+          },
+          {
+            "day": 20,
+            "age": 28.4,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": null,
+            "food": 0,
+            "fuel": 50,
+            "wood": 80
+          },
+          {
+            "day": 20,
+            "age": 6.4,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": null,
+            "food": 0,
+            "fuel": 50,
+            "wood": 80
+          },
+          {
+            "day": 20,
+            "age": 3.4,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": null,
+            "food": 0,
+            "fuel": 50,
+            "wood": 80
+          },
+          {
+            "day": 20,
+            "age": 38.4,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": null,
+            "food": 0,
+            "fuel": 50,
+            "wood": 80
+          },
+          {
+            "day": 20,
+            "age": 35.4,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": null,
+            "food": 0,
+            "fuel": 50,
+            "wood": 80
+          },
+          {
+            "day": 20,
+            "age": 9.4,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": null,
+            "food": 0,
+            "fuel": 50,
+            "wood": 80
+          },
+          {
+            "day": 20,
+            "age": 28.4,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": null,
+            "food": 0,
+            "fuel": 50,
+            "wood": 80
+          },
+          {
+            "day": 20,
+            "age": 18.4,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": null,
+            "food": 0,
+            "fuel": 50,
+            "wood": 80
+          },
+          {
+            "day": 20,
+            "age": 24.4,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": null,
+            "food": 0,
+            "fuel": 50,
+            "wood": 80
+          },
+          {
+            "day": 20,
+            "age": 27.4,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": null,
+            "food": 0,
+            "fuel": 50,
+            "wood": 80
+          }
+        ],
+        "snapshots": [
+          {
+            "day": 0,
+            "pop": 15,
+            "wood": 80,
+            "stone": 48,
+            "iron": 0,
+            "tools": 15,
+            "food": 500,
+            "meat": 0,
+            "eggs": 0,
+            "vegetables": 0,
+            "grain": 500,
+            "apples": 0,
+            "pears": 0,
+            "firewood": 50,
+            "leather": 0,
+            "wool": 0,
+            "clothes": 0,
+            "herbs": 0,
+            "coal": 0,
+            "steelTools": 0,
+            "ale": 0,
+            "warmCoats": 0,
+            "deaths": 0,
+            "buildings": "storage:ok:0"
+          },
+          {
+            "day": 12,
+            "pop": 15,
+            "wood": 80,
+            "stone": 48,
+            "iron": 0,
+            "tools": 14,
+            "food": 125,
+            "meat": 0,
+            "eggs": 0,
+            "vegetables": 0,
+            "grain": 125,
+            "apples": 0,
+            "pears": 0,
+            "firewood": 50,
+            "leather": 0,
+            "wool": 0,
+            "clothes": 0,
+            "herbs": 0,
+            "coal": 0,
+            "steelTools": 0,
+            "ale": 0,
+            "warmCoats": 0,
+            "deaths": 0,
+            "buildings": "storage:ok:0"
+          }
+        ],
+        "buildLog": [],
+        "buildings": [
+          {
+            "type": "storage",
+            "state": "ok",
+            "workers": 0
+          }
+        ]
+      },
+      {
+        "seed": 5,
+        "strategy": "original",
+        "sourceHash": "287678385ddd4b1a956f0c0dce5343264b2977d291b40ad36607885868c10cd9",
+        "tuning": {},
+        "years": 1,
+        "day": 39,
+        "population": 0,
+        "born": 1,
+        "died": 16,
+        "causes": {
+          "饿死": 16
+        },
+        "resources": {
+          "wood": 26,
+          "stone": 217,
+          "iron": 41,
+          "tools": 31,
+          "food": 1.7,
+          "meat": 0,
+          "eggs": 0,
+          "vegetables": 1.7,
+          "grain": 0,
+          "apples": 0,
+          "pears": 0,
+          "firewood": 151,
+          "leather": 0,
+          "wool": 0,
+          "clothes": 0,
+          "herbs": 0,
+          "coal": 0,
+          "steelTools": 0,
+          "ale": 0,
+          "warmCoats": 0
+        },
+        "minima": {
+          "food": 0.4166666666662069,
+          "firewood": 50,
+          "tools": 13,
+          "wood": 8
+        },
+        "winterMinima": {
+          "1": {
+            "food": 1.6666666666662024,
+            "firewood": 151
+          }
+        },
+        "shortages": {
+          "hungryCitizenDays": 48,
+          "toolDays": 0,
+          "unheatedHomeDays": 0
+        },
+        "production": {
+          "laborer.stone": 270,
+          "laborer.iron": 50,
+          "woodcutter.firewood": 126,
+          "gatherer.vegetables": 545,
+          "laborer.wood": 222,
+          "blacksmith.tools": 18
+        },
+        "staffingHours": {
+          "storage": 0,
+          "gatherer": 2422,
+          "woodcutter": 293,
+          "boarding": 296,
+          "blacksmith": 337
+        },
+        "assignments": {
+          "gatherer": 9,
+          "woodcutter": 5,
+          "boarding": 4,
+          "blacksmith": 4
+        },
+        "interruptions": {},
+        "deaths": [
+          {
+            "day": 35,
+            "age": 18.7,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": 24,
+            "food": 1.7,
+            "fuel": 176,
+            "wood": 26
+          },
+          {
+            "day": 35,
+            "age": 22.7,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": 24,
+            "food": 1.7,
+            "fuel": 176,
+            "wood": 26
+          },
+          {
+            "day": 35,
+            "age": 26.7,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": 24,
+            "food": 1.7,
+            "fuel": 176,
+            "wood": 26
+          },
+          {
+            "day": 35,
+            "age": 29.7,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": 24,
+            "food": 1.7,
+            "fuel": 176,
+            "wood": 26
+          },
+          {
+            "day": 35,
+            "age": 19.7,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": 24,
+            "food": 1.7,
+            "fuel": 176,
+            "wood": 26
+          },
+          {
+            "day": 35,
+            "age": 37.7,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": 24,
+            "food": 1.7,
+            "fuel": 176,
+            "wood": 26
+          },
+          {
+            "day": 35,
+            "age": 31.7,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": 24,
+            "food": 1.7,
+            "fuel": 176,
+            "wood": 26
+          },
+          {
+            "day": 35,
+            "age": 27.7,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": 24,
+            "food": 1.7,
+            "fuel": 176,
+            "wood": 26
+          },
+          {
+            "day": 35,
+            "age": 25.7,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": 24,
+            "food": 1.7,
+            "fuel": 176,
+            "wood": 26
+          },
+          {
+            "day": 36,
+            "age": 34.8,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": 24,
+            "food": 1.7,
+            "fuel": 169.8,
+            "wood": 26
+          },
+          {
+            "day": 36,
+            "age": 5.7,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": 24,
+            "food": 1.7,
+            "fuel": 169.8,
+            "wood": 26
+          },
+          {
+            "day": 36,
+            "age": 0.4,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": 24,
+            "food": 1.7,
+            "fuel": 169.8,
+            "wood": 26
+          },
+          {
+            "day": 37,
+            "age": 4.8,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0.35,
+            "home": 24,
+            "food": 1.7,
+            "fuel": 163.5,
+            "wood": 26
+          },
+          {
+            "day": 38,
+            "age": 7.8,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0.44,
+            "home": 24,
+            "food": 1.7,
+            "fuel": 157.3,
+            "wood": 26
+          },
+          {
+            "day": 39,
+            "age": 3.8,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0.37,
+            "home": 24,
+            "food": 1.7,
+            "fuel": 151,
+            "wood": 26
+          },
+          {
+            "day": 39,
+            "age": 2.8,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0.35,
+            "home": 24,
+            "food": 1.7,
+            "fuel": 151,
+            "wood": 26
+          }
+        ],
+        "snapshots": [
+          {
+            "day": 0,
+            "pop": 15,
+            "wood": 80,
+            "stone": 48,
+            "iron": 0,
+            "tools": 15,
+            "food": 500,
+            "meat": 0,
+            "eggs": 0,
+            "vegetables": 0,
+            "grain": 500,
+            "apples": 0,
+            "pears": 0,
+            "firewood": 50,
+            "leather": 0,
+            "wool": 0,
+            "clothes": 0,
+            "herbs": 0,
+            "coal": 0,
+            "steelTools": 0,
+            "ale": 0,
+            "warmCoats": 0,
+            "deaths": 0,
+            "buildings": "storage:ok:0,gatherer:site:4,woodcutter:site:4"
+          },
+          {
+            "day": 12,
+            "pop": 15,
+            "wood": 20,
+            "stone": 188,
+            "iron": 50,
+            "tools": 14,
+            "food": 325,
+            "meat": 0,
+            "eggs": 0,
+            "vegetables": 44,
+            "grain": 281,
+            "apples": 0,
+            "pears": 0,
+            "firewood": 104,
+            "leather": 0,
+            "wool": 0,
+            "clothes": 0,
+            "herbs": 0,
+            "coal": 0,
+            "steelTools": 0,
+            "ale": 0,
+            "warmCoats": 0,
+            "deaths": 0,
+            "buildings": "storage:ok:0,gatherer:ok:2,woodcutter:ok:0,boarding:site:4"
+          },
+          {
+            "day": 24,
+            "pop": 16,
+            "wood": 54,
+            "stone": 131,
+            "iron": 50,
+            "tools": 13,
+            "food": 181,
+            "meat": 0,
+            "eggs": 0,
+            "vegetables": 96,
+            "grain": 85,
+            "apples": 0,
+            "pears": 0,
+            "firewood": 176,
+            "leather": 0,
+            "wool": 0,
+            "clothes": 0,
+            "herbs": 0,
+            "coal": 0,
+            "steelTools": 0,
+            "ale": 0,
+            "warmCoats": 0,
+            "deaths": 0,
+            "buildings": "storage:ok:0,gatherer:ok:1,woodcutter:ok:0,boarding:ok:0,gatherer:ok:2"
+          },
+          {
+            "day": 36,
+            "pop": 4,
+            "wood": 26,
+            "stone": 217,
+            "iron": 41,
+            "tools": 31,
+            "food": 2,
+            "meat": 0,
+            "eggs": 0,
+            "vegetables": 2,
+            "grain": 0,
+            "apples": 0,
+            "pears": 0,
+            "firewood": 170,
+            "leather": 0,
+            "wool": 0,
+            "clothes": 0,
+            "herbs": 0,
+            "coal": 0,
+            "steelTools": 0,
+            "ale": 0,
+            "warmCoats": 0,
+            "deaths": 12,
+            "buildings": "storage:ok:0,gatherer:ok:0,woodcutter:ok:0,boarding:ok:0,gatherer:ok:0,blacksmith:ok:0"
+          }
+        ],
+        "buildLog": [
+          "d0:gatherer@62,63",
+          "d0:woodcutter@60,56",
+          "d11:boarding@53,57",
+          "d14:gatherer@63,66",
+          "d25:blacksmith@56,53"
+        ],
+        "buildings": [
+          {
+            "type": "storage",
+            "state": "ok",
+            "workers": 0
+          },
+          {
+            "type": "gatherer",
+            "state": "ok",
+            "workers": 0
+          },
+          {
+            "type": "woodcutter",
+            "state": "ok",
+            "workers": 0
+          },
+          {
+            "type": "boarding",
+            "state": "ok",
+            "workers": 0
+          },
+          {
+            "type": "gatherer",
+            "state": "ok",
+            "workers": 0
+          },
+          {
+            "type": "blacksmith",
+            "state": "ok",
+            "workers": 0
+          }
+        ]
+      },
+      {
+        "seed": 49,
+        "strategy": "original",
+        "sourceHash": "287678385ddd4b1a956f0c0dce5343264b2977d291b40ad36607885868c10cd9",
+        "tuning": {},
+        "years": 1,
+        "day": 48,
+        "population": 14,
+        "born": 1,
+        "died": 2,
+        "causes": {
+          "饿死": 2
+        },
+        "resources": {
+          "wood": 4,
+          "stone": 131,
+          "iron": 0,
+          "tools": 12,
+          "food": 1.7,
+          "meat": 0,
+          "eggs": 0,
+          "vegetables": 1.7,
+          "grain": 0,
+          "apples": 0,
+          "pears": 0,
+          "firewood": 179,
+          "leather": 0,
+          "wool": 0,
+          "clothes": 0,
+          "herbs": 0,
+          "coal": 0,
+          "steelTools": 0,
+          "ale": 0,
+          "warmCoats": 0
+        },
+        "minima": {
+          "food": 0.4166666666657628,
+          "firewood": 50,
+          "tools": 12,
+          "wood": 4
+        },
+        "winterMinima": {
+          "1": {
+            "food": 0.4166666666657628,
+            "firewood": 168.75
+          }
+        },
+        "shortages": {
+          "hungryCitizenDays": 54,
+          "toolDays": 0,
+          "unheatedHomeDays": 0
+        },
+        "production": {
+          "laborer.stone": 160,
+          "woodcutter.firewood": 204,
+          "gatherer.vegetables": 930,
+          "laborer.wood": 166
+        },
+        "staffingHours": {
+          "storage": 0,
+          "gatherer": 4458,
+          "woodcutter": 459,
+          "boarding": 306,
+          "farm": 24
+        },
+        "assignments": {
+          "gatherer": 8,
+          "woodcutter": 17,
+          "boarding": 4,
+          "farm": 4
+        },
+        "interruptions": {},
+        "deaths": [
+          {
+            "day": 43,
+            "age": 24.9,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0.25,
+            "home": 25,
+            "food": 1.2,
+            "fuel": 174,
+            "wood": 14
+          },
+          {
+            "day": 43,
+            "age": 27.9,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0.17,
+            "home": 25,
+            "food": 1.2,
+            "fuel": 174,
+            "wood": 14
+          }
+        ],
+        "snapshots": [
+          {
+            "day": 0,
+            "pop": 15,
+            "wood": 80,
+            "stone": 48,
+            "iron": 0,
+            "tools": 15,
+            "food": 500,
+            "meat": 0,
+            "eggs": 0,
+            "vegetables": 0,
+            "grain": 500,
+            "apples": 0,
+            "pears": 0,
+            "firewood": 50,
+            "leather": 0,
+            "wool": 0,
+            "clothes": 0,
+            "herbs": 0,
+            "coal": 0,
+            "steelTools": 0,
+            "ale": 0,
+            "warmCoats": 0,
+            "deaths": 0,
+            "buildings": "storage:ok:0,gatherer:site:4,woodcutter:site:4"
+          },
+          {
+            "day": 12,
+            "pop": 15,
+            "wood": 92,
+            "stone": 166,
+            "iron": 0,
+            "tools": 14,
+            "food": 265,
+            "meat": 0,
+            "eggs": 0,
+            "vegetables": 5,
+            "grain": 260,
+            "apples": 0,
+            "pears": 0,
+            "firewood": 104,
+            "leather": 0,
+            "wool": 0,
+            "clothes": 0,
+            "herbs": 0,
+            "coal": 0,
+            "steelTools": 0,
+            "ale": 0,
+            "warmCoats": 0,
+            "deaths": 0,
+            "buildings": "storage:ok:0,gatherer:ok:2,woodcutter:ok:0,gatherer:site:4"
+          },
+          {
+            "day": 24,
+            "pop": 15,
+            "wood": 30,
+            "stone": 131,
+            "iron": 0,
+            "tools": 13,
+            "food": 170,
+            "meat": 0,
+            "eggs": 0,
+            "vegetables": 108,
+            "grain": 62,
+            "apples": 0,
+            "pears": 0,
+            "firewood": 176,
+            "leather": 0,
+            "wool": 0,
+            "clothes": 0,
+            "herbs": 0,
+            "coal": 0,
+            "steelTools": 0,
+            "ale": 0,
+            "warmCoats": 0,
+            "deaths": 0,
+            "buildings": "storage:ok:0,gatherer:ok:2,woodcutter:ok:0,gatherer:ok:2,boarding:ok:0"
+          },
+          {
+            "day": 36,
+            "pop": 16,
+            "wood": 30,
+            "stone": 131,
+            "iron": 0,
+            "tools": 12,
+            "food": 54,
+            "meat": 0,
+            "eggs": 0,
+            "vegetables": 54,
+            "grain": 0,
+            "apples": 0,
+            "pears": 0,
+            "firewood": 170,
+            "leather": 0,
+            "wool": 0,
+            "clothes": 0,
+            "herbs": 0,
+            "coal": 0,
+            "steelTools": 0,
+            "ale": 0,
+            "warmCoats": 0,
+            "deaths": 0,
+            "buildings": "storage:ok:0,gatherer:ok:2,woodcutter:ok:0,gatherer:ok:2,boarding:ok:0"
+          },
+          {
+            "day": 48,
+            "pop": 14,
+            "wood": 4,
+            "stone": 131,
+            "iron": 0,
+            "tools": 12,
+            "food": 2,
+            "meat": 0,
+            "eggs": 0,
+            "vegetables": 2,
+            "grain": 0,
+            "apples": 0,
+            "pears": 0,
+            "firewood": 179,
+            "leather": 0,
+            "wool": 0,
+            "clothes": 0,
+            "herbs": 0,
+            "coal": 0,
+            "steelTools": 0,
+            "ale": 0,
+            "warmCoats": 0,
+            "deaths": 2,
+            "buildings": "storage:ok:0,gatherer:ok:2,woodcutter:ok:0,gatherer:ok:2,boarding:ok:0,farm:site:4"
+          }
+        ],
+        "buildLog": [
+          "d0:gatherer@61,74",
+          "d0:woodcutter@56,62",
+          "d10:gatherer@68,61",
+          "d15:boarding@50,59",
+          "d48:farm@56,64"
+        ],
+        "buildings": [
+          {
+            "type": "storage",
+            "state": "ok",
+            "workers": 0
+          },
+          {
+            "type": "gatherer",
+            "state": "ok",
+            "workers": 2
+          },
+          {
+            "type": "woodcutter",
+            "state": "ok",
+            "workers": 0
+          },
+          {
+            "type": "gatherer",
+            "state": "ok",
+            "workers": 2
+          },
+          {
+            "type": "boarding",
+            "state": "ok",
+            "workers": 0
+          },
+          {
+            "type": "farm",
+            "state": "site",
+            "workers": 4
+          }
+        ]
+      }
+    ]
+  },
+  "negativeAfter": {
+    "strategyHash": "df44de0137ace15c5aa3e08102cad72a86fb19c223c25c82760403c69ff59979",
+    "sourceHash": "b146b6230017959082feb27e99df0edf71778694a3e594e78090d2cae4a7be1c",
+    "results": [
+      {
+        "seed": 5,
+        "strategy": "neglect",
+        "sourceHash": "b146b6230017959082feb27e99df0edf71778694a3e594e78090d2cae4a7be1c",
+        "tuning": {},
+        "years": 1,
+        "day": 20,
+        "population": 0,
+        "born": 0,
+        "died": 15,
+        "causes": {
+          "饿死": 15
+        },
+        "resources": {
+          "wood": 80,
+          "stone": 48,
+          "iron": 0,
+          "tools": 14,
+          "food": 0,
+          "meat": 0,
+          "eggs": 0,
+          "vegetables": 0,
+          "grain": 0,
+          "apples": 0,
+          "pears": 0,
+          "firewood": 50,
+          "leather": 0,
+          "wool": 0,
+          "clothes": 0,
+          "herbs": 0,
+          "coal": 0,
+          "steelTools": 0,
+          "ale": 0,
+          "warmCoats": 0
+        },
+        "minima": {
+          "food": 1.7559287357471476e-12,
+          "firewood": 50,
+          "tools": 14,
+          "wood": 80
+        },
+        "winterMinima": {},
+        "shortages": {
+          "hungryCitizenDays": 45,
+          "toolDays": 0,
+          "unheatedHomeDays": 0
+        },
+        "production": {},
+        "staffingHours": {
+          "storage": 0
+        },
+        "assignments": {},
+        "interruptions": {},
+        "deaths": [
+          {
+            "day": 20,
+            "age": 34.4,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": null,
+            "food": 0,
+            "fuel": 50,
+            "wood": 80
+          },
+          {
+            "day": 20,
+            "age": 18.4,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": null,
+            "food": 0,
+            "fuel": 50,
+            "wood": 80
+          },
+          {
+            "day": 20,
+            "age": 3.4,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": null,
+            "food": 0,
+            "fuel": 50,
+            "wood": 80
+          },
+          {
+            "day": 20,
+            "age": 2.4,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": null,
+            "food": 0,
+            "fuel": 50,
+            "wood": 80
+          },
+          {
+            "day": 20,
+            "age": 22.4,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": null,
+            "food": 0,
+            "fuel": 50,
+            "wood": 80
+          },
+          {
+            "day": 20,
+            "age": 26.4,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": null,
+            "food": 0,
+            "fuel": 50,
+            "wood": 80
+          },
+          {
+            "day": 20,
+            "age": 7.4,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": null,
+            "food": 0,
+            "fuel": 50,
+            "wood": 80
+          },
+          {
+            "day": 20,
+            "age": 4.4,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": null,
+            "food": 0,
+            "fuel": 50,
+            "wood": 80
+          },
+          {
+            "day": 20,
+            "age": 29.4,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": null,
+            "food": 0,
+            "fuel": 50,
+            "wood": 80
+          },
+          {
+            "day": 20,
+            "age": 19.4,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": null,
+            "food": 0,
+            "fuel": 50,
+            "wood": 80
+          },
+          {
+            "day": 20,
+            "age": 5.4,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": null,
+            "food": 0,
+            "fuel": 50,
+            "wood": 80
+          },
+          {
+            "day": 20,
+            "age": 37.4,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": null,
+            "food": 0,
+            "fuel": 50,
+            "wood": 80
+          },
+          {
+            "day": 20,
+            "age": 31.4,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": null,
+            "food": 0,
+            "fuel": 50,
+            "wood": 80
+          },
+          {
+            "day": 20,
+            "age": 27.4,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": null,
+            "food": 0,
+            "fuel": 50,
+            "wood": 80
+          },
+          {
+            "day": 20,
+            "age": 25.4,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": null,
+            "food": 0,
+            "fuel": 50,
+            "wood": 80
+          }
+        ],
+        "snapshots": [
+          {
+            "day": 0,
+            "pop": 15,
+            "wood": 80,
+            "stone": 48,
+            "iron": 0,
+            "tools": 15,
+            "food": 500,
+            "meat": 0,
+            "eggs": 0,
+            "vegetables": 0,
+            "grain": 500,
+            "apples": 0,
+            "pears": 0,
+            "firewood": 50,
+            "leather": 0,
+            "wool": 0,
+            "clothes": 0,
+            "herbs": 0,
+            "coal": 0,
+            "steelTools": 0,
+            "ale": 0,
+            "warmCoats": 0,
+            "deaths": 0,
+            "buildings": "storage:ok:0"
+          },
+          {
+            "day": 12,
+            "pop": 15,
+            "wood": 80,
+            "stone": 48,
+            "iron": 0,
+            "tools": 14,
+            "food": 125,
+            "meat": 0,
+            "eggs": 0,
+            "vegetables": 0,
+            "grain": 125,
+            "apples": 0,
+            "pears": 0,
+            "firewood": 50,
+            "leather": 0,
+            "wool": 0,
+            "clothes": 0,
+            "herbs": 0,
+            "coal": 0,
+            "steelTools": 0,
+            "ale": 0,
+            "warmCoats": 0,
+            "deaths": 0,
+            "buildings": "storage:ok:0"
+          }
+        ],
+        "buildLog": [],
+        "buildings": [
+          {
+            "type": "storage",
+            "state": "ok",
+            "workers": 0
+          }
+        ]
+      },
+      {
+        "seed": 49,
+        "strategy": "neglect",
+        "sourceHash": "b146b6230017959082feb27e99df0edf71778694a3e594e78090d2cae4a7be1c",
+        "tuning": {},
+        "years": 1,
+        "day": 20,
+        "population": 0,
+        "born": 0,
+        "died": 15,
+        "causes": {
+          "饿死": 15
+        },
+        "resources": {
+          "wood": 80,
+          "stone": 48,
+          "iron": 0,
+          "tools": 14,
+          "food": 0,
+          "meat": 0,
+          "eggs": 0,
+          "vegetables": 0,
+          "grain": 0,
+          "apples": 0,
+          "pears": 0,
+          "firewood": 50,
+          "leather": 0,
+          "wool": 0,
+          "clothes": 0,
+          "herbs": 0,
+          "coal": 0,
+          "steelTools": 0,
+          "ale": 0,
+          "warmCoats": 0
+        },
+        "minima": {
+          "food": 1.7559287357471476e-12,
+          "firewood": 50,
+          "tools": 14,
+          "wood": 80
+        },
+        "winterMinima": {},
+        "shortages": {
+          "hungryCitizenDays": 45,
+          "toolDays": 0,
+          "unheatedHomeDays": 0
+        },
+        "production": {},
+        "staffingHours": {
+          "storage": 0
+        },
+        "assignments": {},
+        "interruptions": {},
+        "deaths": [
+          {
+            "day": 20,
+            "age": 29.4,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": null,
+            "food": 0,
+            "fuel": 50,
+            "wood": 80
+          },
+          {
+            "day": 20,
+            "age": 21.4,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": null,
+            "food": 0,
+            "fuel": 50,
+            "wood": 80
+          },
+          {
+            "day": 20,
+            "age": 6.4,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": null,
+            "food": 0,
+            "fuel": 50,
+            "wood": 80
+          },
+          {
+            "day": 20,
+            "age": 6.4,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": null,
+            "food": 0,
+            "fuel": 50,
+            "wood": 80
+          },
+          {
+            "day": 20,
+            "age": 28.4,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": null,
+            "food": 0,
+            "fuel": 50,
+            "wood": 80
+          },
+          {
+            "day": 20,
+            "age": 28.4,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": null,
+            "food": 0,
+            "fuel": 50,
+            "wood": 80
+          },
+          {
+            "day": 20,
+            "age": 6.4,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": null,
+            "food": 0,
+            "fuel": 50,
+            "wood": 80
+          },
+          {
+            "day": 20,
+            "age": 3.4,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": null,
+            "food": 0,
+            "fuel": 50,
+            "wood": 80
+          },
+          {
+            "day": 20,
+            "age": 38.4,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": null,
+            "food": 0,
+            "fuel": 50,
+            "wood": 80
+          },
+          {
+            "day": 20,
+            "age": 35.4,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": null,
+            "food": 0,
+            "fuel": 50,
+            "wood": 80
+          },
+          {
+            "day": 20,
+            "age": 9.4,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": null,
+            "food": 0,
+            "fuel": 50,
+            "wood": 80
+          },
+          {
+            "day": 20,
+            "age": 28.4,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": null,
+            "food": 0,
+            "fuel": 50,
+            "wood": 80
+          },
+          {
+            "day": 20,
+            "age": 18.4,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": null,
+            "food": 0,
+            "fuel": 50,
+            "wood": 80
+          },
+          {
+            "day": 20,
+            "age": 24.4,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": null,
+            "food": 0,
+            "fuel": 50,
+            "wood": 80
+          },
+          {
+            "day": 20,
+            "age": 27.4,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": null,
+            "food": 0,
+            "fuel": 50,
+            "wood": 80
+          }
+        ],
+        "snapshots": [
+          {
+            "day": 0,
+            "pop": 15,
+            "wood": 80,
+            "stone": 48,
+            "iron": 0,
+            "tools": 15,
+            "food": 500,
+            "meat": 0,
+            "eggs": 0,
+            "vegetables": 0,
+            "grain": 500,
+            "apples": 0,
+            "pears": 0,
+            "firewood": 50,
+            "leather": 0,
+            "wool": 0,
+            "clothes": 0,
+            "herbs": 0,
+            "coal": 0,
+            "steelTools": 0,
+            "ale": 0,
+            "warmCoats": 0,
+            "deaths": 0,
+            "buildings": "storage:ok:0"
+          },
+          {
+            "day": 12,
+            "pop": 15,
+            "wood": 80,
+            "stone": 48,
+            "iron": 0,
+            "tools": 14,
+            "food": 125,
+            "meat": 0,
+            "eggs": 0,
+            "vegetables": 0,
+            "grain": 125,
+            "apples": 0,
+            "pears": 0,
+            "firewood": 50,
+            "leather": 0,
+            "wool": 0,
+            "clothes": 0,
+            "herbs": 0,
+            "coal": 0,
+            "steelTools": 0,
+            "ale": 0,
+            "warmCoats": 0,
+            "deaths": 0,
+            "buildings": "storage:ok:0"
+          }
+        ],
+        "buildLog": [],
+        "buildings": [
+          {
+            "type": "storage",
+            "state": "ok",
+            "workers": 0
+          }
+        ]
+      },
+      {
+        "seed": 5,
+        "strategy": "original",
+        "sourceHash": "b146b6230017959082feb27e99df0edf71778694a3e594e78090d2cae4a7be1c",
+        "tuning": {},
+        "years": 1,
+        "day": 39,
+        "population": 0,
+        "born": 1,
+        "died": 16,
+        "causes": {
+          "饿死": 16
+        },
+        "resources": {
+          "wood": 26,
+          "stone": 217,
+          "iron": 41,
+          "tools": 31,
+          "food": 1.7,
+          "meat": 0,
+          "eggs": 0,
+          "vegetables": 1.7,
+          "grain": 0,
+          "apples": 0,
+          "pears": 0,
+          "firewood": 151,
+          "leather": 0,
+          "wool": 0,
+          "clothes": 0,
+          "herbs": 0,
+          "coal": 0,
+          "steelTools": 0,
+          "ale": 0,
+          "warmCoats": 0
+        },
+        "minima": {
+          "food": 0.4166666666662069,
+          "firewood": 50,
+          "tools": 13,
+          "wood": 8
+        },
+        "winterMinima": {
+          "1": {
+            "food": 1.6666666666662024,
+            "firewood": 151
+          }
+        },
+        "shortages": {
+          "hungryCitizenDays": 48,
+          "toolDays": 0,
+          "unheatedHomeDays": 0
+        },
+        "production": {
+          "laborer.stone": 270,
+          "laborer.iron": 50,
+          "woodcutter.firewood": 126,
+          "gatherer.vegetables": 545,
+          "laborer.wood": 222,
+          "blacksmith.tools": 18
+        },
+        "staffingHours": {
+          "storage": 0,
+          "gatherer": 2422,
+          "woodcutter": 293,
+          "boarding": 296,
+          "blacksmith": 337
+        },
+        "assignments": {
+          "gatherer": 9,
+          "woodcutter": 5,
+          "boarding": 4,
+          "blacksmith": 4
+        },
+        "interruptions": {},
+        "deaths": [
+          {
+            "day": 35,
+            "age": 18.7,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": 24,
+            "food": 1.7,
+            "fuel": 176,
+            "wood": 26
+          },
+          {
+            "day": 35,
+            "age": 22.7,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": 24,
+            "food": 1.7,
+            "fuel": 176,
+            "wood": 26
+          },
+          {
+            "day": 35,
+            "age": 26.7,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": 24,
+            "food": 1.7,
+            "fuel": 176,
+            "wood": 26
+          },
+          {
+            "day": 35,
+            "age": 29.7,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": 24,
+            "food": 1.7,
+            "fuel": 176,
+            "wood": 26
+          },
+          {
+            "day": 35,
+            "age": 19.7,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": 24,
+            "food": 1.7,
+            "fuel": 176,
+            "wood": 26
+          },
+          {
+            "day": 35,
+            "age": 37.7,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": 24,
+            "food": 1.7,
+            "fuel": 176,
+            "wood": 26
+          },
+          {
+            "day": 35,
+            "age": 31.7,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": 24,
+            "food": 1.7,
+            "fuel": 176,
+            "wood": 26
+          },
+          {
+            "day": 35,
+            "age": 27.7,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": 24,
+            "food": 1.7,
+            "fuel": 176,
+            "wood": 26
+          },
+          {
+            "day": 35,
+            "age": 25.7,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": 24,
+            "food": 1.7,
+            "fuel": 176,
+            "wood": 26
+          },
+          {
+            "day": 36,
+            "age": 34.8,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": 24,
+            "food": 1.7,
+            "fuel": 169.8,
+            "wood": 26
+          },
+          {
+            "day": 36,
+            "age": 5.7,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": 24,
+            "food": 1.7,
+            "fuel": 169.8,
+            "wood": 26
+          },
+          {
+            "day": 36,
+            "age": 0.4,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0,
+            "home": 24,
+            "food": 1.7,
+            "fuel": 169.8,
+            "wood": 26
+          },
+          {
+            "day": 37,
+            "age": 4.8,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0.35,
+            "home": 24,
+            "food": 1.7,
+            "fuel": 163.5,
+            "wood": 26
+          },
+          {
+            "day": 38,
+            "age": 7.8,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0.44,
+            "home": 24,
+            "food": 1.7,
+            "fuel": 157.3,
+            "wood": 26
+          },
+          {
+            "day": 39,
+            "age": 3.8,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0.37,
+            "home": 24,
+            "food": 1.7,
+            "fuel": 151,
+            "wood": 26
+          },
+          {
+            "day": 39,
+            "age": 2.8,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0.35,
+            "home": 24,
+            "food": 1.7,
+            "fuel": 151,
+            "wood": 26
+          }
+        ],
+        "snapshots": [
+          {
+            "day": 0,
+            "pop": 15,
+            "wood": 80,
+            "stone": 48,
+            "iron": 0,
+            "tools": 15,
+            "food": 500,
+            "meat": 0,
+            "eggs": 0,
+            "vegetables": 0,
+            "grain": 500,
+            "apples": 0,
+            "pears": 0,
+            "firewood": 50,
+            "leather": 0,
+            "wool": 0,
+            "clothes": 0,
+            "herbs": 0,
+            "coal": 0,
+            "steelTools": 0,
+            "ale": 0,
+            "warmCoats": 0,
+            "deaths": 0,
+            "buildings": "storage:ok:0,gatherer:site:4,woodcutter:site:4"
+          },
+          {
+            "day": 12,
+            "pop": 15,
+            "wood": 20,
+            "stone": 188,
+            "iron": 50,
+            "tools": 14,
+            "food": 325,
+            "meat": 0,
+            "eggs": 0,
+            "vegetables": 44,
+            "grain": 281,
+            "apples": 0,
+            "pears": 0,
+            "firewood": 104,
+            "leather": 0,
+            "wool": 0,
+            "clothes": 0,
+            "herbs": 0,
+            "coal": 0,
+            "steelTools": 0,
+            "ale": 0,
+            "warmCoats": 0,
+            "deaths": 0,
+            "buildings": "storage:ok:0,gatherer:ok:2,woodcutter:ok:0,boarding:site:4"
+          },
+          {
+            "day": 24,
+            "pop": 16,
+            "wood": 54,
+            "stone": 131,
+            "iron": 50,
+            "tools": 13,
+            "food": 181,
+            "meat": 0,
+            "eggs": 0,
+            "vegetables": 96,
+            "grain": 85,
+            "apples": 0,
+            "pears": 0,
+            "firewood": 176,
+            "leather": 0,
+            "wool": 0,
+            "clothes": 0,
+            "herbs": 0,
+            "coal": 0,
+            "steelTools": 0,
+            "ale": 0,
+            "warmCoats": 0,
+            "deaths": 0,
+            "buildings": "storage:ok:0,gatherer:ok:1,woodcutter:ok:0,boarding:ok:0,gatherer:ok:2"
+          },
+          {
+            "day": 36,
+            "pop": 4,
+            "wood": 26,
+            "stone": 217,
+            "iron": 41,
+            "tools": 31,
+            "food": 2,
+            "meat": 0,
+            "eggs": 0,
+            "vegetables": 2,
+            "grain": 0,
+            "apples": 0,
+            "pears": 0,
+            "firewood": 170,
+            "leather": 0,
+            "wool": 0,
+            "clothes": 0,
+            "herbs": 0,
+            "coal": 0,
+            "steelTools": 0,
+            "ale": 0,
+            "warmCoats": 0,
+            "deaths": 12,
+            "buildings": "storage:ok:0,gatherer:ok:0,woodcutter:ok:0,boarding:ok:0,gatherer:ok:0,blacksmith:ok:0"
+          }
+        ],
+        "buildLog": [
+          "d0:gatherer@62,63",
+          "d0:woodcutter@60,56",
+          "d11:boarding@53,57",
+          "d14:gatherer@63,66",
+          "d25:blacksmith@56,53"
+        ],
+        "buildings": [
+          {
+            "type": "storage",
+            "state": "ok",
+            "workers": 0
+          },
+          {
+            "type": "gatherer",
+            "state": "ok",
+            "workers": 0
+          },
+          {
+            "type": "woodcutter",
+            "state": "ok",
+            "workers": 0
+          },
+          {
+            "type": "boarding",
+            "state": "ok",
+            "workers": 0
+          },
+          {
+            "type": "gatherer",
+            "state": "ok",
+            "workers": 0
+          },
+          {
+            "type": "blacksmith",
+            "state": "ok",
+            "workers": 0
+          }
+        ]
+      },
+      {
+        "seed": 49,
+        "strategy": "original",
+        "sourceHash": "b146b6230017959082feb27e99df0edf71778694a3e594e78090d2cae4a7be1c",
+        "tuning": {},
+        "years": 1,
+        "day": 48,
+        "population": 14,
+        "born": 1,
+        "died": 2,
+        "causes": {
+          "饿死": 2
+        },
+        "resources": {
+          "wood": 4,
+          "stone": 131,
+          "iron": 0,
+          "tools": 12,
+          "food": 1.7,
+          "meat": 0,
+          "eggs": 0,
+          "vegetables": 1.7,
+          "grain": 0,
+          "apples": 0,
+          "pears": 0,
+          "firewood": 179,
+          "leather": 0,
+          "wool": 0,
+          "clothes": 0,
+          "herbs": 0,
+          "coal": 0,
+          "steelTools": 0,
+          "ale": 0,
+          "warmCoats": 0
+        },
+        "minima": {
+          "food": 0.4166666666657628,
+          "firewood": 50,
+          "tools": 12,
+          "wood": 4
+        },
+        "winterMinima": {
+          "1": {
+            "food": 0.4166666666657628,
+            "firewood": 168.75
+          }
+        },
+        "shortages": {
+          "hungryCitizenDays": 54,
+          "toolDays": 0,
+          "unheatedHomeDays": 0
+        },
+        "production": {
+          "laborer.stone": 160,
+          "woodcutter.firewood": 204,
+          "gatherer.vegetables": 930,
+          "laborer.wood": 166
+        },
+        "staffingHours": {
+          "storage": 0,
+          "gatherer": 4458,
+          "woodcutter": 459,
+          "boarding": 306,
+          "farm": 24
+        },
+        "assignments": {
+          "gatherer": 8,
+          "woodcutter": 17,
+          "boarding": 4,
+          "farm": 4
+        },
+        "interruptions": {},
+        "deaths": [
+          {
+            "day": 43,
+            "age": 24.9,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0.25,
+            "home": 25,
+            "food": 1.2,
+            "fuel": 174,
+            "wood": 14
+          },
+          {
+            "day": 43,
+            "age": 27.9,
+            "reason": "饿死",
+            "hunger": 4,
+            "cold": 0.17,
+            "home": 25,
+            "food": 1.2,
+            "fuel": 174,
+            "wood": 14
+          }
+        ],
+        "snapshots": [
+          {
+            "day": 0,
+            "pop": 15,
+            "wood": 80,
+            "stone": 48,
+            "iron": 0,
+            "tools": 15,
+            "food": 500,
+            "meat": 0,
+            "eggs": 0,
+            "vegetables": 0,
+            "grain": 500,
+            "apples": 0,
+            "pears": 0,
+            "firewood": 50,
+            "leather": 0,
+            "wool": 0,
+            "clothes": 0,
+            "herbs": 0,
+            "coal": 0,
+            "steelTools": 0,
+            "ale": 0,
+            "warmCoats": 0,
+            "deaths": 0,
+            "buildings": "storage:ok:0,gatherer:site:4,woodcutter:site:4"
+          },
+          {
+            "day": 12,
+            "pop": 15,
+            "wood": 92,
+            "stone": 166,
+            "iron": 0,
+            "tools": 14,
+            "food": 265,
+            "meat": 0,
+            "eggs": 0,
+            "vegetables": 5,
+            "grain": 260,
+            "apples": 0,
+            "pears": 0,
+            "firewood": 104,
+            "leather": 0,
+            "wool": 0,
+            "clothes": 0,
+            "herbs": 0,
+            "coal": 0,
+            "steelTools": 0,
+            "ale": 0,
+            "warmCoats": 0,
+            "deaths": 0,
+            "buildings": "storage:ok:0,gatherer:ok:2,woodcutter:ok:0,gatherer:site:4"
+          },
+          {
+            "day": 24,
+            "pop": 15,
+            "wood": 30,
+            "stone": 131,
+            "iron": 0,
+            "tools": 13,
+            "food": 170,
+            "meat": 0,
+            "eggs": 0,
+            "vegetables": 108,
+            "grain": 62,
+            "apples": 0,
+            "pears": 0,
+            "firewood": 176,
+            "leather": 0,
+            "wool": 0,
+            "clothes": 0,
+            "herbs": 0,
+            "coal": 0,
+            "steelTools": 0,
+            "ale": 0,
+            "warmCoats": 0,
+            "deaths": 0,
+            "buildings": "storage:ok:0,gatherer:ok:2,woodcutter:ok:0,gatherer:ok:2,boarding:ok:0"
+          },
+          {
+            "day": 36,
+            "pop": 16,
+            "wood": 30,
+            "stone": 131,
+            "iron": 0,
+            "tools": 12,
+            "food": 54,
+            "meat": 0,
+            "eggs": 0,
+            "vegetables": 54,
+            "grain": 0,
+            "apples": 0,
+            "pears": 0,
+            "firewood": 170,
+            "leather": 0,
+            "wool": 0,
+            "clothes": 0,
+            "herbs": 0,
+            "coal": 0,
+            "steelTools": 0,
+            "ale": 0,
+            "warmCoats": 0,
+            "deaths": 0,
+            "buildings": "storage:ok:0,gatherer:ok:2,woodcutter:ok:0,gatherer:ok:2,boarding:ok:0"
+          },
+          {
+            "day": 48,
+            "pop": 14,
+            "wood": 4,
+            "stone": 131,
+            "iron": 0,
+            "tools": 12,
+            "food": 2,
+            "meat": 0,
+            "eggs": 0,
+            "vegetables": 2,
+            "grain": 0,
+            "apples": 0,
+            "pears": 0,
+            "firewood": 179,
+            "leather": 0,
+            "wool": 0,
+            "clothes": 0,
+            "herbs": 0,
+            "coal": 0,
+            "steelTools": 0,
+            "ale": 0,
+            "warmCoats": 0,
+            "deaths": 2,
+            "buildings": "storage:ok:0,gatherer:ok:2,woodcutter:ok:0,gatherer:ok:2,boarding:ok:0,farm:site:4"
+          }
+        ],
+        "buildLog": [
+          "d0:gatherer@61,74",
+          "d0:woodcutter@56,62",
+          "d10:gatherer@68,61",
+          "d15:boarding@50,59",
+          "d48:farm@56,64"
+        ],
+        "buildings": [
+          {
+            "type": "storage",
+            "state": "ok",
+            "workers": 0
+          },
+          {
+            "type": "gatherer",
+            "state": "ok",
+            "workers": 2
+          },
+          {
+            "type": "woodcutter",
+            "state": "ok",
+            "workers": 0
+          },
+          {
+            "type": "gatherer",
+            "state": "ok",
+            "workers": 2
+          },
+          {
+            "type": "boarding",
+            "state": "ok",
+            "workers": 0
+          },
+          {
+            "type": "farm",
+            "state": "site",
+            "workers": 4
+          }
+        ]
+      }
+    ]
+  },
+  "fixtureScriptHash": "b684b1f689647a7437ae9391341e64e26a371574c603e86ec231088042807280"
+}

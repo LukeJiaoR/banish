@@ -189,9 +189,9 @@ G.endDay = function () {
   // ---- 工具磨损：每个成人每天磨损 1/toolLifeDays 把；用尽则全员生产减半 ----
   const adultsNow = w.citizens.filter(c => !c.dead && c.adult).length;
   if(!G.personalToolsEnabled())G.wearTools(adultsNow);
-  // 有人住的房子才烧柴（含石屋/宿舍；取暖量按建筑类型，原版石屋省一半）
+  // 有人住的房子才烧柴（含石屋/宿舍；取暖量按建筑类型，石屋比木屋省三分之一）
   const houses = w.buildings.filter(b => G.isOccupiedHome(w, b));
-  // 原版：木屋每年约烧 30 柴火（石屋 15），集中在冬季消耗；柴火按屋支付，付不起的屋子挨冻
+  // 本作预算：木屋每年烧30柴火（石屋20），集中在冬季消耗；柴火按屋支付，付不起的屋子挨冻
   for (const h of houses) h.unheated = false;
   if (winter && houses.length) {
     for (const h of houses) {

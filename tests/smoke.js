@@ -680,7 +680,7 @@ G.markGroundDirty = G.markGroundDirty || (() => {}); // render.js 未加载时�
   check('铁是全局资源之一', G.RES_KEYS.includes('iron') && G.RES.iron.name === '铁');
 }
 
-/* ---- 8.2 石屋取暖省一半（原版木屋≈30/年、石屋 15/年） ---- */
+/* ---- 8.2 石屋取暖省三分之一（本作木屋30/年、石屋20/年） ---- */
 {
   freshGame();
   const g = G.game;
@@ -692,7 +692,7 @@ G.markGroundDirty = G.markGroundDirty || (() => {}); // render.js 未加载时�
   const fam2 = { id: G.nextId(), members: [m2.id], houseId: sh.id };
   m2.familyId = fam2.id; G.world.families.push(fam2); sh.family = fam2.id;
   G.endDay();
-  check('木屋每天 2.5 + 石屋每天 1.25 柴火', Math.abs(g.res.firewood - (100 - 2.5 - 1.25)) < 1e-9);
+  check('木屋每天 2.5 + 石屋每天 20/12 柴火', Math.abs(g.res.firewood - (100 - 2.5 - 20/12)) < 1e-9);
   check('两户都取暖正常', !wh.unheated && !sh.unheated);
 }
 
@@ -881,7 +881,7 @@ G.markGroundDirty = G.markGroundDirty || (() => {}); // render.js 未加载时�
 {
   freshGame();
   check('地图 128 格（原版「小型」地图尺寸）', G.MAP === 128);
-  check('家庭人口上限 8（原版每屋 8 人）', G.LIFE.maxFamily === 8);
+  check('本作家庭人口上限8暂不改变旧家庭', G.LIFE.maxFamily === 8);
   check('毕业年龄 17 岁（原版）', G.LIFE.gradAge === 17);
   check('学堂容量 20 学生（原版）', G.LIFE.schoolCap === 20);
   check('自然死亡 70 岁起（原版多活到 70~85）', G.OLD_AGE === 70);

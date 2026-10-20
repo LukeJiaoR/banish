@@ -19,7 +19,7 @@ G.START_TERRAINS = Object.freeze({classic: Object.freeze({name:'现行地形',ma
 
 /* 建筑（w/h 为占地格数；cost 为建造消耗；buildWork 为建造所需工时（游戏小时））
  * jobs: 工作岗位数；passable: 建成后是否可通行
- * warmWoodPerYear: 每年取暖柴火（原版：木屋 ≈30，石屋省一半 ≈15）
+ * warmWoodPerYear: 每年取暖柴火（本作冬季预算：木屋30、石屋20；效率比例60/90取自官方工具包）
  * isHome/chimney: 渲染用（窗户透光 / 烟囱炊烟） */
 G.BDEF = {
   house: {
@@ -27,14 +27,14 @@ G.BDEF = {
     cost: { wood: 16, stone: 8 }, buildWork: 90, jobs: 0, passable: false,
     warmWoodPerYear: 30, isHome: true, chimney: true,
     wall: '#8a6242', wallD: '#6d4b32', roof: '#8f4433',
-    desc: '原版成本 16木+8石。供一家人居住（原版每屋至多 8 人），每年约烧 30 柴火。没房子住的家庭冬天会冻死人。',
+    desc: '原版成本 16木+8石。供一家人居住（本作每户至多 8 人），每年约烧 30 柴火。没房子住的家庭冬天会冻死人。',
   },
   stonehouse: {
     id: 'stonehouse', name: '石屋', icon: '🏠', w: 2, h: 2,
     cost: { wood: 24, stone: 40, iron: 10 }, buildWork: 120, jobs: 0, passable: false,
-    warmWoodPerYear: 15, isHome: true, chimney: true,
+    warmWoodPerYear: 20, isHome: true, chimney: true,
     wall: '#9a948a', wallD: '#736e64', roof: '#6d675c',
-    desc: '原版成本 24木+40石+10铁。石墙更保暖，每年只烧约 15 柴火（木屋的一半），适合人口定居后的更新换代。',
+    desc: '原版成本 24木+40石+10铁。石墙更保暖，每年约烧 20 柴火（比木屋省三分之一），适合人口定居后的更新换代。',
   },
   boarding: {
     id: 'boarding', name: '宿舍', icon: '🛏️', w: 4, h: 3,
@@ -244,7 +244,7 @@ G.PROD = {
 /* 生存参数（原版基准） */
 G.LIFE = {
   eatPerYear: 100,        // 每人每年吃 100 食物（原版）
-  houseWarmWoodPerYear: 30, // 每栋有人住的木屋每年烧约 30 柴火（原版），冬季集中消耗；石屋 15、宿舍 75（5 家分摊，人均 15 = 木屋一半）
+  houseWarmWoodPerYear: 30, // 本作冬季预算：木屋30、石屋20、宿舍75；只在冬季按已入住建筑扣除
   starveDays: 4,          // 连续挨饿几天死亡
   coldDays: 5,            // 受冻值达到该值死亡（1.0 = 在户外挨满一整天）
   // 受冻双侧模型（原版：户外累积寒冷、回家烤火恢复）。速率为「处于该状态每满 24 小时」的量，按实际小时数折算
@@ -255,7 +255,7 @@ G.LIFE = {
   birthChance: 0.014,     // 有房夫妇每天生育概率；非冬季 36 生育日 → 年受孕率 ≈ 40%（约 2.5 年一胎，原版节奏）
   birthFoodDays: 4,       // 粮食储备需可支撑的天数，才允许生育
   pairEvery: 3,           // 每 N 天尝试为单身者组建家庭
-  maxFamily: 8,           // 每个家庭人口上限（原版每栋住宅至多住 8 人）
+  maxFamily: 8,           // 本作每户人口上限；原版住宅5人，旧家庭兼容另行设计
   restFrom: 22,           // 休息开始时刻（小时）：市民回家睡觉
   restTo: 6,              // 休息结束时刻：天亮起床
   campDist: 10,           // 深夜离家超过该格数就地在工地露宿（护林人常驻林中的真实做法，避免长途回家又折返）；冬季露宿整夜受冻，是省工时还是保命的真实权衡
