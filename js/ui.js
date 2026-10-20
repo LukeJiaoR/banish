@@ -631,7 +631,7 @@ G.ui = {
     const lines = [];
     if (s.size) lines.push(`牧场 ${s.size[0]}×${s.size[1]} · ${s.area ?? s.size[0] * s.size[1]}格`);
     if (capacities) lines.push(`可容纳羊 ${capacities.sheep} 头 / 牛 ${capacities.cattle} 头 / 鸡 ${capacities.chicken} 只（选择一种，不能混养）`);
-    if (capacities?.cattle === 2) lines.push('本场最多2头牛，只适合保种或转场；保留量最低2头，无法靠繁殖产生超额屠宰的肉和皮革。');
+    if (capacities?.cattle === 2) lines.push('本场最多保留2头牛；照料累积满一次繁殖后，牧人可屠宰新生超额，原2头种畜保留。产物仍须实运，繁殖较慢。');
     if (s.cost && Number.isFinite(s.work)) lines.push(`建材 ${this.resourceCost(s.cost, false)} · 施工 ${s.work} 工时（本作适配）；先清 ${s.trees || 0} 棵树，工人实际砍伐搬木后施工`);
     if (Number.isFinite(s.workers)) lines.push(`本场牧人上限 ${s.workers} 人：面积不足200格为1人，200格及以上为2人；上限不保证配足`);
     if (s.reason) lines.push(s.reason);
@@ -4239,7 +4239,7 @@ G.ui = {
       <details class="building-task"><summary>放入已购牲畜</summary><form id="pasture-stock-form" class="economy-form"><h3>放入已购同种牲畜</h3><p data-economy-live="sheep-bank"></p>
         <label for="pasture-stock-quantity">放入数量</label><input id="pasture-stock-quantity" type="number" min="1" max="${G.pastureCapacity(b, G.pastureTypeOf(b))}" step="1" value="2" inputmode="numeric"><button type="submit" id="pasture-stock">放入牧场</button></form></details>
       <details class="building-task"><summary>繁殖与保留数量</summary><form id="pasture-target-form" class="economy-form"><h3>繁殖与保留数量</h3><label for="pasture-target-quantity" data-economy-live="pasture-target-range"></label><input id="pasture-target-quantity" type="number" min="2" max="${G.pastureCapacity(b, G.pastureTypeOf(b))}" step="1" value="${Number(b.animalTarget) || 8}" inputmode="numeric"><button type="submit">应用保留数量</button>
-        <p class="desc" data-economy-live="pasture-rule"></p><p class="desc">至少2只/头同种牲畜且牧人实际照料才繁殖。保留数只控制超额屠宰。新建固定6×6牧场采用原版容量；已建面积牧场保留各自容量；鸡蛋独立库存，与肉类同属一个营养组。产物逐批实背送仓后才可使用，库存满则保留；牧场内待送产物未搬空不能拆场。</p></form></details>
+        <p class="desc" data-economy-live="pasture-rule"></p><p class="desc">至少2只/头同种牲畜且牧人实际照料才繁殖。保留数只控制超额屠宰；满容量后，累积满一次繁殖仍由牧人劳动屠宰新生超额，不扣保留畜群。新建固定6×6牧场采用固定容量；已建面积牧场保留各自容量；鸡蛋独立库存，与肉类同属一个营养组。产物逐批实背送仓后才可使用，库存满则保留；牧场内待送产物未搬空不能拆场。</p></form></details>
       <details class="building-task"><summary>分群扩场</summary><section data-pasture-split><h3>分群扩场</h3>
         <label for="pasture-split-target">同种空牧场（确认时检查通路）</label><select id="pasture-split-target"></select>
         <p class="desc" data-pasture-split-status></p>
@@ -4745,7 +4745,7 @@ G.ui = {
       const dimensions = d.dimensions || [b.w, b.h], area = d.area ?? b.w * b.h;
       set('[data-economy-live="pasture-area"]', `牧场 ${dimensions[0]}×${dimensions[1]} · ${area}格 · 本场牧人上限 ${G.workerMaximumOf(b)} 人（上限不保证配足）`);
       set('[data-economy-live="pasture-capacity-rule"]', d.capacityRule === 'area' ? `原版面积密度：牛20格/头、羊16格/头、鸡6格/只，容量向下取整。本场最多羊 ${G.pastureCapacity(b, 'sheep')} 头 / 牛 ${G.pastureCapacity(b, 'cattle')} 头 / 鸡 ${G.pastureCapacity(b, 'chicken')} 只，不能混养。` : '固定6×6牧场容量：羊12头 / 牛10头 / 鸡24只，默认保留8只/头；容量、建材与用工沿用旧版。');
-      set('[data-economy-live="pasture-cattle-warning"]', d.capacityRule === 'area' && d.type === 'cattle' && d.cap === 2 ? '本场最多2头牛，只适合保种或转场；保留量最低2头，无法靠繁殖产生超额屠宰的肉和皮革。' : '');
+      set('[data-economy-live="pasture-cattle-warning"]', d.capacityRule === 'area' && d.type === 'cattle' && d.cap === 2 ? '本场最多保留2头牛；照料累积满一次繁殖后，牧人可屠宰新生超额，原2头种畜保留。产物仍须实运，繁殖较慢。' : '');
       set('[data-economy-live="animals"]', `${d.name}群 ${d.animals}/${d.cap} ${unit} · 当前保留 ${d.target} ${unit}`);
       const products=d.type==='chicken'?`场内待取鸡蛋 ${Math.floor(d.eggs||0)} / ${G.CHICKEN.eggCap} · 未成蛋进度 ${Math.floor((d.eggProgress||0)*100)}% · 已屠宰待送：肉 ${d.meat}`:d.type==='sheep'?`待剪羊毛 ${Math.floor(d.wool)}`:`已屠宰待送：肉 ${d.meat} · 皮革 ${d.leather}`;
       set('[data-economy-live="pasture-production"]', `繁殖进度 ${Math.floor(d.growth*100)}% · ${products}`);

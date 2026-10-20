@@ -3101,9 +3101,14 @@ G.completeEconomyWork = function(c,t){
   if(t.economy==='pasture'){
     if(c.carry||(t.pastureType&&t.pastureType!==G.pastureTypeOf(b)))return;
     const d=G.LIVESTOCK[G.pastureTypeOf(b)];
+    // At capacity a completed birth is held in growth (at most one), never as
+    // an over-cap live animal. Only actual work may consume that birth and
+    // slaughter its existing yield; storage/goals keep it pending as usual.
+    const fullBirth=b.animals===G.pastureCapacity(b)&&b.animalTarget===b.animals&&b.animalGrowth>=1;
     // Commit both products together once, then move one bounded batch per trip.
-    if(canTend&&b.animals>b.animalTarget&&!G.pastureSlaughterReason(b)){
-      b.animals--;G.recordProduction(b,'meat',d.meat);
+    if(canTend&&(b.animals>b.animalTarget||fullBirth)&&!G.pastureSlaughterReason(b)){
+      if(fullBirth)b.animalGrowth-=1;else b.animals--;
+      G.recordProduction(b,'meat',d.meat);
       if(!d.leather){c.carry={type:'meat',qty:d.meat,pastureId:b.id};return;} // Existing sheep keep their one-trip 24-meat batch.
       b.pastureProducts.meat+=d.meat;b.pastureProducts.leather+=d.leather;G.recordProduction(b,'leather',d.leather);
     }

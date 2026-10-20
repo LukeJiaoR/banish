@@ -1,0 +1,6702 @@
+{
+  "date": "2026-10-20",
+  "baselineCommit": "ebe0a4e2802fb834ad8d5a45c3e9c974a5c51aa6",
+  "scope": "Full-capacity birth slaughter only; unchanged livestock yields, capacities, growth rates, food consumption and mortality. Provisioned production fixtures are not purchase-payback or survival tests.",
+  "sourceFileSha256": {
+    "js/core.js": "23085a07f2cfd577fac7eb2965b3befe5e65be88680144d3a73888e770af8f29",
+    "js/defs.js": "00b1deebff0b0feb4d770c28ce819e48af6def755a9b9c20695a3da0b0110536",
+    "js/map.js": "bb8a850d8208938a7aced19fc54ba8939ea67681b7671b00887840e323fd51cd",
+    "js/sim.js": "d41bf032a8647ceb056dbb60d01cc22a12be3a9ceaa11e2f2d450a012116785d",
+    "js/fire.js": "9258e380612fe10c2808f9d71da2a5cabf7933c71a6f629c4841d02578ebdd01",
+    "js/supply.js": "33a2760b02c34ff4bb6cba4901174032af6c0db8cf309498fee45fdaea8083da",
+    "js/main.js": "3f204953d5f3b9580b7790fd65088e10ebe1ff1b0d0b36e7d83d66e6b815fcf9",
+    "js/ui.js": "b431badf5f20cbae3868d921237924dada3bba214bdf5006117d2487724757fe"
+  },
+  "fixtureSha256": "e26cbbaf2b86a2aa625f5e7bcd984a81546bae6b9f322bd26ee5c6e11dd5c293",
+  "compatibilityTestSha256": "1f4de30b83a1740c18b2f5ace8a010a5842ce0c270f4665d67ec930822c66572",
+  "officialSource": {
+    "url": "https://shiningrocksoftware.com/game/mods/",
+    "archiveSha256": "615d75d111be843c48af2c1544e2a01aea317e26305ec8087b199cf9504ae964",
+    "resourceSha256": {
+      "resource/Game/Help/Pasture.rsc": "ffe9f0540d5daf5245bd7799790e6ed23906ca136740cde540f6747dcd1ba576",
+      "resource/Template/Citizen.rsc": "009ab1c8c6b528ff28cb41bfb1a4227735b301be7e62ce49ce9523dbdb4856d0",
+      "resource/Template/LivestockCow.rsc": "e8f5b18311c608e8a6868897f528f39677eec8ebad8c00748011b244da1c7c9b",
+      "resource/Template/LivestockSheep.rsc": "61edc54dfc0cc80d7694ba0d6eb01c2b4b9be57208835064b0f79dbaa4c3d442",
+      "resource/Template/LivestockChicken.rsc": "d1cd8633ba77afb9ca06f57ef40d5a1cdcbcac11544e5cc1dd0d58e021429efb",
+      "resource/Template/RawMaterialBeef.rsc": "05c3459d6bd1aa4f268e7c87fe77906ac15620c902b5037c8cdfe1d91c55dbc6",
+      "resource/Template/RawMaterialMutton.rsc": "774079fa6f82da1699a6bd6f0d845d9804219673002484d11761ad7af215fb6d",
+      "resource/Template/RawMaterialLeather.rsc": "67ca0e686f003b5e72a38c6c275ee1d446327dbfe9eb17616a65bd23a73050af"
+    }
+  },
+  "experiments": {
+    "capacityBefore": {
+      "fixtureOptions": {
+        "initialFood": 300,
+        "stores": 8
+      },
+      "results": [
+        {
+          "species": "sheep",
+          "seed": 5,
+          "distance": "near",
+          "initialAnimals": 12,
+          "target": 12,
+          "workers": 1,
+          "years": [
+            {
+              "year": 1,
+              "animals": 12,
+              "produced": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 47,
+                "eggs": 0
+              },
+              "received": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 47,
+                "eggs": 0
+              }
+            }
+          ],
+          "initialFood": 300,
+          "stores": 8,
+          "sourceHash": "bf29094e7df45640fcdc121020dffaec9d13a12a933a683481466a745ee0c2d4",
+          "constants": {
+            "eatPerYear": 100,
+            "yearDays": 48,
+            "cap": 12,
+            "meatPerAnimal": 24
+          },
+          "produced": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 47,
+            "eggs": 0
+          },
+          "received": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 47,
+            "eggs": 0
+          },
+          "ledgerReceived": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 47,
+            "eggs": 0
+          },
+          "discarded": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "trips": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 47,
+            "eggs": 0
+          },
+          "durationYears": 1,
+          "careCompletions": 74,
+          "caredDays": 48,
+          "births": 0,
+          "overflowBirths": 0,
+          "slaughters": 0,
+          "workingHours": 596.426409,
+          "staffedHours": 1152,
+          "staffedWalkOrHaulStateHours": 236.1,
+          "firstMeatDay": null,
+          "deaths": [],
+          "carried": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "pending": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "final": {
+            "day": 48,
+            "population": 2,
+            "animals": 12,
+            "growth": 1,
+            "unshornWool": 1,
+            "stock": {
+              "wood": 0,
+              "stone": 0,
+              "iron": 0,
+              "tools": 1000,
+              "food": 99.99999999999989,
+              "meat": 0,
+              "eggs": 0,
+              "vegetables": 0,
+              "grain": 99.99999999999989,
+              "apples": 0,
+              "pears": 0,
+              "firewood": 970,
+              "leather": 0,
+              "wool": 47,
+              "clothes": 0,
+              "herbs": 0,
+              "coal": 0,
+              "steelTools": 0,
+              "ale": 0,
+              "warmCoats": 0
+            }
+          }
+        },
+        {
+          "species": "sheep",
+          "seed": 5,
+          "distance": "far",
+          "initialAnimals": 12,
+          "target": 12,
+          "workers": 1,
+          "years": [
+            {
+              "year": 1,
+              "animals": 12,
+              "produced": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 47,
+                "eggs": 0
+              },
+              "received": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 46,
+                "eggs": 0
+              }
+            }
+          ],
+          "initialFood": 300,
+          "stores": 8,
+          "sourceHash": "bf29094e7df45640fcdc121020dffaec9d13a12a933a683481466a745ee0c2d4",
+          "constants": {
+            "eatPerYear": 100,
+            "yearDays": 48,
+            "cap": 12,
+            "meatPerAnimal": 24
+          },
+          "produced": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 47,
+            "eggs": 0
+          },
+          "received": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 47,
+            "eggs": 0
+          },
+          "ledgerReceived": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 47,
+            "eggs": 0
+          },
+          "discarded": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "trips": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 47,
+            "eggs": 0
+          },
+          "durationYears": 1,
+          "careCompletions": 48,
+          "caredDays": 48,
+          "births": 0,
+          "overflowBirths": 0,
+          "slaughters": 0,
+          "workingHours": 384,
+          "staffedHours": 1152,
+          "staffedWalkOrHaulStateHours": 422.4,
+          "firstMeatDay": null,
+          "deaths": [],
+          "carried": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "pending": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "final": {
+            "day": 48,
+            "population": 2,
+            "animals": 12,
+            "growth": 1,
+            "unshornWool": 1,
+            "stock": {
+              "wood": 0,
+              "stone": 0,
+              "iron": 0,
+              "tools": 1000,
+              "food": 99.99999999999989,
+              "meat": 0,
+              "eggs": 0,
+              "vegetables": 0,
+              "grain": 99.99999999999989,
+              "apples": 0,
+              "pears": 0,
+              "firewood": 970,
+              "leather": 0,
+              "wool": 47,
+              "clothes": 0,
+              "herbs": 0,
+              "coal": 0,
+              "steelTools": 0,
+              "ale": 0,
+              "warmCoats": 0
+            }
+          }
+        },
+        {
+          "species": "cattle",
+          "seed": 5,
+          "distance": "near",
+          "initialAnimals": 10,
+          "target": 10,
+          "workers": 1,
+          "years": [
+            {
+              "year": 1,
+              "animals": 10,
+              "produced": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 0
+              },
+              "received": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 0
+              }
+            }
+          ],
+          "initialFood": 300,
+          "stores": 8,
+          "sourceHash": "bf29094e7df45640fcdc121020dffaec9d13a12a933a683481466a745ee0c2d4",
+          "constants": {
+            "eatPerYear": 100,
+            "yearDays": 48,
+            "cap": 10,
+            "meatPerAnimal": 36
+          },
+          "produced": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "received": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "ledgerReceived": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "discarded": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "trips": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "durationYears": 1,
+          "careCompletions": 89,
+          "caredDays": 48,
+          "births": 0,
+          "overflowBirths": 0,
+          "slaughters": 0,
+          "workingHours": 717.315698,
+          "staffedHours": 1152,
+          "staffedWalkOrHaulStateHours": 67.8,
+          "firstMeatDay": null,
+          "deaths": [],
+          "carried": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "pending": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "final": {
+            "day": 48,
+            "population": 2,
+            "animals": 10,
+            "growth": 1,
+            "unshornWool": 0,
+            "stock": {
+              "wood": 0,
+              "stone": 0,
+              "iron": 0,
+              "tools": 1000,
+              "food": 99.99999999999989,
+              "meat": 0,
+              "eggs": 0,
+              "vegetables": 0,
+              "grain": 99.99999999999989,
+              "apples": 0,
+              "pears": 0,
+              "firewood": 970,
+              "leather": 0,
+              "wool": 0,
+              "clothes": 0,
+              "herbs": 0,
+              "coal": 0,
+              "steelTools": 0,
+              "ale": 0,
+              "warmCoats": 0
+            }
+          }
+        },
+        {
+          "species": "cattle",
+          "seed": 5,
+          "distance": "far",
+          "initialAnimals": 10,
+          "target": 10,
+          "workers": 1,
+          "years": [
+            {
+              "year": 1,
+              "animals": 10,
+              "produced": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 0
+              },
+              "received": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 0
+              }
+            }
+          ],
+          "initialFood": 300,
+          "stores": 8,
+          "sourceHash": "bf29094e7df45640fcdc121020dffaec9d13a12a933a683481466a745ee0c2d4",
+          "constants": {
+            "eatPerYear": 100,
+            "yearDays": 48,
+            "cap": 10,
+            "meatPerAnimal": 36
+          },
+          "produced": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "received": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "ledgerReceived": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "discarded": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "trips": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "durationYears": 1,
+          "careCompletions": 89,
+          "caredDays": 48,
+          "births": 0,
+          "overflowBirths": 0,
+          "slaughters": 0,
+          "workingHours": 717.315698,
+          "staffedHours": 1152,
+          "staffedWalkOrHaulStateHours": 67.8,
+          "firstMeatDay": null,
+          "deaths": [],
+          "carried": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "pending": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "final": {
+            "day": 48,
+            "population": 2,
+            "animals": 10,
+            "growth": 1,
+            "unshornWool": 0,
+            "stock": {
+              "wood": 0,
+              "stone": 0,
+              "iron": 0,
+              "tools": 1000,
+              "food": 99.99999999999989,
+              "meat": 0,
+              "eggs": 0,
+              "vegetables": 0,
+              "grain": 99.99999999999989,
+              "apples": 0,
+              "pears": 0,
+              "firewood": 970,
+              "leather": 0,
+              "wool": 0,
+              "clothes": 0,
+              "herbs": 0,
+              "coal": 0,
+              "steelTools": 0,
+              "ale": 0,
+              "warmCoats": 0
+            }
+          }
+        },
+        {
+          "species": "chicken",
+          "seed": 5,
+          "distance": "near",
+          "initialAnimals": 24,
+          "target": 24,
+          "workers": 1,
+          "years": [
+            {
+              "year": 1,
+              "animals": 24,
+              "produced": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 576
+              },
+              "received": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 564
+              }
+            }
+          ],
+          "initialFood": 300,
+          "stores": 8,
+          "sourceHash": "bf29094e7df45640fcdc121020dffaec9d13a12a933a683481466a745ee0c2d4",
+          "constants": {
+            "eatPerYear": 100,
+            "yearDays": 48,
+            "cap": 24,
+            "meatPerAnimal": 6
+          },
+          "produced": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 576
+          },
+          "received": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 564
+          },
+          "ledgerReceived": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 564
+          },
+          "discarded": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "trips": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 47
+          },
+          "durationYears": 1,
+          "careCompletions": 75,
+          "caredDays": 48,
+          "births": 0,
+          "overflowBirths": 0,
+          "slaughters": 0,
+          "workingHours": 603.948367,
+          "staffedHours": 1152,
+          "staffedWalkOrHaulStateHours": 236.1,
+          "firstMeatDay": null,
+          "deaths": [],
+          "carried": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "pending": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 12
+          },
+          "final": {
+            "day": 48,
+            "population": 2,
+            "animals": 24,
+            "growth": 1,
+            "unshornWool": 0,
+            "stock": {
+              "wood": 0,
+              "stone": 0,
+              "iron": 0,
+              "tools": 1000,
+              "food": 663.9999999999992,
+              "meat": 0,
+              "eggs": 466.0833333333327,
+              "vegetables": 0,
+              "grain": 197.91666666666652,
+              "apples": 0,
+              "pears": 0,
+              "firewood": 970,
+              "leather": 0,
+              "wool": 0,
+              "clothes": 0,
+              "herbs": 0,
+              "coal": 0,
+              "steelTools": 0,
+              "ale": 0,
+              "warmCoats": 0
+            }
+          }
+        },
+        {
+          "species": "chicken",
+          "seed": 5,
+          "distance": "far",
+          "initialAnimals": 24,
+          "target": 24,
+          "workers": 1,
+          "years": [
+            {
+              "year": 1,
+              "animals": 24,
+              "produced": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 576
+              },
+              "received": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 552
+              }
+            }
+          ],
+          "initialFood": 300,
+          "stores": 8,
+          "sourceHash": "bf29094e7df45640fcdc121020dffaec9d13a12a933a683481466a745ee0c2d4",
+          "constants": {
+            "eatPerYear": 100,
+            "yearDays": 48,
+            "cap": 24,
+            "meatPerAnimal": 6
+          },
+          "produced": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 576
+          },
+          "received": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 564
+          },
+          "ledgerReceived": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 564
+          },
+          "discarded": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "trips": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 47
+          },
+          "durationYears": 1,
+          "careCompletions": 48,
+          "caredDays": 48,
+          "births": 0,
+          "overflowBirths": 0,
+          "slaughters": 0,
+          "workingHours": 384,
+          "staffedHours": 1152,
+          "staffedWalkOrHaulStateHours": 422.5,
+          "firstMeatDay": null,
+          "deaths": [],
+          "carried": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "pending": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 12
+          },
+          "final": {
+            "day": 48,
+            "population": 2,
+            "animals": 24,
+            "growth": 1,
+            "unshornWool": 0,
+            "stock": {
+              "wood": 0,
+              "stone": 0,
+              "iron": 0,
+              "tools": 1000,
+              "food": 663.9999999999992,
+              "meat": 0,
+              "eggs": 466.0833333333327,
+              "vegetables": 0,
+              "grain": 197.91666666666652,
+              "apples": 0,
+              "pears": 0,
+              "firewood": 970,
+              "leather": 0,
+              "wool": 0,
+              "clothes": 0,
+              "herbs": 0,
+              "coal": 0,
+              "steelTools": 0,
+              "ale": 0,
+              "warmCoats": 0
+            }
+          }
+        }
+      ]
+    },
+    "capacityAfter": {
+      "fixtureOptions": {
+        "initialFood": 300,
+        "stores": 8
+      },
+      "results": [
+        {
+          "species": "sheep",
+          "seed": 5,
+          "distance": "near",
+          "initialAnimals": 12,
+          "target": 12,
+          "workers": 1,
+          "years": [
+            {
+              "year": 1,
+              "animals": 12,
+              "produced": {
+                "meat": 120,
+                "leather": 0,
+                "wool": 47,
+                "eggs": 0
+              },
+              "received": {
+                "meat": 120,
+                "leather": 0,
+                "wool": 47,
+                "eggs": 0
+              }
+            }
+          ],
+          "initialFood": 300,
+          "stores": 8,
+          "sourceHash": "0f3308c06bf1d77474260c2ed29edc3a587184f7c2884c936d64e4008e26606e",
+          "constants": {
+            "eatPerYear": 100,
+            "yearDays": 48,
+            "cap": 12,
+            "meatPerAnimal": 24
+          },
+          "produced": {
+            "meat": 120,
+            "leather": 0,
+            "wool": 47,
+            "eggs": 0
+          },
+          "received": {
+            "meat": 120,
+            "leather": 0,
+            "wool": 47,
+            "eggs": 0
+          },
+          "ledgerReceived": {
+            "meat": 120,
+            "leather": 0,
+            "wool": 47,
+            "eggs": 0
+          },
+          "discarded": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "trips": {
+            "meat": 5,
+            "leather": 0,
+            "wool": 46,
+            "eggs": 0
+          },
+          "durationYears": 1,
+          "careCompletions": 74,
+          "caredDays": 48,
+          "births": 0,
+          "overflowBirths": 5,
+          "slaughters": 5,
+          "workingHours": 596.049179,
+          "staffedHours": 1152,
+          "staffedWalkOrHaulStateHours": 241.3,
+          "firstMeatDay": 8,
+          "deaths": [],
+          "carried": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "pending": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "final": {
+            "day": 48,
+            "population": 2,
+            "animals": 12,
+            "growth": 1,
+            "unshornWool": 1,
+            "stock": {
+              "wood": 0,
+              "stone": 0,
+              "iron": 0,
+              "tools": 1000,
+              "food": 220.00000000000082,
+              "meat": 36.666666666666714,
+              "eggs": 0,
+              "vegetables": 0,
+              "grain": 183.3333333333341,
+              "apples": 0,
+              "pears": 0,
+              "firewood": 970,
+              "leather": 0,
+              "wool": 47,
+              "clothes": 0,
+              "herbs": 0,
+              "coal": 0,
+              "steelTools": 0,
+              "ale": 0,
+              "warmCoats": 0
+            }
+          }
+        },
+        {
+          "species": "sheep",
+          "seed": 5,
+          "distance": "far",
+          "initialAnimals": 12,
+          "target": 12,
+          "workers": 1,
+          "years": [
+            {
+              "year": 1,
+              "animals": 12,
+              "produced": {
+                "meat": 120,
+                "leather": 0,
+                "wool": 47,
+                "eggs": 0
+              },
+              "received": {
+                "meat": 120,
+                "leather": 0,
+                "wool": 46,
+                "eggs": 0
+              }
+            }
+          ],
+          "initialFood": 300,
+          "stores": 8,
+          "sourceHash": "0f3308c06bf1d77474260c2ed29edc3a587184f7c2884c936d64e4008e26606e",
+          "constants": {
+            "eatPerYear": 100,
+            "yearDays": 48,
+            "cap": 12,
+            "meatPerAnimal": 24
+          },
+          "produced": {
+            "meat": 120,
+            "leather": 0,
+            "wool": 47,
+            "eggs": 0
+          },
+          "received": {
+            "meat": 120,
+            "leather": 0,
+            "wool": 47,
+            "eggs": 0
+          },
+          "ledgerReceived": {
+            "meat": 120,
+            "leather": 0,
+            "wool": 47,
+            "eggs": 0
+          },
+          "discarded": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "trips": {
+            "meat": 5,
+            "leather": 0,
+            "wool": 42,
+            "eggs": 0
+          },
+          "durationYears": 1,
+          "careCompletions": 48,
+          "caredDays": 48,
+          "births": 0,
+          "overflowBirths": 5,
+          "slaughters": 5,
+          "workingHours": 384,
+          "staffedHours": 1152,
+          "staffedWalkOrHaulStateHours": 422.5,
+          "firstMeatDay": 8,
+          "deaths": [],
+          "carried": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "pending": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "final": {
+            "day": 48,
+            "population": 2,
+            "animals": 12,
+            "growth": 1,
+            "unshornWool": 1,
+            "stock": {
+              "wood": 0,
+              "stone": 0,
+              "iron": 0,
+              "tools": 1000,
+              "food": 220.00000000000082,
+              "meat": 36.666666666666714,
+              "eggs": 0,
+              "vegetables": 0,
+              "grain": 183.3333333333341,
+              "apples": 0,
+              "pears": 0,
+              "firewood": 970,
+              "leather": 0,
+              "wool": 47,
+              "clothes": 0,
+              "herbs": 0,
+              "coal": 0,
+              "steelTools": 0,
+              "ale": 0,
+              "warmCoats": 0
+            }
+          }
+        },
+        {
+          "species": "cattle",
+          "seed": 5,
+          "distance": "near",
+          "initialAnimals": 10,
+          "target": 10,
+          "workers": 1,
+          "years": [
+            {
+              "year": 1,
+              "animals": 10,
+              "produced": {
+                "meat": 144,
+                "leather": 16,
+                "wool": 0,
+                "eggs": 0
+              },
+              "received": {
+                "meat": 144,
+                "leather": 16,
+                "wool": 0,
+                "eggs": 0
+              }
+            }
+          ],
+          "initialFood": 300,
+          "stores": 8,
+          "sourceHash": "0f3308c06bf1d77474260c2ed29edc3a587184f7c2884c936d64e4008e26606e",
+          "constants": {
+            "eatPerYear": 100,
+            "yearDays": 48,
+            "cap": 10,
+            "meatPerAnimal": 36
+          },
+          "produced": {
+            "meat": 144,
+            "leather": 16,
+            "wool": 0,
+            "eggs": 0
+          },
+          "received": {
+            "meat": 144,
+            "leather": 16,
+            "wool": 0,
+            "eggs": 0
+          },
+          "ledgerReceived": {
+            "meat": 144,
+            "leather": 16,
+            "wool": 0,
+            "eggs": 0
+          },
+          "discarded": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "trips": {
+            "meat": 8,
+            "leather": 4,
+            "wool": 0,
+            "eggs": 0
+          },
+          "durationYears": 1,
+          "careCompletions": 87,
+          "caredDays": 48,
+          "births": 0,
+          "overflowBirths": 4,
+          "slaughters": 4,
+          "workingHours": 698.024493,
+          "staffedHours": 1152,
+          "staffedWalkOrHaulStateHours": 102.3,
+          "firstMeatDay": 10,
+          "deaths": [],
+          "carried": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "pending": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "final": {
+            "day": 48,
+            "population": 2,
+            "animals": 10,
+            "growth": 0.8333333333333333,
+            "unshornWool": 0,
+            "stock": {
+              "wood": 0,
+              "stone": 0,
+              "iron": 0,
+              "tools": 1000,
+              "food": 244.00000000000105,
+              "meat": 64.83333333333334,
+              "eggs": 0,
+              "vegetables": 0,
+              "grain": 179.1666666666677,
+              "apples": 0,
+              "pears": 0,
+              "firewood": 970,
+              "leather": 16,
+              "wool": 0,
+              "clothes": 0,
+              "herbs": 0,
+              "coal": 0,
+              "steelTools": 0,
+              "ale": 0,
+              "warmCoats": 0
+            }
+          }
+        },
+        {
+          "species": "cattle",
+          "seed": 5,
+          "distance": "far",
+          "initialAnimals": 10,
+          "target": 10,
+          "workers": 1,
+          "years": [
+            {
+              "year": 1,
+              "animals": 10,
+              "produced": {
+                "meat": 144,
+                "leather": 16,
+                "wool": 0,
+                "eggs": 0
+              },
+              "received": {
+                "meat": 144,
+                "leather": 16,
+                "wool": 0,
+                "eggs": 0
+              }
+            }
+          ],
+          "initialFood": 300,
+          "stores": 8,
+          "sourceHash": "0f3308c06bf1d77474260c2ed29edc3a587184f7c2884c936d64e4008e26606e",
+          "constants": {
+            "eatPerYear": 100,
+            "yearDays": 48,
+            "cap": 10,
+            "meatPerAnimal": 36
+          },
+          "produced": {
+            "meat": 144,
+            "leather": 16,
+            "wool": 0,
+            "eggs": 0
+          },
+          "received": {
+            "meat": 144,
+            "leather": 16,
+            "wool": 0,
+            "eggs": 0
+          },
+          "ledgerReceived": {
+            "meat": 144,
+            "leather": 16,
+            "wool": 0,
+            "eggs": 0
+          },
+          "discarded": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "trips": {
+            "meat": 8,
+            "leather": 4,
+            "wool": 0,
+            "eggs": 0
+          },
+          "durationYears": 1,
+          "careCompletions": 75,
+          "caredDays": 48,
+          "births": 0,
+          "overflowBirths": 4,
+          "slaughters": 4,
+          "workingHours": 605.061233,
+          "staffedHours": 1152,
+          "staffedWalkOrHaulStateHours": 211.8,
+          "firstMeatDay": 10,
+          "deaths": [],
+          "carried": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "pending": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "final": {
+            "day": 48,
+            "population": 2,
+            "animals": 10,
+            "growth": 0.8333333333333333,
+            "unshornWool": 0,
+            "stock": {
+              "wood": 0,
+              "stone": 0,
+              "iron": 0,
+              "tools": 1000,
+              "food": 244.00000000000105,
+              "meat": 64.83333333333334,
+              "eggs": 0,
+              "vegetables": 0,
+              "grain": 179.1666666666677,
+              "apples": 0,
+              "pears": 0,
+              "firewood": 970,
+              "leather": 16,
+              "wool": 0,
+              "clothes": 0,
+              "herbs": 0,
+              "coal": 0,
+              "steelTools": 0,
+              "ale": 0,
+              "warmCoats": 0
+            }
+          }
+        },
+        {
+          "species": "chicken",
+          "seed": 5,
+          "distance": "near",
+          "initialAnimals": 24,
+          "target": 24,
+          "workers": 1,
+          "years": [
+            {
+              "year": 1,
+              "animals": 24,
+              "produced": {
+                "meat": 126,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 576
+              },
+              "received": {
+                "meat": 126,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 564
+              }
+            }
+          ],
+          "initialFood": 300,
+          "stores": 8,
+          "sourceHash": "0f3308c06bf1d77474260c2ed29edc3a587184f7c2884c936d64e4008e26606e",
+          "constants": {
+            "eatPerYear": 100,
+            "yearDays": 48,
+            "cap": 24,
+            "meatPerAnimal": 6
+          },
+          "produced": {
+            "meat": 126,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 576
+          },
+          "received": {
+            "meat": 126,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 564
+          },
+          "ledgerReceived": {
+            "meat": 126,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 564
+          },
+          "discarded": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "trips": {
+            "meat": 21,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 47
+          },
+          "durationYears": 1,
+          "careCompletions": 71,
+          "caredDays": 48,
+          "births": 0,
+          "overflowBirths": 21,
+          "slaughters": 21,
+          "workingHours": 573.36573,
+          "staffedHours": 1152,
+          "staffedWalkOrHaulStateHours": 266.2,
+          "firstMeatDay": 3,
+          "deaths": [],
+          "carried": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "pending": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 12
+          },
+          "final": {
+            "day": 48,
+            "population": 2,
+            "animals": 24,
+            "growth": 1,
+            "unshornWool": 0,
+            "stock": {
+              "wood": 0,
+              "stone": 0,
+              "iron": 0,
+              "tools": 1000,
+              "food": 790.0000000000005,
+              "meat": 79.12500000000006,
+              "eggs": 512.9583333333339,
+              "vegetables": 0,
+              "grain": 197.91666666666652,
+              "apples": 0,
+              "pears": 0,
+              "firewood": 970,
+              "leather": 0,
+              "wool": 0,
+              "clothes": 0,
+              "herbs": 0,
+              "coal": 0,
+              "steelTools": 0,
+              "ale": 0,
+              "warmCoats": 0
+            }
+          }
+        },
+        {
+          "species": "chicken",
+          "seed": 5,
+          "distance": "far",
+          "initialAnimals": 24,
+          "target": 24,
+          "workers": 1,
+          "years": [
+            {
+              "year": 1,
+              "animals": 24,
+              "produced": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 576
+              },
+              "received": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 552
+              }
+            }
+          ],
+          "initialFood": 300,
+          "stores": 8,
+          "sourceHash": "0f3308c06bf1d77474260c2ed29edc3a587184f7c2884c936d64e4008e26606e",
+          "constants": {
+            "eatPerYear": 100,
+            "yearDays": 48,
+            "cap": 24,
+            "meatPerAnimal": 6
+          },
+          "produced": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 576
+          },
+          "received": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 564
+          },
+          "ledgerReceived": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 564
+          },
+          "discarded": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "trips": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 47
+          },
+          "durationYears": 1,
+          "careCompletions": 48,
+          "caredDays": 48,
+          "births": 0,
+          "overflowBirths": 0,
+          "slaughters": 0,
+          "workingHours": 384,
+          "staffedHours": 1152,
+          "staffedWalkOrHaulStateHours": 422.5,
+          "firstMeatDay": null,
+          "deaths": [],
+          "carried": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "pending": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 12
+          },
+          "final": {
+            "day": 48,
+            "population": 2,
+            "animals": 24,
+            "growth": 1,
+            "unshornWool": 0,
+            "stock": {
+              "wood": 0,
+              "stone": 0,
+              "iron": 0,
+              "tools": 1000,
+              "food": 663.9999999999992,
+              "meat": 0,
+              "eggs": 466.0833333333327,
+              "vegetables": 0,
+              "grain": 197.91666666666652,
+              "apples": 0,
+              "pears": 0,
+              "firewood": 970,
+              "leather": 0,
+              "wool": 0,
+              "clothes": 0,
+              "herbs": 0,
+              "coal": 0,
+              "steelTools": 0,
+              "ale": 0,
+              "warmCoats": 0
+            }
+          }
+        }
+      ]
+    },
+    "defaultRetentionBaseline": {
+      "fixtureOptions": {
+        "initialFood": 1600,
+        "stores": 4
+      },
+      "results": [
+        {
+          "species": "sheep",
+          "seed": 5,
+          "distance": "near",
+          "initialAnimals": 8,
+          "target": 8,
+          "workers": 1,
+          "years": [
+            {
+              "year": 1,
+              "animals": 9,
+              "produced": {
+                "meat": 72,
+                "leather": 0,
+                "wool": 31,
+                "eggs": 0
+              },
+              "received": {
+                "meat": 72,
+                "leather": 0,
+                "wool": 31,
+                "eggs": 0
+              }
+            }
+          ],
+          "sourceHash": "bf29094e7df45640fcdc121020dffaec9d13a12a933a683481466a745ee0c2d4",
+          "constants": {
+            "eatPerYear": 100,
+            "yearDays": 48,
+            "cap": 12,
+            "meatPerAnimal": 24
+          },
+          "produced": {
+            "meat": 72,
+            "leather": 0,
+            "wool": 31,
+            "eggs": 0
+          },
+          "received": {
+            "meat": 72,
+            "leather": 0,
+            "wool": 31,
+            "eggs": 0
+          },
+          "ledgerReceived": {
+            "meat": 72,
+            "leather": 0,
+            "wool": 31,
+            "eggs": 0
+          },
+          "discarded": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "trips": {
+            "meat": 3,
+            "leather": 0,
+            "wool": 31,
+            "eggs": 0
+          },
+          "careCompletions": 79,
+          "caredDays": 48,
+          "births": 4,
+          "slaughters": 3,
+          "workingHours": 638.680435,
+          "staffedHours": 1152,
+          "staffedWalkOrHaulStateHours": 183.8,
+          "firstMeatDay": 12,
+          "deaths": [],
+          "carried": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "pending": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "final": {
+            "day": 48,
+            "population": 2,
+            "animals": 9,
+            "growth": 0,
+            "unshornWool": 1.333333333333332,
+            "stock": {
+              "wood": 0,
+              "stone": 0,
+              "iron": 0,
+              "tools": 1000,
+              "food": 1471.9999999999964,
+              "meat": 0,
+              "eggs": 0,
+              "vegetables": 0,
+              "grain": 1471.9999999999964,
+              "apples": 0,
+              "pears": 0,
+              "firewood": 970,
+              "leather": 0,
+              "wool": 31,
+              "clothes": 0,
+              "herbs": 0,
+              "coal": 0,
+              "steelTools": 0,
+              "ale": 0,
+              "warmCoats": 0
+            }
+          }
+        },
+        {
+          "species": "sheep",
+          "seed": 5,
+          "distance": "far",
+          "initialAnimals": 8,
+          "target": 8,
+          "workers": 1,
+          "years": [
+            {
+              "year": 1,
+              "animals": 9,
+              "produced": {
+                "meat": 72,
+                "leather": 0,
+                "wool": 31,
+                "eggs": 0
+              },
+              "received": {
+                "meat": 72,
+                "leather": 0,
+                "wool": 30,
+                "eggs": 0
+              }
+            }
+          ],
+          "sourceHash": "bf29094e7df45640fcdc121020dffaec9d13a12a933a683481466a745ee0c2d4",
+          "constants": {
+            "eatPerYear": 100,
+            "yearDays": 48,
+            "cap": 12,
+            "meatPerAnimal": 24
+          },
+          "produced": {
+            "meat": 72,
+            "leather": 0,
+            "wool": 31,
+            "eggs": 0
+          },
+          "received": {
+            "meat": 72,
+            "leather": 0,
+            "wool": 31,
+            "eggs": 0
+          },
+          "ledgerReceived": {
+            "meat": 72,
+            "leather": 0,
+            "wool": 31,
+            "eggs": 0
+          },
+          "discarded": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "trips": {
+            "meat": 3,
+            "leather": 0,
+            "wool": 31,
+            "eggs": 0
+          },
+          "careCompletions": 49,
+          "caredDays": 48,
+          "births": 4,
+          "slaughters": 3,
+          "workingHours": 392,
+          "staffedHours": 1152,
+          "staffedWalkOrHaulStateHours": 476.6,
+          "firstMeatDay": 12,
+          "deaths": [],
+          "carried": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "pending": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "final": {
+            "day": 48,
+            "population": 2,
+            "animals": 9,
+            "growth": 0,
+            "unshornWool": 1.333333333333332,
+            "stock": {
+              "wood": 0,
+              "stone": 0,
+              "iron": 0,
+              "tools": 1000,
+              "food": 1471.9999999999966,
+              "meat": 1.083333333333328,
+              "eggs": 0,
+              "vegetables": 0,
+              "grain": 1470.9166666666633,
+              "apples": 0,
+              "pears": 0,
+              "firewood": 970,
+              "leather": 0,
+              "wool": 31,
+              "clothes": 0,
+              "herbs": 0,
+              "coal": 0,
+              "steelTools": 0,
+              "ale": 0,
+              "warmCoats": 0
+            }
+          }
+        },
+        {
+          "species": "sheep",
+          "seed": 49,
+          "distance": "near",
+          "initialAnimals": 8,
+          "target": 8,
+          "workers": 1,
+          "years": [
+            {
+              "year": 1,
+              "animals": 9,
+              "produced": {
+                "meat": 72,
+                "leather": 0,
+                "wool": 31,
+                "eggs": 0
+              },
+              "received": {
+                "meat": 72,
+                "leather": 0,
+                "wool": 31,
+                "eggs": 0
+              }
+            }
+          ],
+          "sourceHash": "bf29094e7df45640fcdc121020dffaec9d13a12a933a683481466a745ee0c2d4",
+          "constants": {
+            "eatPerYear": 100,
+            "yearDays": 48,
+            "cap": 12,
+            "meatPerAnimal": 24
+          },
+          "produced": {
+            "meat": 72,
+            "leather": 0,
+            "wool": 31,
+            "eggs": 0
+          },
+          "received": {
+            "meat": 72,
+            "leather": 0,
+            "wool": 31,
+            "eggs": 0
+          },
+          "ledgerReceived": {
+            "meat": 72,
+            "leather": 0,
+            "wool": 31,
+            "eggs": 0
+          },
+          "discarded": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "trips": {
+            "meat": 3,
+            "leather": 0,
+            "wool": 31,
+            "eggs": 0
+          },
+          "careCompletions": 79,
+          "caredDays": 48,
+          "births": 4,
+          "slaughters": 3,
+          "workingHours": 638.680435,
+          "staffedHours": 1152,
+          "staffedWalkOrHaulStateHours": 183.6,
+          "firstMeatDay": 12,
+          "deaths": [],
+          "carried": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "pending": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "final": {
+            "day": 48,
+            "population": 2,
+            "animals": 9,
+            "growth": 0,
+            "unshornWool": 1.333333333333332,
+            "stock": {
+              "wood": 0,
+              "stone": 0,
+              "iron": 0,
+              "tools": 1000,
+              "food": 1471.9999999999964,
+              "meat": 0,
+              "eggs": 0,
+              "vegetables": 0,
+              "grain": 1471.9999999999964,
+              "apples": 0,
+              "pears": 0,
+              "firewood": 970,
+              "leather": 0,
+              "wool": 31,
+              "clothes": 0,
+              "herbs": 0,
+              "coal": 0,
+              "steelTools": 0,
+              "ale": 0,
+              "warmCoats": 0
+            }
+          }
+        },
+        {
+          "species": "sheep",
+          "seed": 49,
+          "distance": "far",
+          "initialAnimals": 8,
+          "target": 8,
+          "workers": 1,
+          "years": [
+            {
+              "year": 1,
+              "animals": 9,
+              "produced": {
+                "meat": 72,
+                "leather": 0,
+                "wool": 31,
+                "eggs": 0
+              },
+              "received": {
+                "meat": 72,
+                "leather": 0,
+                "wool": 30,
+                "eggs": 0
+              }
+            }
+          ],
+          "sourceHash": "bf29094e7df45640fcdc121020dffaec9d13a12a933a683481466a745ee0c2d4",
+          "constants": {
+            "eatPerYear": 100,
+            "yearDays": 48,
+            "cap": 12,
+            "meatPerAnimal": 24
+          },
+          "produced": {
+            "meat": 72,
+            "leather": 0,
+            "wool": 31,
+            "eggs": 0
+          },
+          "received": {
+            "meat": 72,
+            "leather": 0,
+            "wool": 31,
+            "eggs": 0
+          },
+          "ledgerReceived": {
+            "meat": 72,
+            "leather": 0,
+            "wool": 31,
+            "eggs": 0
+          },
+          "discarded": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "trips": {
+            "meat": 3,
+            "leather": 0,
+            "wool": 31,
+            "eggs": 0
+          },
+          "careCompletions": 49,
+          "caredDays": 48,
+          "births": 4,
+          "slaughters": 3,
+          "workingHours": 392,
+          "staffedHours": 1152,
+          "staffedWalkOrHaulStateHours": 491,
+          "firstMeatDay": 12,
+          "deaths": [],
+          "carried": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "pending": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "final": {
+            "day": 48,
+            "population": 2,
+            "animals": 9,
+            "growth": 0,
+            "unshornWool": 1.333333333333332,
+            "stock": {
+              "wood": 0,
+              "stone": 0,
+              "iron": 0,
+              "tools": 1000,
+              "food": 1471.9999999999966,
+              "meat": 1.083333333333328,
+              "eggs": 0,
+              "vegetables": 0,
+              "grain": 1470.9166666666633,
+              "apples": 0,
+              "pears": 0,
+              "firewood": 970,
+              "leather": 0,
+              "wool": 31,
+              "clothes": 0,
+              "herbs": 0,
+              "coal": 0,
+              "steelTools": 0,
+              "ale": 0,
+              "warmCoats": 0
+            }
+          }
+        },
+        {
+          "species": "cattle",
+          "seed": 5,
+          "distance": "near",
+          "initialAnimals": 8,
+          "target": 8,
+          "workers": 1,
+          "years": [
+            {
+              "year": 1,
+              "animals": 9,
+              "produced": {
+                "meat": 108,
+                "leather": 12,
+                "wool": 0,
+                "eggs": 0
+              },
+              "received": {
+                "meat": 108,
+                "leather": 12,
+                "wool": 0,
+                "eggs": 0
+              }
+            }
+          ],
+          "sourceHash": "bf29094e7df45640fcdc121020dffaec9d13a12a933a683481466a745ee0c2d4",
+          "constants": {
+            "eatPerYear": 100,
+            "yearDays": 48,
+            "cap": 10,
+            "meatPerAnimal": 36
+          },
+          "produced": {
+            "meat": 108,
+            "leather": 12,
+            "wool": 0,
+            "eggs": 0
+          },
+          "received": {
+            "meat": 108,
+            "leather": 12,
+            "wool": 0,
+            "eggs": 0
+          },
+          "ledgerReceived": {
+            "meat": 108,
+            "leather": 12,
+            "wool": 0,
+            "eggs": 0
+          },
+          "discarded": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "trips": {
+            "meat": 6,
+            "leather": 3,
+            "wool": 0,
+            "eggs": 0
+          },
+          "careCompletions": 87,
+          "caredDays": 48,
+          "births": 4,
+          "slaughters": 3,
+          "workingHours": 703.895059,
+          "staffedHours": 1152,
+          "staffedWalkOrHaulStateHours": 92.7,
+          "firstMeatDay": 12,
+          "deaths": [],
+          "carried": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "pending": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "final": {
+            "day": 48,
+            "population": 2,
+            "animals": 9,
+            "growth": 0,
+            "unshornWool": 0,
+            "stock": {
+              "wood": 0,
+              "stone": 0,
+              "iron": 0,
+              "tools": 1000,
+              "food": 1507.9999999999964,
+              "meat": 33.00000000000007,
+              "eggs": 0,
+              "vegetables": 0,
+              "grain": 1474.9999999999964,
+              "apples": 0,
+              "pears": 0,
+              "firewood": 970,
+              "leather": 12,
+              "wool": 0,
+              "clothes": 0,
+              "herbs": 0,
+              "coal": 0,
+              "steelTools": 0,
+              "ale": 0,
+              "warmCoats": 0
+            }
+          }
+        },
+        {
+          "species": "cattle",
+          "seed": 5,
+          "distance": "far",
+          "initialAnimals": 8,
+          "target": 8,
+          "workers": 1,
+          "years": [
+            {
+              "year": 1,
+              "animals": 9,
+              "produced": {
+                "meat": 108,
+                "leather": 12,
+                "wool": 0,
+                "eggs": 0
+              },
+              "received": {
+                "meat": 108,
+                "leather": 12,
+                "wool": 0,
+                "eggs": 0
+              }
+            }
+          ],
+          "sourceHash": "bf29094e7df45640fcdc121020dffaec9d13a12a933a683481466a745ee0c2d4",
+          "constants": {
+            "eatPerYear": 100,
+            "yearDays": 48,
+            "cap": 10,
+            "meatPerAnimal": 36
+          },
+          "produced": {
+            "meat": 108,
+            "leather": 12,
+            "wool": 0,
+            "eggs": 0
+          },
+          "received": {
+            "meat": 108,
+            "leather": 12,
+            "wool": 0,
+            "eggs": 0
+          },
+          "ledgerReceived": {
+            "meat": 108,
+            "leather": 12,
+            "wool": 0,
+            "eggs": 0
+          },
+          "discarded": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "trips": {
+            "meat": 6,
+            "leather": 3,
+            "wool": 0,
+            "eggs": 0
+          },
+          "careCompletions": 79,
+          "caredDays": 48,
+          "births": 4,
+          "slaughters": 3,
+          "workingHours": 634.32803,
+          "staffedHours": 1152,
+          "staffedWalkOrHaulStateHours": 181.3,
+          "firstMeatDay": 12,
+          "deaths": [],
+          "carried": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "pending": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "final": {
+            "day": 48,
+            "population": 2,
+            "animals": 9,
+            "growth": 0,
+            "unshornWool": 0,
+            "stock": {
+              "wood": 0,
+              "stone": 0,
+              "iron": 0,
+              "tools": 1000,
+              "food": 1507.9999999999964,
+              "meat": 33.00000000000005,
+              "eggs": 0,
+              "vegetables": 0,
+              "grain": 1474.9999999999964,
+              "apples": 0,
+              "pears": 0,
+              "firewood": 970,
+              "leather": 12,
+              "wool": 0,
+              "clothes": 0,
+              "herbs": 0,
+              "coal": 0,
+              "steelTools": 0,
+              "ale": 0,
+              "warmCoats": 0
+            }
+          }
+        },
+        {
+          "species": "cattle",
+          "seed": 49,
+          "distance": "near",
+          "initialAnimals": 8,
+          "target": 8,
+          "workers": 1,
+          "years": [
+            {
+              "year": 1,
+              "animals": 9,
+              "produced": {
+                "meat": 108,
+                "leather": 12,
+                "wool": 0,
+                "eggs": 0
+              },
+              "received": {
+                "meat": 108,
+                "leather": 12,
+                "wool": 0,
+                "eggs": 0
+              }
+            }
+          ],
+          "sourceHash": "bf29094e7df45640fcdc121020dffaec9d13a12a933a683481466a745ee0c2d4",
+          "constants": {
+            "eatPerYear": 100,
+            "yearDays": 48,
+            "cap": 10,
+            "meatPerAnimal": 36
+          },
+          "produced": {
+            "meat": 108,
+            "leather": 12,
+            "wool": 0,
+            "eggs": 0
+          },
+          "received": {
+            "meat": 108,
+            "leather": 12,
+            "wool": 0,
+            "eggs": 0
+          },
+          "ledgerReceived": {
+            "meat": 108,
+            "leather": 12,
+            "wool": 0,
+            "eggs": 0
+          },
+          "discarded": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "trips": {
+            "meat": 6,
+            "leather": 3,
+            "wool": 0,
+            "eggs": 0
+          },
+          "careCompletions": 87,
+          "caredDays": 48,
+          "births": 4,
+          "slaughters": 3,
+          "workingHours": 702.680435,
+          "staffedHours": 1152,
+          "staffedWalkOrHaulStateHours": 93.6,
+          "firstMeatDay": 12,
+          "deaths": [],
+          "carried": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "pending": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "final": {
+            "day": 48,
+            "population": 2,
+            "animals": 9,
+            "growth": 0,
+            "unshornWool": 0,
+            "stock": {
+              "wood": 0,
+              "stone": 0,
+              "iron": 0,
+              "tools": 1000,
+              "food": 1507.9999999999964,
+              "meat": 33.000000000000064,
+              "eggs": 0,
+              "vegetables": 0,
+              "grain": 1474.9999999999964,
+              "apples": 0,
+              "pears": 0,
+              "firewood": 970,
+              "leather": 12,
+              "wool": 0,
+              "clothes": 0,
+              "herbs": 0,
+              "coal": 0,
+              "steelTools": 0,
+              "ale": 0,
+              "warmCoats": 0
+            }
+          }
+        },
+        {
+          "species": "cattle",
+          "seed": 49,
+          "distance": "far",
+          "initialAnimals": 8,
+          "target": 8,
+          "workers": 1,
+          "years": [
+            {
+              "year": 1,
+              "animals": 9,
+              "produced": {
+                "meat": 108,
+                "leather": 12,
+                "wool": 0,
+                "eggs": 0
+              },
+              "received": {
+                "meat": 108,
+                "leather": 12,
+                "wool": 0,
+                "eggs": 0
+              }
+            }
+          ],
+          "sourceHash": "bf29094e7df45640fcdc121020dffaec9d13a12a933a683481466a745ee0c2d4",
+          "constants": {
+            "eatPerYear": 100,
+            "yearDays": 48,
+            "cap": 10,
+            "meatPerAnimal": 36
+          },
+          "produced": {
+            "meat": 108,
+            "leather": 12,
+            "wool": 0,
+            "eggs": 0
+          },
+          "received": {
+            "meat": 108,
+            "leather": 12,
+            "wool": 0,
+            "eggs": 0
+          },
+          "ledgerReceived": {
+            "meat": 108,
+            "leather": 12,
+            "wool": 0,
+            "eggs": 0
+          },
+          "discarded": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "trips": {
+            "meat": 6,
+            "leather": 3,
+            "wool": 0,
+            "eggs": 0
+          },
+          "careCompletions": 79,
+          "caredDays": 48,
+          "births": 4,
+          "slaughters": 3,
+          "workingHours": 633.821937,
+          "staffedHours": 1152,
+          "staffedWalkOrHaulStateHours": 181.3,
+          "firstMeatDay": 12,
+          "deaths": [],
+          "carried": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "pending": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "final": {
+            "day": 48,
+            "population": 2,
+            "animals": 9,
+            "growth": 0,
+            "unshornWool": 0,
+            "stock": {
+              "wood": 0,
+              "stone": 0,
+              "iron": 0,
+              "tools": 1000,
+              "food": 1507.9999999999964,
+              "meat": 33.00000000000005,
+              "eggs": 0,
+              "vegetables": 0,
+              "grain": 1474.9999999999964,
+              "apples": 0,
+              "pears": 0,
+              "firewood": 970,
+              "leather": 12,
+              "wool": 0,
+              "clothes": 0,
+              "herbs": 0,
+              "coal": 0,
+              "steelTools": 0,
+              "ale": 0,
+              "warmCoats": 0
+            }
+          }
+        },
+        {
+          "species": "chicken",
+          "seed": 5,
+          "distance": "near",
+          "initialAnimals": 8,
+          "target": 8,
+          "workers": 1,
+          "years": [
+            {
+              "year": 1,
+              "animals": 9,
+              "produced": {
+                "meat": 42,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 198
+              },
+              "received": {
+                "meat": 42,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 194
+              }
+            }
+          ],
+          "sourceHash": "bf29094e7df45640fcdc121020dffaec9d13a12a933a683481466a745ee0c2d4",
+          "constants": {
+            "eatPerYear": 100,
+            "yearDays": 48,
+            "cap": 24,
+            "meatPerAnimal": 6
+          },
+          "produced": {
+            "meat": 42,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 198
+          },
+          "received": {
+            "meat": 42,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 194
+          },
+          "ledgerReceived": {
+            "meat": 42,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 194
+          },
+          "discarded": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "trips": {
+            "meat": 7,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 47
+          },
+          "careCompletions": 74,
+          "caredDays": 48,
+          "births": 8,
+          "slaughters": 7,
+          "workingHours": 593.113642,
+          "staffedHours": 1152,
+          "staffedWalkOrHaulStateHours": 244.8,
+          "firstMeatDay": 8,
+          "deaths": [],
+          "carried": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "pending": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 4
+          },
+          "final": {
+            "day": 48,
+            "population": 2,
+            "animals": 9,
+            "growth": 0.10416666666666585,
+            "unshornWool": 0,
+            "stock": {
+              "wood": 0,
+              "stone": 0,
+              "iron": 0,
+              "tools": 1000,
+              "food": 1635.9999999999932,
+              "meat": 1.5833333333333353,
+              "eggs": 136.50000000000006,
+              "vegetables": 0,
+              "grain": 1497.9166666666597,
+              "apples": 0,
+              "pears": 0,
+              "firewood": 970,
+              "leather": 0,
+              "wool": 0,
+              "clothes": 0,
+              "herbs": 0,
+              "coal": 0,
+              "steelTools": 0,
+              "ale": 0,
+              "warmCoats": 0
+            }
+          }
+        },
+        {
+          "species": "chicken",
+          "seed": 5,
+          "distance": "far",
+          "initialAnimals": 8,
+          "target": 8,
+          "workers": 1,
+          "years": [
+            {
+              "year": 1,
+              "animals": 20,
+              "produced": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 310
+              },
+              "received": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 290
+              }
+            }
+          ],
+          "sourceHash": "bf29094e7df45640fcdc121020dffaec9d13a12a933a683481466a745ee0c2d4",
+          "constants": {
+            "eatPerYear": 100,
+            "yearDays": 48,
+            "cap": 24,
+            "meatPerAnimal": 6
+          },
+          "produced": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 310
+          },
+          "received": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 300
+          },
+          "ledgerReceived": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 300
+          },
+          "discarded": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "trips": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 47
+          },
+          "careCompletions": 48,
+          "caredDays": 48,
+          "births": 12,
+          "slaughters": 0,
+          "workingHours": 384,
+          "staffedHours": 1152,
+          "staffedWalkOrHaulStateHours": 422.5,
+          "firstMeatDay": null,
+          "deaths": [],
+          "carried": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "pending": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 10
+          },
+          "final": {
+            "day": 48,
+            "population": 2,
+            "animals": 20,
+            "growth": 0.6874999999999998,
+            "unshornWool": 0,
+            "stock": {
+              "wood": 0,
+              "stone": 0,
+              "iron": 0,
+              "tools": 1000,
+              "food": 1699.9999999999932,
+              "meat": 0,
+              "eggs": 202.25000000000009,
+              "vegetables": 0,
+              "grain": 1497.7499999999932,
+              "apples": 0,
+              "pears": 0,
+              "firewood": 970,
+              "leather": 0,
+              "wool": 0,
+              "clothes": 0,
+              "herbs": 0,
+              "coal": 0,
+              "steelTools": 0,
+              "ale": 0,
+              "warmCoats": 0
+            }
+          }
+        },
+        {
+          "species": "chicken",
+          "seed": 49,
+          "distance": "near",
+          "initialAnimals": 8,
+          "target": 8,
+          "workers": 1,
+          "years": [
+            {
+              "year": 1,
+              "animals": 9,
+              "produced": {
+                "meat": 42,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 198
+              },
+              "received": {
+                "meat": 42,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 194
+              }
+            }
+          ],
+          "sourceHash": "bf29094e7df45640fcdc121020dffaec9d13a12a933a683481466a745ee0c2d4",
+          "constants": {
+            "eatPerYear": 100,
+            "yearDays": 48,
+            "cap": 24,
+            "meatPerAnimal": 6
+          },
+          "produced": {
+            "meat": 42,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 198
+          },
+          "received": {
+            "meat": 42,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 194
+          },
+          "ledgerReceived": {
+            "meat": 42,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 194
+          },
+          "discarded": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "trips": {
+            "meat": 7,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 47
+          },
+          "careCompletions": 74,
+          "caredDays": 48,
+          "births": 8,
+          "slaughters": 7,
+          "workingHours": 594.024804,
+          "staffedHours": 1152,
+          "staffedWalkOrHaulStateHours": 244.8,
+          "firstMeatDay": 8,
+          "deaths": [],
+          "carried": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "pending": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 4
+          },
+          "final": {
+            "day": 48,
+            "population": 2,
+            "animals": 9,
+            "growth": 0.10416666666666585,
+            "unshornWool": 0,
+            "stock": {
+              "wood": 0,
+              "stone": 0,
+              "iron": 0,
+              "tools": 1000,
+              "food": 1635.9999999999932,
+              "meat": 1.5833333333333353,
+              "eggs": 136.50000000000006,
+              "vegetables": 0,
+              "grain": 1497.9166666666597,
+              "apples": 0,
+              "pears": 0,
+              "firewood": 970,
+              "leather": 0,
+              "wool": 0,
+              "clothes": 0,
+              "herbs": 0,
+              "coal": 0,
+              "steelTools": 0,
+              "ale": 0,
+              "warmCoats": 0
+            }
+          }
+        },
+        {
+          "species": "chicken",
+          "seed": 49,
+          "distance": "far",
+          "initialAnimals": 8,
+          "target": 8,
+          "workers": 1,
+          "years": [
+            {
+              "year": 1,
+              "animals": 20,
+              "produced": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 310
+              },
+              "received": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 290
+              }
+            }
+          ],
+          "sourceHash": "bf29094e7df45640fcdc121020dffaec9d13a12a933a683481466a745ee0c2d4",
+          "constants": {
+            "eatPerYear": 100,
+            "yearDays": 48,
+            "cap": 24,
+            "meatPerAnimal": 6
+          },
+          "produced": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 310
+          },
+          "received": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 300
+          },
+          "ledgerReceived": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 300
+          },
+          "discarded": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "trips": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 47
+          },
+          "careCompletions": 48,
+          "caredDays": 48,
+          "births": 12,
+          "slaughters": 0,
+          "workingHours": 384,
+          "staffedHours": 1152,
+          "staffedWalkOrHaulStateHours": 422.4,
+          "firstMeatDay": null,
+          "deaths": [],
+          "carried": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "pending": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 10
+          },
+          "final": {
+            "day": 48,
+            "population": 2,
+            "animals": 20,
+            "growth": 0.6874999999999998,
+            "unshornWool": 0,
+            "stock": {
+              "wood": 0,
+              "stone": 0,
+              "iron": 0,
+              "tools": 1000,
+              "food": 1699.9999999999932,
+              "meat": 0,
+              "eggs": 202.2500000000001,
+              "vegetables": 0,
+              "grain": 1497.7499999999932,
+              "apples": 0,
+              "pears": 0,
+              "firewood": 970,
+              "leather": 0,
+              "wool": 0,
+              "clothes": 0,
+              "herbs": 0,
+              "coal": 0,
+              "steelTools": 0,
+              "ale": 0,
+              "warmCoats": 0
+            }
+          }
+        }
+      ]
+    },
+    "breedingPairsBaseline": {
+      "fixtureOptions": {
+        "initialFood": 1600,
+        "stores": 4
+      },
+      "results": [
+        {
+          "species": "sheep",
+          "seed": 5,
+          "distance": "near",
+          "initialAnimals": 2,
+          "target": 8,
+          "workers": 1,
+          "years": [
+            {
+              "year": 1,
+              "animals": 3,
+              "produced": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 7,
+                "eggs": 0
+              },
+              "received": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 7,
+                "eggs": 0
+              }
+            },
+            {
+              "year": 2,
+              "animals": 4,
+              "produced": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 14,
+                "eggs": 0
+              },
+              "received": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 14,
+                "eggs": 0
+              }
+            },
+            {
+              "year": 3,
+              "animals": 7,
+              "produced": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 21,
+                "eggs": 0
+              },
+              "received": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 21,
+                "eggs": 0
+              }
+            },
+            {
+              "year": 4,
+              "animals": 8,
+              "produced": {
+                "meat": 72,
+                "leather": 0,
+                "wool": 31,
+                "eggs": 0
+              },
+              "received": {
+                "meat": 72,
+                "leather": 0,
+                "wool": 31,
+                "eggs": 0
+              }
+            },
+            {
+              "year": 5,
+              "animals": 8,
+              "produced": {
+                "meat": 96,
+                "leather": 0,
+                "wool": 33,
+                "eggs": 0
+              },
+              "received": {
+                "meat": 96,
+                "leather": 0,
+                "wool": 33,
+                "eggs": 0
+              }
+            },
+            {
+              "year": 6,
+              "animals": 8,
+              "produced": {
+                "meat": 96,
+                "leather": 0,
+                "wool": 32,
+                "eggs": 0
+              },
+              "received": {
+                "meat": 96,
+                "leather": 0,
+                "wool": 32,
+                "eggs": 0
+              }
+            }
+          ],
+          "sourceHash": "bf29094e7df45640fcdc121020dffaec9d13a12a933a683481466a745ee0c2d4",
+          "constants": {
+            "eatPerYear": 100,
+            "yearDays": 48,
+            "cap": 12,
+            "meatPerAnimal": 24
+          },
+          "produced": {
+            "meat": 264,
+            "leather": 0,
+            "wool": 138,
+            "eggs": 0
+          },
+          "received": {
+            "meat": 264,
+            "leather": 0,
+            "wool": 138,
+            "eggs": 0
+          },
+          "ledgerReceived": {
+            "meat": 264,
+            "leather": 0,
+            "wool": 138,
+            "eggs": 0
+          },
+          "discarded": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "trips": {
+            "meat": 11,
+            "leather": 0,
+            "wool": 135,
+            "eggs": 0
+          },
+          "careCompletions": 445,
+          "caredDays": 288,
+          "births": 17,
+          "slaughters": 11,
+          "workingHours": 3560.174569,
+          "staffedHours": 6912,
+          "staffedWalkOrHaulStateHours": 923.6,
+          "firstMeatDay": 166,
+          "deaths": [],
+          "carried": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "pending": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "final": {
+            "day": 288,
+            "population": 2,
+            "animals": 8,
+            "growth": 0.2291666666666673,
+            "unshornWool": 1.249999999999996,
+            "stock": {
+              "wood": 0,
+              "stone": 0,
+              "iron": 0,
+              "tools": 996,
+              "food": 664.0000000000281,
+              "meat": 19.83333333333333,
+              "eggs": 0,
+              "vegetables": 0,
+              "grain": 644.1666666666947,
+              "apples": 0,
+              "pears": 0,
+              "firewood": 820,
+              "leather": 0,
+              "wool": 138,
+              "clothes": 0,
+              "herbs": 0,
+              "coal": 0,
+              "steelTools": 0,
+              "ale": 0,
+              "warmCoats": 0
+            }
+          }
+        },
+        {
+          "species": "sheep",
+          "seed": 5,
+          "distance": "far",
+          "initialAnimals": 2,
+          "target": 8,
+          "workers": 1,
+          "years": [
+            {
+              "year": 1,
+              "animals": 3,
+              "produced": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 7,
+                "eggs": 0
+              },
+              "received": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 7,
+                "eggs": 0
+              }
+            },
+            {
+              "year": 2,
+              "animals": 4,
+              "produced": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 14,
+                "eggs": 0
+              },
+              "received": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 14,
+                "eggs": 0
+              }
+            },
+            {
+              "year": 3,
+              "animals": 7,
+              "produced": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 21,
+                "eggs": 0
+              },
+              "received": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 21,
+                "eggs": 0
+              }
+            },
+            {
+              "year": 4,
+              "animals": 8,
+              "produced": {
+                "meat": 72,
+                "leather": 0,
+                "wool": 31,
+                "eggs": 0
+              },
+              "received": {
+                "meat": 72,
+                "leather": 0,
+                "wool": 30,
+                "eggs": 0
+              }
+            },
+            {
+              "year": 5,
+              "animals": 8,
+              "produced": {
+                "meat": 96,
+                "leather": 0,
+                "wool": 33,
+                "eggs": 0
+              },
+              "received": {
+                "meat": 96,
+                "leather": 0,
+                "wool": 32,
+                "eggs": 0
+              }
+            },
+            {
+              "year": 6,
+              "animals": 8,
+              "produced": {
+                "meat": 96,
+                "leather": 0,
+                "wool": 31,
+                "eggs": 0
+              },
+              "received": {
+                "meat": 96,
+                "leather": 0,
+                "wool": 33,
+                "eggs": 0
+              }
+            }
+          ],
+          "sourceHash": "bf29094e7df45640fcdc121020dffaec9d13a12a933a683481466a745ee0c2d4",
+          "constants": {
+            "eatPerYear": 100,
+            "yearDays": 48,
+            "cap": 12,
+            "meatPerAnimal": 24
+          },
+          "produced": {
+            "meat": 264,
+            "leather": 0,
+            "wool": 137,
+            "eggs": 0
+          },
+          "received": {
+            "meat": 264,
+            "leather": 0,
+            "wool": 137,
+            "eggs": 0
+          },
+          "ledgerReceived": {
+            "meat": 264,
+            "leather": 0,
+            "wool": 137,
+            "eggs": 0
+          },
+          "discarded": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "trips": {
+            "meat": 11,
+            "leather": 0,
+            "wool": 131,
+            "eggs": 0
+          },
+          "careCompletions": 324,
+          "caredDays": 288,
+          "births": 17,
+          "slaughters": 11,
+          "workingHours": 2599.418974,
+          "staffedHours": 6912,
+          "staffedWalkOrHaulStateHours": 2404.8,
+          "firstMeatDay": 166,
+          "deaths": [],
+          "carried": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "pending": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "final": {
+            "day": 288,
+            "population": 2,
+            "animals": 8,
+            "growth": 0.2291666666666673,
+            "unshornWool": 2.2499999999999956,
+            "stock": {
+              "wood": 0,
+              "stone": 0,
+              "iron": 0,
+              "tools": 996,
+              "food": 664.0000000000275,
+              "meat": 21.916666666666664,
+              "eggs": 0,
+              "vegetables": 0,
+              "grain": 642.0833333333609,
+              "apples": 0,
+              "pears": 0,
+              "firewood": 820,
+              "leather": 0,
+              "wool": 137,
+              "clothes": 0,
+              "herbs": 0,
+              "coal": 0,
+              "steelTools": 0,
+              "ale": 0,
+              "warmCoats": 0
+            }
+          }
+        },
+        {
+          "species": "cattle",
+          "seed": 5,
+          "distance": "near",
+          "initialAnimals": 2,
+          "target": 8,
+          "workers": 1,
+          "years": [
+            {
+              "year": 1,
+              "animals": 3,
+              "produced": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 0
+              },
+              "received": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 0
+              }
+            },
+            {
+              "year": 2,
+              "animals": 4,
+              "produced": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 0
+              },
+              "received": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 0
+              }
+            },
+            {
+              "year": 3,
+              "animals": 7,
+              "produced": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 0
+              },
+              "received": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 0
+              }
+            },
+            {
+              "year": 4,
+              "animals": 8,
+              "produced": {
+                "meat": 108,
+                "leather": 12,
+                "wool": 0,
+                "eggs": 0
+              },
+              "received": {
+                "meat": 108,
+                "leather": 12,
+                "wool": 0,
+                "eggs": 0
+              }
+            },
+            {
+              "year": 5,
+              "animals": 8,
+              "produced": {
+                "meat": 144,
+                "leather": 16,
+                "wool": 0,
+                "eggs": 0
+              },
+              "received": {
+                "meat": 144,
+                "leather": 16,
+                "wool": 0,
+                "eggs": 0
+              }
+            },
+            {
+              "year": 6,
+              "animals": 8,
+              "produced": {
+                "meat": 144,
+                "leather": 16,
+                "wool": 0,
+                "eggs": 0
+              },
+              "received": {
+                "meat": 144,
+                "leather": 16,
+                "wool": 0,
+                "eggs": 0
+              }
+            }
+          ],
+          "sourceHash": "bf29094e7df45640fcdc121020dffaec9d13a12a933a683481466a745ee0c2d4",
+          "constants": {
+            "eatPerYear": 100,
+            "yearDays": 48,
+            "cap": 10,
+            "meatPerAnimal": 36
+          },
+          "produced": {
+            "meat": 396,
+            "leather": 44,
+            "wool": 0,
+            "eggs": 0
+          },
+          "received": {
+            "meat": 396,
+            "leather": 44,
+            "wool": 0,
+            "eggs": 0
+          },
+          "ledgerReceived": {
+            "meat": 396,
+            "leather": 44,
+            "wool": 0,
+            "eggs": 0
+          },
+          "discarded": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "trips": {
+            "meat": 22,
+            "leather": 11,
+            "wool": 0,
+            "eggs": 0
+          },
+          "careCompletions": 481,
+          "caredDays": 288,
+          "births": 17,
+          "slaughters": 11,
+          "workingHours": 3850.269396,
+          "staffedHours": 6912,
+          "staffedWalkOrHaulStateHours": 506,
+          "firstMeatDay": 166,
+          "deaths": [],
+          "carried": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "pending": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "final": {
+            "day": 288,
+            "population": 2,
+            "animals": 8,
+            "growth": 0.2291666666666673,
+            "unshornWool": 0,
+            "stock": {
+              "wood": 0,
+              "stone": 0,
+              "iron": 0,
+              "tools": 996,
+              "food": 796.0000000000276,
+              "meat": 141.8333333333329,
+              "eggs": 0,
+              "vegetables": 0,
+              "grain": 654.1666666666947,
+              "apples": 0,
+              "pears": 0,
+              "firewood": 820,
+              "leather": 44,
+              "wool": 0,
+              "clothes": 0,
+              "herbs": 0,
+              "coal": 0,
+              "steelTools": 0,
+              "ale": 0,
+              "warmCoats": 0
+            }
+          }
+        },
+        {
+          "species": "cattle",
+          "seed": 5,
+          "distance": "far",
+          "initialAnimals": 2,
+          "target": 8,
+          "workers": 1,
+          "years": [
+            {
+              "year": 1,
+              "animals": 3,
+              "produced": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 0
+              },
+              "received": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 0
+              }
+            },
+            {
+              "year": 2,
+              "animals": 4,
+              "produced": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 0
+              },
+              "received": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 0
+              }
+            },
+            {
+              "year": 3,
+              "animals": 7,
+              "produced": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 0
+              },
+              "received": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 0
+              }
+            },
+            {
+              "year": 4,
+              "animals": 8,
+              "produced": {
+                "meat": 108,
+                "leather": 12,
+                "wool": 0,
+                "eggs": 0
+              },
+              "received": {
+                "meat": 92,
+                "leather": 8,
+                "wool": 0,
+                "eggs": 0
+              }
+            },
+            {
+              "year": 5,
+              "animals": 8,
+              "produced": {
+                "meat": 144,
+                "leather": 16,
+                "wool": 0,
+                "eggs": 0
+              },
+              "received": {
+                "meat": 144,
+                "leather": 16,
+                "wool": 0,
+                "eggs": 0
+              }
+            },
+            {
+              "year": 6,
+              "animals": 8,
+              "produced": {
+                "meat": 144,
+                "leather": 16,
+                "wool": 0,
+                "eggs": 0
+              },
+              "received": {
+                "meat": 144,
+                "leather": 16,
+                "wool": 0,
+                "eggs": 0
+              }
+            }
+          ],
+          "sourceHash": "bf29094e7df45640fcdc121020dffaec9d13a12a933a683481466a745ee0c2d4",
+          "constants": {
+            "eatPerYear": 100,
+            "yearDays": 48,
+            "cap": 10,
+            "meatPerAnimal": 36
+          },
+          "produced": {
+            "meat": 396,
+            "leather": 44,
+            "wool": 0,
+            "eggs": 0
+          },
+          "received": {
+            "meat": 380,
+            "leather": 40,
+            "wool": 0,
+            "eggs": 0
+          },
+          "ledgerReceived": {
+            "meat": 380,
+            "leather": 40,
+            "wool": 0,
+            "eggs": 0
+          },
+          "discarded": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "trips": {
+            "meat": 21,
+            "leather": 10,
+            "wool": 0,
+            "eggs": 0
+          },
+          "careCompletions": 460,
+          "caredDays": 288,
+          "births": 17,
+          "slaughters": 11,
+          "workingHours": 3687.331896,
+          "staffedHours": 6912,
+          "staffedWalkOrHaulStateHours": 754.3,
+          "firstMeatDay": 166,
+          "deaths": [],
+          "carried": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "pending": {
+            "meat": 16,
+            "leather": 4,
+            "wool": 0,
+            "eggs": 0
+          },
+          "final": {
+            "day": 288,
+            "population": 2,
+            "animals": 8,
+            "growth": 0.2291666666666673,
+            "unshornWool": 0,
+            "stock": {
+              "wood": 0,
+              "stone": 0,
+              "iron": 0,
+              "tools": 996,
+              "food": 780.0000000000275,
+              "meat": 125.83333333333283,
+              "eggs": 0,
+              "vegetables": 0,
+              "grain": 654.1666666666947,
+              "apples": 0,
+              "pears": 0,
+              "firewood": 820,
+              "leather": 40,
+              "wool": 0,
+              "clothes": 0,
+              "herbs": 0,
+              "coal": 0,
+              "steelTools": 0,
+              "ale": 0,
+              "warmCoats": 0
+            }
+          }
+        },
+        {
+          "species": "chicken",
+          "seed": 5,
+          "distance": "near",
+          "initialAnimals": 2,
+          "target": 8,
+          "workers": 1,
+          "years": [
+            {
+              "year": 1,
+              "animals": 4,
+              "produced": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 64
+              },
+              "received": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 62
+              }
+            },
+            {
+              "year": 2,
+              "animals": 9,
+              "produced": {
+                "meat": 12,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 159
+              },
+              "received": {
+                "meat": 12,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 157
+              }
+            },
+            {
+              "year": 3,
+              "animals": 8,
+              "produced": {
+                "meat": 54,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 199
+              },
+              "received": {
+                "meat": 54,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 199
+              }
+            },
+            {
+              "year": 4,
+              "animals": 9,
+              "produced": {
+                "meat": 36,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 174
+              },
+              "received": {
+                "meat": 36,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 173
+              }
+            },
+            {
+              "year": 5,
+              "animals": 8,
+              "produced": {
+                "meat": 54,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 197
+              },
+              "received": {
+                "meat": 54,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 198
+              }
+            },
+            {
+              "year": 6,
+              "animals": 8,
+              "produced": {
+                "meat": 48,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 198
+              },
+              "received": {
+                "meat": 48,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 198
+              }
+            }
+          ],
+          "sourceHash": "bf29094e7df45640fcdc121020dffaec9d13a12a933a683481466a745ee0c2d4",
+          "constants": {
+            "eatPerYear": 100,
+            "yearDays": 48,
+            "cap": 24,
+            "meatPerAnimal": 6
+          },
+          "produced": {
+            "meat": 204,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 991
+          },
+          "received": {
+            "meat": 204,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 987
+          },
+          "ledgerReceived": {
+            "meat": 204,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 987
+          },
+          "discarded": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "trips": {
+            "meat": 34,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 281
+          },
+          "careCompletions": 434,
+          "caredDays": 282,
+          "births": 40,
+          "slaughters": 34,
+          "workingHours": 3544.70875,
+          "staffedHours": 6912,
+          "staffedWalkOrHaulStateHours": 1456.3,
+          "firstMeatDay": 85,
+          "deaths": [],
+          "carried": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "pending": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 4
+          },
+          "final": {
+            "day": 288,
+            "population": 2,
+            "animals": 8,
+            "growth": 0.4583333333333296,
+            "unshornWool": 0,
+            "stock": {
+              "wood": 0,
+              "stone": 0,
+              "iron": 0,
+              "tools": 996,
+              "food": 1590.9999999999745,
+              "meat": 4.958333333333334,
+              "eggs": 624.5416666666664,
+              "vegetables": 0,
+              "grain": 961.4999999999749,
+              "apples": 0,
+              "pears": 0,
+              "firewood": 820,
+              "leather": 0,
+              "wool": 0,
+              "clothes": 0,
+              "herbs": 0,
+              "coal": 0,
+              "steelTools": 0,
+              "ale": 0,
+              "warmCoats": 0
+            }
+          }
+        },
+        {
+          "species": "chicken",
+          "seed": 5,
+          "distance": "far",
+          "initialAnimals": 2,
+          "target": 8,
+          "workers": 1,
+          "years": [
+            {
+              "year": 1,
+              "animals": 4,
+              "produced": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 64
+              },
+              "received": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 60
+              }
+            },
+            {
+              "year": 2,
+              "animals": 11,
+              "produced": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 169
+              },
+              "received": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 162
+              }
+            },
+            {
+              "year": 3,
+              "animals": 24,
+              "produced": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 441
+              },
+              "received": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 428
+              }
+            },
+            {
+              "year": 4,
+              "animals": 24,
+              "produced": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 576
+              },
+              "received": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 545.8333333333505
+              }
+            },
+            {
+              "year": 5,
+              "animals": 24,
+              "produced": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 256
+              },
+              "received": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 200.00000000000364
+              }
+            },
+            {
+              "year": 6,
+              "animals": 24,
+              "produced": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 200
+              },
+              "received": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 199.99999999999795
+              }
+            }
+          ],
+          "sourceHash": "bf29094e7df45640fcdc121020dffaec9d13a12a933a683481466a745ee0c2d4",
+          "constants": {
+            "eatPerYear": 100,
+            "yearDays": 48,
+            "cap": 24,
+            "meatPerAnimal": 6
+          },
+          "produced": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 1706
+          },
+          "received": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 1595.8333333333521
+          },
+          "ledgerReceived": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 1595.8333333333521
+          },
+          "discarded": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "trips": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 300
+          },
+          "careCompletions": 335,
+          "caredDays": 287,
+          "births": 22,
+          "slaughters": 0,
+          "workingHours": 2681.633587,
+          "staffedHours": 6874,
+          "staffedWalkOrHaulStateHours": 2026.2,
+          "firstMeatDay": null,
+          "deaths": [],
+          "carried": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 14.16666666664787
+          },
+          "pending": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 96
+          },
+          "final": {
+            "day": 288,
+            "population": 2,
+            "animals": 24,
+            "growth": 1,
+            "unshornWool": 0,
+            "stock": {
+              "wood": 0,
+              "stone": 0,
+              "iron": 0,
+              "tools": 996,
+              "food": 1995.8333333333333,
+              "meat": 0,
+              "eggs": 1035.83333333336,
+              "vegetables": 0,
+              "grain": 959.9999999999732,
+              "apples": 0,
+              "pears": 0,
+              "firewood": 820,
+              "leather": 0,
+              "wool": 0,
+              "clothes": 0,
+              "herbs": 0,
+              "coal": 0,
+              "steelTools": 0,
+              "ale": 0,
+              "warmCoats": 0
+            }
+          }
+        }
+      ]
+    },
+    "unattendedAfter": {
+      "fixtureOptions": {
+        "initialFood": 1600,
+        "stores": 4
+      },
+      "results": [
+        {
+          "species": "sheep",
+          "seed": 5,
+          "distance": "near",
+          "initialAnimals": 8,
+          "target": 8,
+          "workers": 0,
+          "years": [
+            {
+              "year": 1,
+              "animals": 8,
+              "produced": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 0
+              },
+              "received": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 0
+              }
+            }
+          ],
+          "initialFood": 1600,
+          "stores": 4,
+          "sourceHash": "0f3308c06bf1d77474260c2ed29edc3a587184f7c2884c936d64e4008e26606e",
+          "constants": {
+            "eatPerYear": 100,
+            "yearDays": 48,
+            "cap": 12,
+            "meatPerAnimal": 24
+          },
+          "produced": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "received": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "ledgerReceived": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "discarded": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "trips": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "durationYears": 1,
+          "careCompletions": 0,
+          "caredDays": 0,
+          "births": 0,
+          "overflowBirths": 0,
+          "slaughters": 0,
+          "workingHours": 0,
+          "staffedHours": 0,
+          "staffedWalkOrHaulStateHours": 0,
+          "firstMeatDay": null,
+          "deaths": [],
+          "carried": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "pending": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "final": {
+            "day": 48,
+            "population": 2,
+            "animals": 8,
+            "growth": 0,
+            "unshornWool": 0,
+            "stock": {
+              "wood": 0,
+              "stone": 0,
+              "iron": 0,
+              "tools": 1000,
+              "food": 1400.0000000000073,
+              "meat": 0,
+              "eggs": 0,
+              "vegetables": 0,
+              "grain": 1400.0000000000073,
+              "apples": 0,
+              "pears": 0,
+              "firewood": 970,
+              "leather": 0,
+              "wool": 0,
+              "clothes": 0,
+              "herbs": 0,
+              "coal": 0,
+              "steelTools": 0,
+              "ale": 0,
+              "warmCoats": 0
+            }
+          }
+        },
+        {
+          "species": "cattle",
+          "seed": 5,
+          "distance": "near",
+          "initialAnimals": 8,
+          "target": 8,
+          "workers": 0,
+          "years": [
+            {
+              "year": 1,
+              "animals": 8,
+              "produced": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 0
+              },
+              "received": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 0
+              }
+            }
+          ],
+          "initialFood": 1600,
+          "stores": 4,
+          "sourceHash": "0f3308c06bf1d77474260c2ed29edc3a587184f7c2884c936d64e4008e26606e",
+          "constants": {
+            "eatPerYear": 100,
+            "yearDays": 48,
+            "cap": 10,
+            "meatPerAnimal": 36
+          },
+          "produced": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "received": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "ledgerReceived": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "discarded": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "trips": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "durationYears": 1,
+          "careCompletions": 0,
+          "caredDays": 0,
+          "births": 0,
+          "overflowBirths": 0,
+          "slaughters": 0,
+          "workingHours": 0,
+          "staffedHours": 0,
+          "staffedWalkOrHaulStateHours": 0,
+          "firstMeatDay": null,
+          "deaths": [],
+          "carried": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "pending": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "final": {
+            "day": 48,
+            "population": 2,
+            "animals": 8,
+            "growth": 0,
+            "unshornWool": 0,
+            "stock": {
+              "wood": 0,
+              "stone": 0,
+              "iron": 0,
+              "tools": 1000,
+              "food": 1400.0000000000073,
+              "meat": 0,
+              "eggs": 0,
+              "vegetables": 0,
+              "grain": 1400.0000000000073,
+              "apples": 0,
+              "pears": 0,
+              "firewood": 970,
+              "leather": 0,
+              "wool": 0,
+              "clothes": 0,
+              "herbs": 0,
+              "coal": 0,
+              "steelTools": 0,
+              "ale": 0,
+              "warmCoats": 0
+            }
+          }
+        },
+        {
+          "species": "chicken",
+          "seed": 5,
+          "distance": "near",
+          "initialAnimals": 8,
+          "target": 8,
+          "workers": 0,
+          "years": [
+            {
+              "year": 1,
+              "animals": 8,
+              "produced": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 0
+              },
+              "received": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 0
+              }
+            }
+          ],
+          "initialFood": 1600,
+          "stores": 4,
+          "sourceHash": "0f3308c06bf1d77474260c2ed29edc3a587184f7c2884c936d64e4008e26606e",
+          "constants": {
+            "eatPerYear": 100,
+            "yearDays": 48,
+            "cap": 24,
+            "meatPerAnimal": 6
+          },
+          "produced": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "received": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "ledgerReceived": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "discarded": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "trips": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "durationYears": 1,
+          "careCompletions": 0,
+          "caredDays": 0,
+          "births": 0,
+          "overflowBirths": 0,
+          "slaughters": 0,
+          "workingHours": 0,
+          "staffedHours": 0,
+          "staffedWalkOrHaulStateHours": 0,
+          "firstMeatDay": null,
+          "deaths": [],
+          "carried": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "pending": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "final": {
+            "day": 48,
+            "population": 2,
+            "animals": 8,
+            "growth": 0,
+            "unshornWool": 0,
+            "stock": {
+              "wood": 0,
+              "stone": 0,
+              "iron": 0,
+              "tools": 1000,
+              "food": 1400.0000000000073,
+              "meat": 0,
+              "eggs": 0,
+              "vegetables": 0,
+              "grain": 1400.0000000000073,
+              "apples": 0,
+              "pears": 0,
+              "firewood": 970,
+              "leather": 0,
+              "wool": 0,
+              "clothes": 0,
+              "herbs": 0,
+              "coal": 0,
+              "steelTools": 0,
+              "ale": 0,
+              "warmCoats": 0
+            }
+          }
+        }
+      ]
+    },
+    "capacityPressureBefore": {
+      "fixtureOptions": {
+        "initialFood": 1600,
+        "stores": 4
+      },
+      "results": [
+        {
+          "species": "sheep",
+          "seed": 5,
+          "distance": "near",
+          "initialAnimals": 12,
+          "target": 12,
+          "workers": 1,
+          "years": [
+            {
+              "year": 1,
+              "animals": 12,
+              "produced": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 47,
+                "eggs": 0
+              },
+              "received": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 47,
+                "eggs": 0
+              }
+            }
+          ],
+          "sourceHash": "bf29094e7df45640fcdc121020dffaec9d13a12a933a683481466a745ee0c2d4",
+          "constants": {
+            "eatPerYear": 100,
+            "yearDays": 48,
+            "cap": 12,
+            "meatPerAnimal": 24
+          },
+          "produced": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 47,
+            "eggs": 0
+          },
+          "received": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 47,
+            "eggs": 0
+          },
+          "ledgerReceived": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 47,
+            "eggs": 0
+          },
+          "discarded": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "trips": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 47,
+            "eggs": 0
+          },
+          "durationYears": 1,
+          "careCompletions": 74,
+          "caredDays": 48,
+          "births": 0,
+          "overflowBirths": 0,
+          "slaughters": 0,
+          "workingHours": 596.426409,
+          "staffedHours": 1152,
+          "staffedWalkOrHaulStateHours": 236.1,
+          "firstMeatDay": null,
+          "deaths": [],
+          "carried": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "pending": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "final": {
+            "day": 48,
+            "population": 2,
+            "animals": 12,
+            "growth": 1,
+            "unshornWool": 1,
+            "stock": {
+              "wood": 0,
+              "stone": 0,
+              "iron": 0,
+              "tools": 1000,
+              "food": 1400.0000000000073,
+              "meat": 0,
+              "eggs": 0,
+              "vegetables": 0,
+              "grain": 1400.0000000000073,
+              "apples": 0,
+              "pears": 0,
+              "firewood": 970,
+              "leather": 0,
+              "wool": 47,
+              "clothes": 0,
+              "herbs": 0,
+              "coal": 0,
+              "steelTools": 0,
+              "ale": 0,
+              "warmCoats": 0
+            }
+          }
+        },
+        {
+          "species": "sheep",
+          "seed": 5,
+          "distance": "far",
+          "initialAnimals": 12,
+          "target": 12,
+          "workers": 1,
+          "years": [
+            {
+              "year": 1,
+              "animals": 12,
+              "produced": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 47,
+                "eggs": 0
+              },
+              "received": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 46,
+                "eggs": 0
+              }
+            }
+          ],
+          "sourceHash": "bf29094e7df45640fcdc121020dffaec9d13a12a933a683481466a745ee0c2d4",
+          "constants": {
+            "eatPerYear": 100,
+            "yearDays": 48,
+            "cap": 12,
+            "meatPerAnimal": 24
+          },
+          "produced": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 47,
+            "eggs": 0
+          },
+          "received": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 47,
+            "eggs": 0
+          },
+          "ledgerReceived": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 47,
+            "eggs": 0
+          },
+          "discarded": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "trips": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 47,
+            "eggs": 0
+          },
+          "durationYears": 1,
+          "careCompletions": 48,
+          "caredDays": 48,
+          "births": 0,
+          "overflowBirths": 0,
+          "slaughters": 0,
+          "workingHours": 384,
+          "staffedHours": 1152,
+          "staffedWalkOrHaulStateHours": 422.4,
+          "firstMeatDay": null,
+          "deaths": [],
+          "carried": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "pending": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "final": {
+            "day": 48,
+            "population": 2,
+            "animals": 12,
+            "growth": 1,
+            "unshornWool": 1,
+            "stock": {
+              "wood": 0,
+              "stone": 0,
+              "iron": 0,
+              "tools": 1000,
+              "food": 1400.0000000000073,
+              "meat": 0,
+              "eggs": 0,
+              "vegetables": 0,
+              "grain": 1400.0000000000073,
+              "apples": 0,
+              "pears": 0,
+              "firewood": 970,
+              "leather": 0,
+              "wool": 47,
+              "clothes": 0,
+              "herbs": 0,
+              "coal": 0,
+              "steelTools": 0,
+              "ale": 0,
+              "warmCoats": 0
+            }
+          }
+        },
+        {
+          "species": "cattle",
+          "seed": 5,
+          "distance": "near",
+          "initialAnimals": 10,
+          "target": 10,
+          "workers": 1,
+          "years": [
+            {
+              "year": 1,
+              "animals": 10,
+              "produced": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 0
+              },
+              "received": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 0
+              }
+            }
+          ],
+          "sourceHash": "bf29094e7df45640fcdc121020dffaec9d13a12a933a683481466a745ee0c2d4",
+          "constants": {
+            "eatPerYear": 100,
+            "yearDays": 48,
+            "cap": 10,
+            "meatPerAnimal": 36
+          },
+          "produced": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "received": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "ledgerReceived": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "discarded": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "trips": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "durationYears": 1,
+          "careCompletions": 89,
+          "caredDays": 48,
+          "births": 0,
+          "overflowBirths": 0,
+          "slaughters": 0,
+          "workingHours": 717.315698,
+          "staffedHours": 1152,
+          "staffedWalkOrHaulStateHours": 67.8,
+          "firstMeatDay": null,
+          "deaths": [],
+          "carried": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "pending": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "final": {
+            "day": 48,
+            "population": 2,
+            "animals": 10,
+            "growth": 1,
+            "unshornWool": 0,
+            "stock": {
+              "wood": 0,
+              "stone": 0,
+              "iron": 0,
+              "tools": 1000,
+              "food": 1400.0000000000073,
+              "meat": 0,
+              "eggs": 0,
+              "vegetables": 0,
+              "grain": 1400.0000000000073,
+              "apples": 0,
+              "pears": 0,
+              "firewood": 970,
+              "leather": 0,
+              "wool": 0,
+              "clothes": 0,
+              "herbs": 0,
+              "coal": 0,
+              "steelTools": 0,
+              "ale": 0,
+              "warmCoats": 0
+            }
+          }
+        },
+        {
+          "species": "cattle",
+          "seed": 5,
+          "distance": "far",
+          "initialAnimals": 10,
+          "target": 10,
+          "workers": 1,
+          "years": [
+            {
+              "year": 1,
+              "animals": 10,
+              "produced": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 0
+              },
+              "received": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 0
+              }
+            }
+          ],
+          "sourceHash": "bf29094e7df45640fcdc121020dffaec9d13a12a933a683481466a745ee0c2d4",
+          "constants": {
+            "eatPerYear": 100,
+            "yearDays": 48,
+            "cap": 10,
+            "meatPerAnimal": 36
+          },
+          "produced": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "received": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "ledgerReceived": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "discarded": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "trips": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "durationYears": 1,
+          "careCompletions": 89,
+          "caredDays": 48,
+          "births": 0,
+          "overflowBirths": 0,
+          "slaughters": 0,
+          "workingHours": 717.315698,
+          "staffedHours": 1152,
+          "staffedWalkOrHaulStateHours": 67.8,
+          "firstMeatDay": null,
+          "deaths": [],
+          "carried": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "pending": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "final": {
+            "day": 48,
+            "population": 2,
+            "animals": 10,
+            "growth": 1,
+            "unshornWool": 0,
+            "stock": {
+              "wood": 0,
+              "stone": 0,
+              "iron": 0,
+              "tools": 1000,
+              "food": 1400.0000000000073,
+              "meat": 0,
+              "eggs": 0,
+              "vegetables": 0,
+              "grain": 1400.0000000000073,
+              "apples": 0,
+              "pears": 0,
+              "firewood": 970,
+              "leather": 0,
+              "wool": 0,
+              "clothes": 0,
+              "herbs": 0,
+              "coal": 0,
+              "steelTools": 0,
+              "ale": 0,
+              "warmCoats": 0
+            }
+          }
+        },
+        {
+          "species": "chicken",
+          "seed": 5,
+          "distance": "near",
+          "initialAnimals": 24,
+          "target": 24,
+          "workers": 1,
+          "years": [
+            {
+              "year": 1,
+              "animals": 24,
+              "produced": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 576
+              },
+              "received": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 564
+              }
+            }
+          ],
+          "sourceHash": "bf29094e7df45640fcdc121020dffaec9d13a12a933a683481466a745ee0c2d4",
+          "constants": {
+            "eatPerYear": 100,
+            "yearDays": 48,
+            "cap": 24,
+            "meatPerAnimal": 6
+          },
+          "produced": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 576
+          },
+          "received": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 564
+          },
+          "ledgerReceived": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 564
+          },
+          "discarded": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "trips": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 47
+          },
+          "durationYears": 1,
+          "careCompletions": 75,
+          "caredDays": 48,
+          "births": 0,
+          "overflowBirths": 0,
+          "slaughters": 0,
+          "workingHours": 603.948367,
+          "staffedHours": 1152,
+          "staffedWalkOrHaulStateHours": 236.1,
+          "firstMeatDay": null,
+          "deaths": [],
+          "carried": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "pending": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 12
+          },
+          "final": {
+            "day": 48,
+            "population": 2,
+            "animals": 24,
+            "growth": 1,
+            "unshornWool": 0,
+            "stock": {
+              "wood": 0,
+              "stone": 0,
+              "iron": 0,
+              "tools": 1000,
+              "food": 1963.9999999999923,
+              "meat": 0,
+              "eggs": 466.0833333333327,
+              "vegetables": 0,
+              "grain": 1497.9166666666597,
+              "apples": 0,
+              "pears": 0,
+              "firewood": 970,
+              "leather": 0,
+              "wool": 0,
+              "clothes": 0,
+              "herbs": 0,
+              "coal": 0,
+              "steelTools": 0,
+              "ale": 0,
+              "warmCoats": 0
+            }
+          }
+        },
+        {
+          "species": "chicken",
+          "seed": 5,
+          "distance": "far",
+          "initialAnimals": 24,
+          "target": 24,
+          "workers": 1,
+          "years": [
+            {
+              "year": 1,
+              "animals": 24,
+              "produced": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 576
+              },
+              "received": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 552
+              }
+            }
+          ],
+          "sourceHash": "bf29094e7df45640fcdc121020dffaec9d13a12a933a683481466a745ee0c2d4",
+          "constants": {
+            "eatPerYear": 100,
+            "yearDays": 48,
+            "cap": 24,
+            "meatPerAnimal": 6
+          },
+          "produced": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 576
+          },
+          "received": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 564
+          },
+          "ledgerReceived": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 564
+          },
+          "discarded": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "trips": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 47
+          },
+          "durationYears": 1,
+          "careCompletions": 48,
+          "caredDays": 48,
+          "births": 0,
+          "overflowBirths": 0,
+          "slaughters": 0,
+          "workingHours": 384,
+          "staffedHours": 1152,
+          "staffedWalkOrHaulStateHours": 422.5,
+          "firstMeatDay": null,
+          "deaths": [],
+          "carried": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "pending": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 12
+          },
+          "final": {
+            "day": 48,
+            "population": 2,
+            "animals": 24,
+            "growth": 1,
+            "unshornWool": 0,
+            "stock": {
+              "wood": 0,
+              "stone": 0,
+              "iron": 0,
+              "tools": 1000,
+              "food": 1963.9999999999923,
+              "meat": 0,
+              "eggs": 466.0833333333327,
+              "vegetables": 0,
+              "grain": 1497.9166666666597,
+              "apples": 0,
+              "pears": 0,
+              "firewood": 970,
+              "leather": 0,
+              "wool": 0,
+              "clothes": 0,
+              "herbs": 0,
+              "coal": 0,
+              "steelTools": 0,
+              "ale": 0,
+              "warmCoats": 0
+            }
+          }
+        }
+      ]
+    },
+    "capacityPressureAfter": {
+      "fixtureOptions": {
+        "initialFood": 1600,
+        "stores": 4
+      },
+      "results": [
+        {
+          "species": "sheep",
+          "seed": 5,
+          "distance": "near",
+          "initialAnimals": 12,
+          "target": 12,
+          "workers": 1,
+          "years": [
+            {
+              "year": 1,
+              "animals": 12,
+              "produced": {
+                "meat": 120,
+                "leather": 0,
+                "wool": 47,
+                "eggs": 0
+              },
+              "received": {
+                "meat": 120,
+                "leather": 0,
+                "wool": 47,
+                "eggs": 0
+              }
+            }
+          ],
+          "sourceHash": "0f3308c06bf1d77474260c2ed29edc3a587184f7c2884c936d64e4008e26606e",
+          "constants": {
+            "eatPerYear": 100,
+            "yearDays": 48,
+            "cap": 12,
+            "meatPerAnimal": 24
+          },
+          "produced": {
+            "meat": 120,
+            "leather": 0,
+            "wool": 47,
+            "eggs": 0
+          },
+          "received": {
+            "meat": 120,
+            "leather": 0,
+            "wool": 47,
+            "eggs": 0
+          },
+          "ledgerReceived": {
+            "meat": 120,
+            "leather": 0,
+            "wool": 47,
+            "eggs": 0
+          },
+          "discarded": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "trips": {
+            "meat": 5,
+            "leather": 0,
+            "wool": 46,
+            "eggs": 0
+          },
+          "durationYears": 1,
+          "careCompletions": 74,
+          "caredDays": 48,
+          "births": 0,
+          "overflowBirths": 5,
+          "slaughters": 5,
+          "workingHours": 596.049179,
+          "staffedHours": 1152,
+          "staffedWalkOrHaulStateHours": 241.3,
+          "firstMeatDay": 8,
+          "deaths": [],
+          "carried": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "pending": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "final": {
+            "day": 48,
+            "population": 2,
+            "animals": 12,
+            "growth": 1,
+            "unshornWool": 1,
+            "stock": {
+              "wood": 0,
+              "stone": 0,
+              "iron": 0,
+              "tools": 1000,
+              "food": 1519.9999999999952,
+              "meat": 36.666666666666714,
+              "eggs": 0,
+              "vegetables": 0,
+              "grain": 1483.3333333333285,
+              "apples": 0,
+              "pears": 0,
+              "firewood": 970,
+              "leather": 0,
+              "wool": 47,
+              "clothes": 0,
+              "herbs": 0,
+              "coal": 0,
+              "steelTools": 0,
+              "ale": 0,
+              "warmCoats": 0
+            }
+          }
+        },
+        {
+          "species": "sheep",
+          "seed": 5,
+          "distance": "far",
+          "initialAnimals": 12,
+          "target": 12,
+          "workers": 1,
+          "years": [
+            {
+              "year": 1,
+              "animals": 12,
+              "produced": {
+                "meat": 120,
+                "leather": 0,
+                "wool": 47,
+                "eggs": 0
+              },
+              "received": {
+                "meat": 120,
+                "leather": 0,
+                "wool": 46,
+                "eggs": 0
+              }
+            }
+          ],
+          "sourceHash": "0f3308c06bf1d77474260c2ed29edc3a587184f7c2884c936d64e4008e26606e",
+          "constants": {
+            "eatPerYear": 100,
+            "yearDays": 48,
+            "cap": 12,
+            "meatPerAnimal": 24
+          },
+          "produced": {
+            "meat": 120,
+            "leather": 0,
+            "wool": 47,
+            "eggs": 0
+          },
+          "received": {
+            "meat": 120,
+            "leather": 0,
+            "wool": 47,
+            "eggs": 0
+          },
+          "ledgerReceived": {
+            "meat": 120,
+            "leather": 0,
+            "wool": 47,
+            "eggs": 0
+          },
+          "discarded": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "trips": {
+            "meat": 5,
+            "leather": 0,
+            "wool": 42,
+            "eggs": 0
+          },
+          "durationYears": 1,
+          "careCompletions": 48,
+          "caredDays": 48,
+          "births": 0,
+          "overflowBirths": 5,
+          "slaughters": 5,
+          "workingHours": 384,
+          "staffedHours": 1152,
+          "staffedWalkOrHaulStateHours": 422.5,
+          "firstMeatDay": 8,
+          "deaths": [],
+          "carried": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "pending": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "final": {
+            "day": 48,
+            "population": 2,
+            "animals": 12,
+            "growth": 1,
+            "unshornWool": 1,
+            "stock": {
+              "wood": 0,
+              "stone": 0,
+              "iron": 0,
+              "tools": 1000,
+              "food": 1519.9999999999952,
+              "meat": 36.666666666666714,
+              "eggs": 0,
+              "vegetables": 0,
+              "grain": 1483.3333333333285,
+              "apples": 0,
+              "pears": 0,
+              "firewood": 970,
+              "leather": 0,
+              "wool": 47,
+              "clothes": 0,
+              "herbs": 0,
+              "coal": 0,
+              "steelTools": 0,
+              "ale": 0,
+              "warmCoats": 0
+            }
+          }
+        },
+        {
+          "species": "cattle",
+          "seed": 5,
+          "distance": "near",
+          "initialAnimals": 10,
+          "target": 10,
+          "workers": 1,
+          "years": [
+            {
+              "year": 1,
+              "animals": 10,
+              "produced": {
+                "meat": 144,
+                "leather": 16,
+                "wool": 0,
+                "eggs": 0
+              },
+              "received": {
+                "meat": 144,
+                "leather": 16,
+                "wool": 0,
+                "eggs": 0
+              }
+            }
+          ],
+          "sourceHash": "0f3308c06bf1d77474260c2ed29edc3a587184f7c2884c936d64e4008e26606e",
+          "constants": {
+            "eatPerYear": 100,
+            "yearDays": 48,
+            "cap": 10,
+            "meatPerAnimal": 36
+          },
+          "produced": {
+            "meat": 144,
+            "leather": 16,
+            "wool": 0,
+            "eggs": 0
+          },
+          "received": {
+            "meat": 144,
+            "leather": 16,
+            "wool": 0,
+            "eggs": 0
+          },
+          "ledgerReceived": {
+            "meat": 144,
+            "leather": 16,
+            "wool": 0,
+            "eggs": 0
+          },
+          "discarded": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "trips": {
+            "meat": 8,
+            "leather": 4,
+            "wool": 0,
+            "eggs": 0
+          },
+          "durationYears": 1,
+          "careCompletions": 87,
+          "caredDays": 48,
+          "births": 0,
+          "overflowBirths": 4,
+          "slaughters": 4,
+          "workingHours": 698.024493,
+          "staffedHours": 1152,
+          "staffedWalkOrHaulStateHours": 102.3,
+          "firstMeatDay": 10,
+          "deaths": [],
+          "carried": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "pending": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "final": {
+            "day": 48,
+            "population": 2,
+            "animals": 10,
+            "growth": 0.8333333333333333,
+            "unshornWool": 0,
+            "stock": {
+              "wood": 0,
+              "stone": 0,
+              "iron": 0,
+              "tools": 1000,
+              "food": 1543.9999999999957,
+              "meat": 64.83333333333334,
+              "eggs": 0,
+              "vegetables": 0,
+              "grain": 1479.1666666666624,
+              "apples": 0,
+              "pears": 0,
+              "firewood": 970,
+              "leather": 16,
+              "wool": 0,
+              "clothes": 0,
+              "herbs": 0,
+              "coal": 0,
+              "steelTools": 0,
+              "ale": 0,
+              "warmCoats": 0
+            }
+          }
+        },
+        {
+          "species": "cattle",
+          "seed": 5,
+          "distance": "far",
+          "initialAnimals": 10,
+          "target": 10,
+          "workers": 1,
+          "years": [
+            {
+              "year": 1,
+              "animals": 10,
+              "produced": {
+                "meat": 144,
+                "leather": 16,
+                "wool": 0,
+                "eggs": 0
+              },
+              "received": {
+                "meat": 144,
+                "leather": 16,
+                "wool": 0,
+                "eggs": 0
+              }
+            }
+          ],
+          "sourceHash": "0f3308c06bf1d77474260c2ed29edc3a587184f7c2884c936d64e4008e26606e",
+          "constants": {
+            "eatPerYear": 100,
+            "yearDays": 48,
+            "cap": 10,
+            "meatPerAnimal": 36
+          },
+          "produced": {
+            "meat": 144,
+            "leather": 16,
+            "wool": 0,
+            "eggs": 0
+          },
+          "received": {
+            "meat": 144,
+            "leather": 16,
+            "wool": 0,
+            "eggs": 0
+          },
+          "ledgerReceived": {
+            "meat": 144,
+            "leather": 16,
+            "wool": 0,
+            "eggs": 0
+          },
+          "discarded": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "trips": {
+            "meat": 8,
+            "leather": 4,
+            "wool": 0,
+            "eggs": 0
+          },
+          "durationYears": 1,
+          "careCompletions": 75,
+          "caredDays": 48,
+          "births": 0,
+          "overflowBirths": 4,
+          "slaughters": 4,
+          "workingHours": 605.061233,
+          "staffedHours": 1152,
+          "staffedWalkOrHaulStateHours": 211.8,
+          "firstMeatDay": 10,
+          "deaths": [],
+          "carried": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "pending": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "final": {
+            "day": 48,
+            "population": 2,
+            "animals": 10,
+            "growth": 0.8333333333333333,
+            "unshornWool": 0,
+            "stock": {
+              "wood": 0,
+              "stone": 0,
+              "iron": 0,
+              "tools": 1000,
+              "food": 1543.9999999999957,
+              "meat": 64.83333333333334,
+              "eggs": 0,
+              "vegetables": 0,
+              "grain": 1479.1666666666624,
+              "apples": 0,
+              "pears": 0,
+              "firewood": 970,
+              "leather": 16,
+              "wool": 0,
+              "clothes": 0,
+              "herbs": 0,
+              "coal": 0,
+              "steelTools": 0,
+              "ale": 0,
+              "warmCoats": 0
+            }
+          }
+        },
+        {
+          "species": "chicken",
+          "seed": 5,
+          "distance": "near",
+          "initialAnimals": 24,
+          "target": 24,
+          "workers": 1,
+          "years": [
+            {
+              "year": 1,
+              "animals": 24,
+              "produced": {
+                "meat": 108,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 564
+              },
+              "received": {
+                "meat": 108,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 487.8333333333394
+              }
+            }
+          ],
+          "sourceHash": "0f3308c06bf1d77474260c2ed29edc3a587184f7c2884c936d64e4008e26606e",
+          "constants": {
+            "eatPerYear": 100,
+            "yearDays": 48,
+            "cap": 24,
+            "meatPerAnimal": 6
+          },
+          "produced": {
+            "meat": 108,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 564
+          },
+          "received": {
+            "meat": 108,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 487.8333333333394
+          },
+          "ledgerReceived": {
+            "meat": 108,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 487.8333333333394
+          },
+          "discarded": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "trips": {
+            "meat": 20,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 47
+          },
+          "durationYears": 1,
+          "careCompletions": 68,
+          "caredDays": 47,
+          "births": 0,
+          "overflowBirths": 18,
+          "slaughters": 18,
+          "workingHours": 544.404961,
+          "staffedHours": 1112,
+          "staffedWalkOrHaulStateHours": 237.5,
+          "firstMeatDay": 3,
+          "deaths": [],
+          "carried": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 8.166666666660603
+          },
+          "pending": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 68
+          },
+          "final": {
+            "day": 48,
+            "population": 2,
+            "animals": 24,
+            "growth": 1,
+            "unshornWool": 0,
+            "stock": {
+              "wood": 0,
+              "stone": 0,
+              "iron": 0,
+              "tools": 1000,
+              "food": 1995.833333333333,
+              "meat": 61.125000000000014,
+              "eggs": 436.79166666667345,
+              "vegetables": 0,
+              "grain": 1497.9166666666597,
+              "apples": 0,
+              "pears": 0,
+              "firewood": 970,
+              "leather": 0,
+              "wool": 0,
+              "clothes": 0,
+              "herbs": 0,
+              "coal": 0,
+              "steelTools": 0,
+              "ale": 0,
+              "warmCoats": 0
+            }
+          }
+        },
+        {
+          "species": "chicken",
+          "seed": 5,
+          "distance": "far",
+          "initialAnimals": 24,
+          "target": 24,
+          "workers": 1,
+          "years": [
+            {
+              "year": 1,
+              "animals": 24,
+              "produced": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 576
+              },
+              "received": {
+                "meat": 0,
+                "leather": 0,
+                "wool": 0,
+                "eggs": 552
+              }
+            }
+          ],
+          "sourceHash": "0f3308c06bf1d77474260c2ed29edc3a587184f7c2884c936d64e4008e26606e",
+          "constants": {
+            "eatPerYear": 100,
+            "yearDays": 48,
+            "cap": 24,
+            "meatPerAnimal": 6
+          },
+          "produced": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 576
+          },
+          "received": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 564
+          },
+          "ledgerReceived": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 564
+          },
+          "discarded": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "trips": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 47
+          },
+          "durationYears": 1,
+          "careCompletions": 48,
+          "caredDays": 48,
+          "births": 0,
+          "overflowBirths": 0,
+          "slaughters": 0,
+          "workingHours": 384,
+          "staffedHours": 1152,
+          "staffedWalkOrHaulStateHours": 422.5,
+          "firstMeatDay": null,
+          "deaths": [],
+          "carried": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 0
+          },
+          "pending": {
+            "meat": 0,
+            "leather": 0,
+            "wool": 0,
+            "eggs": 12
+          },
+          "final": {
+            "day": 48,
+            "population": 2,
+            "animals": 24,
+            "growth": 1,
+            "unshornWool": 0,
+            "stock": {
+              "wood": 0,
+              "stone": 0,
+              "iron": 0,
+              "tools": 1000,
+              "food": 1963.9999999999923,
+              "meat": 0,
+              "eggs": 466.0833333333327,
+              "vegetables": 0,
+              "grain": 1497.9166666666597,
+              "apples": 0,
+              "pears": 0,
+              "firewood": 970,
+              "leather": 0,
+              "wool": 0,
+              "clothes": 0,
+              "herbs": 0,
+              "coal": 0,
+              "steelTools": 0,
+              "ale": 0,
+              "warmCoats": 0
+            }
+          }
+        }
+      ]
+    }
+  },
+  "survivalControls": [
+    {
+      "years": 1,
+      "strategyHash": "df44de0137ace15c5aa3e08102cad72a86fb19c223c25c82760403c69ff59979",
+      "sourceHash": "0f3308c06bf1d77474260c2ed29edc3a587184f7c2884c936d64e4008e26606e",
+      "checks": [
+        {
+          "name": "normal seed5: survives requested horizon",
+          "pass": true
+        },
+        {
+          "name": "normal seed5: no first-winter deaths",
+          "pass": true
+        },
+        {
+          "name": "normal seed5: no starvation",
+          "pass": true
+        },
+        {
+          "name": "normal seed5: at most two cold deaths over five years",
+          "pass": true
+        },
+        {
+          "name": "normal seed5: three food days at finish",
+          "pass": true
+        },
+        {
+          "name": "normal seed5: tools maintained",
+          "pass": true
+        },
+        {
+          "name": "normal seed49: survives requested horizon",
+          "pass": true
+        },
+        {
+          "name": "normal seed49: no first-winter deaths",
+          "pass": true
+        },
+        {
+          "name": "normal seed49: no starvation",
+          "pass": true
+        },
+        {
+          "name": "normal seed49: at most two cold deaths over five years",
+          "pass": true
+        },
+        {
+          "name": "normal seed49: three food days at finish",
+          "pass": true
+        },
+        {
+          "name": "normal seed49: tools maintained",
+          "pass": true
+        },
+        {
+          "name": "neglect seed5: initial food does not make survival free",
+          "pass": true
+        },
+        {
+          "name": "neglect seed49: initial food does not make survival free",
+          "pass": true
+        }
+      ],
+      "results": [
+        {
+          "seed": 5,
+          "strategy": "normal",
+          "years": 1,
+          "day": 48,
+          "population": 15,
+          "born": 0,
+          "died": 0,
+          "causes": {},
+          "resources": {
+            "wood": 30,
+            "stone": 32,
+            "iron": 0,
+            "tools": 11,
+            "food": 468.8,
+            "meat": 0,
+            "eggs": 0,
+            "vegetables": 468.8,
+            "grain": 0,
+            "apples": 0,
+            "pears": 0,
+            "firewood": 98,
+            "leather": 0,
+            "wool": 0,
+            "clothes": 0,
+            "herbs": 0,
+            "coal": 0,
+            "steelTools": 0,
+            "ale": 0,
+            "warmCoats": 0
+          },
+          "shortages": {
+            "hungryCitizenDays": 0,
+            "toolDays": 0,
+            "unheatedHomeDays": 0
+          },
+          "deaths": []
+        },
+        {
+          "seed": 49,
+          "strategy": "normal",
+          "years": 1,
+          "day": 48,
+          "population": 18,
+          "born": 3,
+          "died": 0,
+          "causes": {},
+          "resources": {
+            "wood": 28,
+            "stone": 52,
+            "iron": 0,
+            "tools": 11,
+            "food": 392.1,
+            "meat": 0,
+            "eggs": 0,
+            "vegetables": 392.1,
+            "grain": 0,
+            "apples": 0,
+            "pears": 0,
+            "firewood": 104,
+            "leather": 0,
+            "wool": 0,
+            "clothes": 0,
+            "herbs": 0,
+            "coal": 0,
+            "steelTools": 0,
+            "ale": 0,
+            "warmCoats": 0
+          },
+          "shortages": {
+            "hungryCitizenDays": 0,
+            "toolDays": 0,
+            "unheatedHomeDays": 0
+          },
+          "deaths": []
+        },
+        {
+          "seed": 5,
+          "strategy": "neglect",
+          "years": 1,
+          "day": 20,
+          "population": 0,
+          "born": 0,
+          "died": 15,
+          "causes": {
+            "饿死": 15
+          },
+          "resources": {
+            "wood": 80,
+            "stone": 48,
+            "iron": 0,
+            "tools": 14,
+            "food": 0,
+            "meat": 0,
+            "eggs": 0,
+            "vegetables": 0,
+            "grain": 0,
+            "apples": 0,
+            "pears": 0,
+            "firewood": 50,
+            "leather": 0,
+            "wool": 0,
+            "clothes": 0,
+            "herbs": 0,
+            "coal": 0,
+            "steelTools": 0,
+            "ale": 0,
+            "warmCoats": 0
+          },
+          "shortages": {
+            "hungryCitizenDays": 45,
+            "toolDays": 0,
+            "unheatedHomeDays": 0
+          },
+          "deaths": [
+            {
+              "day": 20,
+              "age": 34.4,
+              "reason": "饿死",
+              "hunger": 4,
+              "cold": 0,
+              "home": null,
+              "food": 0,
+              "fuel": 50,
+              "wood": 80
+            },
+            {
+              "day": 20,
+              "age": 18.4,
+              "reason": "饿死",
+              "hunger": 4,
+              "cold": 0,
+              "home": null,
+              "food": 0,
+              "fuel": 50,
+              "wood": 80
+            },
+            {
+              "day": 20,
+              "age": 3.4,
+              "reason": "饿死",
+              "hunger": 4,
+              "cold": 0,
+              "home": null,
+              "food": 0,
+              "fuel": 50,
+              "wood": 80
+            },
+            {
+              "day": 20,
+              "age": 2.4,
+              "reason": "饿死",
+              "hunger": 4,
+              "cold": 0,
+              "home": null,
+              "food": 0,
+              "fuel": 50,
+              "wood": 80
+            },
+            {
+              "day": 20,
+              "age": 22.4,
+              "reason": "饿死",
+              "hunger": 4,
+              "cold": 0,
+              "home": null,
+              "food": 0,
+              "fuel": 50,
+              "wood": 80
+            },
+            {
+              "day": 20,
+              "age": 26.4,
+              "reason": "饿死",
+              "hunger": 4,
+              "cold": 0,
+              "home": null,
+              "food": 0,
+              "fuel": 50,
+              "wood": 80
+            },
+            {
+              "day": 20,
+              "age": 7.4,
+              "reason": "饿死",
+              "hunger": 4,
+              "cold": 0,
+              "home": null,
+              "food": 0,
+              "fuel": 50,
+              "wood": 80
+            },
+            {
+              "day": 20,
+              "age": 4.4,
+              "reason": "饿死",
+              "hunger": 4,
+              "cold": 0,
+              "home": null,
+              "food": 0,
+              "fuel": 50,
+              "wood": 80
+            },
+            {
+              "day": 20,
+              "age": 29.4,
+              "reason": "饿死",
+              "hunger": 4,
+              "cold": 0,
+              "home": null,
+              "food": 0,
+              "fuel": 50,
+              "wood": 80
+            },
+            {
+              "day": 20,
+              "age": 19.4,
+              "reason": "饿死",
+              "hunger": 4,
+              "cold": 0,
+              "home": null,
+              "food": 0,
+              "fuel": 50,
+              "wood": 80
+            },
+            {
+              "day": 20,
+              "age": 5.4,
+              "reason": "饿死",
+              "hunger": 4,
+              "cold": 0,
+              "home": null,
+              "food": 0,
+              "fuel": 50,
+              "wood": 80
+            },
+            {
+              "day": 20,
+              "age": 37.4,
+              "reason": "饿死",
+              "hunger": 4,
+              "cold": 0,
+              "home": null,
+              "food": 0,
+              "fuel": 50,
+              "wood": 80
+            },
+            {
+              "day": 20,
+              "age": 31.4,
+              "reason": "饿死",
+              "hunger": 4,
+              "cold": 0,
+              "home": null,
+              "food": 0,
+              "fuel": 50,
+              "wood": 80
+            },
+            {
+              "day": 20,
+              "age": 27.4,
+              "reason": "饿死",
+              "hunger": 4,
+              "cold": 0,
+              "home": null,
+              "food": 0,
+              "fuel": 50,
+              "wood": 80
+            },
+            {
+              "day": 20,
+              "age": 25.4,
+              "reason": "饿死",
+              "hunger": 4,
+              "cold": 0,
+              "home": null,
+              "food": 0,
+              "fuel": 50,
+              "wood": 80
+            }
+          ]
+        },
+        {
+          "seed": 49,
+          "strategy": "neglect",
+          "years": 1,
+          "day": 20,
+          "population": 0,
+          "born": 0,
+          "died": 15,
+          "causes": {
+            "饿死": 15
+          },
+          "resources": {
+            "wood": 80,
+            "stone": 48,
+            "iron": 0,
+            "tools": 14,
+            "food": 0,
+            "meat": 0,
+            "eggs": 0,
+            "vegetables": 0,
+            "grain": 0,
+            "apples": 0,
+            "pears": 0,
+            "firewood": 50,
+            "leather": 0,
+            "wool": 0,
+            "clothes": 0,
+            "herbs": 0,
+            "coal": 0,
+            "steelTools": 0,
+            "ale": 0,
+            "warmCoats": 0
+          },
+          "shortages": {
+            "hungryCitizenDays": 45,
+            "toolDays": 0,
+            "unheatedHomeDays": 0
+          },
+          "deaths": [
+            {
+              "day": 20,
+              "age": 29.4,
+              "reason": "饿死",
+              "hunger": 4,
+              "cold": 0,
+              "home": null,
+              "food": 0,
+              "fuel": 50,
+              "wood": 80
+            },
+            {
+              "day": 20,
+              "age": 21.4,
+              "reason": "饿死",
+              "hunger": 4,
+              "cold": 0,
+              "home": null,
+              "food": 0,
+              "fuel": 50,
+              "wood": 80
+            },
+            {
+              "day": 20,
+              "age": 6.4,
+              "reason": "饿死",
+              "hunger": 4,
+              "cold": 0,
+              "home": null,
+              "food": 0,
+              "fuel": 50,
+              "wood": 80
+            },
+            {
+              "day": 20,
+              "age": 6.4,
+              "reason": "饿死",
+              "hunger": 4,
+              "cold": 0,
+              "home": null,
+              "food": 0,
+              "fuel": 50,
+              "wood": 80
+            },
+            {
+              "day": 20,
+              "age": 28.4,
+              "reason": "饿死",
+              "hunger": 4,
+              "cold": 0,
+              "home": null,
+              "food": 0,
+              "fuel": 50,
+              "wood": 80
+            },
+            {
+              "day": 20,
+              "age": 28.4,
+              "reason": "饿死",
+              "hunger": 4,
+              "cold": 0,
+              "home": null,
+              "food": 0,
+              "fuel": 50,
+              "wood": 80
+            },
+            {
+              "day": 20,
+              "age": 6.4,
+              "reason": "饿死",
+              "hunger": 4,
+              "cold": 0,
+              "home": null,
+              "food": 0,
+              "fuel": 50,
+              "wood": 80
+            },
+            {
+              "day": 20,
+              "age": 3.4,
+              "reason": "饿死",
+              "hunger": 4,
+              "cold": 0,
+              "home": null,
+              "food": 0,
+              "fuel": 50,
+              "wood": 80
+            },
+            {
+              "day": 20,
+              "age": 38.4,
+              "reason": "饿死",
+              "hunger": 4,
+              "cold": 0,
+              "home": null,
+              "food": 0,
+              "fuel": 50,
+              "wood": 80
+            },
+            {
+              "day": 20,
+              "age": 35.4,
+              "reason": "饿死",
+              "hunger": 4,
+              "cold": 0,
+              "home": null,
+              "food": 0,
+              "fuel": 50,
+              "wood": 80
+            },
+            {
+              "day": 20,
+              "age": 9.4,
+              "reason": "饿死",
+              "hunger": 4,
+              "cold": 0,
+              "home": null,
+              "food": 0,
+              "fuel": 50,
+              "wood": 80
+            },
+            {
+              "day": 20,
+              "age": 28.4,
+              "reason": "饿死",
+              "hunger": 4,
+              "cold": 0,
+              "home": null,
+              "food": 0,
+              "fuel": 50,
+              "wood": 80
+            },
+            {
+              "day": 20,
+              "age": 18.4,
+              "reason": "饿死",
+              "hunger": 4,
+              "cold": 0,
+              "home": null,
+              "food": 0,
+              "fuel": 50,
+              "wood": 80
+            },
+            {
+              "day": 20,
+              "age": 24.4,
+              "reason": "饿死",
+              "hunger": 4,
+              "cold": 0,
+              "home": null,
+              "food": 0,
+              "fuel": 50,
+              "wood": 80
+            },
+            {
+              "day": 20,
+              "age": 27.4,
+              "reason": "饿死",
+              "hunger": 4,
+              "cold": 0,
+              "home": null,
+              "food": 0,
+              "fuel": 50,
+              "wood": 80
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "years": 2,
+      "strategyHash": "df44de0137ace15c5aa3e08102cad72a86fb19c223c25c82760403c69ff59979",
+      "sourceHash": "0f3308c06bf1d77474260c2ed29edc3a587184f7c2884c936d64e4008e26606e",
+      "checks": [
+        {
+          "name": "no-fuel seed5: cold remains consequential",
+          "pass": true
+        },
+        {
+          "name": "no-fuel seed49: cold remains consequential",
+          "pass": true
+        }
+      ],
+      "results": [
+        {
+          "seed": 5,
+          "strategy": "no-fuel",
+          "years": 2,
+          "day": 96,
+          "population": 10,
+          "born": 3,
+          "died": 8,
+          "causes": {
+            "冻死": 8
+          },
+          "resources": {
+            "wood": 28,
+            "stone": 12,
+            "iron": 9,
+            "tools": 29,
+            "food": 979.2,
+            "meat": 0,
+            "eggs": 0,
+            "vegetables": 927,
+            "grain": 52.2,
+            "apples": 0,
+            "pears": 0,
+            "firewood": 0,
+            "leather": 0,
+            "wool": 0,
+            "clothes": 0,
+            "herbs": 0,
+            "coal": 0,
+            "steelTools": 0,
+            "ale": 0,
+            "warmCoats": 0
+          },
+          "shortages": {
+            "hungryCitizenDays": 0,
+            "toolDays": 0,
+            "unheatedHomeDays": 64
+          },
+          "deaths": [
+            {
+              "day": 93,
+              "age": 4.9,
+              "reason": "冻死",
+              "hunger": 0,
+              "cold": 5.01,
+              "home": 24,
+              "food": 935,
+              "fuel": 0,
+              "wood": 24
+            },
+            {
+              "day": 93,
+              "age": 3.9,
+              "reason": "冻死",
+              "hunger": 0,
+              "cold": 5.07,
+              "home": 24,
+              "food": 935,
+              "fuel": 0,
+              "wood": 24
+            },
+            {
+              "day": 93,
+              "age": 8.9,
+              "reason": "冻死",
+              "hunger": 0,
+              "cold": 5.09,
+              "home": 25,
+              "food": 935,
+              "fuel": 0,
+              "wood": 24
+            },
+            {
+              "day": 93,
+              "age": 5.9,
+              "reason": "冻死",
+              "hunger": 0,
+              "cold": 5.03,
+              "home": 25,
+              "food": 935,
+              "fuel": 0,
+              "wood": 24
+            },
+            {
+              "day": 93,
+              "age": 1.4,
+              "reason": "冻死",
+              "hunger": 0,
+              "cold": 5.02,
+              "home": 26,
+              "food": 935,
+              "fuel": 0,
+              "wood": 24
+            },
+            {
+              "day": 93,
+              "age": 0.2,
+              "reason": "冻死",
+              "hunger": 0,
+              "cold": 5.03,
+              "home": 25,
+              "food": 935,
+              "fuel": 0,
+              "wood": 24
+            },
+            {
+              "day": 94,
+              "age": 7,
+              "reason": "冻死",
+              "hunger": 0,
+              "cold": 5.55,
+              "home": 26,
+              "food": 950,
+              "fuel": 0,
+              "wood": 24
+            },
+            {
+              "day": 94,
+              "age": 1.5,
+              "reason": "冻死",
+              "hunger": 0,
+              "cold": 5.55,
+              "home": 24,
+              "food": 950,
+              "fuel": 0,
+              "wood": 24
+            }
+          ]
+        },
+        {
+          "seed": 49,
+          "strategy": "no-fuel",
+          "years": 2,
+          "day": 96,
+          "population": 11,
+          "born": 2,
+          "died": 6,
+          "causes": {
+            "冻死": 6
+          },
+          "resources": {
+            "wood": 40,
+            "stone": 32,
+            "iron": 8,
+            "tools": 31,
+            "food": 962.5,
+            "meat": 0,
+            "eggs": 0,
+            "vegetables": 813.8,
+            "grain": 148.7,
+            "apples": 0,
+            "pears": 0,
+            "firewood": 0,
+            "leather": 0,
+            "wool": 0,
+            "clothes": 0,
+            "herbs": 0,
+            "coal": 0,
+            "steelTools": 0,
+            "ale": 0,
+            "warmCoats": 0
+          },
+          "shortages": {
+            "hungryCitizenDays": 0,
+            "toolDays": 0,
+            "unheatedHomeDays": 64
+          },
+          "deaths": [
+            {
+              "day": 93,
+              "age": 7.9,
+              "reason": "冻死",
+              "hunger": 0,
+              "cold": 5.08,
+              "home": 24,
+              "food": 921.3,
+              "fuel": 0,
+              "wood": 36
+            },
+            {
+              "day": 93,
+              "age": 7.9,
+              "reason": "冻死",
+              "hunger": 0,
+              "cold": 5.07,
+              "home": 24,
+              "food": 921.3,
+              "fuel": 0,
+              "wood": 36
+            },
+            {
+              "day": 93,
+              "age": 7.9,
+              "reason": "冻死",
+              "hunger": 0,
+              "cold": 5.07,
+              "home": 25,
+              "food": 921.3,
+              "fuel": 0,
+              "wood": 36
+            },
+            {
+              "day": 93,
+              "age": 4.9,
+              "reason": "冻死",
+              "hunger": 0,
+              "cold": 5.13,
+              "home": 25,
+              "food": 921.3,
+              "fuel": 0,
+              "wood": 36
+            },
+            {
+              "day": 93,
+              "age": 0.6,
+              "reason": "冻死",
+              "hunger": 0,
+              "cold": 5.13,
+              "home": 24,
+              "food": 921.3,
+              "fuel": 0,
+              "wood": 36
+            },
+            {
+              "day": 93,
+              "age": 0.5,
+              "reason": "冻死",
+              "hunger": 0,
+              "cold": 5.07,
+              "home": 24,
+              "food": 921.3,
+              "fuel": 0,
+              "wood": 36
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "validation": {
+    "capacityBirthCases": 13,
+    "capacityBirthExitCode": 0,
+    "regular": [
+      {
+        "test": "cattle-pasture",
+        "exitCode": 0
+      },
+      {
+        "test": "cattle-pasture-ui",
+        "exitCode": 0
+      },
+      {
+        "test": "cattle-pasture-render",
+        "exitCode": 0
+      },
+      {
+        "test": "chickens",
+        "exitCode": 0
+      },
+      {
+        "test": "chickens-ui",
+        "exitCode": 1
+      },
+      {
+        "test": "chickens-render",
+        "exitCode": 0
+      },
+      {
+        "test": "pasture-area",
+        "exitCode": 1
+      },
+      {
+        "test": "pasture-area-ui",
+        "exitCode": 0
+      },
+      {
+        "test": "pasture-area-render",
+        "exitCode": 1
+      },
+      {
+        "test": "pasture-split",
+        "exitCode": 1
+      },
+      {
+        "test": "pasture-split-ui",
+        "exitCode": 0
+      },
+      {
+        "test": "pasture-pests",
+        "exitCode": 0
+      },
+      {
+        "test": "pasture-pests-ui",
+        "exitCode": 0
+      },
+      {
+        "test": "pasture-pests-render",
+        "exitCode": 0
+      },
+      {
+        "test": "simple-fields-save",
+        "exitCode": 0
+      },
+      {
+        "test": "workforce-controls",
+        "exitCode": 0
+      },
+      {
+        "test": "workforce-controls-ui",
+        "exitCode": 0
+      },
+      {
+        "test": "town-ledger",
+        "exitCode": 0
+      },
+      {
+        "test": "industry-ledger",
+        "exitCode": 0
+      },
+      {
+        "test": "cattle-pasture-ui (final 11 cases)",
+        "exitCode": 0
+      }
+    ],
+    "adjacent": [
+      {
+        "test": "orchard-yield-balance",
+        "exitCode": 0
+      },
+      {
+        "test": "orchard-renewal",
+        "exitCode": 0
+      },
+      {
+        "test": "orchard-area",
+        "exitCode": 0
+      },
+      {
+        "test": "fruit-brewing",
+        "exitCode": 0
+      },
+      {
+        "test": "farm-planning",
+        "exitCode": 0
+      },
+      {
+        "test": "fixed-farm-preview",
+        "exitCode": 0
+      },
+      {
+        "test": "crop-seeds",
+        "exitCode": 0
+      },
+      {
+        "test": "early-harvest",
+        "exitCode": 0
+      },
+      {
+        "test": "cold-squash",
+        "exitCode": 0
+      }
+    ],
+    "syntaxChecks": [
+      "js/sim.js",
+      "js/ui.js"
+    ],
+    "diffWhitespace": "passed",
+    "knownBaselineFailures": [
+      {
+        "test": "chickens-ui",
+        "line": 266,
+        "reason": "Existing assertion expects SVG stroke; selected A UI uses original PNG icon."
+      },
+      {
+        "test": "pasture-area",
+        "line": 215,
+        "reason": "Existing water mutation fixture expects saved authoritative terrain to reject."
+      },
+      {
+        "test": "pasture-area-render",
+        "reason": "Existing preview whole-world equality fixture lacks lazily created roadWorkIndex."
+      },
+      {
+        "test": "pasture-split",
+        "line": 21,
+        "reason": "Existing bridge fixture calls finishBuilding before actual construction material delivery."
+      }
+    ],
+    "review": "Independent read-only review found no blocking correctness or compatibility issue; active downstaffing case added afterward and passed.",
+    "notRun": [
+      "Browser or real mobile UI validation",
+      "Full repository suite",
+      "Production deployment"
+    ]
+  }
+}
