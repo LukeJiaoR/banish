@@ -1909,7 +1909,10 @@ G.makeTask = function (b, c) {
       G.ensureEconomyBuilding(b);
       if (!b.animals&&!G.pastureHasProducts(b)&&!(b.woolReady>=1)) { b.noWork=true; b.warnText='需贸易购买牲畜并放入同种牧场'; return null; }
       const spot=G.workSpot(w,b,c.x,c.y); if(!spot)return null;
-      return G.withTaskRoute({kind:'work',b,tx:spot.x,ty:spot.y,work:G.taskWork(c,8),workLeft:0,economy:'pasture',pastureType:G.pastureTypeOf(b)},spot.route);
+      // Existing goods have already been produced. Fetch them with the same
+      // physical handling step as workshop inputs, not another 8-hour care job.
+      const product=G.pasturePickupProduct(b),phase=product?'pickup':'care';
+      return G.withTaskRoute({kind:'work',b,tx:spot.x,ty:spot.y,work:product ? .1 : G.taskWork(c,8),workLeft:0,economy:'pasture',pastureType:G.pastureTypeOf(b),phase,pastureProduct:product},spot.route);
     }
     case 'orchard': return G.makeOrchardTask(b,c);
     case 'tailor': return G.makeTailorTask(b,c);
@@ -3052,6 +3055,11 @@ G.advancePasturePests=function(){
 G.setPastureTarget = function(b,qty){if(!b||G.world.bmap[b.id]!==b||b.type!=='pasture'||b.state!=='ok'||!Number.isInteger(qty)||qty<2||qty>G.pastureCapacity(b))return false;b.animalTarget=qty;return true;};
 G.pastureTaskCurrent=(c,t)=>!!(t?.economy==='pasture'&&t.b?.type==='pasture'&&G.world.bmap[t.b.id]===t.b&&t.b.state==='ok'&&c.job===t.b.id&&(!t.pastureType||t.pastureType===G.pastureTypeOf(t.b)));
 G.atPastureWork=(c,t)=>G.pastureTaskCurrent(c,t)&&G.atMedicalDoor(c,t.b)&&G.d2(c.x,c.y,t.tx,t.ty)<.04&&!G.tileBlocked(G.world,t.tx,t.ty);
+G.pasturePickupProduct=b=>['meat','leather','eggs'].find(type=>b.pastureProducts?.[type]>0&&G.mineralStorageSpace(type)>0)||null;
+G.pickupPastureProduct=function(c,b,type){
+  if(c.carry||!['meat','leather','eggs'].includes(type)||!(b.pastureProducts[type]>0)||G.mineralStorageSpace(type)<=0)return false;
+  const qty=Math.min(20,b.pastureProducts[type]);b.pastureProducts[type]-=qty;c.carry={type,qty,pastureId:b.id};return true;
+};
 G.pastureSlaughterReason=function(b){
   if(G.pastureHasProducts(b))return '先搬完场内待送产物（肉、皮革或鸡蛋）';
   const d=G.LIVESTOCK[G.pastureTypeOf(b)],outputs=d.leather?['meat','leather']:['meat'];
@@ -3095,7 +3103,13 @@ G.advanceTownEconomy = function(){
 };
 G.completeEconomyWork = function(c,t){
   const b=t.b;if(G.world.bmap[b.id]!==b||b.state!=='ok')return;
-  if(t.economy==='pasture'&&!G.atPastureWork(c,t))return;
+  if(t.economy==='pasture'&&(!G.atPastureWork(c,t)||t.completed||t.workLeft>0))return;
+  // A short pickup can only transfer the resource selected at dispatch. If
+  // another worker took it, finish empty; never upgrade it into free husbandry.
+  if(t.economy==='pasture'&&t.phase==='pickup'){
+    t.completed=true;G.pickupPastureProduct(c,b,t.pastureProduct);return;
+  }
+  if(t.economy==='pasture')t.completed=true;
   const canTend=!(t.economy==='pasture'&&G.pastureTypeOf(b)==='chicken'&&(G.isSick(c)||c.hunger>0));
   G.ensureEconomyBuilding(b);if(canTend)b.tendedDay=G.game.day;
   if(t.economy==='pasture'){
@@ -3112,9 +3126,7 @@ G.completeEconomyWork = function(c,t){
       if(!d.leather){c.carry={type:'meat',qty:d.meat,pastureId:b.id};return;} // Existing sheep keep their one-trip 24-meat batch.
       b.pastureProducts.meat+=d.meat;b.pastureProducts.leather+=d.leather;G.recordProduction(b,'leather',d.leather);
     }
-    for(const type of ['meat','leather','eggs'])if(b.pastureProducts[type]>0&&G.mineralStorageSpace(type)>0){
-      const qty=Math.min(20,b.pastureProducts[type]);b.pastureProducts[type]-=qty;c.carry={type,qty,pastureId:b.id};return;
-    }
+    if(G.pickupPastureProduct(c,b,G.pasturePickupProduct(b)))return;
     if(G.pastureTypeOf(b)==='sheep'&&b.woolReady>=1&&!G.goalPaused('wool')&&G.mineralStorageSpace('wool')>0){const qty=Math.min(8,Math.floor(b.woolReady));b.woolReady-=qty;c.carry={type:'wool',qty,pastureId:b.id};G.recordProduction(b,'wool',qty);}
   }
 };
