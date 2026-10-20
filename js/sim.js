@@ -1912,7 +1912,8 @@ G.makeTask = function (b, c) {
       // Existing goods have already been produced. Fetch them with the same
       // physical handling step as workshop inputs, not another 8-hour care job.
       const product=G.pasturePickupProduct(b),phase=product?'pickup':'care';
-      return G.withTaskRoute({kind:'work',b,tx:spot.x,ty:spot.y,work:product ? .1 : G.taskWork(c,8),workLeft:0,economy:'pasture',pastureType:G.pastureTypeOf(b),phase,pastureProduct:product},spot.route);
+      const pastureStartedEmpty=phase==='care'&&!G.pastureHasProducts(b);
+      return G.withTaskRoute({kind:'work',b,tx:spot.x,ty:spot.y,work:product ? .1 : G.taskWork(c,8),workLeft:0,economy:'pasture',pastureType:G.pastureTypeOf(b),phase,pastureProduct:product,pastureStartedEmpty},spot.route);
     }
     case 'orchard': return G.makeOrchardTask(b,c);
     case 'tailor': return G.makeTailorTask(b,c);
@@ -3060,8 +3061,11 @@ G.pickupPastureProduct=function(c,b,type){
   if(c.carry||!['meat','leather','eggs'].includes(type)||!(b.pastureProducts[type]>0)||G.mineralStorageSpace(type)<=0)return false;
   const qty=Math.min(20,b.pastureProducts[type]);b.pastureProducts[type]-=qty;c.carry={type,qty,pastureId:b.id};return true;
 };
-G.pastureSlaughterReason=function(b){
-  if(G.pastureHasProducts(b))return '先搬完场内待送产物（肉、皮革或鸡蛋）';
+G.pastureSlaughterReason=function(b,allowNewEggs=false){
+  // Only eggs arriving during a full care task may yield priority. Existing
+  // slaughter products and every new dispatch still have to clear first.
+  const newEggsOnly=allowNewEggs&&G.pastureTypeOf(b)==='chicken'&&!b.pastureProducts?.meat&&!b.pastureProducts?.leather;
+  if(G.pastureHasProducts(b)&&!newEggsOnly)return '先搬完场内待送产物（肉、皮革或鸡蛋）';
   const d=G.LIVESTOCK[G.pastureTypeOf(b)],outputs=d.leather?['meat','leather']:['meat'];
   for(const type of outputs){if(G.goalPaused(type))return G.RES[type].name+'达到目标，暂停新屠宰';if(G.mineralStorageSpace(type)<=0)return G.RES[type].name+'仓满，暂停新屠宰';}
   return '';
@@ -3120,7 +3124,10 @@ G.completeEconomyWork = function(c,t){
     // slaughter its existing yield; storage/goals keep it pending as usual.
     const fullBirth=b.animals===G.pastureCapacity(b)&&b.animalTarget===b.animals&&b.animalGrowth>=1;
     // Commit both products together once, then move one bounded batch per trip.
-    if(canTend&&(b.animals>b.animalTarget||fullBirth)&&!G.pastureSlaughterReason(b)){
+    // New eggs cannot repeatedly preempt care that began with no backlog.
+    // This task-local fact is neither a reserved birth nor saved work credit.
+    const allowNewEggs=t.phase==='care'&&t.pastureStartedEmpty===true;
+    if(canTend&&(b.animals>b.animalTarget||fullBirth)&&!G.pastureSlaughterReason(b,allowNewEggs)){
       if(fullBirth)b.animalGrowth-=1;else b.animals--;
       G.recordProduction(b,'meat',d.meat);
       if(!d.leather){c.carry={type:'meat',qty:d.meat,pastureId:b.id};return;} // Existing sheep keep their one-trip 24-meat batch.
