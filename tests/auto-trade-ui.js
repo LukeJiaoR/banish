@@ -351,4 +351,21 @@ test('manual targets and orders remain independent and ordered premium is checke
   assert.equal(b.tradeInventory.stone, 397); assert.equal(b.tradeInventory.coal, 3); assert.equal(b.merchant.stock.coal, 7);
 });
 
+test('ale export and stone import appear in targets, manual quotes, orders and automatic receipt', () => {
+  const f = post(true), { G, b } = f; b.tradeInventory.ale = 7;
+  for (const id of ['trade-target-resource', 'trade-payment', 'auto-trade-payment']) assert(f.get(id).children.some(o => o.value === 'ale'));
+  for (const id of ['trade-good', 'trade-order-good', 'auto-trade-good']) assert(f.get(id).children.some(o => o.value === 'stone'));
+  f.get('trade-target-resource').value = 'ale'; f.get('trade-target-quantity').value = '7'; f.get('trade-target-form').emit('submit');
+  assert.equal(b.tradeTargets.ale, 7);
+  f.get('trade-good').value = 'stone'; f.get('trade-buy-quantity').value = '8'; f.get('trade-payment').value = 'ale'; f.get('trade-good').emit('input');
+  assert.equal(G.ui.tradeQuote(b).cost, 7); f.get('trade-exchange-form').emit('submit');
+  assert.equal(b.tradeInventory.ale, 0); assert.equal(b.tradeInventory.stone, 408);
+  f.get('trade-order-good').value = 'stone'; f.get('trade-order-quantity').value = '10'; f.get('trade-order-good').emit('input');
+  f.get('trade-order-form').emit('submit'); assert.equal(b.merchantOrders.general.good, 'stone');
+  b.tradeInventory.ale = 10; f.enable({ good: 'stone', quantity: 10, payment: 'ale', price: 8 });
+  assert.equal(b.tradeInventory.ale, 10); b.merchantVisits = 3; G.game.day = 48; G.arriveMerchant(b); G.ui.renderInfo();
+  assert.equal(b.tradeInventory.ale, 0); assert.equal(b.tradeInventory.stone, 418);
+  assert.match(f.text('receipt'), /石料 × 10.*已成交.*麦酒 × 10/);
+});
+
 console.log(`Automatic purchase UI: ${passed} DOM/live-simulation suites passed (not browser/mobile acceptance).`);

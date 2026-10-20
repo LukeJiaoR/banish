@@ -2719,15 +2719,15 @@ G.tradeIncoming=function(b,exclude=null){
 };
 G.tradeFreeSpace=(b,exclude=null)=>Math.max(0,G.TRADE_CAPACITY-G.tradeStored(b)-G.tradeIncoming(b,exclude));
 
-G.TRADE_VALUES = {wood:2,stone:7,iron:5,tools:8,firewood:4,meat:1,eggs:2,vegetables:1,apples:1,pears:1,grain:1,leather:10,wool:5,clothes:15,warmCoats:20,herbs:4,coal:6,steelTools:10};
-G.TRADE_GOODS = {wheatSeed:{name:'小麦种子',price:2500,stock:1},chicken:{name:'鸡',price:400,stock:4},eggs:{name:'鸡蛋',price:2,stock:200},meat:{name:'肉类',price:1,stock:200},coal:{name:'煤',price:6,stock:100},steelTools:{name:'钢工具',price:10,stock:20},sheep:{name:'羊',price:600,stock:4},cattle:{name:'牛',price:800,stock:4},orchardSeed:{name:'果树种子',price:2500,stock:1},appleSeed:{name:'苹果种子',price:2500,stock:1},pearSeed:{name:'梨种子',price:2500,stock:1},apples:{name:'苹果',price:1,stock:200},pears:{name:'梨',price:1,stock:200},cabbageSeed:{name:'卷心菜种子',price:2500,stock:1},beanSeed:{name:'早熟豆类种子',price:2500,stock:1},squashSeed:{name:'耐寒瓜种子',price:2500,stock:1},grain:{name:'主食',price:1,stock:400},iron:{name:'铁',price:5,stock:100},leather:{name:'皮革',price:10,stock:80}};
+G.TRADE_VALUES = {wood:2,stone:7,iron:5,tools:8,firewood:4,meat:1,eggs:2,vegetables:1,apples:1,pears:1,grain:1,leather:10,wool:5,clothes:15,warmCoats:20,herbs:4,coal:6,steelTools:10,ale:8};
+G.TRADE_GOODS = {wheatSeed:{name:'小麦种子',price:2500,stock:1},chicken:{name:'鸡',price:400,stock:4},eggs:{name:'鸡蛋',price:2,stock:200},meat:{name:'肉类',price:1,stock:200},coal:{name:'煤',price:6,stock:100},steelTools:{name:'钢工具',price:10,stock:20},sheep:{name:'羊',price:600,stock:4},cattle:{name:'牛',price:800,stock:4},orchardSeed:{name:'果树种子',price:2500,stock:1},appleSeed:{name:'苹果种子',price:2500,stock:1},pearSeed:{name:'梨种子',price:2500,stock:1},apples:{name:'苹果',price:1,stock:200},pears:{name:'梨',price:1,stock:200},cabbageSeed:{name:'卷心菜种子',price:2500,stock:1},beanSeed:{name:'早熟豆类种子',price:2500,stock:1},squashSeed:{name:'耐寒瓜种子',price:2500,stock:1},grain:{name:'主食',price:1,stock:400},iron:{name:'铁',price:5,stock:100},leather:{name:'皮革',price:10,stock:80},stone:{name:'石料',price:7,stock:100}};
 // Profile selection and visit timing are compact-map adaptations. Orders follow
 // the original same-merchant / pay-on-purchase / floor(1.25*price) rules.
 G.MERCHANT_CYCLE=['general','supplies','seeds'];
 G.MERCHANT_INTERVAL=16;
 G.MERCHANTS={
   general:{id:'general',name:'河湾杂货商',goods:Object.keys(G.TRADE_GOODS),acceptsFood:true,assortment:4},
-  supplies:{id:'supplies',name:'山路物资商',goods:['coal','steelTools','iron','leather'],acceptsFood:false,assortment:2},
+  supplies:{id:'supplies',name:'山路物资商',goods:['coal','steelTools','iron','leather','stone'],acceptsFood:false,assortment:2},
   seeds:{id:'seeds',name:'绿篱种子商',goods:['orchardSeed','appleSeed','pearSeed','cabbageSeed','beanSeed','squashSeed','wheatSeed'],acceptsFood:false,assortment:1}
 };
 G.merchantProfile=b=>G.MERCHANTS[b?.merchant?.id]||G.MERCHANTS.general;
@@ -4438,3 +4438,4 @@ G.roadWorkSummary=function(b){const rw=b.roadWork,completed=rw.cells.filter(p=>p
  const status=b.sitePaused?'铺路已暂停；现场余料与分格进度保留，在途石材退仓；独立清场标记仍保留':clearing?(unmarked?'清场标记已撤销，请重新标记剩余树木或矿物或取消铺路':`等待散工清除${clearing}处树木/矿物，清完自动接续施工；采集物仍须实运入仓`):working?'工人正在目标格实际铺路，完成该格后才加速':pavingCarried?'铺路者正把现场石材带往目标格':fetchCarried?'工人正从仓库实运石材到路线首格料场':!workers.length?'等待分配铺路工人':b.warnText||(missing>0&&G.game.res.stone<1?'缺石材，等待采集或生产；旧路仍可走':onsite?'现场有料，等待工人取料到格施工':'工人正前往路格或可达仓库');
  return {surface:rw.surface,total:rw.cells.length,completed,pending:rw.cells.length-completed,workLeft:b.workLeft,totalWork:b.totalWork,stoneRequired,onsite,incoming,fetchCarried,pavingCarried,incorporated,status,materials:stoneRequired?[{type:'stone',required:stoneRequired,onsite,incoming,incorporated,missing}]:[],refund:onsite?{stone:onsite}:{},phase:b.sitePaused?'paused':clearing?'clearing':working?'building':missing?'materials':'building',ready:!missing&&!clearing,clearing,consumed:false};
 };
+
