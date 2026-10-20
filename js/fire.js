@@ -58,7 +58,7 @@ G.assignFireRescuers=function(){if(!G.activeHouseFires().length)return;let slots
  for(const c of G.world.citizens.filter(G.fireRescueEligible)){if(slots<=0)break;
   const targets=G.activeHouseFires().map(b=>({b,spot:G.workSpot(G.world,b,c.x,c.y)})).filter(q=>q.spot).sort((a,b)=>a.spot.route.eta-b.spot.route.eta);
   const q=targets[0];if(!q)continue;
-  const t={kind:'firefight',b:q.b,incident:q.b.houseFire.incident,phase:'fetch',water:false,work:G.FIRE.fetchHours,workLeft:G.FIRE.fetchHours,tx:q.spot.x,ty:q.spot.y,retryH:0};c.task=t;c.path=null;c.pausedTask=null;c.camped=false;G.planFireLeg(c,t);slots--;
+  const t={kind:'firefight',b:q.b,incident:q.b.houseFire.incident,phase:'fetch',water:false,work:G.FIRE.fetchHours,workLeft:G.FIRE.fetchHours,tx:q.spot.x,ty:q.spot.y,retryH:0};c.warmthJourney=null;c.task=t;c.path=null;c.pausedTask=null;c.camped=false;G.planFireLeg(c,t);slots--;
  }
 };
 G.atFireLeg=function(c,t){if(!G.fireTaskCurrent(c,t)||G.d2(c.x,c.y,t.tx,t.ty)>.000001||G.tileBlocked(G.world,Math.round(c.x),Math.round(c.y)))return false;

@@ -586,7 +586,7 @@ G.spawnCitizen = function (opt) {
     state: 'idle', walkKind: '', path: null, pi: 0, camped: false,
     wanderT: G.rng() * 3,
     toolType:null,toolHours:0,
-    hunger: 0, cold: 0, clothingLeft: 0, clothingType:null, dietVariety: 0, dietScore: 1, happiness: 3, leisureDays:0, chapelDays:0, chapelId:null, health: 4, sickDays: 0, immunityDays: 0, herbCooldown: 0, careHours: 0,
+    hunger: 0, cold: 0, warmthSeeking: false, clothingLeft: 0, clothingType:null, dietVariety: 0, dietScore: 1, happiness: 3, leisureDays:0, chapelDays:0, chapelId:null, health: 4, sickDays: 0, immunityDays: 0, herbCooldown: 0, careHours: 0,
     animT: G.rng() * 10,
     dead: false,
   };
@@ -752,7 +752,8 @@ G.goHome = function (c) {
   const d = Math.sqrt(G.d2(c.x, c.y, h.x + h.w / 2, h.y + h.h / 2));
   if (d > G.LIFE.campDist) { c.path = null; c.state = 'rest'; c.camped = true; return; }
   const spot = G.workSpot(G.world, h, c.x, c.y);
-  const p = spot ? (G.routeCanReuse(spot.route,c,spot.x,spot.y) ? spot.route.path : G.findPath(G.world,c.x,c.y,spot.x,spot.y)) : null;
+  let p = spot ? (G.routeCanReuse(spot.route,c,spot.x,spot.y) ? spot.route.path : G.findPath(G.world,c.x,c.y,spot.x,spot.y)) : null;
+  if (p && !p.length && G.d2(c.x,c.y,spot.x,spot.y)>1e-8) p=[{x:spot.x,y:spot.y}];
   // A nearby home can require a long detour around water or buildings. For a
   // suspended job, reuse the route already found rather than restarting the same
   // unfinished commute every morning. No new path search or cross-day cache.
@@ -771,6 +772,7 @@ G.goHome = function (c) {
 
 /* 天亮续接昨晚挂起的任务；目标已失效（树被砍/建筑拆了/换岗位）则放弃 */
 G.resumeTask = function (c) {
+  c.warmthCareResume=false;
   if (G.isArriving(c)) {c.pausedTask=null;return G.startImmigration(c);}
   if(c.student){c.pausedTask=null;return G.startStudy(c);}
   const t = c.pausedTask;
@@ -1049,7 +1051,7 @@ G.buildingGoalStatus = function (b) {
 // Only configured automatic jobs gain completion protection. Never change the
 // unset baseline, teachers, manual tasks, or construction scheduling here.
 G.goalCommitment = function (c) {
-  if(c.mealJourney)return true;
+  if(c.mealJourney||c.warmthJourney)return true;
   if(G.toolFetchTask(c))return true;
   if(G.fireTaskOf&&G.fireTaskOf(c))return true;
   if(G.supplyTaskOf&&G.supplyTaskOf(c))return true;
@@ -1246,7 +1248,89 @@ G.firewoodFetchDone = function (c, t) {
   return G.sendTo(c, t.tx, t.ty, spot.route);
 };
 
-/* 受冻（原版双侧模型）：冬季户外累积寒冷，回到烧着柴的家里恢复；
+/* Need-based warming is a compatibility step, not the complete original time
+ * model. Thresholds are local adaptations; heat rates and daily fuel bills are
+ * unchanged. A journey owns no task slot and never moves or consumes cargo. */
+G.WARMTH={startCold:.5,stopCold:.1,retryHours:2};
+G.warmthHome=function(c){
+  const h=G.homeOf(c);
+  return h&&G.world.bmap[h.id]===h&&h.state==='ok'&&['house','stonehouse','boarding'].includes(h.type)&&!h.houseFire?h:null;
+};
+G.atWarmthHome=function(c,h=G.warmthHome(c)){
+  const x=Math.round(c.x),y=Math.round(c.y);
+  return !!h&&h===G.warmthHome(c)&&G.d2(c.x,c.y,x,y)<1e-8&&!G.tileBlocked(G.world,x,y)&&G.atMedicalDoor(c,h);
+};
+G.warmthPriorityTask=c=>[c.task,c.pausedTask].some(t=>t&&['care','clinic','firefight','arrival'].includes(t.kind));
+G.tryWarmthCare=function(c){
+  if(!(c.warmthJourney||c.warmthSeeking||c.cold>=G.WARMTH.startCold)||c.mealJourney||G.isArriving(c)||
+      G.warmthPriorityTask(c)||c.carry||c.task&&c.pausedTask)return false;
+  const previous={task:c.task,pausedTask:c.pausedTask,path:c.path,pi:c.pi,state:c.state,walkKind:c.walkKind,camped:c.camped,wanderT:c.wanderT};
+  if(c.task)c.pausedTask=c.task;
+  c.task=null;
+  if(G.tryMedicalCare(c)){
+    c.warmthJourney=null;c.warmthCareResume=true;return true;
+  }
+  // Care dispatch can fail after selecting a route. Restore the old ownership
+  // and path exactly; retain only the medical retry timer from that attempt.
+  Object.assign(c,previous);return false;
+};
+G.finishWarmthJourney=function(c){
+  c.warmthJourney=null;c.warmthCareResume=false;c.path=null;c.pi=0;c.state='idle';c.walkKind='';c.warmthRetryH=G.WARMTH.retryHours;c.wanderT=0;
+  if(G.isRestTime()&&(c.pausedTask||!c.carry)){G.goHome(c);return;}
+  if(c.pausedTask&&G.resumeTask(c))return;
+  if(c.carry)G.startHaul(c);
+};
+G.planWarmthJourney=function(c,planned=null){
+  const m=c.warmthJourney,h=G.warmthHome(c);
+  if(!m)return false;
+  const spot=h&&!h.unheated&&(planned||G.workSpot(G.world,h,c.x,c.y));
+  if(!spot){G.finishWarmthJourney(c);return false;}
+  m.home=h;m.tx=spot.x;m.ty=spot.y;m.navigationRevision=G.world.navigationRevision||0;
+  c.path=spot.route.path;c.pi=0;c.camped=false;
+  if(!c.path.length&&G.d2(c.x,c.y,m.tx,m.ty)>1e-8)c.path=[{x:m.tx,y:m.ty}];
+  c.state=c.path.length?'walk':'warmth';c.walkKind='warmth';return true;
+};
+G.tryWarmthJourney=function(c){
+  if(!G.isWinter()||c.dead||c.mealJourney||G.isArriving(c)||G.warmthPriorityTask(c))return false;
+  if(c.cold>=G.WARMTH.startCold)c.warmthSeeking=true;
+  if(!c.warmthSeeking||c.cold<=G.WARMTH.stopCold||c.warmthRetryH>0||c.task&&c.pausedTask)return false;
+  if(c.warmthJourney)return true;
+  const h=G.warmthHome(c),spot=h&&!h.unheated&&G.workSpot(G.world,h,c.x,c.y);
+  if(!spot){c.warmthRetryH=G.WARMTH.retryHours;return false;}
+  if(c.task)c.pausedTask=c.task;
+  c.task=null;c.warmthCareResume=false;c.warmthJourney={};return G.planWarmthJourney(c,spot);
+};
+G.resumeAfterWarmthCare=function(c){
+  if(!c.warmthCareResume||c.task)return false;
+  if(G.tryWarmthJourney(c))return true;
+  G.finishWarmthJourney(c);return true;
+};
+G.stepWarmth=function(c,dtH){
+  c.warmthRetryH=Math.max(0,(c.warmthRetryH||0)-dtH);
+  if(G.tryWarmthCare(c))return false;
+  if(G.resumeAfterWarmthCare(c))return true;
+  if(!G.isWinter()||c.cold<=G.WARMTH.stopCold){
+    c.warmthSeeking=false;
+    if(c.warmthJourney){G.finishWarmthJourney(c);return true;}
+    return false;
+  }
+  // A higher-priority action may have replaced the path. Keep its task/path
+  // and the warming need, rather than trying to nest another paused task.
+  if(c.mealJourney||G.warmthPriorityTask(c)){
+    c.warmthJourney=null;return false;
+  }
+  if(!c.warmthJourney&&!G.tryWarmthJourney(c))return false;
+  const m=c.warmthJourney,h=G.warmthHome(c);
+  if(m.home!==h||h?.unheated||m.navigationRevision!==(G.world.navigationRevision||0)||
+      !(c.state==='warmth'||c.state==='walk'&&c.walkKind==='warmth')){
+    G.planWarmthJourney(c);return true;
+  }
+  if(c.state==='walk'){G.walkCitizenPath(c,dtH);return true;}
+  if(!G.atWarmthHome(c,h))G.planWarmthJourney(c);
+  return true;
+};
+
+/* 受冻（双侧模型）：冬季户外累积寒冷，实际回到烧着柴的家里恢复；
  * 冷屋挡风但没柴火，屋内缓慢累积；露宿/无房者整夜在外照常累积。
  * 速率常量为「处于该状态每满 24 小时」的量，按实际小时数折算；非冬季持续回暖清零 */
 G.coldStep = function (c, dtH) {
@@ -1254,9 +1338,9 @@ G.coldStep = function (c, dtH) {
   if (G.inMedicalCare(c)) { c.cold = Math.max(0, c.cold - dtH * G.LIFE.warmRecover / 24); return; }
   if(G.inSchool(c)){c.cold+=dtH*G.LIFE.coldIndoors/24;return;} // Classroom shelters wind; it is not a heated home.
   const childMul = c.age < G.ADULT_AGE ? G.LIFE.coldChildMul : 1;
-  if (c.state === 'rest' && !c.camped) {
-    const home = G.homeOf(c);
-    if (home && home.state === 'ok') {
+  if ((c.state === 'rest' && !c.camped) || c.state === 'meal' || c.state === 'warmth' && c.warmthJourney) {
+    const home = G.warmthHome(c);
+    if (G.atWarmthHome(c,home)) {
       if (!home.unheated) { c.cold = Math.max(0, c.cold - dtH * G.LIFE.warmRecover / 24); return; }
       c.cold += dtH * G.LIFE.coldIndoors / 24 * childMul; // 冷屋挡风但不取暖
       return;
@@ -1270,6 +1354,7 @@ G.coldStep = function (c, dtH) {
 G.pathStepBlocked = (w,c,t)=>!G.tunnelSegmentAllowed(w,c.x,c.y,t.x,t.y);
 G.detourCitizen = function (c, dtH) {
   if(c.mealJourney){G.planMealJourney(c);return;}
+  if(c.warmthJourney){G.planWarmthJourney(c);return;}
   if(c.task?.kind==='roadPave'){G.resumeRoadWork(c,c.task);return;}
   if(c.task?.kind==='toolFetch'){G.planToolFetch(c,c.task);return;}
   if(c.task?.kind==='constructionMaterial'){const t=c.task,spot=G.constructionLegSpot(c,t);if(spot){t.tx=spot.x;t.ty=spot.y;G.sendTo(c,t.tx,t.ty,spot.route);}else if(G.constructionCargo(c))G.returnConstructionCargo(c);else G.dropBlockedTask(c,t);return;}
@@ -1345,7 +1430,9 @@ G.stepCitizen = function (c, dtH) {
   if(c.task?.kind==='hunt'&&!G.huntingTaskCurrent(c,c.task))G.dropBlockedTask(c,c.task);
   if(c.task?.kind==='orchard'&&!G.orchardTaskCurrent(c,c.task))G.dropBlockedTask(c,c.task);
   if(c.task&&['study','teach'].includes(c.task.kind)&&!G.validSchoolTask(c)){G.clearSchoolTasks(c);c.wanderT=0;}
+  c.careRetryH = Math.max(0, (c.careRetryH || 0) - dtH);
   G.coldStep(c, dtH);
+  if(G.stepWarmth(c,dtH))return;
   if(G.supplyServiceBreak)G.supplyServiceBreak(c,dtH);
   if(G.stepFirefighting&&G.stepFirefighting(c,dtH))return;
   if(G.stepSupply&&G.stepSupply(c,dtH))return;
@@ -1353,7 +1440,6 @@ G.stepCitizen = function (c, dtH) {
   c.chapelRetryH=Math.max(0,(c.chapelRetryH||0)-dtH);
   if(G.isChapelVisitor(c)&&(!G.validWorshipTask(c)||G.isRestTime()))G.cancelWorship(c);
   if(G.isLeisureVisitor(c) && (!G.validLeisureTask(c) || G.isRestTime()))G.cancelLeisure(c);
-  c.careRetryH = Math.max(0, (c.careRetryH || 0) - dtH);
   if (c.task && c.task.kind === 'care' && !G.validCareTask(c)) G.cancelMedicalCare(c);
   if (c.task && c.task.kind === 'care' && c.state === 'work') { G.stepMedicalCare(c, dtH); return; }
   if (c.state === 'rest') {
@@ -1432,6 +1518,7 @@ G.stepCitizen = function (c, dtH) {
 G.arrive = function (c) {
   c.path = null;
   if(c.mealJourney){c.state='meal';return;}
+  if(c.warmthJourney){c.state='warmth';return;}
   if (c.state === 'haul') {
     // Connectivity may change during this trip. Check once at delivery, not per tick.
     G.protectConstructionPriorityCargo(c);
@@ -1497,6 +1584,8 @@ G.cancelResourceMarks = function (kind) {
 
 G.requestTask = function (c) {
   if(c.mealJourney||G.tryMealJourney&&G.tryMealJourney(c,true))return;
+  if(G.tryWarmthCare(c)||G.resumeAfterWarmthCare(c))return;
+  if(c.warmthJourney||G.tryWarmthJourney(c))return;
   if(G.toolFetchTask(c)){G.planToolFetch(c,G.toolFetchTask(c));return;}
   if(G.supplyTaskOf&&G.supplyTaskOf(c)){G.planSupplyLeg(c,G.supplyTaskOf(c));return;}
   if(G.fireTaskOf&&G.fireTaskOf(c)){G.planFireLeg(c,G.fireTaskOf(c));return;}
@@ -2108,7 +2197,7 @@ G.releaseWorker = function (c) {
 };
 
 G.assignWorker = function (b, c) {
-  if(!c||c.dead||c.mealJourney||!c.adult||c.student||c.job!=null||c.carry?.staffingReturn===true||G.toolFetchTask(c)||(G.fireTaskOf&&G.fireTaskOf(c))||(G.supplyTaskOf&&G.supplyTaskOf(c))||G.isArriving(c)||G.world.bmap[b.id]!==b||b.workers.length>=G.workerLimitOf(b))return;
+  if(!c||c.dead||c.mealJourney||c.warmthJourney||!c.adult||c.student||c.job!=null||c.carry?.staffingReturn===true||G.toolFetchTask(c)||(G.fireTaskOf&&G.fireTaskOf(c))||(G.supplyTaskOf&&G.supplyTaskOf(c))||G.isArriving(c)||G.world.bmap[b.id]!==b||b.workers.length>=G.workerLimitOf(b))return;
   if(b.state==='site'&&!G.constructionCanStaff(b,c))return;
   if(b.type==='tavern'&&b.state==='ok'&&(c.age<18||G.isSick(c)))return;
   if(b.type==='chapel'&&b.state==='ok'&&(G.isSick(c)||c.hunger>0))return;
@@ -2204,7 +2293,7 @@ G.scheduleJobs = function () {
   // A held mineral batch is not a free pair of hands. Free only an empty job
   // slot; staffing handoffs retain their slot, even if the ceiling was restored.
   // releaseWorker preserves other bounded cargo and retries that delivery.
-  for (const c of w.citizens) if (!c.dead && c.job != null && c.staffingRelease!==c.job && c.carry?.staffingReturn!==true && !c.mealJourney && !c.task && !c.pausedTask && G.mineralDeliveryBlocked(c)) G.releaseWorker(c);
+  for (const c of w.citizens) if (!c.dead && c.job != null && c.staffingRelease!==c.job && c.carry?.staffingReturn!==true && !c.mealJourney && !c.warmthJourney && !c.task && !c.pausedTask && G.mineralDeliveryBlocked(c)) G.releaseWorker(c);
   for (const b of w.buildings) {
     // Plans do not reserve materials. Release only empty, uncommitted slots;
     // fetching, delivery, clearing and suspended work keep their current owner.
@@ -4064,6 +4153,7 @@ G.makeTeachingTask=function(b,c){
 };
 G.startStudy=function(c){
   if(c.mealJourney||G.tryMealJourney&&G.tryMealJourney(c,true))return true;
+  if(c.warmthJourney||G.tryWarmthJourney(c))return true;
   if(!c.student||c.dead||G.isArriving(c)||G.isRestTime()||G.isSick(c)||c.hunger>=1)return false;
   G.restrictStudentWork(c);if(c.carry){G.startHaul(c);return false;}
   const assigned=G.assignSchool(c);if(!assigned){c.state='idle';c.wanderT=4;return false;}
