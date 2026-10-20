@@ -3116,7 +3116,12 @@ G.completeEconomyWork = function(c,t){
 
 /* Orchard trees are fixed plot slots, not map forest trees. Ages, work and
  * lifespan are small-map adaptations; old mature saves get at least eight years. */
-G.ORCHARD={count:9,matureDays:G.YEAR_DAYS*4,fruit:20,plantHours:4,tendHours:.5,harvestHours:6};
+// Future seasons use the official apple/pear resource's base yield. Education
+// already changes work time here; do not also apply the original high yield.
+G.ORCHARD={count:9,matureDays:G.YEAR_DAYS*4,fruit:50,plantHours:4,tendHours:.5,harvestHours:6};
+// Aggregate saves predate per-tree records and always used 20 per tree. Keep
+// their exact distribution and harvest trips when migrating existing fruit.
+G.LEGACY_ORCHARD_FRUIT=20;
 G.ORCHARD_TYPES={legacy:{name:'旧通用果树',output:'vegetables',unlock:'orchard'},apple:{name:'苹果',output:'apples',unlock:'apple'},pear:{name:'梨',output:'pears',unlock:'pear'}};
 G.orchardTypeOf=b=>typeof b?.orchardType==='string'&&Object.hasOwn(G.ORCHARD_TYPES,b.orchardType)?b.orchardType:'legacy';
 G.orchardTreeType=t=>typeof t?.type==='string'&&Object.hasOwn(G.ORCHARD_TYPES,t.type)?t.type:'legacy';
@@ -3134,7 +3139,7 @@ G.newOrchardTrees=b=>Array.from({length:G.orchardTreeCount(b)},()=>G.newOrchardT
 G.ensureOrchard=function(b){
   if(!b.orchardTrees){
     let fruit=b.orchardYield||0;const age=Math.min(G.ORCHARD.matureDays,b.orchardAge||0);
-    b.orchardTrees=Array.from({length:G.orchardTreeCount(b)},()=>{const n=Math.min(G.ORCHARD.fruit,fruit);fruit-=n;return {type:'legacy',planted:true,age,fruit:n,season:b.orchardSeason||0,tendedDay:b.tendedDay??-1,cycle:0};});
+    b.orchardTrees=Array.from({length:G.orchardTreeCount(b)},()=>{const n=Math.min(G.LEGACY_ORCHARD_FRUIT,fruit);fruit-=n;return {type:'legacy',planted:true,age,fruit:n,season:b.orchardSeason||0,tendedDay:b.tendedDay??-1,cycle:0};});
     b.orchardDay=G.game.day; // Unknown old partial day is not replayed.
   }
   if(b.orchardReplant===undefined)b.orchardReplant=true;

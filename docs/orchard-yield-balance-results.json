@@ -1,0 +1,980 @@
+{
+  "baselineCommit": "f098ed2686c10dd23a1e5d145f8102597d71509e",
+  "baselineSourceHash": "904a9abb233a201078603e2c8d4e28220793215d75e2358c5e4c84aee028da8f",
+  "candidateSourceHash": "bf29094e7df45640fcdc121020dffaec9d13a12a933a683481466a745ee0c2d4",
+  "benchmarkScriptSha256": "411a4191e2c7c16289a3d27d05cd4df75d169f4e56cf1c0f42fc206d3376603b",
+  "fixture": "Provisioned fixed plots, two adult residents; ordinary simulation after setup",
+  "metrics": {
+    "workingHours": "Sum of actual remaining task work decrements, excluding travel and rest.",
+    "staffedWalkOrHaulStateHours": "0.1-hour samples in walk/haul state while assigned to plot, including commuting/home walks; not exact movement or pure hauling time.",
+    "discarded": "Observed ledgerRecord(discarded) events, never calculated as a conservation remainder.",
+    "unpickedFruitLost": "Per-tree decreases during daily orchard updates; not counted as produced or discarded harvested goods.",
+    "trips": "Deposit calls with positive accepted quantity."
+  },
+  "observerPositiveControl": {
+    "offered": 7,
+    "accepted": 3,
+    "discardedEvent": 4,
+    "retainedOfferAtFullStorage": 5,
+    "additionalDiscarded": 0
+  },
+  "before": [
+    {
+      "type": "farm",
+      "workers": 1,
+      "distance": "near",
+      "fruitPerTree": 20,
+      "produced": 336,
+      "received": 336,
+      "ledgerReceived": 336,
+      "discarded": 0,
+      "unpickedFruitLost": 0,
+      "workingHours": 44,
+      "staffedWalkOrHaulStateHours": 159.9,
+      "staffedHours": 286,
+      "trips": 12,
+      "firstFruitDay": null,
+      "deaths": [],
+      "years": [
+        {
+          "year": 1,
+          "produced": 336,
+          "received": 336
+        }
+      ],
+      "carried": 0,
+      "final": {
+        "day": 48,
+        "population": 2,
+        "stock": 436.0000000000007,
+        "cells": 64
+      }
+    },
+    {
+      "type": "farm",
+      "workers": 1,
+      "distance": "far",
+      "fruitPerTree": 20,
+      "produced": 252,
+      "received": 252,
+      "ledgerReceived": 252,
+      "discarded": 0,
+      "unpickedFruitLost": 0,
+      "workingHours": 41,
+      "staffedWalkOrHaulStateHours": 148.8,
+      "staffedHours": 286,
+      "trips": 9,
+      "firstFruitDay": null,
+      "deaths": [],
+      "years": [
+        {
+          "year": 1,
+          "produced": 252,
+          "received": 252
+        }
+      ],
+      "carried": 0,
+      "final": {
+        "day": 48,
+        "population": 2,
+        "stock": 352.00000000000057,
+        "cells": 64
+      }
+    },
+    {
+      "type": "farm",
+      "workers": 2,
+      "distance": "near",
+      "fruitPerTree": 20,
+      "produced": 700,
+      "received": 700,
+      "ledgerReceived": 700,
+      "discarded": 0,
+      "unpickedFruitLost": 0,
+      "workingHours": 57,
+      "staffedWalkOrHaulStateHours": 342.7,
+      "staffedHours": 556,
+      "trips": 25,
+      "firstFruitDay": null,
+      "deaths": [],
+      "years": [
+        {
+          "year": 1,
+          "produced": 700,
+          "received": 700
+        }
+      ],
+      "carried": 0,
+      "final": {
+        "day": 48,
+        "population": 2,
+        "stock": 799.9999999999989,
+        "cells": 64
+      }
+    },
+    {
+      "type": "farm",
+      "workers": 2,
+      "distance": "far",
+      "fruitPerTree": 20,
+      "produced": 532,
+      "received": 532,
+      "ledgerReceived": 532,
+      "discarded": 0,
+      "unpickedFruitLost": 0,
+      "workingHours": 51,
+      "staffedWalkOrHaulStateHours": 319.2,
+      "staffedHours": 556,
+      "trips": 19,
+      "firstFruitDay": null,
+      "deaths": [],
+      "years": [
+        {
+          "year": 1,
+          "produced": 532,
+          "received": 532
+        }
+      ],
+      "carried": 0,
+      "final": {
+        "day": 48,
+        "population": 2,
+        "stock": 631.999999999999,
+        "cells": 64
+      }
+    },
+    {
+      "type": "orchard",
+      "workers": 1,
+      "distance": "near",
+      "fruitPerTree": 20,
+      "produced": 180,
+      "received": 180,
+      "ledgerReceived": 180,
+      "discarded": 0,
+      "unpickedFruitLost": 0,
+      "workingHours": 54,
+      "staffedWalkOrHaulStateHours": 112.5,
+      "staffedHours": 224,
+      "trips": 9,
+      "firstFruitDay": 24,
+      "deaths": [],
+      "years": [
+        {
+          "year": 1,
+          "produced": 180,
+          "received": 180
+        }
+      ],
+      "carried": 0,
+      "final": {
+        "day": 48,
+        "population": 2,
+        "stock": 130.00000000000028,
+        "trees": 9
+      }
+    },
+    {
+      "type": "orchard",
+      "workers": 1,
+      "distance": "far",
+      "fruitPerTree": 20,
+      "produced": 180,
+      "received": 180,
+      "ledgerReceived": 180,
+      "discarded": 0,
+      "unpickedFruitLost": 0,
+      "workingHours": 54,
+      "staffedWalkOrHaulStateHours": 107.8,
+      "staffedHours": 224,
+      "trips": 9,
+      "firstFruitDay": 24,
+      "deaths": [],
+      "years": [
+        {
+          "year": 1,
+          "produced": 180,
+          "received": 180
+        }
+      ],
+      "carried": 0,
+      "final": {
+        "day": 48,
+        "population": 2,
+        "stock": 132.0833333333336,
+        "trees": 9
+      }
+    },
+    {
+      "type": "orchard",
+      "workers": 2,
+      "distance": "near",
+      "fruitPerTree": 20,
+      "produced": 180,
+      "received": 180,
+      "ledgerReceived": 180,
+      "discarded": 0,
+      "unpickedFruitLost": 0,
+      "workingHours": 54,
+      "staffedWalkOrHaulStateHours": 106.4,
+      "staffedHours": 236,
+      "trips": 9,
+      "firstFruitDay": 24,
+      "deaths": [],
+      "years": [
+        {
+          "year": 1,
+          "produced": 180,
+          "received": 180
+        }
+      ],
+      "carried": 0,
+      "final": {
+        "day": 48,
+        "population": 2,
+        "stock": 130.0000000000004,
+        "trees": 9
+      }
+    },
+    {
+      "type": "orchard",
+      "workers": 2,
+      "distance": "far",
+      "fruitPerTree": 20,
+      "produced": 180,
+      "received": 180,
+      "ledgerReceived": 180,
+      "discarded": 0,
+      "unpickedFruitLost": 0,
+      "workingHours": 54,
+      "staffedWalkOrHaulStateHours": 106.2,
+      "staffedHours": 256,
+      "trips": 9,
+      "firstFruitDay": 24,
+      "deaths": [],
+      "years": [
+        {
+          "year": 1,
+          "produced": 180,
+          "received": 180
+        }
+      ],
+      "carried": 0,
+      "final": {
+        "day": 48,
+        "population": 2,
+        "stock": 132.08333333333368,
+        "trees": 9
+      }
+    },
+    {
+      "type": "orchard",
+      "workers": 2,
+      "distance": "near",
+      "young": true,
+      "fruitPerTree": 20,
+      "produced": 360,
+      "received": 360,
+      "ledgerReceived": 360,
+      "discarded": 0,
+      "unpickedFruitLost": 0,
+      "workingHours": 994,
+      "staffedWalkOrHaulStateHours": 4090.1,
+      "staffedHours": 8528,
+      "trips": 18,
+      "firstFruitDay": 216,
+      "deaths": [],
+      "years": [
+        {
+          "year": 1,
+          "produced": 0,
+          "received": 0
+        },
+        {
+          "year": 2,
+          "produced": 0,
+          "received": 0
+        },
+        {
+          "year": 3,
+          "produced": 0,
+          "received": 0
+        },
+        {
+          "year": 4,
+          "produced": 0,
+          "received": 0
+        },
+        {
+          "year": 5,
+          "produced": 180,
+          "received": 180
+        },
+        {
+          "year": 6,
+          "produced": 180,
+          "received": 180
+        }
+      ],
+      "carried": 0,
+      "final": {
+        "day": 288,
+        "population": 2,
+        "stock": 210.00000000000063,
+        "trees": 9
+      }
+    },
+    {
+      "type": "orchard",
+      "workers": 0,
+      "distance": "near",
+      "fruitPerTree": 20,
+      "produced": 0,
+      "received": 0,
+      "ledgerReceived": 0,
+      "discarded": 0,
+      "unpickedFruitLost": 180,
+      "workingHours": 0,
+      "staffedWalkOrHaulStateHours": 0,
+      "staffedHours": 0,
+      "trips": 0,
+      "firstFruitDay": 24,
+      "deaths": [],
+      "years": [
+        {
+          "year": 1,
+          "produced": 0,
+          "received": 0
+        }
+      ],
+      "carried": 0,
+      "final": {
+        "day": 48,
+        "population": 2,
+        "stock": 0,
+        "trees": 9
+      }
+    }
+  ],
+  "after": [
+    {
+      "type": "farm",
+      "workers": 1,
+      "distance": "near",
+      "fruitPerTree": 50,
+      "produced": 336,
+      "received": 336,
+      "ledgerReceived": 336,
+      "discarded": 0,
+      "unpickedFruitLost": 0,
+      "workingHours": 44,
+      "staffedWalkOrHaulStateHours": 159.9,
+      "staffedHours": 286,
+      "trips": 12,
+      "firstFruitDay": null,
+      "deaths": [],
+      "years": [
+        {
+          "year": 1,
+          "produced": 336,
+          "received": 336
+        }
+      ],
+      "carried": 0,
+      "final": {
+        "day": 48,
+        "population": 2,
+        "stock": 436.0000000000007,
+        "cells": 64
+      }
+    },
+    {
+      "type": "farm",
+      "workers": 1,
+      "distance": "far",
+      "fruitPerTree": 50,
+      "produced": 252,
+      "received": 252,
+      "ledgerReceived": 252,
+      "discarded": 0,
+      "unpickedFruitLost": 0,
+      "workingHours": 41,
+      "staffedWalkOrHaulStateHours": 148.8,
+      "staffedHours": 286,
+      "trips": 9,
+      "firstFruitDay": null,
+      "deaths": [],
+      "years": [
+        {
+          "year": 1,
+          "produced": 252,
+          "received": 252
+        }
+      ],
+      "carried": 0,
+      "final": {
+        "day": 48,
+        "population": 2,
+        "stock": 352.00000000000057,
+        "cells": 64
+      }
+    },
+    {
+      "type": "farm",
+      "workers": 2,
+      "distance": "near",
+      "fruitPerTree": 50,
+      "produced": 700,
+      "received": 700,
+      "ledgerReceived": 700,
+      "discarded": 0,
+      "unpickedFruitLost": 0,
+      "workingHours": 57,
+      "staffedWalkOrHaulStateHours": 342.7,
+      "staffedHours": 556,
+      "trips": 25,
+      "firstFruitDay": null,
+      "deaths": [],
+      "years": [
+        {
+          "year": 1,
+          "produced": 700,
+          "received": 700
+        }
+      ],
+      "carried": 0,
+      "final": {
+        "day": 48,
+        "population": 2,
+        "stock": 799.9999999999989,
+        "cells": 64
+      }
+    },
+    {
+      "type": "farm",
+      "workers": 2,
+      "distance": "far",
+      "fruitPerTree": 50,
+      "produced": 532,
+      "received": 532,
+      "ledgerReceived": 532,
+      "discarded": 0,
+      "unpickedFruitLost": 0,
+      "workingHours": 51,
+      "staffedWalkOrHaulStateHours": 319.2,
+      "staffedHours": 556,
+      "trips": 19,
+      "firstFruitDay": null,
+      "deaths": [],
+      "years": [
+        {
+          "year": 1,
+          "produced": 532,
+          "received": 532
+        }
+      ],
+      "carried": 0,
+      "final": {
+        "day": 48,
+        "population": 2,
+        "stock": 631.999999999999,
+        "cells": 64
+      }
+    },
+    {
+      "type": "orchard",
+      "workers": 1,
+      "distance": "near",
+      "fruitPerTree": 50,
+      "produced": 450,
+      "received": 450,
+      "ledgerReceived": 450,
+      "discarded": 0,
+      "unpickedFruitLost": 0,
+      "workingHours": 54,
+      "staffedWalkOrHaulStateHours": 112.5,
+      "staffedHours": 224,
+      "trips": 9,
+      "firstFruitDay": 24,
+      "deaths": [],
+      "years": [
+        {
+          "year": 1,
+          "produced": 450,
+          "received": 450
+        }
+      ],
+      "carried": 0,
+      "final": {
+        "day": 48,
+        "population": 2,
+        "stock": 399.9999999999993,
+        "trees": 9
+      }
+    },
+    {
+      "type": "orchard",
+      "workers": 1,
+      "distance": "far",
+      "fruitPerTree": 50,
+      "produced": 450,
+      "received": 450,
+      "ledgerReceived": 450,
+      "discarded": 0,
+      "unpickedFruitLost": 0,
+      "workingHours": 54,
+      "staffedWalkOrHaulStateHours": 107.8,
+      "staffedHours": 224,
+      "trips": 9,
+      "firstFruitDay": 24,
+      "deaths": [],
+      "years": [
+        {
+          "year": 1,
+          "produced": 450,
+          "received": 450
+        }
+      ],
+      "carried": 0,
+      "final": {
+        "day": 48,
+        "population": 2,
+        "stock": 402.0833333333327,
+        "trees": 9
+      }
+    },
+    {
+      "type": "orchard",
+      "workers": 2,
+      "distance": "near",
+      "fruitPerTree": 50,
+      "produced": 450,
+      "received": 450,
+      "ledgerReceived": 450,
+      "discarded": 0,
+      "unpickedFruitLost": 0,
+      "workingHours": 54,
+      "staffedWalkOrHaulStateHours": 106.4,
+      "staffedHours": 236,
+      "trips": 9,
+      "firstFruitDay": 24,
+      "deaths": [],
+      "years": [
+        {
+          "year": 1,
+          "produced": 450,
+          "received": 450
+        }
+      ],
+      "carried": 0,
+      "final": {
+        "day": 48,
+        "population": 2,
+        "stock": 399.9999999999992,
+        "trees": 9
+      }
+    },
+    {
+      "type": "orchard",
+      "workers": 2,
+      "distance": "far",
+      "fruitPerTree": 50,
+      "produced": 450,
+      "received": 450,
+      "ledgerReceived": 450,
+      "discarded": 0,
+      "unpickedFruitLost": 0,
+      "workingHours": 54,
+      "staffedWalkOrHaulStateHours": 106.2,
+      "staffedHours": 256,
+      "trips": 9,
+      "firstFruitDay": 24,
+      "deaths": [],
+      "years": [
+        {
+          "year": 1,
+          "produced": 450,
+          "received": 450
+        }
+      ],
+      "carried": 0,
+      "final": {
+        "day": 48,
+        "population": 2,
+        "stock": 402.0833333333326,
+        "trees": 9
+      }
+    },
+    {
+      "type": "orchard",
+      "workers": 2,
+      "distance": "near",
+      "young": true,
+      "fruitPerTree": 50,
+      "produced": 900,
+      "received": 900,
+      "ledgerReceived": 900,
+      "discarded": 0,
+      "unpickedFruitLost": 0,
+      "workingHours": 994,
+      "staffedWalkOrHaulStateHours": 4090.1,
+      "staffedHours": 8528,
+      "trips": 18,
+      "firstFruitDay": 216,
+      "deaths": [],
+      "years": [
+        {
+          "year": 1,
+          "produced": 0,
+          "received": 0
+        },
+        {
+          "year": 2,
+          "produced": 0,
+          "received": 0
+        },
+        {
+          "year": 3,
+          "produced": 0,
+          "received": 0
+        },
+        {
+          "year": 4,
+          "produced": 0,
+          "received": 0
+        },
+        {
+          "year": 5,
+          "produced": 450,
+          "received": 450
+        },
+        {
+          "year": 6,
+          "produced": 450,
+          "received": 450
+        }
+      ],
+      "carried": 0,
+      "final": {
+        "day": 288,
+        "population": 2,
+        "stock": 750,
+        "trees": 9
+      }
+    },
+    {
+      "type": "orchard",
+      "workers": 0,
+      "distance": "near",
+      "fruitPerTree": 50,
+      "produced": 0,
+      "received": 0,
+      "ledgerReceived": 0,
+      "discarded": 0,
+      "unpickedFruitLost": 450,
+      "workingHours": 0,
+      "staffedWalkOrHaulStateHours": 0,
+      "staffedHours": 0,
+      "trips": 0,
+      "firstFruitDay": 24,
+      "deaths": [],
+      "years": [
+        {
+          "year": 1,
+          "produced": 0,
+          "received": 0
+        }
+      ],
+      "carried": 0,
+      "final": {
+        "day": 48,
+        "population": 2,
+        "stock": 0,
+        "trees": 9
+      }
+    }
+  ],
+  "sameCandidateEarlierObservations": {
+    "note": "Recovered existing completed runs; exact source hashes match the final production code. No mature orchards in these scenarios, so these are survival-risk controls, not orchard survival acceptance.",
+    "opening": [
+      {
+        "seed": 5,
+        "scenario": "baseline",
+        "sourceHash": "bf29094e7df45640fcdc121020dffaec9d13a12a933a683481466a745ee0c2d4",
+        "policyHash": "da1e08551d35d6eb33c53e17b5413a998d1b6e5cc2a19d82ff4ffc9506ffa111",
+        "years": 1,
+        "final": {
+          "day": 48,
+          "hour": 6,
+          "pop": 15,
+          "adults": 10,
+          "res": {
+            "wood": 30,
+            "stone": 32,
+            "iron": 0,
+            "tools": 11,
+            "food": 468.8,
+            "meat": 0,
+            "eggs": 0,
+            "vegetables": 468.8,
+            "grain": 0,
+            "apples": 0,
+            "pears": 0,
+            "firewood": 98,
+            "leather": 0,
+            "wool": 0,
+            "clothes": 0,
+            "herbs": 0,
+            "coal": 0,
+            "steelTools": 0,
+            "ale": 0,
+            "warmCoats": 0
+          },
+          "foodDays": 15,
+          "foodNet": 0,
+          "homeless": 2,
+          "unhousedChildren": 0,
+          "unheated": 0,
+          "warmNeed": 90,
+          "marks": [
+            2,
+            0
+          ],
+          "buildings": [
+            {
+              "id": 1,
+              "type": "storage",
+              "state": "ok",
+              "workers": 0,
+              "target": null,
+              "progress": 1
+            },
+            {
+              "id": 22,
+              "type": "gatherer",
+              "state": "ok",
+              "workers": 2,
+              "target": null,
+              "progress": 1
+            },
+            {
+              "id": 23,
+              "type": "woodcutter",
+              "state": "ok",
+              "workers": 1,
+              "target": 100,
+              "progress": 1
+            },
+            {
+              "id": 24,
+              "type": "gatherer",
+              "state": "ok",
+              "workers": 2,
+              "target": null,
+              "progress": 1
+            },
+            {
+              "id": 25,
+              "type": "house",
+              "state": "ok",
+              "workers": 0,
+              "target": null,
+              "progress": 1
+            },
+            {
+              "id": 26,
+              "type": "house",
+              "state": "ok",
+              "workers": 0,
+              "target": null,
+              "progress": 1
+            },
+            {
+              "id": 27,
+              "type": "house",
+              "state": "ok",
+              "workers": 0,
+              "target": null,
+              "progress": 1
+            }
+          ],
+          "jobs": {
+            "gatherer": 4,
+            "laborer": 5,
+            "woodcutter": 1
+          }
+        },
+        "shortages": {
+          "hungryCitizenDays": 0,
+          "toolDays": 0,
+          "coldHouseDays": 0
+        },
+        "deaths": []
+      },
+      {
+        "seed": 49,
+        "scenario": "baseline",
+        "sourceHash": "bf29094e7df45640fcdc121020dffaec9d13a12a933a683481466a745ee0c2d4",
+        "policyHash": "da1e08551d35d6eb33c53e17b5413a998d1b6e5cc2a19d82ff4ffc9506ffa111",
+        "years": 1,
+        "final": {
+          "day": 48,
+          "hour": 6,
+          "pop": 18,
+          "adults": 11,
+          "res": {
+            "wood": 28,
+            "stone": 52,
+            "iron": 0,
+            "tools": 11,
+            "food": 392.1,
+            "meat": 0,
+            "eggs": 0,
+            "vegetables": 392.1,
+            "grain": 0,
+            "apples": 0,
+            "pears": 0,
+            "firewood": 104,
+            "leather": 0,
+            "wool": 0,
+            "clothes": 0,
+            "herbs": 0,
+            "coal": 0,
+            "steelTools": 0,
+            "ale": 0,
+            "warmCoats": 0
+          },
+          "foodDays": 10.46,
+          "foodNet": -7.5,
+          "homeless": 2,
+          "unhousedChildren": 0,
+          "unheated": 0,
+          "warmNeed": 90,
+          "marks": [
+            2,
+            0
+          ],
+          "buildings": [
+            {
+              "id": 1,
+              "type": "storage",
+              "state": "ok",
+              "workers": 0,
+              "target": null,
+              "progress": 1
+            },
+            {
+              "id": 22,
+              "type": "gatherer",
+              "state": "ok",
+              "workers": 2,
+              "target": null,
+              "progress": 1
+            },
+            {
+              "id": 23,
+              "type": "woodcutter",
+              "state": "ok",
+              "workers": 0,
+              "target": 100,
+              "progress": 1
+            },
+            {
+              "id": 24,
+              "type": "gatherer",
+              "state": "ok",
+              "workers": 2,
+              "target": null,
+              "progress": 1
+            },
+            {
+              "id": 25,
+              "type": "house",
+              "state": "ok",
+              "workers": 0,
+              "target": null,
+              "progress": 1
+            },
+            {
+              "id": 26,
+              "type": "house",
+              "state": "ok",
+              "workers": 0,
+              "target": null,
+              "progress": 1
+            },
+            {
+              "id": 28,
+              "type": "house",
+              "state": "ok",
+              "workers": 0,
+              "target": null,
+              "progress": 1
+            }
+          ],
+          "jobs": {
+            "laborer": 7,
+            "gatherer": 4
+          }
+        },
+        "shortages": {
+          "hungryCitizenDays": 0,
+          "toolDays": 0,
+          "coldHouseDays": 0
+        },
+        "deaths": []
+      }
+    ],
+    "riskStrategyHash": "df44de0137ace15c5aa3e08102cad72a86fb19c223c25c82760403c69ff59979",
+    "risk": [
+      {
+        "seed": 5,
+        "strategy": "neglect",
+        "sourceHash": "bf29094e7df45640fcdc121020dffaec9d13a12a933a683481466a745ee0c2d4",
+        "years": 2,
+        "day": 20,
+        "population": 0,
+        "died": 15,
+        "causes": {
+          "饿死": 15
+        }
+      },
+      {
+        "seed": 49,
+        "strategy": "neglect",
+        "sourceHash": "bf29094e7df45640fcdc121020dffaec9d13a12a933a683481466a745ee0c2d4",
+        "years": 2,
+        "day": 20,
+        "population": 0,
+        "died": 15,
+        "causes": {
+          "饿死": 15
+        }
+      },
+      {
+        "seed": 5,
+        "strategy": "no-fuel",
+        "sourceHash": "bf29094e7df45640fcdc121020dffaec9d13a12a933a683481466a745ee0c2d4",
+        "years": 2,
+        "day": 96,
+        "population": 10,
+        "died": 8,
+        "causes": {
+          "冻死": 8
+        }
+      },
+      {
+        "seed": 49,
+        "strategy": "no-fuel",
+        "sourceHash": "bf29094e7df45640fcdc121020dffaec9d13a12a933a683481466a745ee0c2d4",
+        "years": 2,
+        "day": 96,
+        "population": 11,
+        "died": 6,
+        "causes": {
+          "冻死": 6
+        }
+      }
+    ]
+  }
+}
