@@ -13,6 +13,7 @@ const initialFood = Number(arg('--initial-food', '1600'));
 const stores = Number(arg('--stores', '4'));
 assert(Number.isInteger(stores) && stores >= 4 && stores <= 10);
 assert(Number.isFinite(initialFood) && initialFood >= 300);
+const trace = args.includes('--timeline');
 const outputs = ['meat', 'leather', 'wool', 'eggs'];
 const basket = () => Object.fromEntries(outputs.map(k => [k, 0]));
 const near = (a, b, message) => assert(Math.abs(a - b) < 1e-6, `${message}: ${a} != ${b}`);
@@ -51,7 +52,17 @@ function run(options) {
     produced: basket(), received: basket(), ledgerReceived: basket(), discarded: basket(), trips: basket(),
     durationYears: options.years, careCompletions: 0, caredDays: 0, births: 0, overflowBirths: 0, slaughters: 0, workingHours: 0,
     staffedHours: 0, staffedWalkOrHaulStateHours: 0, firstMeatDay: null,
-    deaths: [], years: [] };
+    deaths: [], years: [], ...(trace ? { timeline: [], workKinds: {}, workHoursByPhase: {}, sampledWorkStateHoursByPhase: {}, travelHours: { toPasture: 0, carrying: 0, home: 0, other: 0 } } : {}) };
+  const stamp = () => ({ day: g.day, hour: +g.h.toFixed(3) });
+  const snapshot = () => ({ animals: b.animals, growth: +b.animalGrowth.toFixed(6), tendedDay: b.tendedDay ?? null, pending: { ...b.pastureProducts } });
+  const event = (kind, facts) => { if (trace) result.timeline.push({ ...stamp(), kind, ...facts }); };
+  const ids = new WeakMap(); let nextTask = 0;
+  const makeTask = G.makeTask;
+  G.makeTask = (building, c) => {
+    const task = makeTask(building, c);
+    if (task?.b === b) { ids.set(task, ++nextTask); event('task', { taskId: nextTask, phase: task.phase || 'combined', work: task.work, citizen: c.id, from: [c.x, c.y], to: [task.tx, task.ty], ...snapshot() }); }
+    return task;
+  };
   const record = G.recordProduction;
   G.recordProduction = (building, type, qty) => {
     if (building === b && outputs.includes(type)) {
@@ -63,7 +74,7 @@ function run(options) {
   const deposit = G.deposit;
   G.deposit = (type, qty, ...rest) => {
     const accepted = deposit(type, qty, ...rest);
-    if (outputs.includes(type)) { result.received[type] += accepted; if (accepted > 0) result.trips[type]++; }
+    if (outputs.includes(type)) { result.received[type] += accepted; if (accepted > 0) result.trips[type]++; event('deposit', { type, offered: qty, accepted }); }
     return accepted;
   };
   const ledger = G.ledgerRecord;
@@ -78,27 +89,43 @@ function run(options) {
   G.advanceTownEconomy = () => {
     const animals = b.animals;
     if (b.tendedDay >= g.day - 2) result.caredDays++;
-    economy(); result.births += Math.max(0, b.animals - animals);
+    economy(); result.births += Math.max(0, b.animals - animals); event('daily', snapshot());
   };
   const complete = G.completeEconomyWork;
   G.completeEconomyWork = (c, task) => {
     const animals = b.animals, growth = b.animalGrowth, meat = result.produced.meat;
     const atWork = task.b === b && G.atPastureWork(c, task);
+    const before = snapshot();
     complete(c, task);
-    if (atWork && b.tendedDay === g.day) result.careCompletions++;
+    if (atWork && task.phase !== 'pickup' && b.tendedDay === g.day) result.careCompletions++;
     const slaughters = (result.produced.meat - meat) / G.LIVESTOCK[options.species].meat;
     result.slaughters += slaughters;
     if (slaughters && b.animals === animals && growth - b.animalGrowth >= 1) result.overflowBirths += slaughters;
+    if (atWork) {
+      const kind = slaughters ? 'slaughter' : c.carry?.type === 'wool' ? 'shear' : c.carry ? 'existingProductPickup' : task.phase === 'pickup' ? 'emptyPickup' : 'careOnly';
+      if (trace) result.workKinds[kind] = (result.workKinds[kind] || 0) + 1;
+      event('complete', { taskId: ids.get(task), phase: task.phase || 'combined', work: task.work, workLeft: task.workLeft, result: kind, cargo: c.carry ? { ...c.carry } : null, before, after: snapshot() });
+    }
   };
   const step = G.stepCitizen;
   G.stepCitizen = (c, dt) => {
     const task = c.task, work = task?.workLeft;
+    if (trace && c.state === 'work' && task?.b === b && G.atPastureWork(c, task)) {
+      const phase = task.phase || 'combined';
+      result.sampledWorkStateHoursByPhase[phase] = (result.sampledWorkStateHoursByPhase[phase] || 0) + dt;
+    }
     if (c.job === b.id) {
       result.staffedHours += dt;
-      if (c.state === 'walk' || c.state === 'haul') result.staffedWalkOrHaulStateHours += dt;
+      if (c.state === 'walk' || c.state === 'haul') {
+        result.staffedWalkOrHaulStateHours += dt;
+        if (trace) result.travelHours[c.state === 'haul' ? 'carrying' : c.walkKind === 'home' ? 'home' : task?.b === b ? 'toPasture' : 'other'] += dt;
+      }
     }
     step(c, dt);
-    if (task?.b === b && Number.isFinite(work)) result.workingHours += Math.max(0, work - Math.max(0, task.workLeft));
+    if (task?.b === b && Number.isFinite(work)) {
+      const used = Math.max(0, work - Math.max(0, task.workLeft)); result.workingHours += used;
+      if (trace) { const phase = task.phase || 'combined'; result.workHoursByPhase[phase] = (result.workHoursByPhase[phase] || 0) + used; }
+    }
   };
   const kill = G.killCitizen;
   G.killCitizen = (c, reason) => { result.deaths.push({ day: g.day, reason }); return kill(c, reason); };
