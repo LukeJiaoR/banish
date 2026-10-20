@@ -154,8 +154,8 @@ test('pressed clear confirmation cannot become paving when the last tree disappe
 test('pressed paving confirmation cannot silently become a new tree marking action',()=>{
  const f=roadFixture(),{G,doc}=f,i=3*G.world.N+5;f.tap(3,3);f.tap(8,3);G.ui.refreshRoadControls();const b=doc.getElementById('road-confirm');b.emit('mousedown');b.focus();G.world.treeIdx[i]=7;G.ui.refreshRoadControls();b.emit('mouseup');b.emit('click');assert.equal(G.world.marked.size,0);assert.equal(G.world.road.some(Boolean),false);assert.equal(projects(G).length,0);f.click(b);assert.equal(G.world.marked.has(i),true);
 });
-test('held Enter repeats cannot upgrade cleared-tree intent into paving without a fresh key press',()=>{
- const f=roadFixture(),{G,doc}=f,i=3*G.world.N+5;G.world.treeIdx[i]=7;f.tap(3,3);f.tap(8,3);G.ui.refreshRoadControls();const b=doc.getElementById('road-confirm');b.focus();b.emit('keydown',{key:'Enter',repeat:false});b.emit('click');assert.equal(G.world.marked.has(i),true);G.world.treeIdx[i]=-1;G.ui.refreshRoadControls();b.emit('keydown',{key:'Enter',repeat:true});b.emit('click');assert.equal(G.world.road.some(Boolean),false);assert.equal(projects(G).length,0);b.emit('keyup',{key:'Enter'});b.emit('keydown',{key:'Enter',repeat:false});b.emit('click');assertQueuedAt(G,5,3);
+test('held Enter repeats cannot duplicate the queued clearing order',()=>{
+ const f=roadFixture(),{G,doc}=f,i=3*G.world.N+5;G.world.treeIdx[i]=7;f.tap(3,3);f.tap(8,3);G.ui.refreshRoadControls();const b=doc.getElementById('road-confirm');b.focus();b.emit('keydown',{key:'Enter',repeat:false});b.emit('click');assert(G.world.marked.has(i));assert.equal(projects(G).length,1);G.world.treeIdx[i]=-1;G.ui.refreshRoadControls();b.emit('keydown',{key:'Enter',repeat:true});b.emit('click');assert.equal(G.world.road.some(Boolean),false);assert.equal(projects(G).length,1);assert.equal(G.roadPlan,null);
 });
 test('late touchend from a previous tool generation cannot create a new road start',()=>{
  const{G,doc}=roadFixture(),cv=doc.getElementById('game'),t={clientX:3,clientY:3};cv.emit('touchstart',{touches:[t]});G.setTool('fell');G.setTool('road');cv.emit('touchend',{changedTouches:[t]});assert.equal(G.roadPlan,null);
@@ -206,19 +206,15 @@ test('changed release endpoint is preview-only until a fresh explicit confirmati
  assert.equal(projects(G).length,0);assert.equal(G.roadPlan.end.x,15);assert.match(G.roadPlan.message,/终点已更新/);
  f.click(doc.getElementById('road-confirm'));assertQueuedAt(G,15,3);
 });
-test('drag tree clearance remains an explicit wait and cannot become paving on release',()=>{
+test('drag queues clearing and construction together but rejects changed tree intent',()=>{
  for(const change of ['none','removed','added']){
   const f=roadFixture(),{G,doc}=f,cv=doc.getElementById('game'),i=3*G.world.N+5;
   if(change!=='added')G.world.treeIdx[i]=7;
   cv.emit('mousedown',{clientX:3,clientY:3});cv.emit('mousemove',{clientX:12,clientY:3});
   if(change==='removed')G.world.treeIdx[i]=-1;if(change==='added')G.world.treeIdx[i]=7;
-  cv.emit('mouseup',{clientX:12,clientY:3});assert.equal(projects(G).length,0);
-  assert.equal(G.world.marked.has(i),change==='none');assert(G.roadPlan);
-  if(change==='none'){
-   assert.match(G.roadPlan.message,/清树后/);assert.equal(doc.getElementById('road-confirm').disabled,true);
-   G.world.treeIdx[i]=-1;G.ui.refreshRoadControls();assert.equal(projects(G).length,0);
-   f.click(doc.getElementById('road-confirm'));assertQueuedAt(G,5,3);
-  }
+  cv.emit('mouseup',{clientX:12,clientY:3});assert.equal(projects(G).length,change==='none'?1:0);
+  assert.equal(G.world.marked.has(i),change==='none');assert.equal(G.world.road.some(Boolean),false);
+  if(change==='none'){assert.equal(G.roadPlan,null);assertQueuedAt(G,5,3);assert.match(doc.getElementById('road-plan-status').textContent,/自动施工/);}else assert(G.roadPlan);
  }
 });
 test('new obstacles reject the displayed route rather than silently rerouting',()=>{

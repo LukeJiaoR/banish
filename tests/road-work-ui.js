@@ -183,15 +183,14 @@ test('dirt plan consumes no materials and queues actual work without an instant 
   assert.equal(JSON.stringify(f.G.game.res), before); assert.equal(f.G.world.road.reduce((sum, n) => sum + n, 0), 0);
   assert.match(f.toasts.at(-1)[0], /已排队 5 格土路施工/);
 });
-test('tree clearing remains a separate step before road construction confirmation', () => {
+test('tree clearing and road construction share one explicit confirmation', () => {
   const f = planning(), { G } = f, w = G.world, index = 8 * w.N + 8;
   w.trees.push({ x: 8, y: 8, age: 12, alive: true }); w.treeIdx[index] = 0;
-  preview(f); assert.equal(input(f, 'road-confirm').textContent, '确认标记清树');
-  activate(f).click(); assert(w.marked.has(index)); assert.equal(projects(f).length, 0);
-  assert.equal(input(f, 'road-confirm').textContent, '等待工人清树'); assert(input(f, 'road-confirm').disabled);
-  w.trees[0].alive = false; w.treeIdx[index] = -1; w.marked.delete(index); G.ui.refreshRoadControls();
-  assert.equal(input(f, 'road-confirm').textContent, '确认排队施工'); assert(!input(f, 'road-confirm').disabled);
-  activate(f).click(); assert.equal(projects(f).length, 1); assert.equal(w.road[index], 0);
+  preview(f); assert.equal(input(f, 'road-confirm').textContent, '确认清树并排队施工');
+  assert.match(input(f, 'road-plan-status').textContent,/暂停或取消铺路保留独立清树标记/);
+  activate(f).click(); assert(w.marked.has(index)); assert.equal(projects(f).length, 1);assert.equal(G.roadPlan,null);
+  assert(input(f, 'road-confirm').disabled);assert.equal(w.road[index],0);
+  const info=G.ui.roadWorkInfoData(projects(f)[0]);assert.match(info.status,/等待散工/);assert.match(info.losses,/暂停或取消铺路不撤销独立清树标记/);
 });
 for (const mode of ['plan', 'world', 'tool', 'modal', 'pointercancel', 'touchcancel', 'blur']) test('stale or interrupted road confirmation cannot queue after ' + mode, () => {
   const f = planning(); preview(f); const button = activate(f);

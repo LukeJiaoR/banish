@@ -865,8 +865,9 @@ G.prepareSaveData = function (d) {
     // Completed non-staging cells are history, not remaining ownership: a player
     // may later upgrade, build over or remove them without replaying completion.
     if(p.done&&!staging)continue;
-    if(G.isMountain(w,p.x,p.y)||w.water[i]===1||w.rock[i]||w.treeIdx[i]>=0||w.bgrid[i]>=0||w.roadWorkIndex[i]>=0||w.road[i]!== (p.done?p.target:p.base))bad('铺路工程占格或路面冲突');w.roadWorkIndex[i]=b.id;
+    if(G.isMountain(w,p.x,p.y)||w.water[i]===1||w.rock[i]||(w.treeIdx[i]>=0&&(p.done||p.used||p.workLeft!==G.ROAD_WORK_H||b.progress!==0))||w.bgrid[i]>=0||w.roadWorkIndex[i]>=0||w.road[i]!== (p.done?p.target:p.base))bad('铺路工程占格或路面冲突');w.roadWorkIndex[i]=b.id;
   }
+  for(const b of w.buildings)if(b.type==='roadwork'&&G.roadWorkTrees(w,b).length&&(b.constructionStarted||b.progress!==0||b.roadWork.cells.some(p=>p.used||p.done||p.workLeft!==G.ROAD_WORK_H)||Object.values(b.construction.onsite).some(n=>n>0)))bad('清树未完的道路不能投料或开工');
   if(currentDeer){
     const rows=array(d.deer,'鹿群');if(rows.length!==G.HUNTING.population)bad('鹿群槽位数量');
     const seen=new Set(),activeTiles=new Set(),keys=['id','x','y','homeX','homeY','returnDay','moveDay','generation'];
@@ -1002,6 +1003,7 @@ G.prepareSaveData = function (d) {
   // loaded batch returns physically and can never become a second site refund.
   const incoming=new Map();
   for(const c of w.citizens)if(G.constructionCargo(c)&&!c.carry.constructionReturn){const cargo=c.carry,key=cargo.constructionId+':'+cargo.type;incoming.set(key,(incoming.get(key)||0)+cargo.qty);}
+  for(const b of w.buildings)if(b.type==='roadwork'&&G.roadWorkTrees(w,b).length&&(incoming.get(b.id+':stone')||0)>0)bad('清树未完的道路不能领取建材');
   for(const b of w.buildings)if(b.construction&&!b.construction.consumed)for(const [k,n]of Object.entries(b.construction.required))if((b.construction.onsite[k]||0)+(incoming.get(b.id+':'+k)||0)+G.constructionUsed(b,k)>n)bad('在途和现场建材超出需求');
   for(const c of w.citizens)if(G.constructionCargo(c))c.carry.constructionReturn=true;
   const chapelCounts={};
@@ -1408,11 +1410,6 @@ G.confirmRoadPlan = function (intent) {
     return { ok: false, reason: '路线或清树需求已变化，请复查预览后重新确认' };
   if(status.tunnel){if(!intent)return {ok:false,reason:'请先查看两端和材料预览，再确认隧道'};const result=G.addTunnel(plan.start,plan.end);if(result.ok){G.cancelRoadPlan();G.ui.refreshHUD();}return {...result,tunnel:true};}
   if(status.bridge){const result=G.addBridge(plan.start,plan.end);if(result.ok){G.cancelRoadPlan();G.ui.refreshHUD();}return {...result,bridge:true};}
-  if (status.trees.length) {
-    for (const p of status.added) G.markFellAt(w, p.x, p.y);
-    plan.message = '已确认清树任务；工人清树后，再点击确认铺路；木材仍须搬运入仓。退出规划不会撤销已确认标记。';
-    return { ok: true, clearing: true, marked: status.added.length };
-  }
   const result=G.addRoadWork(plan.result.path,plan.surface||'dirt');if(!result.ok)return result;
   G.cancelRoadPlan();G.ui.refreshHUD();if(result.b){G.sel={kind:'b',id:result.b.id};G.ui.showInfo?.(G.sel);}return {...result,surface:plan.surface||'dirt'};
 };
