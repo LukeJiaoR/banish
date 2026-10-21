@@ -1428,6 +1428,7 @@ G.stepCitizen = function (c, dtH) {
   c.toolRetryH=Math.max(0,(c.toolRetryH||0)-dtH);
   if(c.student)G.restrictStudentWork(c);
   if(c.task?.kind==='hunt'&&!G.huntingTaskCurrent(c,c.task))G.dropBlockedTask(c,c.task);
+  G.trackHuntingTarget(c);
   if(c.task?.kind==='orchard'&&!G.orchardTaskCurrent(c,c.task))G.dropBlockedTask(c,c.task);
   if(c.task&&['study','teach'].includes(c.task.kind)&&!G.validSchoolTask(c)){G.clearSchoolTasks(c);c.wanderT=0;}
   c.careRetryH = Math.max(0, (c.careRetryH || 0) - dtH);
@@ -1799,19 +1800,39 @@ G.huntingDoors=function(w,b){
 G.deerCandidates=function(w){
   return w.trees.filter(t=>G.deerHabitat(w,t.x,t.y)).map(t=>({x:t.x,y:t.y,rank:G.h2(w.seed^0x6de37,t.x,t.y)})).sort((a,b)=>a.rank-b.rank||a.y-b.y||a.x-b.x);
 };
+// Versioned wildlife uses three bounded herds. Tile positions are authoritative;
+// progress is real simulation movement along the first legal route edge.
+G.deerPosition=function(d){const p=d.route?.[0];return p?{x:d.x+(p.x-d.x)*d.progress,y:d.y+(p.y-d.y)*d.progress}:{x:d.x,y:d.y};};
+G.deerTraversable=(w,x,y)=>!G.tileBlocked(w,x,y);
+G.upgradeWildlife=function(w=G.world,g=G.game){
+  if(w.wildlife)return;
+  const now=G.huntingNow(g),nextBirthDay=(Math.floor(now/G.YEAR_DAYS)+1)*G.YEAR_DAYS;
+  w.wildlife={v:2,lastTime:now,nextBirthDay,herds:[]};
+  for(let id=1;id<=3;id++){
+    const members=w.deer.filter(d=>Math.floor((d.id-1)/8)+1===id),first=members.find(d=>d.returnDay===null)||members[0];
+    w.wildlife.herds.push({id,x:first.homeX,y:first.homeY,nextMoveDay:now+4});
+    for(const d of members){d.herdId=id;d.route=[];d.progress=0;}
+  }
+};
 G.initializeDeer=function(w=G.world,g=G.game){
-  const all=G.deerCandidates(w),near=all.filter(p=>G.d2(p.x,p.y,w.start.x,w.start.y)<=28*28),cabins=w.buildings.filter(b=>b.type==='hunting'&&b.state==='ok').sort((a,b)=>a.id-b.id),chosen=[];
-  const habitatByCabin=new Map(cabins.slice(0,8).map(b=>{const routes=G.huntingDoors(w,b).map(p=>G.foresterReachability(w,p));return [b.id,all.filter(p=>G.inHuntingRange(b,p)&&routes.some(can=>can(p.x,p.y)))];}));
+  const all=G.deerCandidates(w),near=all.filter(p=>G.d2(p.x,p.y,w.start.x,w.start.y)<=28*28),cabins=w.buildings.filter(b=>b.type==='hunting'&&b.state==='ok').sort((a,b)=>a.id-b.id),chosen=[],centers=[];
+  for(let group=0;group<3;group++){
+    const cabin=cabins[group%Math.max(1,cabins.length)],routes=cabin?G.huntingDoors(w,cabin).map(p=>G.foresterReachability(w,p)):[];
+    const preferred=cabin?all.filter(p=>G.inHuntingRange(cabin,p)&&routes.some(can=>can(p.x,p.y))):group===0&&near.length?near:all;
+    centers.push(preferred.find(p=>centers.every(q=>G.d2(p.x,p.y,q.x,q.y)>=64))||preferred[0]||all[0]||w.start);
+  }
   w.deer=Array.from({length:G.HUNTING.population},(_,i)=>{
-    const cabin=i<8?cabins[i%Math.max(1,cabins.length)]:null,cabinRange=cabin?(habitatByCabin.get(cabin.id)||[]):[];
-    const candidates=cabinRange.length?cabinRange:i<12&&near.length?near:all;
-    const p=candidates.find(p=>chosen.every(q=>G.d2(p.x,p.y,q.x,q.y)>=16))||candidates.find(p=>chosen.every(q=>p.x!==q.x||p.y!==q.y));
-    if(p)chosen.push(p);const at=p||w.start;
-    return {id:i+1,x:at.x,y:at.y,homeX:at.x,homeY:at.y,returnDay:p?null:G.huntingNow(g)+G.HUNTING.replenishDays,moveDay:g.day+G.HUNTING.moveDays,generation:0};
+    const center=centers[Math.floor(i/8)],local=all.filter(p=>G.d2(p.x,p.y,center.x,center.y)<=64),p=local.find(p=>chosen.every(q=>p.x!==q.x||p.y!==q.y));
+    if(p)chosen.push(p);const at=p||center;
+    return {id:i+1,x:at.x,y:at.y,homeX:center.x,homeY:center.y,returnDay:p?null:(Math.floor(G.huntingNow(g)/G.YEAR_DAYS)+1)*G.YEAR_DAYS,moveDay:g.day+1,generation:0};
   });
+  delete w.wildlife;G.upgradeWildlife(w,g);
 };
 G.reconcileDeerHabitat=function(w=G.world,g=G.game){
   if(!w?.deer)return;
+  // Clearing trees does not make living animals vanish. Invalid routes are
+  // stopped/replanned by the simulation; births alone need grazing habitat.
+  if(w.wildlife)return;
   for(const d of w.deer)if(d.returnDay===null&&!G.deerHabitat(w,d.x,d.y)){d.returnDay=G.huntingNow(g)+G.HUNTING.replenishDays;d.generation++;}
 };
 G.huntingTaskValid=function(c,t){
@@ -1819,7 +1840,7 @@ G.huntingTaskValid=function(c,t){
   return !!(t&&t.kind==='hunt'&&!t.done&&w.cmap[c.id]===c&&!c.dead&&c.adult&&!c.student&&!c.carry&&
     b?.type==='hunting'&&w.bmap[b.id]===b&&b.state==='ok'&&c.job===b.id&&b.workers.includes(c.id)&&
     (G.workerLimitOf(b)>0||c.staffingRelease===b.id)&&G.huntingNow()>=(b.huntingReadyDay||0)&&
-    d&&d.generation===t.deerGeneration&&d.returnDay===null&&d.x===t.tx&&d.y===t.ty&&G.deerHabitat(w,d.x,d.y)&&G.inHuntingRange(b,d));
+    d&&d.generation===t.deerGeneration&&d.returnDay===null&&G.deerTraversable(w,d.x,d.y)&&G.inHuntingRange(b,d));
 };
 G.huntingClaims=function(except=null){
   const deer=new Set(),cabins=new Set();
@@ -1832,11 +1853,16 @@ G.huntingTaskCurrent=function(c,t){
   // a conflicting claim, including while resting or fetching household goods.
   return !G.world.citizens.some(other=>other.id<c.id&&[other.task,other.pausedTask].some(q=>G.huntingTaskValid(other,q)&&(q.deerId===t.deerId||q.b===t.b)));
 };
-G.atHuntingTarget=(c,t)=>G.huntingTaskCurrent(c,t)&&G.d2(c.x,c.y,t.tx,t.ty)<1e-8;
+G.atHuntingTarget=(c,t)=>G.huntingTaskCurrent(c,t)&&G.world.deer.some(d=>d.id===t.deerId&&!(d.progress>0)&&d.x===t.tx&&d.y===t.ty)&&G.d2(c.x,c.y,t.tx,t.ty)<1e-8;
+G.trackHuntingTarget=function(c){
+  const t=c.task;if(t?.kind!=='hunt'||!G.huntingTaskCurrent(c,t)||c.walkKind==='home'||c.state==='rest')return;
+  const d=G.world.deer.find(d=>d.id===t.deerId);
+  if(t.tx!==d.x||t.ty!==d.y){t.tx=d.x;t.ty=d.y;t.workLeft=t.work;if(!G.sendTo(c,t.tx,t.ty))G.dropBlockedTask(c,t);}
+};
 G.huntingSummary=function(b,query={}){
   let w=G.world;const preview=b.id==null;
   if(preview){w={...w,bgrid:new Int32Array(w.bgrid),bmap:{...w.bmap,0:{type:'hunting',state:'ok',x:b.x,y:b.y,w:2,h:2}}};for(let y=b.y;y<b.y+G.BDEF.hunting.h;y++)for(let x=b.x;x<b.x+G.BDEF.hunting.w;x++)if(x>=0&&y>=0&&x<w.N&&y<w.N)w.bgrid[y*w.N+x]=0;}
-  const claims=G.huntingClaims(query.citizen),deer=(w.deer||[]).filter(d=>d.returnDay===null&&G.deerHabitat(w,d.x,d.y)&&G.inHuntingRange(b,d));
+  const claims=G.huntingClaims(query.citizen),deer=(w.deer||[]).filter(d=>d.returnDay===null&&G.deerTraversable(w,d.x,d.y)&&G.inHuntingRange(b,d));
   const free=deer.filter(d=>!claims.deer.has(d.id)),cooldownDays=Math.max(0,(b.huntingReadyDay||0)-G.huntingNow()),busy=claims.cabins.has(b.id);
   let reachable=null;
   if(query.reachability!==false){
@@ -1854,7 +1880,7 @@ G.makeHuntingTask=function(b,c){
   if(G.world.bmap[b.id]!==b||b.state!=='ok'||G.world.cmap[c.id]!==c||c.dead||!c.adult||c.student||c.job!==b.id)return null;
   const q=G.huntingSummary(b,{citizen:c,reachability:false});
   if(c.carry||q.cooldownDays||q.busy||!q.free){b.noWork=!q.busy;b.warnText=q.reason;return null;}
-  const claims=G.huntingClaims(c),targets=(G.world.deer||[]).filter(d=>d.returnDay===null&&!claims.deer.has(d.id)&&G.deerHabitat(G.world,d.x,d.y)&&G.inHuntingRange(b,d));
+  const claims=G.huntingClaims(c),targets=(G.world.deer||[]).filter(d=>d.returnDay===null&&!claims.deer.has(d.id)&&G.deerTraversable(G.world,d.x,d.y)&&G.inHuntingRange(b,d));
   const route=G.findPathToAny(G.world,c.x,c.y,targets.map(d=>({x:d.x,y:d.y,deerId:d.id})));
   if(!route){b.noWork=true;b.warnText='附近鹿不可达，请打通陆路';return null;}
   b.noWork=false;b.warnText='';
@@ -1869,28 +1895,73 @@ G.completeHuntingTask=function(c,t){
     if(c.task===t)G.dropBlockedTask(c,t);return false;
   }
   const deer=G.world.deer.find(d=>d.id===t.deerId),now=G.huntingNow();
-  t.done=true;deer.generation++;deer.returnDay=now+G.HUNTING.replenishDays;t.b.huntingReadyDay=now+G.HUNTING.cooldownDays;
+  t.done=true;deer.generation++;deer.returnDay=Math.max(now+1,G.world.wildlife.nextBirthDay);deer.route=[];deer.progress=0;t.b.huntingReadyDay=now+G.HUNTING.cooldownDays;
   c.task=null;if(c.pausedTask===t)c.pausedTask=null;
   c.carry={type:'meat',qty:t.yield.qty,extra:{leather:t.extra.leather},staffingReturn:true,huntingId:t.b.id};
   G.recordProduction(t.b,'meat',t.yield.qty);G.recordProduction(t.b,'leather',t.extra.leather);
   G.startHaul(c);return true;
 };
+G.deerRoute=function(w,d,targets){
+  const route=G.findPathToAny(w,d.x,d.y,targets);
+  if(!route||route.path.length>256)return false;
+  d.route=route.path.filter((p,i)=>i||p.x!==d.x||p.y!==d.y).map(p=>({x:p.x,y:p.y}));d.progress=0;return true;
+};
 G.advanceDeer=function(){
-  const w=G.world,g=G.game;if(!w.deer)return;G.reconcileDeerHabitat();const claims=G.huntingClaims();let all=null;
-  const occupied=(x,y,except)=>w.deer.some(d=>d!==except&&d.returnDay===null&&d.x===x&&d.y===y);
-  for(const d of w.deer){
-    if(d.returnDay!==null){
-      if(G.huntingNow()<d.returnDay)continue;
-      const local=[];for(let y=d.homeY-G.HUNTING.roamRadius;y<=d.homeY+G.HUNTING.roamRadius;y++)for(let x=d.homeX-G.HUNTING.roamRadius;x<=d.homeX+G.HUNTING.roamRadius;x++)if(G.deerHabitat(w,x,y)&&!occupied(x,y,d))local.push({x,y});
-      const options=local.length?local:(all||(all=G.deerCandidates(w))).filter(p=>!occupied(p.x,p.y,d));
-      if(!options.length)continue;
-      const p=options[Math.floor(G.h2(w.seed^d.id,g.day,d.id)*options.length)%options.length];
-      d.x=p.x;d.y=p.y;if(!local.length){d.homeX=p.x;d.homeY=p.y;}d.returnDay=null;d.moveDay=g.day+G.HUNTING.moveDays;continue;
+  const w=G.world,g=G.game;if(!w.deer)return;G.upgradeWildlife(w,g);
+  const eco=w.wildlife,now=G.huntingNow(g),elapsed=Math.max(0,now-eco.lastTime);if(elapsed<=0)return;eco.lastTime=now;
+  const cacheKey=[g.day,w.trees.length,w.navigationRevision||0].join(':');
+  if(w._wildlifeCandidateKey!==cacheKey){w._wildlifeCandidates=G.deerCandidates(w);w._wildlifeCandidateKey=cacheKey;}
+  const all=w._wildlifeCandidates,occupied=(x,y,except)=>w.deer.some(d=>d!==except&&d.returnDay===null&&(d.x===x&&d.y===y||d.route?.[0]?.x===x&&d.route?.[0]?.y===y));
+  // Annual, bounded herd recovery. No catch-up multiplication after time skips.
+  if(now>=eco.nextBirthDay){
+    for(const herd of eco.herds){
+      const members=w.deer.filter(d=>d.herdId===herd.id),alive=members.filter(d=>d.returnDay===null).length;
+      let births=Math.min(8-alive,Math.max(5,alive*2)-alive);
+      const habitat=all.filter(p=>G.d2(p.x,p.y,herd.x,herd.y)<=64);
+      for(const d of members)if(births>0&&d.returnDay!==null&&now>=d.returnDay){
+        const p=habitat.find(p=>!occupied(p.x,p.y,d));if(!p)break;
+        d.x=p.x;d.y=p.y;d.homeX=herd.x;d.homeY=herd.y;d.returnDay=null;d.route=[];d.progress=0;d.moveDay=g.day+1;births--;
+      }
     }
-    if(g.day<d.moveDay)continue;d.moveDay=g.day+G.HUNTING.moveDays;
-    if(claims.deer.has(d.id))continue; // no moving-target remote kills
-    const options=[[1,0],[0,1],[-1,0],[0,-1]].map(([dx,dy])=>({x:d.x+dx,y:d.y+dy})).filter(p=>Math.abs(p.x-d.homeX)<=G.HUNTING.roamRadius&&Math.abs(p.y-d.homeY)<=G.HUNTING.roamRadius&&G.deerHabitat(w,p.x,p.y)&&!occupied(p.x,p.y,d));
-    if(options.length){const p=options[Math.floor(G.h2(w.seed^d.id,g.day,d.id)*options.length)%options.length];d.x=p.x;d.y=p.y;}
+    eco.nextBirthDay=(Math.floor(now/G.YEAR_DAYS)+1)*G.YEAR_DAYS;
+  }
+  for(const herd of eco.herds)if(now>=herd.nextMoveDay){
+    const members=w.deer.filter(d=>d.herdId===herd.id&&d.returnDay===null),leader=members[0];
+    // Habitat candidates stay within the 64-wide local migration district.
+    const candidates=all.filter(p=>Math.abs(p.x-herd.x)<=32&&Math.abs(p.y-herd.y)<=32&&G.d2(p.x,p.y,herd.x,herd.y)>=16);
+    if(leader&&candidates.length){const offset=Math.floor(G.h2(w.seed^herd.id,g.day,herd.id)*candidates.length);
+      for(let n=0;n<Math.min(12,candidates.length);n++){const p=candidates[(offset+n)%candidates.length];if(G.findPathToAny(w,leader.x,leader.y,[p])){herd.x=p.x;herd.y=p.y;break;}}
+    }else if(!leader&&all.length){const p=all[Math.floor(G.h2(w.seed,g.day,herd.id)*all.length)];herd.x=p.x;herd.y=p.y;}
+    herd.nextMoveDay=now+4;
+  }
+  for(const d of w.deer){
+    if(d.returnDay!==null)continue;
+    const herd=eco.herds[d.herdId-1];
+    // Only a present hunter at this exact stationary prey may hold it during
+    // onsite work. A distant, sleeping or paused claimant cannot freeze it.
+    const processing=w.citizens.some(c=>c.task?.deerId===d.id&&c.state==='work'&&G.atHuntingTarget(c,c.task));
+    if(processing){d.route=[];d.progress=0;continue;}
+    if(!d.route.length&&now>=d.moveDay){
+      const local=[[1,0],[0,1],[-1,0],[0,-1]].map(([dx,dy])=>({x:d.x+dx,y:d.y+dy})).filter(p=>G.d2(p.x,p.y,herd.x,herd.y)<=64&&G.deerHabitat(w,p.x,p.y)&&G.walkEdgeAllowed(w,d.x,d.y,p.x,p.y)&&!occupied(p.x,p.y,d));
+      if(local.length){const p=local[Math.floor(G.h2(w.seed^d.id,Math.floor(now*8),d.id)*local.length)];d.route=[p];d.progress=0;}
+      else{
+        const nearby=all.filter(p=>G.d2(p.x,p.y,herd.x,herd.y)<=64&&!occupied(p.x,p.y,d)&&!(p.x===d.x&&p.y===d.y));
+        const offset=nearby.length?Math.floor(G.h2(w.seed^d.id,g.day,d.id)*nearby.length):0;
+        G.deerRoute(w,d,nearby.slice(offset).concat(nearby.slice(0,offset)).slice(0,12));
+      }
+      d.moveDay=now+.125;
+    }
+    let distance=Math.min(elapsed*G.DAY_H*.7,32),guard=0;
+    while(d.route.length&&distance>0&&guard++<64){
+      const p=d.route[0];if(!G.walkEdgeAllowed(w,d.x,d.y,p.x,p.y)||occupied(p.x,p.y,d)){
+        // If the edge was blocked while in flight, retain its physical
+        // progress until it becomes usable; never teleport to either endpoint.
+        if(d.progress===0)d.route=[];break;
+      }
+      const length=Math.hypot(p.x-d.x,p.y-d.y),remaining=length*(1-d.progress);
+      if(distance<remaining){d.progress+=distance/length;distance=0;}
+      else{distance-=remaining;d.x=p.x;d.y=p.y;d.route.shift();d.progress=0;if(!d.route.length)d.moveDay=now+.125;}
+    }
   }
 };
 G.loseHuntingCargo=function(c){
@@ -4512,6 +4583,7 @@ G.tunnelLooseGoods=function(b){const w=G.world;return [...(w.supplyCaches||[]),.
 G.tunnelRemovalQuote=function(b){
  const w=G.world;if(!b||w.bmap[b.id]!==b||b.type!=='tunnel')return {ok:false,reason:'隧道已不存在'};
  const {start,end}=G.tunnelEndpoints(b),refund=G.constructionRefund(b),length=b.w+b.h-1,base={start,end,length,refund};
+ if(G.wildlifeInFootprint(w,b))return {...base,ok:false,reason:'洞内或洞口有野鹿，请等它完全离开后再拆除'};
  // Includes mouths and fractional crossing segments. Check again at final confirmation.
  if(w.citizens.some(c=>!c.dead&&c.x>=b.x-.5&&c.x<=b.x+b.w-.5&&c.y>=b.y-.5&&c.y<=b.y+b.h-.5))return {...base,ok:false,reason:'洞内或洞口仍有人，请等居民完全离开后再拆除'};
  if(G.tunnelLooseGoods(b).length)return {...base,ok:false,reason:'洞内有死亡后散落实货，请实际搬空后再拆除'};

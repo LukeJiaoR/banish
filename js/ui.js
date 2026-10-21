@@ -1809,8 +1809,8 @@ G.ui = {
       batch:`每鹿基础肉 ${p.meat} / 受教育 ${p.eduMeat}，皮革 ${p.leather} / ${p.eduLeather}；肉皮另受当前工具规则影响。两名猎人共用一个冷却，不会各算一次。`,
       losses:`猎获及遗留肉皮运输死亡损失：全镇累计肉 ${G.game.huntingLost?.meat||0}、皮革 ${G.game.huntingLost?.leather||0}（肉另计食物账本，皮革在此保留记录）。`,
       delivery:'猎物先成为实背肉皮，走到可达通用仓才入库；仓满或断路保留携货，减少岗位先运完。旧档来源不明的肉皮同样保货，标为遗留货物，不推定是鹿肉。',
-      wildlife:`鹿会在栖地附近活动，被猎后 ${p.replenishDays} 天后补入；无永久灭绝、不吃庄稼。圈内数量不是入库保证。`,
-      source:'原版每屋两月间隔按48日年折为8日；鹿群规模、产量和补入节奏为本作适配。旧档首次读入补建野生鹿，库存与携货不变；之后猎屋也按此间隔工作。',
+      wildlife:`鹿按群沿真实路径觅食迁徙；每年繁殖恢复，最多24只。下一繁殖日 ${G.world.wildlife?.nextBirthDay??'待初始化'}；圈内数量不保证猎获，不吃庄稼。`,
+      source:'依据官方工具包的鹿群/觅食区/月度迁徙/年度繁殖配置；3群各8上限、48日年及移动速度均为本作适配。每屋两月折8日，旧档保留现鹿、缺席、冷却和肉皮。',
     };
   },
   huntingInfoMarkup:function(b){const d=this.huntingInfoData(b);return d?`<section class="economy-form" data-hunting-panel><div class="row"><b>鹿群与狩猎</b></div>${Object.entries(d).map(([k,v])=>`<div class="row${['batch','delivery','wildlife','source'].includes(k)?' desc':''}" data-hunting="${k}">${this.escHtml(v)}</div>`).join('')}</section>`:'';},

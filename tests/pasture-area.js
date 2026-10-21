@@ -12,7 +12,7 @@ function fresh(){
   for(const k of ['water','rock','road'])w[k].fill(0);
   w.bgrid.fill(-1);w.treeIdx.fill(-1);w.trees=[];w.buildings=[];w.bmap={};
   w.citizens=[];w.cmap={};w.families=[];w.marked.clear();w.markedRocks.clear();
-  G.bumpNavigation(w);G.game.h=12;G.rng=()=>.5;
+  G.bumpNavigation(w);G.initializeDeer();G.game.h=12;G.rng=()=>.5;
   G.addBuilding('storage',2,2,{instant:true,free:true});
   for(const k of G.RES_KEYS)G.game.res[k]=0;G.game.res.tools=100;
   const generate=G.genWorld;

@@ -1,5 +1,7 @@
 # 鹿群与实际狩猎（0.3.70）
 
+> 本文保留基础狩猎的历史规则。当前鹿群运动、年度恢复及v2迁移由 [真实鹿群](deer-herds.md) 更新；猎屋冷却与肉皮实运仍沿本文合同。
+
 跟踪：[Issue #77](https://github.com/LukeJiaoR/banish/issues/77)。实现前基线为 [main 72deabe](https://github.com/LukeJiaoR/banish/tree/72deabe6ff42fe8e627a2590b963ba06ee5ea0df)，紧接可变果园 #76。
 
 ## 原版依据与矛盾

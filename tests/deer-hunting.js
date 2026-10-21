@@ -30,7 +30,7 @@ test('actual prey walking and complete onsite work create exactly one mixed carg
  const G=fresh(),b=cabin(G),c=hunter(G,b),d=deer(G),t=start(G,c);assert.equal(c.state,'walk');assert.equal(t.work,5);
  G.completeTask(c);assert.equal(c.carry,null);assert.equal(d.returnDay,null);assert.equal(G.game.res.meat,0);
  start(G,c);until(G,[c],()=>c.state==='work');const work=c.task.workLeft;G.stepCitizen(c,.05);assert(c.task.workLeft<work&&c.task.workLeft>0);assert.equal(c.carry,null);
- until(G,[c],()=>!!c.carry);assert.equal(c.carry.qty,160);assert.equal(c.carry.extra.leather,4);assert.equal(c.carry.huntingId,b.id);assert.equal(G.game.res.meat,0);assert.equal(d.returnDay,8.5);assert.equal(b.huntingReadyDay,8.5);
+ until(G,[c],()=>!!c.carry);assert.equal(c.carry.qty,160);assert.equal(c.carry.extra.leather,4);assert.equal(c.carry.huntingId,b.id);assert.equal(G.game.res.meat,0);assert.equal(d.returnDay,48);assert.equal(b.huntingReadyDay,8.5);
  until(G,[c],()=>!c.carry);assert.equal(G.game.res.meat,160);assert.equal(G.game.res.leather,4);assert.equal(b.produced.meat,160);assert.equal(b.produced.leather,4);
 });
 test('a fractional interrupted approach walks its final fraction before work or completion',()=>{
@@ -42,15 +42,15 @@ test('one cabin reserves one deer; overlapping cabin may reserve a distinct deer
 test('copied completions cannot duplicate a deer now or after it replenishes',()=>{
  const G=fresh(),b=cabin(G),c=hunter(G,b);deer(G);const task=start(G,c),copy={...task};until(G,[c],()=>!!c.carry);const count=total(G,'meat');G.completeHuntingTask(c,task);assert.equal(total(G,'meat'),count);until(G,[c],()=>!c.carry);G.game.day=9;G.advanceDeer();copy.workLeft=0;c.task=copy;c.x=copy.tx;c.y=copy.ty;assert(!G.completeHuntingTask(c,copy));assert.equal(total(G,'meat'),count);
 });
-test('pause locks prey while reassignment, blocked targets and death release derived claims',()=>{
- const G=fresh(),b=cabin(G),c=hunter(G,b),other=cabin(G,11,17),z=hunter(G,other),d=deer(G);start(G,c);G.goHome(c);assert(c.pausedTask);const at=[d.x,d.y];G.game.day=1;G.advanceDeer();assert.deepEqual([d.x,d.y],at);assert.equal(G.makeTask(other,z),null);G.releaseWorker(c);assert(G.makeTask(other,z));
+test('paused claim does not freeze prey; reassignment, blocked targets and death release claims',()=>{
+ const G=fresh(),b=cabin(G),c=hunter(G,b),other=cabin(G,11,17),z=hunter(G,other),d=deer(G);start(G,c);G.goHome(c);assert(c.pausedTask);const at=[d.x,d.y];G.game.day=1;G.advanceDeer();assert.notDeepEqual([d.x,d.y],at);d.x=at[0];d.y=at[1];d.route=[];d.progress=0;assert.equal(G.makeTask(other,z),null);G.releaseWorker(c);assert(G.makeTask(other,z));
  c.job=b.id;b.workers.push(c.id);c.state='idle';start(G,c);G.world.water[d.y*G.world.N+d.x]=1;G.stepCitizen(c,.05);assert.equal(c.task,null);assert.equal(G.huntingClaims().deer.size,0);G.world.water[d.y*G.world.N+d.x]=0;c.wanderT=0;start(G,c);G.killCitizen(c,'测试');assert.equal(G.huntingClaims().deer.size,0);assert.equal(G.game.res.meat,0);
 });
 test('no deer, fully claimed or unreachable prey yields no synthetic food',()=>{
  const G=fresh(),b=cabin(G),c=hunter(G,b);assert.equal(G.makeTask(b,c),null);deer(G);for(let y=0;y<G.world.N;y++)G.world.water[y*G.world.N+13]=1;G.bumpNavigation(G.world);assert.equal(G.makeTask(b,c),null);assert.equal(G.huntingSummary(b,{citizen:c}).reachable,0);assert.equal(G.game.res.meat,0);
 });
-test('shared cooldown lasts eight exact game days and bounded replenishment never clones slots',()=>{
- const G=fresh(),b=cabin(G),c=hunter(G,b);deer(G);kill(G,c);until(G,[c],()=>!c.carry);G.game.day=8;G.game.h=11.9;G.advanceDeer();assert(G.huntingSummary(b).cooldownDays>0);assert.equal(G.world.deer[0].returnDay,8.5);G.game.h=12;G.advanceDeer();assert.equal(G.world.deer[0].returnDay,null);assert.equal(G.huntingSummary(b).cooldownDays,0);assert.equal(G.world.deer.length,24);const before=snap(G).deer;G.advanceDeer();assert.deepEqual(snap(G).deer,before);
+test('shared cooldown lasts eight exact days independently of annual herd replenishment',()=>{
+ const G=fresh(),b=cabin(G),c=hunter(G,b);deer(G);kill(G,c);until(G,[c],()=>!c.carry);G.game.day=8;G.game.h=11.9;G.advanceDeer();assert(G.huntingSummary(b).cooldownDays>0);assert.equal(G.world.deer[0].returnDay,48);G.game.h=12;G.advanceDeer();assert.equal(G.world.deer[0].returnDay,48);assert.equal(G.huntingSummary(b).cooldownDays,0);assert.equal(G.world.deer.length,24);const before=snap(G).deer;G.advanceDeer();assert.deepEqual(snap(G).deer,before);
 });
 test('partial meat delivery and full leather storage preserve both resources, marker and reload',()=>{
  const G=fresh(),b=cabin(G),c=hunter(G,b);deer(G);kill(G,c);G.game.res.food=G.game.res.grain=G.storageCap()-7;G.game.res.leather=G.storageCap();until(G,[c],()=>c.state==='waitStorage');assert.equal(c.carry.qty,153);assert.equal(c.carry.extra.leather,4);assert.equal(G.game.res.meat,7);
@@ -77,8 +77,9 @@ test('square range matches existing overlay and preview excludes footprint witho
 test('saving a suspended hunt restarts work without refilling, moving or preserving stale claims',()=>{
  const G=fresh(),b=cabin(G),c=hunter(G,b);deer(G);start(G,c);G.goHome(c);assert(c.pausedTask);const saved=snap(G),deers=plain(G.world.deer);assert.deepEqual(saved.deer,deers);G.applySaveData(saved);const loaded=G.world.cmap[c.id];assert.equal(loaded.task,null);assert.equal(loaded.pausedTask,null);assert.equal(G.huntingClaims().deer.size,0);assert.deepEqual(plain(G.world.deer),deers);assert.equal(total(G,'meat'),0);assert.equal(G.world.bmap[b.id].huntingReadyDay,0);
 });
-test('lost habitat never permanently depletes slots; replanting allows bounded legal replenishment',()=>{
- const G=fresh(),b=cabin(G),c=hunter(G,b),d=deer(G);start(G,c);for(const t of [...G.world.trees])G.removeTree(G.world,t.x,t.y);assert.equal(d.returnDay,8.5);G.stepCitizen(c,.05);assert.equal(c.task,null);assert.equal(G.huntingClaims().deer.size,0);G.game.day=9;G.advanceDeer();assert(G.world.deer.every(d=>d.returnDay!==null));G.addTree(G.world,20,20,-90);G.advanceDeer();assert(G.world.deer.some(d=>d.returnDay===null));assert.equal(G.world.deer.length,24);assert.equal(total(G,'meat'),0);
+test('clearing grazing habitat keeps living prey real; annual recovery requires habitat',()=>{
+ const G=fresh(),b=cabin(G),c=hunter(G,b),d=deer(G);start(G,c);for(const t of [...G.world.trees])G.removeTree(G.world,t.x,t.y);assert.equal(d.returnDay,null);assert.equal(total(G,'meat'),0);
+ G.game.day=48;G.advanceDeer();assert.equal(G.world.deer.filter(d=>d.returnDay===null).length,1);G.addTree(G.world,20,20,-90);G.game.day=96;G.advanceDeer();assert(G.world.deer.some(d=>d.returnDay===null));assert.equal(G.world.deer.length,24);assert.equal(total(G,'meat'),0);
 });
 test('full meat and a partially delivered leather batch record only remaining leather on death',()=>{
  const G=fresh(),b=cabin(G),c=hunter(G,b);deer(G);kill(G,c);G.game.res.leather=G.storageCap()-1;until(G,[c],()=>c.state==='waitStorage'&&c.carry?.type==='leather');assert.equal(c.carry.qty,3);assert.equal(G.game.res.meat,160);G.killCitizen(c,'测试');assert.deepEqual(plain(G.game.huntingLost),{meat:0,leather:3});
@@ -136,7 +137,7 @@ test('legacy migration leaves explicitly marked pasture, tailor, household and o
  const cargoes=[{type:'meat',qty:6,pastureId:999},{type:'leather',qty:4,pastureId:999},{type:'leather',qty:2,staffingReturn:true,coatInput:999},
    {type:'meat',qty:3,staffingReturn:true,supplyBatch:{kind:'return',to:null}},{type:'clothes',qty:1,tailorId:999},
    {type:'wood',qty:2,staffingReturn:true,fuelInput:true},{type:'grain',qty:4,brewIngredient:true}];
- for(const cargo of cargoes){const data=snap(G);delete data.deer;delete data.game.huntingLost;for(const row of data.buildings)delete row.huntingReadyDay;
+ for(const cargo of cargoes){const data=snap(G);delete data.deer;delete data.wildlife;delete data.game.huntingLost;for(const row of data.buildings)delete row.huntingReadyDay;
    data.citizens.find(row=>row.id===c.id).carry=cargo;const candidate=G.prepareSaveData(data),got=candidate.world.cmap[c.id].carry;assert.deepEqual(plain(got),cargo);assert.equal(got.huntingId,undefined);
  }
 });
