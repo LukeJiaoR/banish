@@ -1153,6 +1153,35 @@ G.pastureAnimalSpots=function(b){
   return Array.from({length:Math.min(count,spots.length)},(_,i)=>spots[Math.floor((i+.5)*spots.length/count)]);
 };
 
+// Cosmetic motion is a pure function of the saved simulation clock. It neither
+// consumes RNG nor changes animal counts, hunting targets or production. A paused
+// game holds its pose; speed and reload naturally follow the same clock.
+G.animalPose=function(id){
+  if(G.buildingReducedMotion())return {dx:0,dy:0,bob:0,flip:id%3===1};
+  const time=((G.game.day||0)*G.DAY_H+(G.game.h||0))/G.HOURS_PER_SEC,
+    phase=time*.65+id*2.399,walk=Math.cos(phase),stride=Math.max(0,Math.abs(walk)-.3)/.7;
+  return {dx:Math.sin(phase)*.32,dy:Math.sin(phase*.71+id)*.22,
+    bob:Math.abs(Math.sin(time*7+id))*stride*.8,flip:walk<0};
+};
+G.pastureAnimalPoint=function(b,spot,i){
+  const pose=G.animalPose(b.id*31+i),[x,y]=spot;
+  // Keep area-pen feet outside the shelter and every herd inside its fence.
+  let dx=pose.dx,dy=pose.dy;
+  if(b.pastureSize){
+    if(x>=3.4&&y<3.72)dx=Math.max(3.4-x,dx);
+    if(y>=3.4&&x<3.72)dy=Math.max(3.4-y,dy);
+  }
+  return {x:b.x+G.clamp(x+dx,.55,b.w-.55),y:b.y+G.clamp(y+dy,.55,b.h-.55),pose};
+};
+G.deerDisplayPoint=function(deer){
+  const pose=G.animalPose(deer.id);
+  // Stay inside the actual habitat tile; never move prey across a shoreline,
+  // building or hunting-range boundary for the sake of an animation.
+  const reduced=G.buildingReducedMotion();
+  if(reduced)pose.flip=deer.id%2===0;
+  return {x:deer.x+(reduced?0:(pose.dx+.32)*.6),y:deer.y+(reduced?0:(pose.dy+.22)*.6),pose};
+};
+
 // Work uses integer tiles; new tree feet sit at those tiles' visual centers.
 G.orchardDisplayPoint=function(b,i){const p=G.orchardPoint(b,i),offset=b.orchardSize ? 0.5 : 0;return {x:p.x+offset,y:p.y+offset};};
 
@@ -1180,7 +1209,7 @@ G.addEconomyFieldParts = function (items, b, bounds) {
   } else {
     add({ kind: 'sheepShelter', x: b.x + 2.1, y: b.y + 2.1 });
     const spots=G.pastureAnimalSpots(b),count=spots.length;
-    for (let i = 0; i < count; i++) add({ kind: G.pastureTypeOf(b), x: b.x + spots[i][0], y: b.y + spots[i][1], n: i });
+    for (let i = 0; i < count; i++) add({ kind: G.pastureTypeOf(b), ...G.pastureAnimalPoint(b,spots[i],i), n: i });
   }
 };
 
@@ -1189,15 +1218,15 @@ G.addEconomyFieldParts = function (items, b, bounds) {
 G.addDeerDrawItems = function(items, w, bounds) {
   for(const deer of w.deer||[]) if(deer.returnDay===null &&
     (!bounds || (deer.x>=bounds.tx0-1&&deer.x<=bounds.tx1+1&&deer.y>=bounds.ty0-1&&deer.y<=bounds.ty1+1)))
-    items.push({d:deer.x+deer.y+.015,k:7,deer});
+    {const point=G.deerDisplayPoint(deer);items.push({d:point.x+point.y+.015,k:7,deer});}
 };
 G.drawDeer = function(ctx, deer) {
   if(deer.returnDay!==null)return;
-  const [x,y]=G.T2S(deer.x,deer.y);
-  ctx.fillStyle='rgba(26,32,19,.16)';ctx.beginPath();ctx.ellipse(x,y-1,8,2.6,0,0,Math.PI*2);ctx.fill();
-  if(G.sprDraw(ctx,'deer',x,y,{w:26,flip:deer.id%2===0}))return;
+  const point=G.deerDisplayPoint(deer),[x,footY]=G.T2S(point.x,point.y),y=footY-point.pose.bob;
+  ctx.fillStyle='rgba(26,32,19,.16)';ctx.beginPath();ctx.ellipse(x,footY-1,8,2.6,0,0,Math.PI*2);ctx.fill();
+  if(G.sprDraw(ctx,'deer',x,y,{w:26,flip:point.pose.flip}))return;
   // Missing-image fallback, consistent with other entity fallbacks.
-  ctx.save();ctx.translate(x,y);if(deer.id%2===0)ctx.scale(-1,1);
+  ctx.save();ctx.translate(x,y);if(point.pose.flip)ctx.scale(-1,1);
   ctx.strokeStyle='#705039';ctx.lineWidth=1.5;ctx.beginPath();
   for(const dx of [-6,-3,4,7]){ctx.moveTo(dx,-7);ctx.lineTo(dx-1,-1);}ctx.stroke();
   ctx.fillStyle='#a77c51';ctx.beginPath();ctx.ellipse(0,-9,9,4,0,0,Math.PI*2);ctx.fill();
@@ -1230,10 +1259,11 @@ G.drawEconomyFieldPart = function (ctx, p) {
   if (p.kind === 'sheepShelter') {
     G.sprDraw(ctx, 'pasture', sx, sy, { w: 112 }); return;
   }
-  if(p.kind==='chicken'){G.sprDraw(ctx,'chicken',sx,sy,{w:16,flip:p.n%3===1});return;}
-  if(p.kind==='cattle'){G.sprDraw(ctx,'cattle',sx,sy,{w:32,flip:p.n%3===1});return;}
+  const animalY=sy-(p.pose?.bob||0),animalFlip=p.pose?.flip??(p.n%3===1);
+  if(p.kind==='chicken'){G.sprDraw(ctx,'chicken',sx,animalY,{w:16,flip:animalFlip});return;}
+  if(p.kind==='cattle'){G.sprDraw(ctx,'cattle',sx,animalY,{w:32,flip:animalFlip});return;}
   if (p.kind === 'sheep') {
-    G.sprDraw(ctx, 'sheep', sx, sy, { w: 24, flip: p.n % 3 === 1 }); return;
+    G.sprDraw(ctx, 'sheep', sx, animalY, { w: 24, flip: animalFlip }); return;
   }
   if (p.kind === 'fruitTree') {
     const tree=p.b.orchardTrees?.[p.ti];

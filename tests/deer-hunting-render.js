@@ -3,7 +3,7 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),crypto=require('node:crypto');
 const root=path.resolve(__dirname,'..'),context={console,document:{},addEventListener(){},setTimeout(){},clearTimeout(){}};context.window=context;vm.createContext(context);
 for(const n of ['core','defs','map','sim','sprites','render'])vm.runInContext(fs.readFileSync(path.join(root,'js',n+'.js'),'utf8'),context);
-const G=context.G;G.game=G.newGameState();G.cam={z:1};let passed=0;function test(n,f){f();passed++;console.log('ok '+n);}
+const G=context.G;G.buildingReducedMotion=()=>true;G.game=G.newGameState();G.cam={z:1};let passed=0;function test(n,f){f();passed++;console.log('ok '+n);}
 function canvas(){const calls=[];return {calls,ctx:new Proxy({},{get:(o,k)=>o[k]||((...a)=>calls.push([k,...a])),set:(o,k,v)=>(o[k]=v,true)})};}
 const deer=(id,x,y,returnDay=null)=>({id,x,y,homeX:x,homeY:y,returnDay,moveDay:1});
 test('only living visible deer enter scene depth sorting with true world coordinates',()=>{const w={deer:[deer(1,3,4),deer(2,5,4,8),deer(3,40,40)]},a=[];G.addDeerDrawItems(a,w,{tx0:0,ty0:0,tx1:10,ty1:10});assert.equal(a.length,1);assert.equal(a[0].deer,w.deer[0]);assert.equal(a[0].d,7.015);assert.equal(a[0].k,7);});
