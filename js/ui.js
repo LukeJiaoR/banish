@@ -334,7 +334,10 @@ G.ui = {
     this.el.toolbar.querySelectorAll('[data-tool]').forEach(btn => btn.addEventListener('click', () => {
       if (G.hasOpenModal && G.hasOpenModal()) return;
       const k = btn.dataset.tool;
-      const active = !!G.tool && (G.tool.kind === k || (G.tool.kind === 'build' && G.tool.type === k));
+      // Road tools share a kind; their surface identifies the actual menu item.
+      const selected = G.tool && (G.tool.kind === 'build' ? G.tool.type : G.tool.kind === 'road'
+        ? ({ dirt: 'road', stone: 'stoneroad', bridge: 'bridge', tunnel: 'tunnel' }[G.tool.surface] || 'road') : G.tool.kind);
+      const active = selected === k;
       G.setTool(active ? null : k);
     }));
     document.getElementById('toolbar-back').addEventListener('click', () => this.backToCategories());
