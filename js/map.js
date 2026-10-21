@@ -602,14 +602,16 @@ G.findPath = function (w, sx, sy, tx, ty, destinations = null) {
     if (!valid.length) return null;
     goals = new Set(valid.map(p => p.y * w.N + p.x));
     bounds = { minX: Math.min(...valid.map(p => p.x)), maxX: Math.max(...valid.map(p => p.x)), minY: Math.min(...valid.map(p => p.y)), maxY: Math.max(...valid.map(p => p.y)) };
-    if (goals.has(sy * w.N + sx)) return [];
+    // A rounded start cell is not physical arrival, even for IEEE residuals.
+    // Keep the last segment so normal movement validates it and lands exactly.
+    if (goals.has(sy * w.N + sx)) return fromX===sx&&fromY===sy ? [] : [{x:sx,y:sy}];
   } else {
     if (G.tileBlocked(w, tx, ty)) {
       const alt = G.nearestWalkable(w, tx, ty, 4);
       if (!alt) return null;
       tx = alt.x; ty = alt.y;
     }
-    if (sx === tx && sy === ty) return [];
+    if (sx === tx && sy === ty) return fromX===sx&&fromY===sy ? [] : [{x:sx,y:sy}];
   }
   const N = w.N;
   const gen = ++G._pfGen || (G._pfGen = 1);
