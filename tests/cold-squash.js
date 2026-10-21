@@ -33,7 +33,8 @@ test('merchant stock remains exact on load; future seed order charges 3125 and a
   p.merchant.id='seeds';p.merchant.arrivedDay=0;assert(G.orderMerchantGoods(p,'squashSeed',1,p.merchant).ok);
   assert.equal(p.tradeInventory.stone||0,0);assert(!G.game.unlocks.squash);p.tradeInventory.stone=1000;
   assert(G.setAutoTrade(p,{enabled:true,good:'squashSeed',qty:1,payment:'stone',maxPrice:3125},G.game).ok);assert(!G.game.unlocks.squash);
-  p.merchant=null;p.nextMerchantDay=48;p.merchantVisits=5;day(G,48);G.advanceTownEconomy();assert.equal(p.merchant.id,'seeds');assert.equal(G.merchantPrice(p,'squashSeed'),3125);
+  // Settle annual wildlife after this artificial time jump so the later save is valid.
+  p.merchant=null;p.nextMerchantDay=48;p.merchantVisits=5;day(G,48);G.advanceDeer();G.advanceTownEconomy();assert.equal(p.merchant.id,'seeds');assert.equal(G.merchantPrice(p,'squashSeed'),3125);
   assert.equal(G.game.unlocks.squash,true);assert.equal(p.tradeInventory.stone,553);assert.equal(p.merchant.stock.squashSeed,0);assert.equal(p.autoTradeLast.paid,447);
   G.runArrivalAutoTrade(p,p.merchant);assert.equal(p.tradeInventory.stone,553);G.applySaveData(save(G));p=G.world.bmap[b.id];G.runArrivalAutoTrade(p,p.merchant);assert.equal(p.tradeInventory.stone,553);
 });
