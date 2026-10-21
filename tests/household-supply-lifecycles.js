@@ -9,8 +9,11 @@ const root = path.resolve(__dirname, '..');
 const results = [];
 const near = (actual, expected, label = '') => assert(Math.abs(actual - expected) < 1e-7, `${label}: ${actual} != ${expected}`);
 
-function fresh() {
+function fresh({ legacy = false } = {}) {
   const G = loadGame(root); G.newGame(1);
+  // Fixed-calendar historical cases intentionally use the pre-climate format.
+  // Other supply cases keep the real new-game Fair/v5 default.
+  if (legacy) { G.game.climate = null; delete G.game.startConfig.climate; assertLegacy(G); }
   const w = G.world;
   for (const k of ['water', 'rock', 'road']) w[k].fill(0);
   w.bgrid.fill(-1); w.treeIdx.fill(-1);
@@ -88,8 +91,14 @@ function deliver(G, c, initial = inventory(G)) {
   return runUntil(G, () => !c.carry && !G.supplyTaskOf(c), { citizen: c, initial, label: 'delivery' });
 }
 const save = G => JSON.parse(JSON.stringify(G.serializeGame()));
+function assertLegacy(G) {
+  assert.equal(G.game.climate, null);
+  const snapshot = save(G); assert.equal(snapshot.v, 4);
+  assert.equal(Object.hasOwn(snapshot.game, 'climate'), false);
+  assert.equal(Object.hasOwn(snapshot.game.startConfig, 'climate'), false);
+}
 function roundtrip(G, initial, times = 3) {
-  for (let i = 0; i < times; i++) { G.applySaveData(save(G)); conserved(G, initial, `reload ${i + 1}`); }
+  for (let i = 0; i < times; i++) { const legacy = !G.game.climate; G.applySaveData(save(G)); if (legacy) assertLegacy(G); else { assert.equal(save(G).v, 5); assert.equal(G.game.climate.type, 'fair'); } conserved(G, initial, `reload ${i + 1}`); }
 }
 function ignite(G, b) {
   assert(G.setFireDisasters(true, G.fireToggleQuote(true).key)); assert(G.igniteHouse(b));
@@ -101,6 +110,10 @@ function test(name, fn) {
 }
 
 test('automatic is the new-game default and does not create private stores', () => {
+  const actual = loadGame(root); assert(actual.newGame(1).ok);
+  assert.equal(actual.game.supplyMode, 'automatic'); assert.equal(actual.game.climate.type, 'fair');
+  assert.equal(actual.game.startConfig.climate, 'fair'); assert.equal(save(actual).v, 5);
+  assert(actual.world.buildings.every(b => b.supplyStock === undefined));
   const G = fresh(), h = build(G, 'house', 15, 10), { c } = family(G, h);
   assert.equal(G.supplyEnabled(), false); assert.equal(G.tryHouseholdSupply(c), false);
   const before = G.game.res.food; G.game.h = 23.9; G.advanceSim(.2);
@@ -109,7 +122,7 @@ test('automatic is the new-game default and does not create private stores', () 
 });
 
 test('public to market to home moves mixed goods only after real pickup and arrival', () => {
-  const G = fresh(), market = build(G, 'market', 20, 10), vendorHome = build(G, 'house', 28, 10), buyerHome = build(G, 'house', 28, 17);
+  const G = fresh({ legacy: true }), market = build(G, 'market', 20, 10), vendorHome = build(G, 'house', 28, 10), buyerHome = build(G, 'house', 28, 17);
   const vendor = family(G, vendorHome).c, buyer = family(G, buyerHome).c;
   G.game.day = 24; G.enablePhysicalSupplyPrototype(); G.game.season = 2; G.setHeatingPolicy(true, 20);
   seedStore(G, vendorHome, { grain: 20, vegetables: 20, meat: 20, firewood: 10 });
@@ -131,7 +144,7 @@ test('public to market to home moves mixed goods only after real pickup and arri
 });
 
 test('daily food and heat consume only home stock and preserve the public coal reserve', () => {
-  const G = fresh(), h = build(G, 'house', 17, 10), { c } = family(G, h);
+  const G = fresh({ legacy: true }), h = build(G, 'house', 17, 10), { c } = family(G, h);
   G.enablePhysicalSupplyPrototype(); G.setHeatingPolicy(true, 20);
   seedStore(G, h, { grain: 3, vegetables: 3, meat: 3, firewood: 1, coal: 2 });
   const initial = inventory(G), before = { ...G.game.res }; G.game.day = 35; G.game.season = 2; G.game.h = 23.9;
@@ -240,7 +253,7 @@ test('unquenched fire loses exactly stored goods after real elapsed time and pre
 });
 
 test('five-type vendor cargo retains all items through destination loss and physical return', () => {
-  const G = fresh(), market = build(G, 'market', 20, 10), h = build(G, 'house', 27, 10), { c } = family(G, h);
+  const G = fresh({ legacy: true }), market = build(G, 'market', 20, 10), h = build(G, 'house', 27, 10), { c } = family(G, h);
   G.game.day = 24; G.enablePhysicalSupplyPrototype(); G.game.season = 2; G.setHeatingPolicy(true, 20);
   seedStore(G, h, { grain: 30, vegetables: 30, meat: 30, firewood: 10 });
   const initial = inventory(G), before = { ...G.game.res }; G.assignWorker(market, c);
@@ -267,7 +280,7 @@ test('repeated reload of a fractional in-flight mixed basket preserves destinati
 });
 
 test('five-type vendor cargo survives three reloads then reaches its market without public redeposit', () => {
-  const G = fresh(), market = build(G, 'market', 20, 10), h = build(G, 'house', 27, 10), { c } = family(G, h);
+  const G = fresh({ legacy: true }), market = build(G, 'market', 20, 10), h = build(G, 'house', 27, 10), { c } = family(G, h);
   G.enablePhysicalSupplyPrototype(); G.game.day = 24; G.game.season = 2; G.game.townLedger = G.newTownLedger(G.game); G.setHeatingPolicy(true, 20);
   seedStore(G, h, { grain: 30, vegetables: 30, meat: 30, firewood: 10 }); const initial = inventory(G);
   G.assignWorker(market, c); runUntil(G, () => !!c.carry, { citizen: c, initial, label: 'reload vendor pickup' });
@@ -295,7 +308,7 @@ test('camp and death-cache stocks survive repeated reload and are still real rea
 });
 
 test('legacy snapshot without supply fields remains automatic and preserves original stock', () => {
-  const G = fresh(), h = build(G, 'house', 18, 10); family(G, h);
+  const G = fresh({ legacy: true }), h = build(G, 'house', 18, 10); family(G, h);
   const snapshot = save(G), before = { ...G.game.res };
   for (const key of ['supplyMode', 'supplyStartedDay', 'supplyUsed', 'supplyLost']) delete snapshot.game[key];
   delete snapshot.supplyCaches; G.applySaveData(snapshot);
@@ -335,7 +348,7 @@ test('malformed supply stores, mixed cargo and caches reject atomically without 
 });
 
 test('an empty household cannot eat or heat remotely from abundant public stores', () => {
-  const G = fresh(), h = build(G, 'house', 25, 10), { c } = family(G, h, [8]);
+  const G = fresh({ legacy: true }), h = build(G, 'house', 25, 10), { c } = family(G, h, [8]);
   G.enablePhysicalSupplyPrototype(); G.game.day = 35; G.game.season = 2; G.game.h = 23.9; G.game.townLedger = G.newTownLedger(G.game);
   const initial = inventory(G), before = { ...G.game.res }; G.advanceSim(.2); conserved(G, initial, 'empty winter household');
   assert.equal(c.hunger, 1); assert(h.unheated); near(h.lastHeating.wood, 0); near(h.lastHeating.coal, 0);
@@ -373,7 +386,7 @@ test('active fire and evacuated camp survive reload without duplicating or losin
 });
 
 test('real household baskets substitute permitted coal for missing firewood without touching the industrial reserve', () => {
-  const G = fresh(), h = build(G, 'house', 25, 10), { c } = family(G, h);
+  const G = fresh({ legacy: true }), h = build(G, 'house', 25, 10), { c } = family(G, h);
   G.game.res.firewood = 1; G.game.res.coal = 24.5; G.game.day = 24; G.game.season = 2; G.game.townLedger = G.newTownLedger(G.game);
   G.setHeatingPolicy(true, 20); G.enablePhysicalSupplyPrototype(); const initial = inventory(G), { items } = pickup(G, c, h, initial);
   assert.equal(Object.keys(items).length, 5); near(items.firewood, 1); near(items.coal, 4.5); near(G.game.res.coal, 20);
@@ -393,7 +406,7 @@ test('demolishing the only home reroutes an already-carried family basket to its
 });
 
 test('formal opt-in quote is read-only and grants a conserved two-day starting allocation exactly once across reload', () => {
-  const G = fresh(), h = build(G, 'house', 18, 10), boarding = build(G, 'boarding', 25, 10);
+  const G = fresh({ legacy: true }), h = build(G, 'house', 18, 10), boarding = build(G, 'boarding', 25, 10);
   family(G, h, [30, 8]); family(G, boarding, [30, 8]); family(G, boarding, [30]); family(G, null, [30], 33, 10);
   G.game.day = 24; G.game.season = 2; G.game.townLedger = G.newTownLedger(G.game);
   G.game.res.firewood = 1; G.game.res.coal = 24.5; G.setHeatingPolicy(true, 20);
@@ -508,7 +521,7 @@ test('market vendor and family carry whole warm coats before actual home replace
 });
 
 test('unreachable public clothes do not equip remotely; reopening the crossing enables real delivery and winter protection', () => {
-  const G=fresh(),h=build(G,'house',25,10),{c}=family(G,h);G.game.res.warmCoats=2;G.enablePhysicalSupplyPrototype();clothingMode(G);seedStore(G,h,{grain:80,firewood:30});
+  const G=fresh({ legacy: true }),h=build(G,'house',25,10),{c}=family(G,h);G.game.res.warmCoats=2;G.enablePhysicalSupplyPrototype();clothingMode(G);seedStore(G,h,{grain:80,firewood:30});
   for(let y=0;y<G.world.N;y++)G.world.water[y*G.world.N+15]=1;G.bumpNavigation(G.world);G.game.day=36;G.game.season=3;G.game.h=8;G.game.townLedger=G.newTownLedger(G.game);
   const initial=inventory(G);for(let n=0;n<240;n++){G.advanceSim(.1);conserved(G,initial,'blocked coat '+n);assert.equal(c.clothingLeft,0);}
   assert.equal(G.game.res.warmCoats,2);const before=c.cold;G.world.water[10*G.world.N+15]=0;G.bumpNavigation(G.world);
