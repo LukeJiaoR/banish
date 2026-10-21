@@ -83,7 +83,8 @@ G.mountainCornerHeight = function(w,x,y) {
   for(let yy=y-5;yy<=y+4;yy++)for(let xx=x-5;xx<=x+4;xx++)
     if(!G.isMountain(w,xx,yy))distance=Math.min(distance,Math.hypot(xx+.5-x,yy+.5-y));
   const inset=Math.max(0,distance-Math.SQRT1_2);
-  const ripple=9*Math.min(1,inset/2)*Math.sin(x*.32+(w.seed||0)%97)*Math.cos(y*.27+(w.seed||0)%43);
+  const phase=(w.seed||0)%97;
+  const ripple=Math.min(1,inset/1.5)*(18*Math.sin(x*.73+phase)*Math.cos(y*.51+phase)+9*Math.sin(x*.31-y*.67));
   heights[i]=Math.max(3,Math.min(G.MOUNTAIN_MAX_RISE,3+24*Math.pow(inset,.82)+ripple));return heights[i];
 };
 G.mountainPolygons = function(w,x,y) {
@@ -123,6 +124,22 @@ G.screenToMapTile = function(sx,sy) {
     return {tx:p.x+.5,ty:p.y+.5,...(p.portal?{tunnel:true}:{mountain:true})};}
   return flat;
 };
+// Shared world-space UVs bend the old four-cell repeat over a broad ridge.
+// No per-cell rotation, random phase, resampling bitmap, or geometry movement:
+// both triangles and neighboring cells use precisely the same edge endpoints.
+G.mountainMaterialUV = function(x,y) {
+  return [64*x+42*Math.sin(y*.37)+22*Math.sin(x*.21+y*.13),
+          64*y+38*Math.cos(x*.29)+18*Math.sin(y*.19-x*.11)];
+};
+G.mountainMaterialTransform = function(points,uv) {
+  const [p,q,r]=points,[u,v,z]=uv,ux=v[0]-u[0],uy=v[1]-u[1],vx=z[0]-u[0],vy=z[1]-u[1];
+  const det=ux*vy-vx*uy;
+  const a=((q[0]-p[0])*vy-(r[0]-p[0])*uy)/det;
+  const c=((r[0]-p[0])*ux-(q[0]-p[0])*vx)/det;
+  const b=((q[1]-p[1])*vy-(r[1]-p[1])*uy)/det;
+  const d=((r[1]-p[1])*ux-(q[1]-p[1])*vx)/det;
+  return [a,b,c,d,p[0]-a*u[0]-c*u[1],p[1]-b*u[0]-d*u[1]];
+};
 G.drawMountain = function(ctx,w,x,y) {
   const snowy=G.game.season===3,name=snowy?'mountain_rock_snow':'mountain_rock',im=G.SPR&&G.SPR.get(name);
   const faces=G.mountainPolygons(w,x,y),tops=faces.filter(f=>f.kind.startsWith('top'));
@@ -136,13 +153,12 @@ G.drawMountain = function(ctx,w,x,y) {
     ctx.fillStyle=backing;ctx.fill();
     if(face.kind.startsWith('top')){
       if(im&&im.width&&ctx.createPattern){
-        const [t,m,n]=face.points;
-        const a=face.kind==='topX'?(m[0]-t[0])/64:(m[0]-n[0])/64;
-        const b=face.kind==='topX'?(m[1]-t[1])/64:(m[1]-n[1])/64;
-        const c=face.kind==='topX'?(n[0]-m[0])/64:(n[0]-t[0])/64;
-        const d=face.kind==='topX'?(n[1]-m[1])/64:(n[1]-t[1])/64;
-        ctx.save();ctx.transform(a,b,c,d,t[0]-a*x*64-c*y*64,t[1]-b*x*64-d*y*64);
-        ctx.fillStyle=ctx.createPattern(im,'repeat');ctx.fillRect(x*64-.5,y*64-.5,65,65);ctx.restore();
+        const corners=face.kind==='topX'?[[x,y],[x+1,y],[x+1,y+1]]:[[x,y],[x+1,y+1],[x,y+1]];
+        const uv=corners.map(([u,v])=>G.mountainMaterialUV(u,v));
+        ctx.save();ctx.transform(...G.mountainMaterialTransform(face.points,uv));
+        ctx.fillStyle=ctx.createPattern(im,'repeat');
+        const us=uv.map(p=>p[0]),vs=uv.map(p=>p[1]);
+        ctx.fillRect(Math.min(...us)-1,Math.min(...vs)-1,Math.max(...us)-Math.min(...us)+2,Math.max(...vs)-Math.min(...vs)+2);ctx.restore();
       }
       const h=face.heights,dx=face.kind==='topX'?h[1]-h[0]:h[1]-h[2],dy=face.kind==='topX'?h[2]-h[1]:h[2]-h[0];
       const shade=Math.max(-.09,Math.min(.11,(dx-dy)*.0045));
@@ -476,6 +492,106 @@ G.drawGroundTile = function (c, w, pal, x, y) {
   }
 };
 
+/* Production coast presentation, derived from the repository's riverbay lab.
+ * Only boundary tracing and a single bounded smoothing pass are adopted.
+ * No experimental materials, simulation, extra canvas or per-frame overlays.
+ * Cached per world: the water mask is immutable after map creation/load.
+ * Winter deliberately retains original tile ice until a continuous ice asset
+ * is available; never tile an alpha-cut diamond as an opaque water surface. */
+G.coastPresentation = (()=>{
+  const key = p => p[0]+','+p[1];
+  function boundaryPaths(w, includeMapBoundary) {
+    const edges=[], outgoing=new Map(), incoming=new Map(), N=w.N;
+    const water=(x,y)=>x>=0&&y>=0&&x<N&&y<N&&w.water[y*N+x]===1;
+    function edge(a,b,dir) {const e={a,b,dir,used:false};edges.push(e);const k=key(a);if(!outgoing.has(k))outgoing.set(k,[]);outgoing.get(k).push(e);incoming.set(key(b),(incoming.get(key(b))||0)+1);}
+    for(let y=0;y<N;y++)for(let x=0;x<N;x++)if(water(x,y)){
+      if((includeMapBoundary||y>0)&&!water(x,y-1))edge([x,y],[x+1,y],0);
+      if((includeMapBoundary||x<N-1)&&!water(x+1,y))edge([x+1,y],[x+1,y+1],1);
+      if((includeMapBoundary||y<N-1)&&!water(x,y+1))edge([x+1,y+1],[x,y+1],2);
+      if((includeMapBoundary||x>0)&&!water(x-1,y))edge([x,y+1],[x,y],3);
+    }
+    const paths=[];
+    // Open coasts first. At a diagonal point-contact, turn right to keep the
+    // same water component on our right rather than bridging separate ponds.
+    const starts=[...edges.filter(e=>!incoming.get(key(e.a))),...edges];
+    for(const start of starts){if(start.used)continue;const points=[start.a];let e=start;
+      while(e&&!e.used){e.used=true;points.push(e.b);if(key(e.b)===key(points[0]))break;
+        const choices=(outgoing.get(key(e.b))||[]).filter(n=>!n.used);
+        choices.sort((a,b)=>[1,0,3,2].indexOf((a.dir-e.dir+4)%4)-[1,0,3,2].indexOf((b.dir-e.dir+4)%4));e=choices[0];}
+      const closed=key(points[0])===key(points[points.length-1]);if(closed)points.pop();
+      paths.push({points,closed,bounds:{x0:Math.min(...points.map(p=>p[0])),y0:Math.min(...points.map(p=>p[1])),x1:Math.max(...points.map(p=>p[0])),y1:Math.max(...points.map(p=>p[1]))}});
+    }
+    return paths;
+  }
+  const coastlines=w=>boundaryPaths(w,false);
+  const waterPolygons=w=>boundaryPaths(w,true);
+  function smoothRoute(route,N){
+    let points=route.points.map(p=>p.slice());
+    // Keep map exits exact. Shared shore/mask vertices use identical smoothing;
+    // no collision or water array is changed by this presentation geometry.
+    // One bounded pass plus the quadratic joins keeps cell centers and narrow
+    // channels on their original side. Repeated smoothing erodes small ponds.
+    for(let pass=0;pass<1;pass++)points=points.map((p,i)=>{
+      if(p[0]===0||p[1]===0||p[0]===N||p[1]===N||!route.closed&&(i===0||i===points.length-1))return p;
+      const a=points[(i+points.length-1)%points.length],b=points[(i+1)%points.length];
+      return [(a[0]+2*p[0]+b[0])/4,(a[1]+2*p[1]+b[1])/4];
+    });
+    return {...route,points};
+  }
+
+  const cache=new WeakMap();
+  function topology(w){
+    let p=cache.get(w);if(p)return p;
+    const ribbon=new Uint8Array(w.N*w.N);
+    for(let y=0;y<w.N;y++)for(let x=0;x<w.N;x++){
+      let near=false;for(let dy=-2;dy<=2&&!near;dy++)for(let dx=-2;dx<=2;dx++){
+        const nx=x+dx,ny=y+dy;if(nx>=0&&ny>=0&&nx<w.N&&ny<w.N&&(w.water[ny*w.N+nx]===2||(w.water[ny*w.N+nx]===1)!==(w.water[y*w.N+x]===1))){near=true;break;}
+      }if(near)ribbon[y*w.N+x]=1;
+    }
+    p={shore:coastlines(w).map(r=>smoothRoute(r,w.N)),water:waterPolygons(w).map(r=>smoothRoute(r,w.N)),ribbon:waterPolygons({N:w.N,water:ribbon})};cache.set(w,p);return p;
+  }
+  function curve(c,route,N){const p=route.points.map(v=>G.T2S(...v)),n=p.length;if(n<2)return;
+    const mid=(a,b)=>[(a[0]+b[0])/2,(a[1]+b[1])/2];
+    function corner(i,q){const v=route.points[i];if(v[0]===0||v[1]===0||v[0]===N||v[1]===N){c.lineTo(...p[i]);c.lineTo(...q);}else c.quadraticCurveTo(...p[i],...q);}
+    if(route.closed){c.moveTo(...mid(p[n-1],p[0]));for(let i=0;i<n;i++)corner(i,mid(p[i],p[(i+1)%n]));c.closePath();}
+    else{c.moveTo(...p[0]);c.lineTo(...mid(p[0],p[1]));for(let i=1;i<n-1;i++)corner(i,mid(p[i],p[i+1]));c.lineTo(...p[n-1]);}
+  }
+  function outline(c,w){[[0,0],[w.N,0],[w.N,w.N],[0,w.N]].forEach((p,i)=>i?c.lineTo(...G.T2S(...p)):c.moveTo(...G.T2S(...p)));c.closePath();}
+  function material(c,name){const im=G.SPR?.get(name);if(!im?.width||!c.createPattern)return null;
+    let entries=G.terrainPatterns.get(c);if(!entries){entries=new Map();G.terrainPatterns.set(c,entries);}let p=entries.get(name);
+    if(!p||p.image!==im){p={image:im,pattern:c.createPattern(im,'repeat')};entries.set(name,p);}return p.pattern;
+  }
+  function surface(c,name,bounds){const pattern=material(c,name);if(!pattern)return false;
+    c.save();c.transform(.5,.25,-.5,.25,0,0);c.fillStyle=pattern;c.fillRect(bounds.x0*64-1,bounds.y0*64-1,(bounds.x1-bounds.x0+1)*64+2,(bounds.y1-bounds.y0+1)*64+2);c.restore();return true;
+  }
+  function active(c,w){return G.game.season!==3&&!!material(c,'water_open')&&!!material(c,'meadow_'+G.TEX_SEASON[G.game.season])&&topology(w).shore.length>0;}
+  function draw(c,w,bounds){
+    if(!active(c,w))return;
+    const p=topology(w),routes=p.shore.filter(r=>r.bounds.x1>=bounds.x0-3&&r.bounds.y1>=bounds.y0-3&&r.bounds.x0<=bounds.x1+3&&r.bounds.y0<=bounds.y1+3);if(!routes.length)return;
+    c.save();
+    // Restore only a ribbon around the coast. Roads and resource outcrops keep
+    // their exact tile appearance. Buildings draw later; occupancy is not a
+    // ground-cache dependency, so placing/removing them cannot leave stale banks.
+    c.beginPath();outline(c,w);
+    for(let y=bounds.y0;y<=bounds.y1;y++)for(let x=bounds.x0;x<=bounds.x1;x++){
+      const i=y*w.N+x;if(!w.road[i]&&!w.rock[i])continue;
+      const [sx,sy]=G.T2S(x,y);c.moveTo(sx,sy);c.lineTo(sx+32,sy+16);c.lineTo(sx,sy+32);c.lineTo(sx-32,sy+16);c.closePath();
+    }c.clip('evenodd');
+    // Trace the exact tile union once rather than clipping thousands of
+    // individual diamonds on every full rebuild (expensive on complex maps).
+    // Opaque restoration still precedes all translucent shore bands.
+    c.beginPath();for(const r of p.ribbon){r.points.forEach((point,i)=>i?c.lineTo(...G.T2S(...point)):c.moveTo(...G.T2S(...point)));c.closePath();}c.clip('evenodd');
+    function stroke(color,width){c.beginPath();for(const r of routes)curve(c,r,w.N);c.strokeStyle=color;c.lineWidth=width;c.lineJoin='round';c.lineCap='round';c.stroke();}
+    c.save();c.beginPath();outline(c,w);for(const r of p.water)curve(c,r,w.N);c.clip('evenodd');surface(c,'meadow_'+G.TEX_SEASON[G.game.season],bounds);stroke('rgba(164,143,97,.65)',18);
+    const sand=G.SPR.get('sand_'+G.TEX_SEASON[G.game.season]);
+    if(sand?.width){const pattern=c.createPattern(sand,'repeat');if(pattern){c.save();c.globalAlpha=.65;stroke(pattern,12);c.restore();}}
+    stroke('rgba(184,161,116,.30)',5);c.restore();
+    c.save();c.beginPath();for(const r of p.water)curve(c,r,w.N);c.clip('evenodd');surface(c,'water_open',bounds);stroke('rgba(115,159,148,.55)',14);stroke('rgba(165,185,157,.35)',5);c.restore();
+    stroke('rgba(207,207,165,.45)',1);c.restore();
+  }
+  return {draw,active,topology,curve,smoothRoute,boundaryPaths};
+})();
+
 G.buildGround = function () {
   const w = G.world, N = w.N;
   const { scale: s, width: gw, height: gh } = G.groundCacheSize(G.groundScale);
@@ -492,19 +608,30 @@ G.buildGround = function () {
   c.setTransform(s, 0, 0, s, G.groundOX * s, G.groundOY * s);
   const pal = G.PAL[G.game.season];
 
-  if (partial) {
-    // 局部重绘：脏瓦片 + 四邻（描边会轻微外溢到相邻瓦片）；先陆地后水体，保持岸线压在陆地上
-    const uniq = new Set();
-    for (const idx of G.groundDirty) {
-      const x = idx % N, y = (idx / N) | 0;
-      uniq.add(idx);
-      if (x > 0) uniq.add(idx - 1);
-      if (x < N - 1) uniq.add(idx + 1);
-      if (y > 0) uniq.add(idx - N);
-      if (y < N - 1) uniq.add(idx + N);
+  if (partial && !G.coastPresentation.active(c,w)) {
+    // Keep the established five-tile fast path when contours are unavailable
+    // (missing sprites, winter ice, or an entirely land/water world).
+    const uniq=new Set();for(const idx of G.groundDirty){const x=idx%N,y=Math.floor(idx/N);uniq.add(idx);if(x>0)uniq.add(idx-1);if(x<N-1)uniq.add(idx+1);if(y>0)uniq.add(idx-N);if(y<N-1)uniq.add(idx+N);}
+    for(const water of [false,true])for(const idx of uniq)if((w.water[idx]===1)===water)G.drawGroundTile(c,w,pal,idx%N,Math.floor(idx/N));
+  } else if (partial) {
+    // A screen-pixel clip prevents repeated antialiasing/translucency buildup.
+    // Keep distant edits separate; only intersecting rectangles are merged.
+    // No two final regions overlap, avoiding redundant antialiased clips.
+    const repairs=[];
+    for(const idx of G.groundDirty){
+    const [x,y]=G.T2S(idx%N,Math.floor(idx/N)),x0=x-80,x1=x+80,y0=y-48,y1=y+80;
+    const r={x0:Math.max(0,Math.floor((x0+G.groundOX)*s)),y0:Math.max(0,Math.floor((y0+G.groundOY)*s)),x1:Math.min(gw,Math.ceil((x1+G.groundOX)*s)),y1:Math.min(gh,Math.ceil((y1+G.groundOY)*s))};
+    for(let j=0;j<repairs.length;){const q=repairs[j];
+      if(r.x0<q.x1&&r.x1>q.x0&&r.y0<q.y1&&r.y1>q.y0){r.x0=Math.min(r.x0,q.x0);r.y0=Math.min(r.y0,q.y0);r.x1=Math.max(r.x1,q.x1);r.y1=Math.max(r.y1,q.y1);repairs.splice(j,1);j=0;}else j++;
+    }repairs.push(r);
     }
-    for (const idx of uniq) if (w.water[idx] !== 1) G.drawGroundTile(c, w, pal, idx % N, (idx / N) | 0);
-    for (const idx of uniq) if (w.water[idx] === 1) G.drawGroundTile(c, w, pal, idx % N, (idx / N) | 0);
+    for(const r of repairs){
+    const corners=[[r.x0,r.y0],[r.x1,r.y0],[r.x0,r.y1],[r.x1,r.y1]].map(([x,y])=>{x=x/s-G.groundOX;y=y/s-G.groundOY;return [x/64+y/32,y/32-x/64];});
+    const b={x0:Math.max(0,Math.floor(Math.min(...corners.map(p=>p[0])))-2),y0:Math.max(0,Math.floor(Math.min(...corners.map(p=>p[1])))-2),x1:Math.min(N-1,Math.ceil(Math.max(...corners.map(p=>p[0])))+2),y1:Math.min(N-1,Math.ceil(Math.max(...corners.map(p=>p[1])))+2)};
+    c.save();c.setTransform(1,0,0,1,0,0);c.beginPath();c.rect(r.x0,r.y0,r.x1-r.x0,r.y1-r.y0);c.clip();c.clearRect(r.x0,r.y0,r.x1-r.x0,r.y1-r.y0);c.fillStyle=pal.bg;c.fillRect(r.x0,r.y0,r.x1-r.x0,r.y1-r.y0);c.setTransform(s,0,0,s,G.groundOX*s,G.groundOY*s);
+    for(const water of [false,true])for(let y=b.y0;y<=b.y1;y++)for(let x=b.x0;x<=b.x1;x++)if((w.water[y*N+x]===1)===water)G.drawGroundTile(c,w,pal,x,y);
+    G.coastPresentation.draw(c,w,b);c.restore();
+    }
   } else {
     c.clearRect(-G.groundOX, -G.groundOY, N * 64 + 80, N * 32 + 80);
     c.fillStyle = pal.bg;
@@ -517,6 +644,7 @@ G.buildGround = function () {
       for (let x = 0; x < N; x++)
         if (w.water[y * N + x] === 1) G.drawGroundTile(c, w, pal, x, y);
   }
+  if(!partial)G.coastPresentation.draw(c,w,{x0:0,y0:0,x1:N-1,y1:N-1});
   G.groundDirty.clear();
   G.needGround = false;
   G._groundWorld = w;

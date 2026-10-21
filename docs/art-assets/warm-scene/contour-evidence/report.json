@@ -1,0 +1,646 @@
+{
+  "engine": "@napi-rs/canvas, offline production renderer; not browser or physical phone validation",
+  "baselineCommit": "5710d96",
+  "candidateRendererSha256": "a95f37cfdb9582cceffeb14f811e0a4f0b5e437f507df70ef5c2b8828f50d0f4",
+  "scene": {
+    "kind": "authored visual fixture",
+    "buildings": 12,
+    "citizens": 20,
+    "trees": 60,
+    "mountainTiles": 54
+  },
+  "cases": [
+    {
+      "season": 0,
+      "viewport": "desktop",
+      "width": 1227,
+      "height": 763,
+      "zoom": 0.75,
+      "choice": "baseline",
+      "filename": "desktop-s0-z0.75-baseline.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 0,
+      "viewport": "desktop",
+      "width": 1227,
+      "height": 763,
+      "zoom": 0.75,
+      "choice": "candidate",
+      "filename": "desktop-s0-z0.75-candidate.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 0,
+      "viewport": "desktop",
+      "width": 1227,
+      "height": 763,
+      "zoom": 1,
+      "choice": "baseline",
+      "filename": "desktop-s0-z1-baseline.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 0,
+      "viewport": "desktop",
+      "width": 1227,
+      "height": 763,
+      "zoom": 1,
+      "choice": "candidate",
+      "filename": "desktop-s0-z1-candidate.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 0,
+      "viewport": "desktop",
+      "width": 1227,
+      "height": 763,
+      "zoom": 2,
+      "choice": "baseline",
+      "filename": "desktop-s0-z2-baseline.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 0,
+      "viewport": "desktop",
+      "width": 1227,
+      "height": 763,
+      "zoom": 2,
+      "choice": "candidate",
+      "filename": "desktop-s0-z2-candidate.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 0,
+      "viewport": "narrow",
+      "width": 390,
+      "height": 620,
+      "zoom": 0.75,
+      "choice": "baseline",
+      "filename": "narrow-s0-z0.75-baseline.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 0,
+      "viewport": "narrow",
+      "width": 390,
+      "height": 620,
+      "zoom": 0.75,
+      "choice": "candidate",
+      "filename": "narrow-s0-z0.75-candidate.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 0,
+      "viewport": "narrow",
+      "width": 390,
+      "height": 620,
+      "zoom": 1,
+      "choice": "baseline",
+      "filename": "narrow-s0-z1-baseline.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 0,
+      "viewport": "narrow",
+      "width": 390,
+      "height": 620,
+      "zoom": 1,
+      "choice": "candidate",
+      "filename": "narrow-s0-z1-candidate.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 0,
+      "viewport": "narrow",
+      "width": 390,
+      "height": 620,
+      "zoom": 2,
+      "choice": "baseline",
+      "filename": "narrow-s0-z2-baseline.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 0,
+      "viewport": "narrow",
+      "width": 390,
+      "height": 620,
+      "zoom": 2,
+      "choice": "candidate",
+      "filename": "narrow-s0-z2-candidate.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 1,
+      "viewport": "desktop",
+      "width": 1227,
+      "height": 763,
+      "zoom": 0.75,
+      "choice": "baseline",
+      "filename": "desktop-s1-z0.75-baseline.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 1,
+      "viewport": "desktop",
+      "width": 1227,
+      "height": 763,
+      "zoom": 0.75,
+      "choice": "candidate",
+      "filename": "desktop-s1-z0.75-candidate.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 1,
+      "viewport": "desktop",
+      "width": 1227,
+      "height": 763,
+      "zoom": 1,
+      "choice": "baseline",
+      "filename": "desktop-s1-z1-baseline.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 1,
+      "viewport": "desktop",
+      "width": 1227,
+      "height": 763,
+      "zoom": 1,
+      "choice": "candidate",
+      "filename": "desktop-s1-z1-candidate.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 1,
+      "viewport": "desktop",
+      "width": 1227,
+      "height": 763,
+      "zoom": 2,
+      "choice": "baseline",
+      "filename": "desktop-s1-z2-baseline.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 1,
+      "viewport": "desktop",
+      "width": 1227,
+      "height": 763,
+      "zoom": 2,
+      "choice": "candidate",
+      "filename": "desktop-s1-z2-candidate.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 1,
+      "viewport": "narrow",
+      "width": 390,
+      "height": 620,
+      "zoom": 0.75,
+      "choice": "baseline",
+      "filename": "narrow-s1-z0.75-baseline.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 1,
+      "viewport": "narrow",
+      "width": 390,
+      "height": 620,
+      "zoom": 0.75,
+      "choice": "candidate",
+      "filename": "narrow-s1-z0.75-candidate.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 1,
+      "viewport": "narrow",
+      "width": 390,
+      "height": 620,
+      "zoom": 1,
+      "choice": "baseline",
+      "filename": "narrow-s1-z1-baseline.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 1,
+      "viewport": "narrow",
+      "width": 390,
+      "height": 620,
+      "zoom": 1,
+      "choice": "candidate",
+      "filename": "narrow-s1-z1-candidate.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 1,
+      "viewport": "narrow",
+      "width": 390,
+      "height": 620,
+      "zoom": 2,
+      "choice": "baseline",
+      "filename": "narrow-s1-z2-baseline.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 1,
+      "viewport": "narrow",
+      "width": 390,
+      "height": 620,
+      "zoom": 2,
+      "choice": "candidate",
+      "filename": "narrow-s1-z2-candidate.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 2,
+      "viewport": "desktop",
+      "width": 1227,
+      "height": 763,
+      "zoom": 0.75,
+      "choice": "baseline",
+      "filename": "desktop-s2-z0.75-baseline.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 2,
+      "viewport": "desktop",
+      "width": 1227,
+      "height": 763,
+      "zoom": 0.75,
+      "choice": "candidate",
+      "filename": "desktop-s2-z0.75-candidate.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 2,
+      "viewport": "desktop",
+      "width": 1227,
+      "height": 763,
+      "zoom": 1,
+      "choice": "baseline",
+      "filename": "desktop-s2-z1-baseline.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 2,
+      "viewport": "desktop",
+      "width": 1227,
+      "height": 763,
+      "zoom": 1,
+      "choice": "candidate",
+      "filename": "desktop-s2-z1-candidate.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 2,
+      "viewport": "desktop",
+      "width": 1227,
+      "height": 763,
+      "zoom": 2,
+      "choice": "baseline",
+      "filename": "desktop-s2-z2-baseline.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 2,
+      "viewport": "desktop",
+      "width": 1227,
+      "height": 763,
+      "zoom": 2,
+      "choice": "candidate",
+      "filename": "desktop-s2-z2-candidate.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 2,
+      "viewport": "narrow",
+      "width": 390,
+      "height": 620,
+      "zoom": 0.75,
+      "choice": "baseline",
+      "filename": "narrow-s2-z0.75-baseline.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 2,
+      "viewport": "narrow",
+      "width": 390,
+      "height": 620,
+      "zoom": 0.75,
+      "choice": "candidate",
+      "filename": "narrow-s2-z0.75-candidate.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 2,
+      "viewport": "narrow",
+      "width": 390,
+      "height": 620,
+      "zoom": 1,
+      "choice": "baseline",
+      "filename": "narrow-s2-z1-baseline.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 2,
+      "viewport": "narrow",
+      "width": 390,
+      "height": 620,
+      "zoom": 1,
+      "choice": "candidate",
+      "filename": "narrow-s2-z1-candidate.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 2,
+      "viewport": "narrow",
+      "width": 390,
+      "height": 620,
+      "zoom": 2,
+      "choice": "baseline",
+      "filename": "narrow-s2-z2-baseline.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 2,
+      "viewport": "narrow",
+      "width": 390,
+      "height": 620,
+      "zoom": 2,
+      "choice": "candidate",
+      "filename": "narrow-s2-z2-candidate.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 3,
+      "viewport": "desktop",
+      "width": 1227,
+      "height": 763,
+      "zoom": 0.75,
+      "choice": "baseline",
+      "filename": "desktop-s3-z0.75-baseline.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 3,
+      "viewport": "desktop",
+      "width": 1227,
+      "height": 763,
+      "zoom": 0.75,
+      "choice": "candidate",
+      "filename": "desktop-s3-z0.75-candidate.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 3,
+      "viewport": "desktop",
+      "width": 1227,
+      "height": 763,
+      "zoom": 1,
+      "choice": "baseline",
+      "filename": "desktop-s3-z1-baseline.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 3,
+      "viewport": "desktop",
+      "width": 1227,
+      "height": 763,
+      "zoom": 1,
+      "choice": "candidate",
+      "filename": "desktop-s3-z1-candidate.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 3,
+      "viewport": "desktop",
+      "width": 1227,
+      "height": 763,
+      "zoom": 2,
+      "choice": "baseline",
+      "filename": "desktop-s3-z2-baseline.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 3,
+      "viewport": "desktop",
+      "width": 1227,
+      "height": 763,
+      "zoom": 2,
+      "choice": "candidate",
+      "filename": "desktop-s3-z2-candidate.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 3,
+      "viewport": "narrow",
+      "width": 390,
+      "height": 620,
+      "zoom": 0.75,
+      "choice": "baseline",
+      "filename": "narrow-s3-z0.75-baseline.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 3,
+      "viewport": "narrow",
+      "width": 390,
+      "height": 620,
+      "zoom": 0.75,
+      "choice": "candidate",
+      "filename": "narrow-s3-z0.75-candidate.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 3,
+      "viewport": "narrow",
+      "width": 390,
+      "height": 620,
+      "zoom": 1,
+      "choice": "baseline",
+      "filename": "narrow-s3-z1-baseline.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 3,
+      "viewport": "narrow",
+      "width": 390,
+      "height": 620,
+      "zoom": 1,
+      "choice": "candidate",
+      "filename": "narrow-s3-z1-candidate.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 3,
+      "viewport": "narrow",
+      "width": 390,
+      "height": 620,
+      "zoom": 2,
+      "choice": "baseline",
+      "filename": "narrow-s3-z2-baseline.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "season": 3,
+      "viewport": "narrow",
+      "width": 390,
+      "height": 620,
+      "zoom": 2,
+      "choice": "candidate",
+      "filename": "narrow-s3-z2-candidate.png",
+      "gameplayUnchanged": true
+    },
+    {
+      "fixture": "authored legal dock and completed bridge; construction completion set for visual fixture, not simulated play",
+      "season": 1,
+      "choice": "baseline",
+      "filename": "structures-s1-baseline.png",
+      "dock": {
+        "x": 19,
+        "y": 10
+      },
+      "bridge": {
+        "x": 16,
+        "y": 21,
+        "w": 7,
+        "h": 1
+      },
+      "gameplayUnchanged": true
+    },
+    {
+      "fixture": "authored legal dock and completed bridge; construction completion set for visual fixture, not simulated play",
+      "season": 1,
+      "choice": "candidate",
+      "filename": "structures-s1-candidate.png",
+      "dock": {
+        "x": 19,
+        "y": 10
+      },
+      "bridge": {
+        "x": 16,
+        "y": 21,
+        "w": 7,
+        "h": 1
+      },
+      "gameplayUnchanged": true
+    },
+    {
+      "fixture": "authored legal dock and completed bridge; construction completion set for visual fixture, not simulated play",
+      "season": 3,
+      "choice": "baseline",
+      "filename": "structures-s3-baseline.png",
+      "dock": {
+        "x": 19,
+        "y": 10
+      },
+      "bridge": {
+        "x": 16,
+        "y": 21,
+        "w": 7,
+        "h": 1
+      },
+      "gameplayUnchanged": true
+    },
+    {
+      "fixture": "authored legal dock and completed bridge; construction completion set for visual fixture, not simulated play",
+      "season": 3,
+      "choice": "candidate",
+      "filename": "structures-s3-candidate.png",
+      "dock": {
+        "x": 19,
+        "y": 10
+      },
+      "bridge": {
+        "x": 16,
+        "y": 21,
+        "w": 7,
+        "h": 1
+      },
+      "gameplayUnchanged": true
+    },
+    {
+      "fixture": "real generated seed0 mountain map",
+      "focus": {
+        "x": 60,
+        "y": 61,
+        "d": 5
+      },
+      "season": 1,
+      "choice": "baseline",
+      "filename": "real-ridge-s1-baseline.png",
+      "groundBuildMs": [
+        103.72000399999888,
+        102.43805200000133,
+        95.58123699999851
+      ],
+      "groundCanvas": [
+        4136,
+        2088
+      ],
+      "gameplayUnchanged": true
+    },
+    {
+      "fixture": "real generated seed0 mountain map",
+      "focus": {
+        "x": 60,
+        "y": 61,
+        "d": 5
+      },
+      "season": 1,
+      "choice": "candidate",
+      "filename": "real-ridge-s1-candidate.png",
+      "groundBuildMs": [
+        167.62005999999747,
+        159.25218199999654,
+        157.30992200000037
+      ],
+      "groundCanvas": [
+        4136,
+        2088
+      ],
+      "gameplayUnchanged": true
+    },
+    {
+      "fixture": "real generated seed0 mountain map",
+      "focus": {
+        "x": 60,
+        "y": 61,
+        "d": 5
+      },
+      "season": 3,
+      "choice": "baseline",
+      "filename": "real-ridge-s3-baseline.png",
+      "groundBuildMs": [
+        106.51966900000116,
+        102.2495110000018,
+        101.73797399999967
+      ],
+      "groundCanvas": [
+        4136,
+        2088
+      ],
+      "gameplayUnchanged": true
+    },
+    {
+      "fixture": "real generated seed0 mountain map",
+      "focus": {
+        "x": 60,
+        "y": 61,
+        "d": 5
+      },
+      "season": 3,
+      "choice": "candidate",
+      "filename": "real-ridge-s3-candidate.png",
+      "groundBuildMs": [
+        108.7182329999996,
+        107.11981799999921,
+        106.46101099999942
+      ],
+      "groundCanvas": [
+        4136,
+        2088
+      ],
+      "gameplayUnchanged": true
+    }
+  ]
+}
