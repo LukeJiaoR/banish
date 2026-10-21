@@ -39,3 +39,7 @@ Current checks: 159 manifest PNG paths and building/carry coverage; terrain seas
 ## 2026-10-21 contour candidate
 
 A subsequent local candidate addresses the visible stepped shore and regular ridge sampling, rather than recoloring another PNG. See [contour scope, contracts, provenance and offline verification](contours.md). It preserves #119 UI and original assets, has a separate same-state baseline comparison, and does not close #87 or claim browser/mobile/A-style acceptance.
+
+## 2026-10-21 winter continuity candidate
+
+After merged #120, a bounded [winter shoreline candidate](winter-shore.md) reuses the unchanged alpha-edged ice over an opaque winter-water backing, so winter can share the same curved coast. Its new evidence is separate from the historical #120 report. It preserves nonwinter scene pixels and does not close the broader #87 art issue.

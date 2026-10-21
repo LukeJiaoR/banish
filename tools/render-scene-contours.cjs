@@ -14,7 +14,8 @@ const {createScene,pose}=require('./riverbay-lab/scene');const scene=createScene
 for(let y=1;y<=6;y++)for(let x=8;x<=16;x++){const i=y*32+x;if(G.world.bgrid[i]>=0||G.world.water[i])throw Error('Occupied ridge');G.world.mountain[i]=1;}
 G.world.trees=G.world.trees.filter(t=>!G.isMountain(G.world,t.x,t.y));G.world.treeIdx.fill(-1);G.world.trees.forEach((t,i)=>G.world.treeIdx[t.y*32+t.x]=i);
 // Pin the comparison to the merged UI baseline, never to a moving remote ref.
-const baselineCommit='5710d96';
+const baselineCommit=process.argv[3]||'5710d96';
+if(!/^[0-9a-f]{7,40}$/.test(baselineCommit))throw Error('Baseline must be an explicit commit SHA');
 const baseline=require('node:child_process').execFileSync('git',['show',baselineCommit+':js/render.js'],{cwd:root,encoding:'utf8'});
 const candidate=fs.readFileSync(path.join(root,'js/render.js'),'utf8');
 const report={engine:'@napi-rs/canvas, offline production renderer; not browser or physical phone validation',baselineCommit, candidateRendererSha256:crypto.createHash('sha256').update(candidate).digest('hex'), scene:{kind:scene.kind,buildings:G.world.buildings.length,citizens:G.world.citizens.length,trees:G.world.trees.length,mountainTiles:G.world.mountain.reduce((a,b)=>a+b,0)},cases:[]};
@@ -27,7 +28,7 @@ G.game.season=season;G.cv=createCanvas(width,height);G.cv.clientWidth=width;G.cv
 const before=gameState();G.frame(0);if(before!==gameState())throw Error('Renderer changed gameplay state');
 const filename=`${viewport}-s${season}-z${zoom}-${choice}.png`;fs.writeFileSync(path.join(out,filename),G.cv.toBuffer('image/png'));canvases.push(G.cv);report.cases.push({season,viewport,width,height,zoom,choice,filename,gameplayUnchanged:true});
 }
-const pair=createCanvas(width*2,height+26),ctx=pair.getContext('2d');ctx.fillStyle='#20231f';ctx.fillRect(0,0,pair.width,pair.height);ctx.fillStyle='#fff';ctx.font='14px sans-serif';canvases.forEach((cv,i)=>{ctx.fillText(['main 5710d96 / offline','contour candidate / offline'][i],i*width+10,18);ctx.drawImage(cv,i*width,26);});fs.writeFileSync(path.join(out,`${viewport}-s${season}-z${zoom}-compare.png`),pair.toBuffer('image/png'));
+const pair=createCanvas(width*2,height+26),ctx=pair.getContext('2d');ctx.fillStyle='#20231f';ctx.fillRect(0,0,pair.width,pair.height);ctx.fillStyle='#fff';ctx.font='14px sans-serif';canvases.forEach((cv,i)=>{ctx.fillText([`main ${baselineCommit} / offline`,'contour candidate / offline'][i],i*width+10,18);ctx.drawImage(cv,i*width,26);});fs.writeFileSync(path.join(out,`${viewport}-s${season}-z${zoom}-compare.png`),pair.toBuffer('image/png'));
 }
 // Add legal original dock/bridge sprites to inspect coast contacts. These are
 // authored fixture operations, not a claim of completed live-game play.
@@ -44,7 +45,7 @@ for(const season of [1,3]){
   G.game.season=season;G.cv=createCanvas(1227,763);G.cv.clientWidth=1227;G.cv.clientHeight=763;G.ctx=G.cv.getContext('2d');G.dpr=1;G.cam.z=1;const [x,y]=G.T2S(18,18);G.cam.x=613-x;G.cam.y=390-y;G.groundScale=.68;G.needGround=true;
   const before=gameState();G.frame(0);if(before!==gameState())throw Error('Structures render changed gameplay state');const filename=`structures-s${season}-${choice}.png`;fs.writeFileSync(path.join(out,filename),G.cv.toBuffer('image/png'));canvases.push(G.cv);report.cases.push({fixture:'authored legal dock and completed bridge; construction completion set for visual fixture, not simulated play',season,choice,filename,dock:{x:dock.x,y:dock.y},bridge:{x:bridge.x,y:bridge.y,w:bridge.w,h:bridge.h},gameplayUnchanged:true});
  }
- const pair=createCanvas(2454,789),c=pair.getContext('2d');c.fillStyle='#20231f';c.fillRect(0,0,2454,789);c.fillStyle='#fff';c.font='14px sans-serif';canvases.forEach((cv,i)=>{c.fillText(['main5710d96 dock + bridge / offline','candidate dock + bridge / offline'][i],i*1227+10,18);c.drawImage(cv,i*1227,26);});fs.writeFileSync(path.join(out,`structures-s${season}-compare.png`),pair.toBuffer('image/png'));
+ const pair=createCanvas(2454,789),c=pair.getContext('2d');c.fillStyle='#20231f';c.fillRect(0,0,2454,789);c.fillStyle='#fff';c.font='14px sans-serif';canvases.forEach((cv,i)=>{c.fillText([`main ${baselineCommit} dock + bridge / offline`,'candidate dock + bridge / offline'][i],i*1227+10,18);c.drawImage(cv,i*1227,26);});fs.writeFileSync(path.join(out,`structures-s${season}-compare.png`),pair.toBuffer('image/png'));
 }
 // Additional real map ridge: the authored rectangle is not representative of
 // generated mountain silhouettes. Same seed, focus and state for both renders.
@@ -64,7 +65,7 @@ for(const season of [1,3]){
   const groundBuildMs=[];for(let n=0;n<3;n++){G.needGround=true;const start=performance.now();G.buildGround();groundBuildMs.push(performance.now()-start);}
   const filename=`real-ridge-s${season}-${choice}.png`;fs.writeFileSync(path.join(out,filename),G.cv.toBuffer('image/png'));canvases.push(G.cv);report.cases.push({fixture:'real generated seed0 mountain map',focus,season,choice,filename,groundBuildMs,groundCanvas:[G._gcv.width,G._gcv.height],gameplayUnchanged:true});
  }
- const pair=createCanvas(2454,789),c=pair.getContext('2d');c.fillStyle='#20231f';c.fillRect(0,0,2454,789);c.fillStyle='#fff';c.font='14px sans-serif';canvases.forEach((cv,i)=>{c.fillText(['main5710d96 real seed0 / offline','candidate real seed0 / offline'][i],i*1227+10,18);c.drawImage(cv,i*1227,26);});fs.writeFileSync(path.join(out,`real-ridge-s${season}-compare.png`),pair.toBuffer('image/png'));
+ const pair=createCanvas(2454,789),c=pair.getContext('2d');c.fillStyle='#20231f';c.fillRect(0,0,2454,789);c.fillStyle='#fff';c.font='14px sans-serif';canvases.forEach((cv,i)=>{c.fillText([`main ${baselineCommit} real seed0 / offline`,'candidate real seed0 / offline'][i],i*1227+10,18);c.drawImage(cv,i*1227,26);});fs.writeFileSync(path.join(out,`real-ridge-s${season}-compare.png`),pair.toBuffer('image/png'));
 }
 fs.writeFileSync(path.join(out,'report.json'),JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify(report.scene));console.log(`${report.cases.length} offline render cases passed`);
 })().catch(e=>{console.error(e);process.exitCode=1;});

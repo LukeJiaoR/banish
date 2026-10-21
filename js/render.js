@@ -411,8 +411,10 @@ G.drawGroundTile = function (c, w, pal, x, y) {
   const [sx, sy] = G.T2S(x, y);
   const tex = G.TEX_SEASON[G.game.season];
   if (w.water[i] === 1) {
-    // Open water stays blue through autumn; only winter selects ice material.
-    if (G.game.season !== 3 && G.fillTerrainSurface(c, 'water_open', x, y)) {
+    // Ice and its curved shore share one world-anchored, alpha-backed surface.
+    if (G.game.season === 3 && G.coastPresentation.fillWinterWater(c,x,y,pal)) {
+      // Original ice PNG, with an opaque base underneath transparent edges.
+    } else if (G.game.season !== 3 && G.fillTerrainSurface(c, 'water_open', x, y)) {
       // Continuous water pattern; no checkerboard seasonal variants.
     } else if (G.fillTexDiamond(c, G.game.season === 3 ? 'water_winter' : 'water_spring', sx, sy)) {
       // Existing blue/ice texture remains a safe asynchronous-loading fallback.
@@ -494,10 +496,11 @@ G.drawGroundTile = function (c, w, pal, x, y) {
 
 /* Production coast presentation, derived from the repository's riverbay lab.
  * Only boundary tracing and a single bounded smoothing pass are adopted.
- * No experimental materials, simulation, extra canvas or per-frame overlays.
+ * No experimental materials, simulation or per-frame overlays; winter uses
+ * only a tiny original-sprite repeat atlas, never another full-map canvas.
  * Cached per world: the water mask is immutable after map creation/load.
- * Winter deliberately retains original tile ice until a continuous ice asset
- * is available; never tile an alpha-cut diamond as an opaque water surface. */
+ * Winter composites the unchanged alpha-edged ice over an opaque backing
+ * inside this same water mask; alpha never reveals old grass or shore pixels. */
 G.coastPresentation = (()=>{
   const key = p => p[0]+','+p[1];
   function boundaryPaths(w, includeMapBoundary) {
@@ -561,12 +564,48 @@ G.coastPresentation = (()=>{
     let entries=G.terrainPatterns.get(c);if(!entries){entries=new Map();G.terrainPatterns.set(c,entries);}let p=entries.get(name);
     if(!p||p.image!==im){p={image:im,pattern:c.createPattern(im,'repeat')};entries.set(name,p);}return p.pattern;
   }
-  function surface(c,name,bounds){const pattern=material(c,name);if(!pattern)return false;
-    c.save();c.transform(.5,.25,-.5,.25,0,0);c.fillStyle=pattern;c.fillRect(bounds.x0*64-1,bounds.y0*64-1,(bounds.x1-bounds.x0+1)*64+2,(bounds.y1-bounds.y0+1)*64+2);c.restore();return true;
+  let winterAtlas=null;
+  function winterPattern(c){
+    const im=G.SPR?.get('water_winter'),backing=G.PAL[3].water;
+    if(!im?.width||!c.createPattern||typeof document==='undefined')return null;
+    // Retain the original screen-space diamond projection. Mapping the entire
+    // alpha-edged square into world space would expose a new diagonal grid.
+    // A 64x32 repeat is the exact period of the original tile lattice (8 KiB).
+    if(!winterAtlas||winterAtlas.image!==im||winterAtlas.backing!==backing){
+      const canvas=document.createElement('canvas');canvas.width=64;canvas.height=32;
+      const ctx=canvas.getContext('2d');ctx.fillStyle=backing;ctx.fillRect(0,0,64,32);
+      for(let sum=-2;sum<=2;sum++)for(let x=-2;x<=3;x++){
+        const y=sum-x,[sx,sy]=G.T2S(x,y);
+        if(sx+32<0||sx-32>64||sy+32<0||sy>32)continue;
+        G.fillTexDiamond(ctx,'water_winter',sx,sy);
+      }
+      winterAtlas={image:im,backing,canvas,patterns:new WeakMap()};
+    }
+    let pattern=winterAtlas.patterns.get(c);
+    if(!pattern){pattern=c.createPattern(winterAtlas.canvas,'repeat');if(pattern)winterAtlas.patterns.set(c,pattern);}
+    return pattern;
   }
-  function active(c,w){return G.game.season!==3&&!!material(c,'water_open')&&!!material(c,'meadow_'+G.TEX_SEASON[G.game.season])&&topology(w).shore.length>0;}
+  function surface(c,name,bounds){
+    const winter=name==='water_winter',pattern=winter?winterPattern(c):material(c,name);if(!pattern)return false;
+    c.save();c.fillStyle=pattern;
+    if(winter){
+      c.fillRect((bounds.x0-bounds.y1-1)*32-1,(bounds.x0+bounds.y0)*16-1,
+        (bounds.x1-bounds.x0+bounds.y1-bounds.y0+2)*32+2,(bounds.x1-bounds.x0+bounds.y1-bounds.y0+2)*16+2);
+    }else{
+      c.transform(.5,.25,-.5,.25,0,0);
+      c.fillRect(bounds.x0*64-1,bounds.y0*64-1,(bounds.x1-bounds.x0+1)*64+2,(bounds.y1-bounds.y0+1)*64+2);
+    }
+    c.restore();return true;
+  }
+  function fillWinterWater(c,x,y,pal){
+    if(!winterPattern(c))return false;
+    c.save();G.diamondPath(c,...G.T2S(x,y));c.clip();surface(c,'water_winter',{x0:x,y0:y,x1:x,y1:y});c.restore();return true;
+  }
+  const waterMaterial=()=>G.game.season===3?'water_winter':'water_open';
+  function active(c,w){return !!(G.game.season===3?winterPattern(c):material(c,waterMaterial()))&&!!material(c,'meadow_'+G.TEX_SEASON[G.game.season])&&topology(w).shore.length>0;}
   function draw(c,w,bounds){
     if(!active(c,w))return;
+    const snowy=G.game.season===3;
     const p=topology(w),routes=p.shore.filter(r=>r.bounds.x1>=bounds.x0-3&&r.bounds.y1>=bounds.y0-3&&r.bounds.x0<=bounds.x1+3&&r.bounds.y0<=bounds.y1+3);if(!routes.length)return;
     c.save();
     // Restore only a ribbon around the coast. Roads and resource outcrops keep
@@ -582,14 +621,14 @@ G.coastPresentation = (()=>{
     // Opaque restoration still precedes all translucent shore bands.
     c.beginPath();for(const r of p.ribbon){r.points.forEach((point,i)=>i?c.lineTo(...G.T2S(...point)):c.moveTo(...G.T2S(...point)));c.closePath();}c.clip('evenodd');
     function stroke(color,width){c.beginPath();for(const r of routes)curve(c,r,w.N);c.strokeStyle=color;c.lineWidth=width;c.lineJoin='round';c.lineCap='round';c.stroke();}
-    c.save();c.beginPath();outline(c,w);for(const r of p.water)curve(c,r,w.N);c.clip('evenodd');surface(c,'meadow_'+G.TEX_SEASON[G.game.season],bounds);stroke('rgba(164,143,97,.65)',18);
+    c.save();c.beginPath();outline(c,w);for(const r of p.water)curve(c,r,w.N);c.clip('evenodd');surface(c,'meadow_'+G.TEX_SEASON[G.game.season],bounds);stroke(snowy?'rgba(186,200,205,.62)':'rgba(164,143,97,.65)',18);
     const sand=G.SPR.get('sand_'+G.TEX_SEASON[G.game.season]);
     if(sand?.width){const pattern=c.createPattern(sand,'repeat');if(pattern){c.save();c.globalAlpha=.65;stroke(pattern,12);c.restore();}}
-    stroke('rgba(184,161,116,.30)',5);c.restore();
-    c.save();c.beginPath();for(const r of p.water)curve(c,r,w.N);c.clip('evenodd');surface(c,'water_open',bounds);stroke('rgba(115,159,148,.55)',14);stroke('rgba(165,185,157,.35)',5);c.restore();
-    stroke('rgba(207,207,165,.45)',1);c.restore();
+    stroke(snowy?'rgba(221,231,232,.35)':'rgba(184,161,116,.30)',5);c.restore();
+    c.save();c.beginPath();for(const r of p.water)curve(c,r,w.N);c.clip('evenodd');surface(c,waterMaterial(),bounds);stroke(snowy?'rgba(167,196,214,.45)':'rgba(115,159,148,.55)',14);stroke(snowy?'rgba(219,233,240,.45)':'rgba(165,185,157,.35)',5);c.restore();
+    stroke(snowy?'rgba(231,242,247,.65)':'rgba(207,207,165,.45)',1);c.restore();
   }
-  return {draw,active,topology,curve,smoothRoute,boundaryPaths};
+  return {draw,active,topology,curve,smoothRoute,boundaryPaths,fillWinterWater};
 })();
 
 G.buildGround = function () {
@@ -610,7 +649,7 @@ G.buildGround = function () {
 
   if (partial && !G.coastPresentation.active(c,w)) {
     // Keep the established five-tile fast path when contours are unavailable
-    // (missing sprites, winter ice, or an entirely land/water world).
+    // (missing sprites or an entirely land/water world).
     const uniq=new Set();for(const idx of G.groundDirty){const x=idx%N,y=Math.floor(idx/N);uniq.add(idx);if(x>0)uniq.add(idx-1);if(x<N-1)uniq.add(idx+1);if(y>0)uniq.add(idx-N);if(y<N-1)uniq.add(idx+N);}
     for(const water of [false,true])for(const idx of uniq)if((w.water[idx]===1)===water)G.drawGroundTile(c,w,pal,idx%N,Math.floor(idx/N));
   } else if (partial) {
