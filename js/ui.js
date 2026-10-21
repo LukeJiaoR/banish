@@ -1286,14 +1286,17 @@ G.ui = {
     const { summary: s, data } = facts;
     return `<section class="economy-form workforce-details" data-workforce-panel aria-labelledby="workforce-title">
       <h3 id="workforce-title">${b.state === 'site' ? '工地用工' : '建筑用工'}</h3>
-      ${['current', 'limit', 'reason', 'rule'].map(key => `<p class="row${key === 'rule' ? ' desc' : ''}" data-workforce="${key}">${this.escHtml(data[key])}</p>`).join('')}
+      ${['current', 'limit', 'reason'].map(key => `<p class="row" data-workforce="${key}">${this.escHtml(data[key])}</p>`).join('')}
       ${s.supported ? b.state === 'site' ? '<div data-workforce-site-action></div>' : `<form id="worker-limit-form">
         <label for="worker-limit-input">用工上限（0–${s.maximum} 的整数）</label>
         <input id="worker-limit-input" type="number" min="0" max="${s.maximum}" step="1" inputmode="numeric" value="${s.limit}" aria-describedby="worker-limit-note">
         <button id="worker-limit-apply" type="submit">应用用工上限</button>
-        <p class="desc" id="worker-limit-note">只设上限，不保证配足。0 停接新工作，收尾后释放；未点应用不生效。</p>
+        <p class="desc" id="worker-limit-note">0 停接新工作；点击应用后生效。</p>
       </form>` : ''}
       <p class="economy-message" data-workforce-message role="status" aria-live="polite"></p>
+      <details class="workforce-overview workforce-help"><summary>用工说明</summary>
+        <p class="desc" data-workforce="rule">${this.escHtml(data.rule)}</p>
+      </details>
       <details class="workforce-overview"><summary>全镇人力概览</summary>
         ${['population', 'assigned', 'available'].map(key => `<p class="row" data-workforce="${key}">${this.escHtml(data[key])}</p>`).join('')}
         <p class="desc">收尾仍占原岗位；收尾者和无岗带货者都不计入可再派工。</p>

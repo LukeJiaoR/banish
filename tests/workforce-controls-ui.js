@@ -137,6 +137,43 @@ function until(f, c, condition, max = 3000) {
   assert(condition(), 'real citizen did not reach the expected stage');
 }
 
+test('rules are opt-in native disclosure after controls while current facts stay visible', () => {
+  for (const options of [{}, { state: 'site', progress: .5, workLeft: 10, totalWork: 20, constructionStarted: true }]) {
+    const f = setup('woodcutter', options), panel = f.info.querySelector('[data-workforce-panel]');
+    const rule = panel.querySelector('[data-workforce="rule"]'), help = rule.parentNode;
+    assert.equal(help.tagName, 'DETAILS');
+    assert.equal(help.getAttribute('open'), null, 'help defaults closed');
+    const summary = help.children[0];
+    assert.equal(summary.tagName, 'SUMMARY'); assert.equal(summary.textContent, '用工说明');
+    assert.equal(summary.getAttribute('tabindex'), null, 'native keyboard focus is not suppressed');
+    assert.equal(summary.getAttribute('role'), null, 'keep native disclosure semantics');
+    for (const key of ['current', 'limit', 'reason']) {
+      const fact = panel.querySelector(`[data-workforce="${key}"]`);
+      assert.equal(fact.parentNode, panel, key + ' must stay outside the collapsed disclosure');
+    }
+    const action = options.state === 'site' ? panel.querySelector('[data-workforce-site-action]') : input(f, 'worker-limit-form');
+    assert.equal(action.parentNode, panel);
+    assert(panel.children.indexOf(action) < panel.children.indexOf(help), 'controls precede optional explanation');
+    assert.equal(rule.textContent, f.G.workforceSummary(f.b).rule, 'no simulation rule text is discarded');
+    if (!options.state) assert.equal(input(f, 'worker-limit-note').textContent, '0 停接新工作；点击应用后生效。');
+  }
+});
+
+test('opening help and keyboard focus survive live updates without hiding actual blockers', () => {
+  const f = setup('woodcutter'), rule = f.info.querySelector('[data-workforce="rule"]'), help = rule.parentNode;
+  help.setAttribute('open', '');
+  const summary = help.children[0]; summary.focus();
+  f.G.game.res.wood = 0; f.G.ui.renderInfo();
+  assert.equal(f.info.querySelector('[data-workforce="rule"]').parentNode, help);
+  assert.equal(help.getAttribute('open'), ''); assert.equal(f.doc.activeElement, summary);
+  assert.match(live(f, 'reason'), /木|原料|材料/);
+  assert.equal(f.info.querySelector('[data-workforce="reason"]').parentNode, help.parentNode);
+  const field = input(f, 'worker-limit-input'); field.focus(); field.value = '0';
+  f.G.ui.renderInfo();
+  assert.equal(field.value, '0'); assert.equal(f.doc.activeElement, field);
+  assert.equal(f.G.workerLimitOf(f.b), f.G.BDEF.woodcutter.jobs, 'editing is not applying');
+});
+
 test('completed jobs expose default, zero, restoration and integer bounds through real APIs', () => {
   const f = setup(), max = f.G.BDEF[f.b.type].jobs;
   assert.equal(f.G.workerLimitOf(f.b), max);
