@@ -212,8 +212,8 @@ test('explicit-size saves reject invalid identity, footprint, work, payment, sta
   for(const edit of edits){const bad=clone(saved);edit(bad.buildings.find(x=>x.id===b.id));assert.throws(()=>G.applySaveData(bad));assert.equal(G.world,world);assert.equal(G.game,game);}
   const nonPasture=clone(saved);nonPasture.buildings[0].pastureSize=[7,7];assert.throws(()=>G.applySaveData(nonPasture));assert.equal(G.world,world);
   const treeSave=clone(saved);treeSave.trees.push([10*G.world.N+10,10,10,0]);assert.throws(()=>G.applySaveData(treeSave));assert.equal(G.world,world);
-  G.world.water[10*G.world.N+10]=1;assert.throws(()=>G.applySaveData(saved));assert.equal(G.world,world);G.world.water[10*G.world.N+10]=0;
-  G.world.rock[10*G.world.N+10]=1;assert.throws(()=>G.applySaveData(saved));assert.equal(G.world,world);G.world.rock[10*G.world.N+10]=0;
+  // Modern saves restore their own terrain, not the current live world's.
+  for(const key of ['water','rock']){const bad=clone(saved);bad.terrain[key][10*G.world.N+10]=1;assert.throws(()=>G.applySaveData(bad));assert.equal(G.world,world);assert.equal(G.game,game);}
 });
 test('joint deletion of all new shape fields cannot upgrade a new plot into dense legacy capacity',()=>{
   for(const instant of [false,true]){const G=fresh();G.game.res.wood=35;const placed=G.addBuilding('pasture',10,10,{pastureSize:[7,7],instant});assert(placed.ok,placed.reason);const b=placed.b,saved=data(G),world=G.world,game=G.game;

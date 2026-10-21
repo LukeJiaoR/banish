@@ -1271,9 +1271,8 @@ G.buildingPlacementStatus = function () {
   if (!pending) return {ok:false,reason:'请先点击地图选择位置',pending:null};
   const def = G.BDEF[pending.type], check = G.canPlace(G.world,pending.type,pending.ox,pending.oy);
   if (!check.ok) return {...check,pending};
-  for (const k in def.cost) if (G.game.res[k] < def.cost[k])
-    return {ok:false,reason:`${G.RES[k].name}不足（需要 ${def.cost[k]}）`,pending};
-  return {ok:true,pending};
+  const affordable = Object.keys(def.cost).every(k => G.game.res[k] >= def.cost[k]);
+  return {ok:true,affordable,reason:affordable?'':'可规划，等待材料',pending};
 };
 G.confirmBuildingPlacement = function (expectedPending) {
   if (!G.isBuildingPlacementPlanning() || G.hasOpenModal())
@@ -1356,8 +1355,8 @@ G.pasturePlanStatus=function(){
   const trees=G.siteTrees(bounds),preview={type:'pasture',pastureSize:size},facts={...base,workers:G.initialPastureWorkers(size),work:def.buildWork,
     trees:trees.length,cost:{...def.cost},capacities:Object.fromEntries(Object.keys(G.LIVESTOCK).map(type=>[type,G.pastureCapacity(preview,type)]))};
   const check=G.canPlace(w,'pasture',bounds.x,bounds.y,size);if(!check.ok)return {...facts,...check};
-  for(const [k,n]of Object.entries(def.cost))if(G.game.res[k]<n)return {...facts,ok:false,reason:G.RES[k].name+'不足（需要 '+n+'）'};
-  return {...facts,ok:true,signature:JSON.stringify([bounds.x,bounds.y,size,w.navigationRevision||0,trees.map(t=>[t.i,t.b]),Object.keys(def.cost).map(k=>[k,G.game.res[k]])])};
+  const affordable=Object.entries(def.cost).every(([k,n])=>G.game.res[k]>=n);
+  return {...facts,ok:true,affordable,reason:affordable?'':'可规划，等待材料',signature:JSON.stringify([bounds.x,bounds.y,size,w.navigationRevision||0,trees.map(t=>[t.i,t.b]),Object.keys(def.cost).map(k=>[k,G.game.res[k]])])};
 };
 G.confirmPasturePlan=function(intent){
   if(!G.isPasturePlanning()||G.hasOpenModal())return {ok:false,reason:'先关闭弹窗并回到牧场规划'};
@@ -1387,8 +1386,8 @@ G.orchardPlanStatus=function(){
   const trees=G.siteTrees(bounds),preview={type:'orchard',orchardSize:size},facts={...base,workers:G.initialOrchardWorkers(size),work:def.buildWork,
     trees:trees.length,cost:{...def.cost},...G.orchardLayout(preview)};
   const check=G.canPlace(w,'orchard',bounds.x,bounds.y,size);if(!check.ok)return {...facts,...check};
-  for(const [k,n]of Object.entries(def.cost))if(G.game.res[k]<n)return {...facts,ok:false,reason:G.RES[k].name+'不足（需要 '+n+'）'};
-  return {...facts,ok:true,signature:JSON.stringify([bounds.x,bounds.y,size,w.navigationRevision||0,trees.map(t=>[t.i,t.b]),Object.keys(def.cost).map(k=>[k,G.game.res[k]])])};
+  const affordable=Object.entries(def.cost).every(([k,n])=>G.game.res[k]>=n);
+  return {...facts,ok:true,affordable,reason:affordable?'':'可规划，等待材料',signature:JSON.stringify([bounds.x,bounds.y,size,w.navigationRevision||0,trees.map(t=>[t.i,t.b]),Object.keys(def.cost).map(k=>[k,G.game.res[k]])])};
 };
 G.confirmOrchardPlan=function(intent){
   if(!G.isOrchardPlanning()||G.hasOpenModal())return {ok:false,reason:'先关闭弹窗并回到果园规划'};
@@ -1418,8 +1417,8 @@ G.cemeteryPlanStatus=function(){
   const trees=G.siteTrees(bounds),preview={type:'cemetery',cemeterySize:size},facts={...base,workers:0,work:def.buildWork,
     trees:trees.length,cost:{...def.cost},capacity:G.cemeteryCapacity(preview)};
   const check=G.canPlace(w,'cemetery',bounds.x,bounds.y,size);if(!check.ok)return {...facts,...check};
-  for(const [k,n]of Object.entries(def.cost))if(G.game.res[k]<n)return {...facts,ok:false,reason:G.RES[k].name+'不足（需要 '+n+'）'};
-  return {...facts,ok:true,signature:JSON.stringify([bounds.x,bounds.y,size,w.navigationRevision||0,trees.map(t=>[t.i,t.b]),Object.keys(def.cost).map(k=>[k,G.game.res[k]])])};
+  const affordable=Object.entries(def.cost).every(([k,n])=>G.game.res[k]>=n);
+  return {...facts,ok:true,affordable,reason:affordable?'':'可规划，等待材料',signature:JSON.stringify([bounds.x,bounds.y,size,w.navigationRevision||0,trees.map(t=>[t.i,t.b]),Object.keys(def.cost).map(k=>[k,G.game.res[k]])])};
 };
 G.confirmCemeteryPlan=function(intent){
   if(!G.isCemeteryPlanning()||G.hasOpenModal())return {ok:false,reason:'先关闭弹窗并回到墓园规划'};

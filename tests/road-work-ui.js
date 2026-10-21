@@ -168,7 +168,7 @@ test('low stock stone preview explains queue, material delivery, adaptation, and
   assert.match(text, /路线 5 格.*待排施工 4.*复用已成路 1.*已排队 0/);
   assert.match(text, /合计 4 石/); assert.match(text, /4 基础游戏施工小时.*本作适配/);
   assert.match(text, /不预扣或预留材料.*原道路仍可走.*每格实际完工后才提速/);
-  assert.match(text, /材料不足：石头差4；仍可排队/); assert(!input(f, 'road-confirm').disabled);
+  assert.match(text, /材料不足：石头差4；仍可规划/); assert(!input(f, 'road-confirm').disabled);
   activate(f).click(); assert.equal(projects(f).length, 1); assert.equal(projects(f)[0].state, 'site'); assert.equal(G.game.res.stone, 0);
   assert.equal(G.world.road[8 * G.world.N + 8], 2); assert.equal(G.world.road[8 * G.world.N + 9], 1);
   assert.equal(G.world.road[8 * G.world.N + 10], 0); assert.equal(G.world.bgrid[8 * G.world.N + 10], -1);

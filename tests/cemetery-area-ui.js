@@ -169,9 +169,9 @@ test('four table corners show actual graves, stone, no jobs and unwithdrawn cons
   input(f,'cemetery-plan-confirm').click(2);assert.equal(f.G.world.buildings.length,1);
  }
 });
-test('bounds and insufficient material show reasons before spending; cancel is read-only',()=>{
+test('invalid bounds block but insufficient materials allow planning; cancel is read-only',()=>{
  const f=planning();for(const [w,h]of [[6,7],[7,21]]){preview(f,w,h);assert(input(f,'cemetery-plan-confirm').disabled);activate(f).click();assert.equal(f.G.world.buildings.length,0);}
- f.G.game.res.stone=0;preview(f,20,20);assert.match(input(f,'cemetery-plan-status').textContent,/实际墓位 144/);assert(input(f,'cemetery-plan-confirm').disabled);
+ f.G.game.res.stone=0;preview(f,20,20);assert.match(input(f,'cemetery-plan-status').textContent,/实际墓位 144/);assert.match(input(f,'cemetery-plan-status').textContent,/等待材料/);assert(!input(f,'cemetery-plan-confirm').disabled);activate(f).click();assert.equal(f.G.world.buildings.length,1);assert.equal(f.G.game.res.stone,0);assert.equal(f.G.world.buildings[0].progress,0);f.G.removeBuilding(f.G.world.buildings[0]);assert.equal(f.G.game.res.stone,0);
  f.G.game.res.stone=1000;preview(f);const before=snapshot(f);input(f,'cemetery-plan-cancel').click();assert.equal(snapshot(f),before);assert.equal(f.G.cemeteryPlan,null);
 });
 for(const mode of ['world','game','tool','generation','plan','hidden','modal','cancelled'])test('stale planning activation cannot commit after '+mode,()=>{

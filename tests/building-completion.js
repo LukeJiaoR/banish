@@ -164,13 +164,13 @@ test('native seed 11: completed construction updates the ordinary selected build
   global.window=global;global.G=G;
   global.document={getElementById(){return {addEventListener(){}};}};
   require(path.join(root,'js/ui.js'));
-  const info={innerHTML:'',querySelector(){return null;},querySelectorAll(){return [];}};
+  const info={innerHTML:'',classList:{add(){},toggle(){},contains(){return false;}},querySelector(){return null;},querySelectorAll(){return [];}};
   G.ui.el.info=info;G.ui.toast=()=>{};G.ui.refreshHUD=()=>{};
   G.sel={kind:'b',id:b.id};G.ui.renderInfo();
   assert.match(info.innerHTML,/等待工人从可达仓库取料并送抵工地/);assert.match(info.innerHTML,/需要 16 · 到场 0 · 在途 0 · 已投入 0 · 待领 16/);assert.match(info.innerHTML,/取消工地/);
   finishWall(G,sites);G.ui.renderInfo();
   assert.doesNotMatch(info.innerHTML,/建造中|取消工地/);
-  assert.match(info.innerHTML,/有人居住|空置/);assert.match(info.innerHTML,/>拆除<\/button>/);
+  assert.match(info.innerHTML,/有人居住|空置/);assert.match(info.innerHTML,/>拆除建筑<\/button>/);
 });
 
 console.log(`Building completion: ${passed} passed, ${failed} failed`);
