@@ -35,9 +35,13 @@ window.addEventListener('DOMContentLoaded', () => {
   const benefit=document.createElement('small');benefit.id='jade-build-benefit';title.append(benefit);
   const costs=document.createElement('div');costs.id='jade-build-costs';copy.append(costs);
   const confirm=document.createElement('button');confirm.id='jade-build-confirm';confirm.type='button';confirm.textContent='选择位置';actions.append(confirm);
+  // Keep keyboard traversal in the same order as the visible workspace.
+  toolbar.prepend(toolbar.querySelector('.toolbar-heading'));toolbar.append(actions);
   let confirmIntent;let confirmArmed=false,confirmKeyHeld=false,confirmKeyUsed=false;
   const arm=e=>{if(e.button!==undefined&&e.button!==0)return;confirmIntent=G.pendingBuildingPlacement;confirmArmed=true;if(e.type!=='keydown'){confirmKeyHeld=false;confirmKeyUsed=false;}};
-  const disarm=()=>{if(confirmArmed){confirmIntent=null;confirmArmed=true;}};confirm.addEventListener('pointercancel',disarm);confirm.addEventListener('touchcancel',disarm);confirm.addEventListener('blur',disarm);window.addEventListener('blur',disarm);document.addEventListener('visibilitychange',()=>{if(document.hidden)disarm();});
+  // Keyup may occur outside this button after focus/visibility changes. Clear
+  // its held-key latch, but keep the cancelled intent to reject a delayed click.
+  const disarm=()=>{if(confirmArmed||confirmKeyHeld){confirmIntent=null;confirmArmed=true;}confirmKeyHeld=false;confirmKeyUsed=false;};confirm.addEventListener('pointercancel',disarm);confirm.addEventListener('touchcancel',disarm);confirm.addEventListener('blur',disarm);window.addEventListener('blur',disarm);document.addEventListener('visibilitychange',()=>{if(document.hidden)disarm();});
   confirm.addEventListener('pointerdown',arm);confirm.addEventListener('mousedown',arm);
   confirm.addEventListener('keydown',e=>{if(!['Enter',' '].includes(e.key))return;if(e.repeat||confirmKeyHeld){e.preventDefault();return;}confirmKeyHeld=true;confirmKeyUsed=false;arm(e);});
   confirm.addEventListener('keyup',e=>{if(['Enter',' '].includes(e.key))confirmKeyHeld=false;});
@@ -76,10 +80,10 @@ window.addEventListener('DOMContentLoaded', () => {
     confirm.textContent=status?.pending?'确认建造':'选择位置';
     confirm.title=status?.reason||'确认在地图标记的位置建造';
     head.dataset.ordinary=String(ordinary);
-    benefit.textContent=def?({house:'一家人的住所',stonehouse:'更温暖的家',boarding:'临时安置 5 户',storage:'全镇资源交货点',stockpile:'原料仓容 +250',well:'消防取水点'}[type]||(def.jobs?'工作岗位 '+def.jobs: def.w+' × '+def.h+' 占地')):'选择建筑，规划小镇';
+    benefit.textContent=def?({house:'一家人的住所',stonehouse:'更温暖的家',boarding:'临时安置 5 户',storage:'全镇资源交货点',stockpile:'原料仓容 +250',well:'消防取水点',cemetery:'7–20格矩形 · 消耗按规划计算'}[type]||(def.jobs?'工作岗位 '+def.jobs: def.w+' × '+def.h+' 占地')):'选择建筑，规划小镇';
     if(status?.pending&&!status.ok){benefit.textContent=status.reason;benefit.classList.add('is-blocked');}else benefit.classList.remove('is-blocked');
-    costs.innerHTML=def?Object.entries(def.cost||{}).map(([key,qty])=>`<span class="jade-cost ${(G.game?.res[key]||0)<qty?'is-short':''}" aria-label="${G.RES[key].name} ${qty}${(G.game?.res[key]||0)<qty?'，库存不足':''}">${ui.resourceIcon(key)}<b>${qty}</b></span>`).join(''):'';
-    costs.title=def?'建造消耗，红色表示库存不足':'';
+    costs.innerHTML=def&&type!=='cemetery'?Object.entries(def.cost||{}).map(([key,qty])=>`<span class="jade-cost ${(G.game?.res[key]||0)<qty?'is-short':''}" aria-label="${G.RES[key].name} ${qty}${(G.game?.res[key]||0)<qty?'，库存不足':''}">${ui.resourceIcon(key)}<b>${qty}</b></span>`).join(''):'';
+    costs.title=def&&type!=='cemetery'?'建造消耗，红色表示库存不足':'';
     if(ordinary)$('toolbar-state').textContent=status?.pending?(status.ok?'位置已选定，确认后建造':status.reason):'点击地图选择位置，再确认建造';
   }
   if(G.stageBuildingPlacement){const stage=G.stageBuildingPlacement;G.stageBuildingPlacement=function(...args){const result=stage.apply(this,args);syncSelection();return result;};}

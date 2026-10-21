@@ -1,0 +1,158 @@
+/* One stable workspace: entry, catalog, selection and confirmation stay together.
+   Existing controls and gameplay handlers are preserved. */
+@media (min-width:761px) {
+  #hud #toolbar,#hud[data-mode=build] #toolbar {
+    left:auto; right:max(12px,env(safe-area-inset-right)); top:64px;
+    bottom:max(12px,env(safe-area-inset-bottom)); width:340px; max-height:none;
+    padding:14px; display:grid; grid-template-columns:104px minmax(0,1fr);
+    grid-template-rows:44px auto minmax(96px,1fr) auto 48px;
+    gap:12px; overflow:hidden; border-radius:20px;
+    background:linear-gradient(145deg,#fffdf3,#f2efdf);
+    box-shadow:inset 0 1px #fffef8,0 8px 28px #24463930;
+  }
+  #hud #toolbar .toolbar-heading {display:flex;grid-column:1/-1;grid-row:1;align-items:center;gap:8px;padding-bottom:10px;border-bottom:1px solid #d9d2bc;min-width:0}
+  #hud #toolbar #toolbar-path {font-size:14px;line-height:1.4;color:var(--ink);min-width:0}
+  #hud #toolbar #toolbar-back {min-height:36px;padding:5px 9px;font-size:13px;white-space:nowrap}
+  #hud #toolbar #jade-build-header {display:contents;position:static;padding:0;border:0;background:none;box-shadow:none;overflow:visible}
+  #hud #toolbar #jade-build-header::after {display:none}
+  #hud #toolbar #jade-build-art {grid-column:1;grid-row:2;width:104px;height:118px;margin:0;align-self:center}
+  #hud #toolbar #jade-build-copy {grid-column:2;grid-row:2;display:flex;flex-direction:column;align-items:stretch;justify-content:center;gap:10px;min-height:118px;max-height:270px;overflow-y:auto;scrollbar-width:thin}
+  #hud #toolbar #jade-build-name,#hud #toolbar #jade-build-title {text-align:left}
+  #hud #toolbar #jade-build-title {font-size:23px;line-height:1.35;min-height:44px}
+  #hud #toolbar #jade-build-benefit {font-size:13px;line-height:1.6;max-height:none;margin-top:5px;color:#52665d}
+  #hud #toolbar #jade-build-benefit.is-blocked {color:#a0472e}
+  #hud #toolbar #jade-build-title>span::after {font-size:13px;margin-left:6px}
+  #hud #toolbar #jade-build-costs {display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-start;gap:6px;padding-top:9px;border-top:1px solid #d9d2bc}
+  #hud #toolbar #jade-build-costs:empty {display:none}
+  #hud #toolbar .jade-cost {min-width:64px;min-height:34px;gap:5px;padding:3px 7px;background:#fffdf5;border:1px solid #dfdac7;border-radius:9px}
+  #hud #toolbar .jade-cost b {font-size:16px}
+  #hud #toolbar .jade-cost .res-icon {width:25px;height:27px}
+  #hud #toolbar .toolbar-items,#hud #toolbar .tool-group,#hud[data-mode=build] #toolbar .toolbar-items {
+    grid-column:1/-1;grid-row:3;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));
+    align-content:start;gap:8px;padding:10px 3px 4px 0;margin:0;border-top:1px solid #d9d2bc;
+    min-height:0;max-height:none;overflow-x:hidden;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#8eab93 #e9eadc;
+  }
+  #hud #toolbar .toolbar-items::-webkit-scrollbar {display:block;width:7px;height:7px}
+  #hud #toolbar .toolbar-items::-webkit-scrollbar-thumb {background:#8eab93;border-radius:6px}
+  #hud #toolbar .tb,#hud #toolbar .tb-category,#hud #toolbar #toolbar-categories .tb-category,
+  #hud #toolbar .tb:not(.tb-category),#hud.is-placing #toolbar .tool-group .tb.active {
+    display:flex;flex-direction:column;flex:none;width:100%;min-width:0;max-width:none;
+    height:88px;min-height:88px;max-height:88px;padding:5px 3px;gap:3px;
+    border:1px solid #d8d4bf;border-radius:12px;background:linear-gradient(#fffef7,#f6f2e4);
+  }
+  #hud #toolbar .tb:hover {background:#edf4e5;border-color:#79a58a}
+  #hud #toolbar .tb.active {background:linear-gradient(#e9f3df,#dceccb);border-color:#368068;box-shadow:inset 0 0 0 1px #f6fff1}
+  #hud #toolbar .tb .ic,#hud #toolbar .tb-category .ic {height:51px;max-height:51px;flex-basis:51px;line-height:51px;width:100%}
+  #hud #toolbar .tb:not(.tb-category) .lb,#hud #toolbar .category-label {display:block;max-width:100%;font-size:13px;line-height:20px;color:var(--ink);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #hud #toolbar .material-badge {width:6px;height:6px;top:5px;right:5px}
+  #hud #toolbar #toolbar-state {position:static;grid-column:1/-1;grid-row:4;width:auto;height:auto;clip-path:none;overflow:visible;max-width:none;min-height:20px;max-height:56px;overflow-y:auto;margin:0;padding-top:9px;border-top:1px solid #d9d2bc;font-size:12px;line-height:1.65;color:#52665d}
+  #hud #toolbar #jade-build-actions {grid-column:1/-1;grid-row:5;display:flex;gap:10px;align-self:end}
+  #hud #toolbar #jade-build-actions button {height:48px;min-height:48px;font-size:16px;border-radius:12px}
+  #hud #toolbar #jade-build-header.jade-details-open #placement-panel,
+  #hud #toolbar #jade-build-header[data-planning=true] #placement-panel {
+    position:static;inset:auto;width:auto;max-height:150px;padding:7px 0;margin:0;
+    background:none;border:0;border-radius:0;box-shadow:none;overflow:auto;
+  }
+  #hud #toolbar #jade-build-header[data-planning=true] #jade-build-art {display:none}
+  #hud #toolbar #jade-build-header[data-planning=true] #jade-build-copy {grid-column:1/-1;max-height:280px;min-height:0}
+  #hud #toolbar #jade-build-header[data-planning=true] #jade-build-title {font-size:21px}
+  #hud #toolbar #jade-build-header[data-planning=true] #jade-build-benefit {display:none}
+  #hud #toolbar #jade-build-header[data-planning=true] #placement-panel {display:block}
+  #hud #toolbar #jade-build-description {font-size:12px;line-height:1.7}
+  #hud #toolbar #jade-back-categories {display:none}
+  #hud #town-controls {right:12px;width:340px;max-height:calc(100dvh - 150px);overflow-y:auto}
+  #hud #info.detail-inspector {width:340px;right:12px;top:64px;bottom:12px;max-height:none}
+}
+@media (min-width:761px) and (max-height:600px) {
+  #hud #toolbar,#hud[data-mode=build] #toolbar {top:60px;bottom:8px;padding:9px;gap:6px;grid-template-rows:36px auto minmax(60px,1fr) auto 40px}
+  #hud #toolbar .toolbar-heading {padding-bottom:4px}
+  #hud #toolbar #jade-build-art {height:70px}
+  #hud #toolbar #jade-build-copy {min-height:70px;max-height:110px;gap:4px}
+  #hud #toolbar #jade-build-title {font-size:18px;min-height:30px}
+  #hud #toolbar #jade-build-benefit {font-size:12px;margin-top:2px}
+  #hud #toolbar #jade-build-costs {padding-top:3px;gap:4px}
+  #hud #toolbar .jade-cost {min-height:27px;padding:1px 5px}
+  #hud #toolbar .jade-cost b {font-size:14px}
+  #hud #toolbar #jade-build-header[data-planning=true] #jade-build-copy {max-height:120px}
+  #hud #toolbar .toolbar-items,#hud #toolbar .tool-group {padding-top:6px;gap:6px}
+  #hud #toolbar #toolbar-state {max-height:22px;padding-top:0;font-size:11px}
+  #hud #toolbar #jade-build-actions button {height:40px;min-height:40px;font-size:14px}
+}
+/* Small screens retain the bottom tray, with readable names and honest overflow. */
+@media (max-width:760px) {
+  #hud #toolbar {max-height:calc(100dvh - 120px);overflow-y:auto;overscroll-behavior:contain}
+  #hud #toolbar .toolbar-heading {display:flex;gap:6px;align-items:center;order:-1}
+  #hud #toolbar #toolbar-path {font-size:12px;line-height:1.3}
+  #hud #toolbar #toolbar-back {min-height:36px;padding:4px 8px;font-size:12px}
+  #hud #toolbar .toolbar-items,#hud #toolbar .tool-group {scrollbar-width:thin;scrollbar-color:#8eab93 #e9eadc;padding-bottom:5px}
+  #hud #toolbar .toolbar-items::-webkit-scrollbar {display:block;height:6px}
+  #hud #toolbar .toolbar-items::-webkit-scrollbar-thumb {background:#8eab93;border-radius:6px}
+  #hud #toolbar #toolbar-categories {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));overflow:visible;gap:5px}
+  #hud #toolbar #toolbar-categories .tb-category {width:100%;height:62px;min-height:62px;max-height:62px}
+  #hud #toolbar .tb:not(.tb-category),#hud.is-placing #toolbar .tool-group .tb.active {height:74px;min-height:74px;max-height:74px}
+  #hud #toolbar .tb:not(.tb-category) .ic {height:45px;max-height:45px;flex-basis:45px}
+  #hud #toolbar .tb:not(.tb-category) .lb {display:block;font-size:11px;line-height:17px;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+}
+@media (min-width:761px) {
+  #hud.is-placing #toolbar .tool-group {max-height:none;min-height:0}
+}
+@media (min-width:761px) {
+  /* Browsing is compact; do not reserve an empty inspector for an unselected item. */
+  #hud:not(.jade-has-tool) #toolbar,#hud:not(.jade-has-tool)[data-mode=build] #toolbar {
+    top:auto;grid-template-rows:44px 0 auto auto 48px;max-height:calc(100dvh - 76px);
+  }
+  #hud #toolbar #jade-build-header[data-selected=""] #jade-build-art,
+  #hud #toolbar #jade-build-header[data-selected=""] #jade-build-copy {display:none}
+  #hud:not(.jade-has-tool) #toolbar .toolbar-items {max-height:calc(100dvh - 250px)}
+  #hud.jade-has-tool #toolbar,#hud.jade-has-tool[data-mode=build] #toolbar {
+    top:auto;grid-template-columns:140px minmax(0,1fr);grid-template-rows:44px auto minmax(96px,auto) auto 48px;
+    max-height:calc(100dvh - 76px);
+  }
+  #hud.jade-has-tool #toolbar #jade-build-art {width:140px;height:156px}
+  #hud.jade-has-tool #toolbar #jade-build-copy {min-height:156px}
+  #hud.jade-has-tool #toolbar .tool-group {max-height:calc(100dvh - 420px)}
+}
+@media (min-width:761px) and (max-height:600px) {
+  #hud:not(.jade-has-tool) #toolbar,#hud:not(.jade-has-tool)[data-mode=build] #toolbar {grid-template-rows:36px 0 auto auto 40px;max-height:calc(100dvh - 68px)}
+  #hud.jade-has-tool #toolbar,#hud.jade-has-tool[data-mode=build] #toolbar {grid-template-columns:104px minmax(0,1fr);grid-template-rows:36px auto minmax(60px,1fr) auto 40px;top:60px;max-height:none}
+  #hud.jade-has-tool #toolbar #jade-build-art {width:104px;height:70px}
+  #hud.jade-has-tool #toolbar #jade-build-copy {min-height:70px}
+  #hud.jade-has-tool #toolbar .tool-group {max-height:none}
+}
+@media (min-width:761px) {
+  #hud:not(.jade-has-tool) #toolbar,#hud:not(.jade-has-tool)[data-mode=build] #toolbar {grid-template-rows:44px auto auto 48px}
+  #hud:not(.jade-has-tool) #toolbar .toolbar-items {grid-row:2;border-top:0;padding-top:0}
+  #hud:not(.jade-has-tool) #toolbar #toolbar-state {grid-row:3}
+  #hud:not(.jade-has-tool) #toolbar #jade-build-actions {grid-row:4}
+  #hud.jade-has-tool #toolbar:has(#jade-build-header[data-planning=true]),
+  #hud.jade-has-tool[data-mode=build] #toolbar:has(#jade-build-header[data-planning=true]) {top:64px;grid-template-rows:44px auto minmax(60px,1fr) auto 48px;max-height:none}
+  #hud #toolbar #jade-build-header[data-planning=true] #jade-build-copy {min-height:0;max-height:230px;gap:5px}
+  #hud #toolbar #jade-build-header[data-planning=true] #jade-build-costs {display:none}
+  #hud #toolbar #jade-build-header[data-planning=true] #placement-panel {max-height:180px;padding:0}
+  #hud #toolbar #placement-panel [role=group] {box-shadow:none;margin:0;padding:6px;border-radius:10px}
+  #hud #toolbar #road-plan-status,#hud #toolbar #cemetery-plan-status,#hud #toolbar #harvest-range-status {max-height:76px;overflow-y:auto;scrollbar-width:thin;margin:0 0 7px;font-size:12px;line-height:1.6}
+  #hud #toolbar #placement-panel [role=group]>button {min-height:40px;font-size:13px}
+}
+@media (min-width:761px) and (max-height:600px) {
+  #hud.jade-has-tool #toolbar:has(#jade-build-header[data-planning=true]),
+  #hud.jade-has-tool[data-mode=build] #toolbar:has(#jade-build-header[data-planning=true]) {top:60px;grid-template-rows:36px auto minmax(40px,1fr) auto 40px}
+  #hud #toolbar #jade-build-header[data-planning=true] #jade-build-copy {max-height:135px}
+  #hud #toolbar #road-plan-status,#hud #toolbar #cemetery-plan-status,#hud #toolbar #harvest-range-status {max-height:35px}
+  #hud:not(.jade-has-tool) #toolbar,#hud:not(.jade-has-tool)[data-mode=build] #toolbar {grid-template-rows:36px auto auto 40px}
+}
+@media (max-height:390px) and (min-width:761px) {
+  #hud #toolbar,#hud[data-mode=build] #toolbar {overflow-y:auto;overscroll-behavior:contain}
+}
+@media (max-width:760px) {
+  #hud #town-controls {max-height:calc(100dvh - 150px);overflow-y:auto}
+}
+@media (max-width:760px) {
+  /* Keep variable-plan confirmation in view rather than below a long explanation. */
+  /* The tray scrolls: expanded details must remain inside its clipping box. */
+  #hud #toolbar #jade-build-header.jade-details-open #placement-panel {position:static;inset:auto;width:auto;max-height:180px}
+  #hud #toolbar #jade-build-header[data-planning=true] #placement-panel {max-height:180px}
+  #hud #toolbar #road-plan-status,#hud #toolbar #cemetery-plan-status,#hud #toolbar #harvest-range-status {max-height:66px;overflow-y:auto;scrollbar-width:thin;margin:0 0 7px;font-size:12px;line-height:1.6}
+  #hud #toolbar #placement-panel [role=group] {padding:6px;margin:0;box-shadow:none}
+  #hud #toolbar #placement-panel [role=group]>button {min-height:40px;font-size:12px}
+  #hud #toolbar #jade-back-categories {display:none}
+}

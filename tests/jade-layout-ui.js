@@ -194,6 +194,10 @@ function fixture() {
       [type, {name: type, icon: '🏠', w:2, h:2, cost: {wood: 16, stone: 8}, jobs: 0, desc: '测试建筑'}])),
     hasOpenModal: () => modal, topModal: () => modal ? {id: 'help'} : null,
     isEditingTarget: target => /^(INPUT|SELECT|TEXTAREA)$/.test(target?.tagName || '')};
+  // Legacy fixed dimensions/cost remain in BDEF for old saves; the new cemetery
+  // header must defer to its rectangular planner instead of displaying them.
+  G.BDEF.cemetery = {name: '墓园', icon: '🪦', w: 4, h: 4, jobs: 0,
+    cost: {wood: 16, stone: 40}, desc: '新墓园框选7–20格矩形，材料按规划计算。'};
   // Execute the production staging/confirmation APIs against a tiny validated
   // world. The full simulation/input/render path is covered separately by
   // building-placement-confirm.js; this fixture checks the real UI handoff.
@@ -303,6 +307,32 @@ test('hero returns to real categories and restores the original category focus',
   assert.equal(f.document.activeElement, category);
   assert(!f.get('toolbar-categories').classList.contains('hidden'));
   assert(f.get('toolbar-group-homes').classList.contains('hidden'));
+});
+
+test('cemetery header shows rectangular planning and clears legacy fixed footprint and costs', f => {
+  f.get('open-build').click();
+  f.toolbar.querySelector('[data-category="homes"]').click();
+  f.toolbar.querySelector('[data-tool="house"]').click();
+  const costs = f.get('jade-build-costs'), benefit = f.get('jade-build-benefit');
+  assert(costs.querySelectorAll('.jade-cost').length > 0);
+  f.get('toolbar-back').click();
+  f.toolbar.querySelector('[data-category="services"]').click();
+  f.toolbar.querySelector('[data-tool="cemetery"]').click();
+  assert.equal(f.G.tool.type, 'cemetery');
+  assert.equal(f.get('jade-build-header').dataset.planning, 'true');
+  assert.equal(f.get('jade-build-confirm').hidden, true);
+  for (let refresh = 0; refresh < 2; refresh++) {
+    assert.equal(benefit.textContent, '7–20格矩形 · 消耗按规划计算');
+    assert.equal(costs.innerHTML, '');
+    assert.equal(costs.querySelectorAll('.jade-cost').length, 0);
+    f.ui.refreshHUD();
+  }
+  f.get('toolbar-back').click();
+  f.toolbar.querySelector('[data-category="homes"]').click();
+  f.toolbar.querySelector('[data-tool="house"]').click();
+  assert.equal(benefit.textContent, '一家人的住所');
+  assert(costs.querySelectorAll('.jade-cost').length > 0);
+  assert.equal(f.G.world.buildings.length, 0);
 });
 
 test('guide Escape takes precedence over tool, category and selection dismissal', f => {
@@ -475,6 +505,34 @@ test('Space release keeps the original captured position and a fresh press can r
   assert.match(f.toasts.at(-1)[0],/位置已更新/);
   f.key(' ');f.event(confirm,'keyup',{key:' '});confirm.click();
   assert.equal(f.G.world.buildings.length,1);assert.equal(f.G.world.buildings[0].x,20);
+});
+
+// A key can be released after focus/window visibility has changed, so its
+// keyup never reaches the confirmation button. A later fresh press must work.
+for (const interrupt of ['button-blur', 'window-blur', 'hidden'])
+  for (const key of ['Enter', ' ']) test(interrupt+' releases interrupted '+(key===' '?'Space':key)+' confirmation', f => {
+    selectHouse(f); stage(f);
+    const confirm=f.get('jade-build-confirm'); confirm.focus(); f.key(key);
+    if(interrupt==='button-blur') f.event(confirm,'blur');
+    else if(interrupt==='window-blur') f.windowEvent('blur');
+    else { f.document.visibilityState='hidden'; f.documentEvent('visibilitychange'); f.document.visibilityState='visible'; }
+    // A delayed activation from the interrupted gesture remains rejected.
+    confirm.click(); assert.equal(f.G.world.buildings.length,0);
+    // The old key was released elsewhere. No keyup is delivered to this button.
+    confirm.focus(); const fresh=f.key(key);
+    assert.equal(fresh.defaultPrevented,false,'fresh keyboard input must not stay latched');
+    if(key===' ') f.event(confirm,'keyup',{key});
+    confirm.click(); assert.equal(f.G.world.buildings.length,1);
+  });
+
+test('focus loss after Enter activation rejects a delayed click against a new site', f => {
+  selectHouse(f); stage(f); const confirm=f.get('jade-build-confirm');
+  confirm.focus(); f.key('Enter'); confirm.click();
+  assert.equal(f.G.world.buildings.length,1);
+  f.event(confirm,'blur'); stage(f,20,20);
+  confirm.click(); assert.equal(f.G.world.buildings.length,1);
+  confirm.focus(); f.key('Enter'); confirm.click();
+  assert.equal(f.G.world.buildings.length,2);
 });
 
 console.log(`Jade composition: ${passed} behavioral groups passed (real toolbar/navigation/layout scripts; minimal DOM, no browser hit-testing).`);
