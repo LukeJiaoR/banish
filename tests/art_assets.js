@@ -50,3 +50,16 @@ barn.state = 'site'; G.drawBuilding(ctx, barn, 0);
 assert.deepStrictEqual(placed.pop(), { name: 'site_3x3', x: 0, y: 416, width: 192 });
 G.sprDraw = drawSprite;
 console.log('Cleaned storage/site retain original real drawBuilding widths and bottom-center anchors.');
+
+// Atlas cleanup changes alpha only, so production destination rectangles remain exact.
+for (const [name, width, height] of [['school',294,289],['boarding',774,464],['mine',683,555]]) {
+  const im = G.SPR.get(name); im.width=width; im.height=height;
+  const def = G.BDEF[name], b = {type:name,state:'ok',x:10,y:10,w:def.w,h:def.h,id:999};
+  calls.length=0;
+  G.drawBuilding(ctx,b,0);
+  const draw=calls.find(c=>c[0]==='drawImage'&&c[1]===im);
+  assert(draw, name+' uses actual loaded sprite');
+  const [bx,by]=G.T2S(b.x+b.w,b.y+b.h), dw=(b.w+b.h)*32*G.BUILD_SPR_W[name], dh=dw*height/width;
+  assert.deepStrictEqual(draw.slice(2),[bx-dw/2,by-dh,dw,dh],name+' retains exact bottom-center anchor and uniform scale');
+}
+console.log('Cleaned school/boarding/mine production drawImage destination rectangles and uniform scale passed.');

@@ -1,0 +1,148 @@
+[
+  {
+    "file": "assets/buildings/school.png",
+    "size": [
+      294,
+      289
+    ],
+    "clearRegions": [
+      [
+        0,
+        0,
+        140,
+        46
+      ],
+      [
+        223,
+        0,
+        294,
+        37
+      ]
+    ],
+    "originalSha256": "016140b09a2789d2251e76c4efc1c5445c99a426fdf9bcd67e1a87ab9ac258c6",
+    "rgbSha256": "5a8976601a114fdc79b0d2ca3ebe9df6919e882f9fc435b4a7e2afb3221211bb",
+    "guardRgbaSha256": "703fbd32a15759d865aeb149e56ac7767d6e422dc18ae773e78c2c4f6028144d",
+    "changedAlphaPixels": 6989,
+    "sourceAtlas": "art/sheet-1-main.png",
+    "sourceAtlasSha256": "2af6daa6d24d1081fe9385e759ed2b3cf04d859289ef79c69b065622aab1a95d",
+    "sourceWindow": [
+      404,
+      530,
+      712,
+      840
+    ],
+    "baselineCommit": "d2df590"
+  },
+  {
+    "file": "assets/buildings/boarding.png",
+    "size": [
+      774,
+      464
+    ],
+    "clearRegions": [
+      [
+        400,
+        354,
+        774,
+        464
+      ]
+    ],
+    "originalSha256": "0b9e54560fb50c7daf17d187b8bf5ed5183ed258294dd630d27ed26b82c98b26",
+    "rgbSha256": "d93d997ff177d028ca1430729f91b9fb65e0e5b58037e11a8c8c3c41ba2e7bf6",
+    "guardRgbaSha256": "c9064cbc2f9cb3510da3c632039db7253fe707dae72feb6f60feef02424bd773",
+    "changedAlphaPixels": 10719,
+    "sourceAtlas": "art/sheet-2-missing.png",
+    "sourceAtlasSha256": "ee827890ad9abd50b502c1a77a239f2906b077cf12f6015d215780c56a0a9506",
+    "sourceWindow": [
+      662,
+      0,
+      1458,
+      724
+    ],
+    "baselineCommit": "d2df590"
+  },
+  {
+    "file": "assets/buildings/mine.png",
+    "size": [
+      683,
+      555
+    ],
+    "clearRegions": [
+      [
+        0,
+        471,
+        45,
+        555
+      ]
+    ],
+    "originalSha256": "99e031e3e57d23b27bd27f70ac96f82659037ffb8ce977ab8cf5f103f7813fab",
+    "rgbSha256": "524682c85ef41538896ae011bc277d05765becc733b8a05a2e6412e8ebbf648a",
+    "guardRgbaSha256": "e54f42a05c3ed796b27c3547c7e422bf01e47b1580e39ab4fb41530e560512e6",
+    "changedAlphaPixels": 2372,
+    "sourceAtlas": "art/sheet-2-missing.png",
+    "sourceAtlasSha256": "ee827890ad9abd50b502c1a77a239f2906b077cf12f6015d215780c56a0a9506",
+    "sourceWindow": [
+      1450,
+      0,
+      2171,
+      600
+    ],
+    "baselineCommit": "d2df590"
+  },
+  {
+    "file": "assets/icons/tool_boarding.png",
+    "size": [
+      96,
+      59
+    ],
+    "clearRegions": [
+      [
+        49,
+        44,
+        94,
+        57
+      ]
+    ],
+    "originalSha256": "67db9bdd9d3b977b624d3899c8980f050c81a1dfce9ee2fd8539c7a6fb2fc21a",
+    "rgbSha256": "e04676023a91c2253c5256a240322fe35f0767eda877faf4adf5cbf952abc247",
+    "guardRgbaSha256": "af813a6e1fb302502d9c82dd404b9d33840506c05b3d2c2f73f6d3c25ed6aad9",
+    "changedAlphaPixels": 184,
+    "sourceAtlas": "art/sheet-2-missing.png",
+    "sourceAtlasSha256": "ee827890ad9abd50b502c1a77a239f2906b077cf12f6015d215780c56a0a9506",
+    "sourceWindow": [
+      662,
+      0,
+      1458,
+      724
+    ],
+    "baselineCommit": "d2df590"
+  },
+  {
+    "file": "assets/icons/tool_mine.png",
+    "size": [
+      96,
+      79
+    ],
+    "clearRegions": [
+      [
+        0,
+        64,
+        9,
+        79
+      ]
+    ],
+    "originalSha256": "d014698a7ec87aa553f4a7e70516736e3eaa8eee25ce61c0c4b591e01e2edcc6",
+    "rgbSha256": "9349355126afdacec4fe64be531ffbc970e90d0c099d314ce13f8b7ffd592a1f",
+    "guardRgbaSha256": "560e6c127bbdcdaf460f746e2ac0f3bb8e643d9569dd923fe0cfd68f4fa8edbc",
+    "changedAlphaPixels": 53,
+    "sourceAtlas": "art/sheet-2-missing.png",
+    "sourceAtlasSha256": "ee827890ad9abd50b502c1a77a239f2906b077cf12f6015d215780c56a0a9506",
+    "sourceWindow": [
+      1450,
+      0,
+      2171,
+      600
+    ],
+    "baselineCommit": "d2df590"
+  }
+]

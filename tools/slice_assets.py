@@ -15,7 +15,12 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, 'assets')
 # Independently edited/reviewed PNGs are no longer derived from the old sheet.
 # Never silently put its known label/neighbor contamination back into these files.
-PRESERVED_EDITS = {'buildings/storage.png', 'buildings/site_3x3.png'}
+PRESERVED_EDITS = {
+    'buildings/storage.png', 'buildings/site_3x3.png',
+    # Atlas-neighbor cleanup keeps the established canvas and footpoint.
+    'buildings/school.png', 'buildings/boarding.png', 'buildings/mine.png',
+    'icons/tool_boarding.png', 'icons/tool_mine.png',
+}
 
 
 def load(name):
