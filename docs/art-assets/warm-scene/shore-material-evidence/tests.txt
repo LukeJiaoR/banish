@@ -1,0 +1,8 @@
+PASS bank samples are cached, deterministic and never rewrite the shared coast
+PASS width field is bounded, varied and world-anchored rather than restarted at tile edges
+PASS closed islands, single ponds, diagonal contacts and map exits produce finite cached bands
+PASS closed banks cover the closing span with oppositely wound loops
+PASS bank sampling never consumes gameplay randomness
+PASS native closed-bank pixels do not depend on arbitrary route start vertex
+PASS native road and resource diamonds remain protected in every season
+Shore material: 7 groups passed

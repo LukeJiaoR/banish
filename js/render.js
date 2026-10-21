@@ -602,6 +602,41 @@ G.coastPresentation = (()=>{
     if(route.closed){c.moveTo(...mid(p[n-1],p[0]));for(let i=0;i<n;i++)corner(i,mid(p[i],p[(i+1)%n]));c.closePath();}
     else{c.moveTo(...p[0]);c.lineTo(...mid(p[0],p[1]));for(let i=1;i<n-1;i++)corner(i,mid(p[i],p[i+1]));c.lineTo(...p[n-1]);}
   }
+  const bankCache=new WeakMap();
+  function bankSamples(route,N){
+    let cached=bankCache.get(route);if(cached)return cached;
+    const points=[];let current;
+    const add=(x,y)=>{current=[x,y];points.push(current);};
+    // Sample the already-approved shoreline path, not a second coast geometry.
+    curve({moveTo:add,lineTo:add,closePath(){},quadraticCurveTo(cx,cy,x,y){
+      const a=current;for(let i=1;i<=6;i++){const t=i/6,u=1-t;add(u*u*a[0]+2*u*t*cx+t*t*x,u*u*a[1]+2*u*t*cy+t*t*y);}
+    }},route,N);
+    if(route.closed&&points.length>1)points.pop();
+    cached=new Float64Array(points.length*5);
+    points.forEach((p,i)=>{
+      const a=points[Math.max(0,i-1)]||p,b=points[Math.min(points.length-1,i+1)]||p;
+      const before=route.closed?points[(i+points.length-1)%points.length]:a,after=route.closed?points[(i+1)%points.length]:b;
+      const dx=after[0]-before[0],dy=after[1]-before[1],d=Math.hypot(dx,dy)||1;
+      const v=.5+.5*Math.sin(p[0]*.031+p[1]*.017+1.2*Math.sin(p[1]*.043-p[0]*.012));
+      const at=i*5;cached[at]=p[0];cached[at+1]=p[1];cached[at+2]=-dy/d;cached[at+3]=dx/d;cached[at+4]=1.5+9*v*v;
+    });bankCache.set(route,cached);return cached;
+  }
+  function bankPath(c,routes,N,scale){
+    c.beginPath();for(const route of routes){const samples=bankSamples(route,N),count=samples.length/5;if(count<2)continue;
+      for(const side of [1,-1]){
+        for(let i=0;i<count;i++){
+          const at=(side===1?i:count-1-i)*5;
+          const x=samples[at]+side*samples[at+2]*samples[at+4]*scale,y=samples[at+1]+side*samples[at+3]*samples[at+4]*scale;
+          if(i===0&&(side===1||route.closed))c.moveTo(x,y);else c.lineTo(x,y);
+        }
+        // Closed coasts need two closed, oppositely wound loops. Joining them
+        // as an open strip would omit the final-to-first bank segment.
+        if(route.closed)c.closePath();
+      }
+      if(!route.closed)c.closePath();
+    }
+  }
+
   function outline(c,w){[[0,0],[w.N,0],[w.N,w.N],[0,w.N]].forEach((p,i)=>i?c.lineTo(...G.T2S(...p)):c.moveTo(...G.T2S(...p)));c.closePath();}
   function material(c,name){const im=G.SPR?.get(name);if(!im?.width||!c.createPattern)return null;
     let entries=G.terrainPatterns.get(c);if(!entries){entries=new Map();G.terrainPatterns.set(c,entries);}let p=entries.get(name);
@@ -664,14 +699,15 @@ G.coastPresentation = (()=>{
     // Opaque restoration still precedes all translucent shore bands.
     c.beginPath();for(const r of p.ribbon){r.points.forEach((point,i)=>i?c.lineTo(...G.T2S(...point)):c.moveTo(...G.T2S(...point)));c.closePath();}c.clip('evenodd');
     function stroke(color,width){c.beginPath();for(const r of routes)curve(c,r,w.N);c.strokeStyle=color;c.lineWidth=width;c.lineJoin='round';c.lineCap='round';c.stroke();}
-    c.save();c.beginPath();outline(c,w);for(const r of p.water)curve(c,r,w.N);c.clip('evenodd');surface(c,'meadow_'+G.TEX_SEASON[G.game.season],bounds);stroke(snowy?'rgba(186,200,205,.62)':'rgba(164,143,97,.65)',18);
-    const sand=G.SPR.get('sand_'+G.TEX_SEASON[G.game.season]);
-    if(sand?.width){const pattern=c.createPattern(sand,'repeat');if(pattern){c.save();c.globalAlpha=.65;stroke(pattern,12);c.restore();}}
-    stroke(snowy?'rgba(221,231,232,.35)':'rgba(184,161,116,.30)',5);c.restore();
+    c.save();c.beginPath();outline(c,w);for(const r of p.water)curve(c,r,w.N);c.clip('evenodd');surface(c,'meadow_'+G.TEX_SEASON[G.game.season],bounds);
+    bankPath(c,routes,w.N,1);c.fillStyle=snowy?'rgba(186,200,205,.40)':'rgba(164,143,97,.40)';c.fill();
+    const sand=material(c,'sand_'+G.TEX_SEASON[G.game.season]);
+    if(sand){c.save();c.globalAlpha=.78;bankPath(c,routes,w.N,.7);c.fillStyle=sand;c.fill();c.restore();}
+    c.restore();
     c.save();c.beginPath();for(const r of p.water)curve(c,r,w.N);c.clip('evenodd');surface(c,waterMaterial(),bounds);stroke(snowy?'rgba(167,196,214,.45)':'rgba(115,159,148,.55)',14);stroke(snowy?'rgba(219,233,240,.45)':'rgba(165,185,157,.35)',5);c.restore();
-    stroke(snowy?'rgba(231,242,247,.65)':'rgba(207,207,165,.45)',1);c.restore();
+    if(snowy)stroke('rgba(231,242,247,.35)',.6);c.restore();
   }
-  return {draw,active,topology,curve,smoothRoute,boundaryPaths,fillWinterWater};
+  return {draw,active,topology,curve,smoothRoute,boundaryPaths,fillWinterWater,bankSamples,bankPath};
 })();
 
 G.buildGround = function () {
