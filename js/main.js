@@ -1203,7 +1203,7 @@ G.setTool = function (t) {
   else if (t === 'demolish') G.tool = { kind: 'demolish' };
   else if (['road','stoneroad','bridge','tunnel'].includes(t)) G.tool = { kind: 'road', surface:t==='stoneroad'?'stone':t==='bridge'?'bridge':t==='tunnel'?'tunnel':'dirt' };
   else if (t === 'fell') G.tool = { kind: 'fell' };
-  else if (t === 'quarry') G.tool = { kind: 'quarry' };
+  else if (['quarry','gatherall','collectstone','collectiron','cancelremoval'].includes(t)) G.tool = { kind: t };
   else G.tool = { kind: 'build', type: t };
   G.ui.setToolActive();
 };
@@ -1489,64 +1489,90 @@ G.confirmRoadPlan = function (intent) {
   G.cancelRoadPlan();G.ui.refreshHUD();if(result.b){G.sel={kind:'b',id:result.b.id};G.ui.showInfo?.(G.sel);}return {...result,surface:plan.surface||'dirt'};
 };
 
-/* Range previews are transient and hold original tree identities, never jobs or
- * inventory. Enumerate only when a corner/drag is committed, not while moving. */
+/* Resource designation is a direct map gesture. No inventory is produced here.
+ * Keep the old finish/confirm API for internal callers; pointer release and the
+ * second touch corner call commitHarvestSelection immediately. */
 G.harvestPlan = null;
 G.harvestGestureVersion = 0;
+G.isHarvestTool = () => !!G.tool && ['fell','quarry','gatherall','collectstone','collectiron','cancelremoval'].includes(G.tool.kind);
 G.cancelHarvestPlan = function () { G.harvestPlan = null; G.harvestGestureVersion++; };
 G.harvestPoint = function (x, y) {
   const w = G.world;
   return w && Number.isFinite(x) && Number.isFinite(y) ? { x: G.clamp(Math.floor(x), 0, w.N - 1), y: G.clamp(Math.floor(y), 0, w.N - 1) } : null;
 };
+G.harvestTarget = function (w, i, kind) {
+  const tree = w.treeIdx[i] >= 0 ? w.trees[w.treeIdx[i]] : null, rock = w.rock[i];
+  if (kind === 'cancelremoval') return tree && w.marked.has(i) ? {i,tree,rock:0} : rock && w.markedRocks.has(i) ? {i,tree:null,rock} : null;
+  if (tree && ['fell','gatherall'].includes(kind)) return {i,tree,rock:0};
+  if (rock && (['quarry','gatherall'].includes(kind) || kind === 'collectstone' && rock === 1 || kind === 'collectiron' && rock === 2)) return {i,tree:null,rock};
+  return null;
+};
 G.beginHarvestRange = function (x, y) {
-  if (!G.tool || !['fell', 'quarry'].includes(G.tool.kind) || G.hasOpenModal()) return;
+  if (!G.isHarvestTool() || G.hasOpenModal()) return;
   const p = G.harvestPoint(x, y); if (!p) return;
-  G.harvestPlan = { world: G.world, kind: G.tool.kind, start: p, end: p, frozen: false };
+  G.harvestPlan = { world: G.world, game:G.game, tool:G.tool, kind: G.tool.kind, start: p, end: p, frozen: false };
 };
 G.finishHarvestRange = function (x, y, awaitingSecond = false) {
   const p = G.harvestPlan, w = G.world, end = G.harvestPoint(x, y);
-  if (!p || p.world !== w || !end || !G.tool || p.kind !== G.tool.kind || G.hasOpenModal()) return;
+  if (!p || p.world !== w || p.game !== G.game || !end || !G.tool || p.tool !== G.tool || G.hasOpenModal()) return;
   const bounds = { x0: Math.min(p.start.x, end.x), y0: Math.min(p.start.y, end.y), x1: Math.max(p.start.x, end.x), y1: Math.max(p.start.y, end.y) };
   const targets = []; let total = 0;
   for (let y = bounds.y0; y <= bounds.y1; y++) for (let x = bounds.x0; x <= bounds.x1; x++) {
-    const i = y * w.N + x, tree = p.kind === 'fell' && w.treeIdx[i] >= 0 ? w.trees[w.treeIdx[i]] : null;
-    const rock = p.kind === 'quarry' ? w.rock[i] : 0;
-    if (!tree && !rock) continue;
+    const target = G.harvestTarget(w,y*w.N+x,p.kind);
+    if (!target) continue;
     total++;
-    // At most 300 existing + 300 new marks can ever fit; bound retained memory.
-    if (targets.length < 601) targets.push({ i, tree, rock });
+    // Two independent 300-order queues; retain one extra to detect overflow.
+    if (targets.length < 601) targets.push(target);
   }
   G.harvestPlan = { ...p, end, bounds, targets, total, frozen: true, awaitingSecond };
 };
 G.selectHarvestCorner = function (x, y) {
   const p = G.harvestPlan;
-  if (p && p.world === G.world && G.tool && p.kind === G.tool.kind && p.awaitingSecond) G.finishHarvestRange(x, y);
-  else { G.beginHarvestRange(x, y); G.finishHarvestRange(x, y, true); }
+  if (p && p.world === G.world && p.game === G.game && p.tool === G.tool && p.awaitingSecond) {
+    G.finishHarvestRange(x, y); return G.commitHarvestSelection();
+  }
+  G.beginHarvestRange(x, y); G.finishHarvestRange(x, y, true);
 };
 G.harvestRangeStatus = function () {
   const p = G.harvestPlan, w = G.world;
-  if (!p || p.world !== w || !G.tool || p.kind !== G.tool.kind || !p.frozen)
-    return { ok: false, reason: p && !p.frozen ? '拖动范围，松开后查看目标并确认' : '鼠标拖出矩形；手机点两个角。确认前不会下达采集任务。' };
+  if (!p || p.world !== w || p.game !== G.game || !G.tool || p.tool !== G.tool || !p.frozen)
+    return { ok: false, reason: p && !p.frozen ? '拖动选择范围，松开即下达任务' : '拖框选择；触屏点两个角。' };
   if (p.total > 600) return { ok: false, reason: '范围内目标过多，请缩小范围；每类最多排队300处。' };
-  const marks = p.kind === 'fell' ? w.marked : w.markedRocks, valid = [], added = [];
-  const counts = { wood: 0, stone: 0, iron: 0 };
+  const valid = [], added = [], counts = { wood: 0, stone: 0, iron: 0 };
   for (const t of p.targets) {
     if (t.tree ? (w.treeIdx[t.i] < 0 || w.trees[w.treeIdx[t.i]] !== t.tree) : w.rock[t.i] !== t.rock) continue;
+    const marks = t.tree ? w.marked : w.markedRocks;
+    if (p.kind === 'cancelremoval' && !marks.has(t.i)) continue;
     valid.push(t); counts[t.tree ? 'wood' : t.rock === 2 ? 'iron' : 'stone']++;
     if (!marks.has(t.i)) added.push(t);
   }
-  const signature = valid.map(t => t.i + ':' + (marks.has(t.i) ? 1 : 0)).join(',');
-  const reason = !valid.length ? '范围内已无对应资源，请重选。' : marks.size + added.length > 300 ? '新增标记会超过300处，请缩小范围、等任务完成或取消多余标记。' : '';
+  const signature = valid.map(t => t.i + ':' + ((t.tree ? w.marked : w.markedRocks).has(t.i) ? 1 : 0)).join(',');
+  const trees = added.filter(t=>t.tree).length, rocks = added.length-trees;
+  const reason = !valid.length ? '范围内没有对应资源标记或可采资源。' : p.kind !== 'cancelremoval' && (w.marked.size+trees>300 || w.markedRocks.size+rocks>300) ? '新增标记会超过300处，请缩小范围、等任务完成或取消多余标记。' : '';
   return { ok: !reason, reason, plan: p, valid, added, counts, existing: valid.length - added.length, signature };
 };
 G.confirmHarvestRange = function (intent) {
   if (G.hasOpenModal()) return { ok: false };
   const s = G.harvestRangeStatus(); if (!s.ok) return s;
-  if (intent && (intent.plan !== s.plan || intent.signature !== s.signature)) return { ok: false, reason: '范围或目标已变化，请复查后重新确认。' };
-  const w = G.world, mark = s.plan.kind === 'fell' ? G.markFellAt : G.markRockAt;
-  for (const t of s.added) mark(w, t.i % w.N, Math.floor(t.i / w.N));
-  G.cancelHarvestPlan();
-  return { ok: true, marked: s.added.length };
+  if (s.plan.awaitingSecond) return {ok:false,reason:'请选择第二个角。'};
+  if (intent && (intent.plan !== s.plan || intent.signature !== s.signature)) return { ok: false, reason: '范围或目标已变化，请重新选择。' };
+  const w = G.world;
+  if (s.plan.kind === 'cancelremoval') {
+    const trees = new Set(s.valid.filter(t=>t.tree).map(t=>t.i)), rocks = new Set(s.valid.filter(t=>!t.tree).map(t=>t.i));
+    const a=G.cancelResourceMarks('trees',trees),b=G.cancelResourceMarks('rocks',rocks);
+    G.cancelHarvestPlan(); return {ok:true,cancelled:a.marks+b.marks};
+  }
+  for (const t of s.added) (t.tree ? G.markFellAt : G.markRockAt)(w, t.i % w.N, Math.floor(t.i / w.N));
+  G.cancelHarvestPlan(); return { ok: true, marked: s.added.length };
+};
+G.commitHarvestSelection = function () {
+  const result = G.confirmHarvestRange();
+  // Invalid/empty selections are discarded, never left armed for a later event.
+  if (!result.ok) G.cancelHarvestPlan();
+  if (result.reason) G.ui.toast(result.reason,'warn');
+  else if (result.cancelled !== undefined) G.ui.toast(`已取消 ${result.cancelled} 处资源标记`,'info');
+  G.ui.refreshHarvest?.();
+  return result;
 };
 
 /* ---------- 初始化 ---------- */
@@ -1595,7 +1621,7 @@ G.init = function () {
   let buildingTouch = null, buildingMouse = null;
   let panTouch = null;
   const fixedField = () => G.tool?.kind === 'build' && ['farm', 'pasture', 'orchard'].includes(G.tool.type);
-  let roadTouch = null, harvestTouch = null, roadMouse = null, farmTouch=null, farmMouse=null, pastureTouch=null, pastureMouse=null, orchardTouch=null, orchardMouse=null, cemeteryTouch=null, cemeteryMouse=null;
+  let roadTouch = null, harvestTouch = null, harvestMouse = null, roadMouse = null, farmTouch=null, farmMouse=null, pastureTouch=null, pastureMouse=null, orchardTouch=null, orchardMouse=null, cemeteryTouch=null, cemeteryMouse=null;
   function resetInput() {
     if (G.roadDrag && !['bridge','tunnel'].includes(G.tool?.surface)) G.cancelRoadPlan();
     if (G.harvestPlan && !G.harvestPlan.frozen) G.cancelHarvestPlan();
@@ -1604,7 +1630,7 @@ G.init = function () {
     panTouch = null;
     G.keys = {};
     dragging = false; dragBtn = -1; dragMoved = 0;
-    roadTouch = null; harvestTouch = null; roadMouse = null; G.roadDrag = null;farmTouch=null;farmMouse=null;G.farmDrag=null;pastureTouch=null;pastureMouse=null;G.pastureDrag=null;orchardTouch=null;orchardMouse=null;G.orchardDrag=null;cemeteryTouch=null;cemeteryMouse=null;G.cemeteryDrag=null;
+    roadTouch = null; harvestTouch = null; harvestMouse = null; roadMouse = null; G.roadDrag = null;farmTouch=null;farmMouse=null;G.farmDrag=null;pastureTouch=null;pastureMouse=null;G.pastureDrag=null;orchardTouch=null;orchardMouse=null;G.orchardDrag=null;cemeteryTouch=null;cemeteryMouse=null;G.cemeteryDrag=null;
   }
   window.addEventListener('blur', () => { resetInput(); roadTouch = null; G.cancelBuildingPlacement(); G.cancelRoadPlan(); G.cancelHarvestPlan(); G.cancelFarmPlan(); G.cancelPasturePlan();G.cancelOrchardPlan();G.cancelCemeteryPlan(); });
   document.addEventListener('focusin', e => { if (G.isInputTarget(e.target)) resetInput(); });
@@ -1631,11 +1657,12 @@ G.init = function () {
       trees:status.trees.map(p=>p.y*gesture.world.N+p.x).join(','),rocks:G.roadRockSignature(status)} : null;
   }
   G.cv.addEventListener('contextmenu', e => e.preventDefault());
-  G.cv.addEventListener('pointercancel', () => { if (roadMouse || buildingMouse) resetInput(); });
+  G.cv.addEventListener('pointercancel', () => { if (roadMouse || buildingMouse || harvestMouse || harvestTouch || G.harvestPlan) { resetInput(); G.cancelHarvestPlan(); } });
 
   G.cv.addEventListener('mousedown', e => {
     if (G.hasOpenModal()) { resetInput(); return; }
     const p = toLocal(e);
+    if (e.button !== 0 && harvestMouse) { resetInput(); G.cancelHarvestPlan(); }
     if (e.button === 2 && G.tool) { G.setTool(null); return; } // 右键取消工具
     dragging = true; dragBtn = e.button; dragMoved = 0;
     lastX = pressX = p.x; lastY = pressY = p.y;
@@ -1655,9 +1682,10 @@ G.init = function () {
       const t = G.screenToMapTile(p.x, p.y);
       roadMouse = { start: { x: Math.floor(t.tx), y: Math.floor(t.ty) }, world: G.world, game:G.game, tool:G.tool, surface:G.tool.surface||'dirt', generation: G.roadGestureVersion };
     }
-    if (e.button === 0 && G.tool && ['fell', 'quarry'].includes(G.tool.kind)) {
+    if (e.button === 0 && G.isHarvestTool()) {
       const t = G.screenToMapTile(p.x, p.y);
       G.beginHarvestRange(t.tx, t.ty);
+      harvestMouse = {tool:G.tool,world:G.world,game:G.game,generation:G.harvestGestureVersion};
     }
   });
 
@@ -1689,7 +1717,7 @@ G.init = function () {
         G.roadPlan = null;
         G.roadDrag = {world:G.world,start:roadMouse.start,end};
       }
-    } else if (dragBtn === 0 && G.tool && ['fell', 'quarry'].includes(G.tool.kind)) {
+    } else if (dragBtn === 0 && G.isHarvestTool()) {
       const plan = G.harvestPlan;
       if (plan && !plan.frozen && plan.world === G.world && plan.kind === G.tool.kind) plan.end = G.harvestPoint(t.tx, t.ty);
     }
@@ -1698,6 +1726,9 @@ G.init = function () {
   window.addEventListener('mouseup', e => {
     if (G.hasOpenModal() || onPlacementPanel(e)) { resetInput(); return; }
     if (!dragging) return;
+    if (e.button !== dragBtn) { resetInput(); return; }
+    const harvestGesture=harvestMouse; harvestMouse=null;
+    if (harvestGesture && (e.target!==G.cv || harvestGesture.tool!==G.tool || harvestGesture.world!==G.world || harvestGesture.game!==G.game || harvestGesture.generation!==G.harvestGestureVersion)) { resetInput(); G.cancelHarvestPlan(); return; }
     dragging = false;
     const stamp=fixedFieldMouse; fixedFieldMouse=null;
     const buildingGesture=buildingMouse; buildingMouse=null;
@@ -1741,8 +1772,8 @@ G.init = function () {
       } else G.selectRoadEndpoint(tx, ty);
       return;
     }
-    if (e.button === 0 && G.tool && ['fell', 'quarry'].includes(G.tool.kind)) {
-      if (G.harvestPlan && !G.harvestPlan.frozen) G.finishHarvestRange(tx, ty);
+    if (e.button === 0 && G.isHarvestTool()) {
+      if (harvestGesture && G.harvestPlan && !G.harvestPlan.frozen) { G.finishHarvestRange(tx, ty); G.commitHarvestSelection(); }
       return;
     }
     if (e.button === 0 && dragMoved <= 4) {
@@ -1852,22 +1883,27 @@ G.init = function () {
   G.cv.addEventListener('touchend',e=>{if(!G.isPasturePlanning()){pastureTouch=null;return;}e.preventDefault();if(pastureTouch&&pastureTouch.world===G.world&&pastureTouch.generation===G.pastureGestureVersion&&e.changedTouches.length===1&&!G.hasOpenModal()){const p=toLocal(e.changedTouches[0]),t=G.screenToMapTile(p.x,p.y);G.selectPastureCorner(t.tx,t.ty);}pastureTouch=null;},{passive:false});
   G.cv.addEventListener('touchend',e=>{if(!G.isOrchardPlanning()){orchardTouch=null;return;}e.preventDefault();if(orchardTouch&&orchardTouch.world===G.world&&orchardTouch.generation===G.orchardGestureVersion&&e.changedTouches.length===1&&!G.hasOpenModal()){const p=toLocal(e.changedTouches[0]),t=G.screenToMapTile(p.x,p.y);G.selectOrchardCorner(t.tx,t.ty);}orchardTouch=null;},{passive:false});
   G.cv.addEventListener('touchend',e=>{if(!G.isCemeteryPlanning()){cemeteryTouch=null;return;}e.preventDefault();if(cemeteryTouch&&cemeteryTouch.world===G.world&&cemeteryTouch.generation===G.cemeteryGestureVersion&&e.changedTouches.length===1&&!G.hasOpenModal()){const p=toLocal(e.changedTouches[0]),t=G.screenToMapTile(p.x,p.y);G.selectCemeteryCorner(t.tx,t.ty);}cemeteryTouch=null;},{passive:false});
-  const harvesting = () => G.tool && ['fell', 'quarry'].includes(G.tool.kind);
+  const harvesting = () => G.isHarvestTool();
   G.cv.addEventListener('touchstart', e => {
     if (!harvesting()) return;
     e.preventDefault(); resetInput();
-    harvestTouch = !G.hasOpenModal() && e.touches.length === 1 ? { x: e.touches[0].clientX, y: e.touches[0].clientY, world: G.world, generation: G.harvestGestureVersion } : null;
+    harvestTouch = !G.hasOpenModal() && e.touches.length === 1 ? { x: e.touches[0].clientX, y: e.touches[0].clientY, world: G.world, game:G.game, tool:G.tool, generation: G.harvestGestureVersion } : null;
+    if (!harvestTouch) G.cancelHarvestPlan();
   }, { passive: false });
   G.cv.addEventListener('touchmove', e => {
     if (!harvesting()) return;
     e.preventDefault();
-    if (!harvestTouch || e.touches.length !== 1 || Math.abs(e.touches[0].clientX - harvestTouch.x) + Math.abs(e.touches[0].clientY - harvestTouch.y) > 10) harvestTouch = null;
+    if (!harvestTouch || e.touches.length !== 1 || Math.abs(e.touches[0].clientX - harvestTouch.x) + Math.abs(e.touches[0].clientY - harvestTouch.y) > 10) { harvestTouch = null; G.cancelHarvestPlan(); }
   }, { passive: false });
   G.cv.addEventListener('touchend', e => {
     if (!harvesting()) { harvestTouch = null; return; }
     e.preventDefault();
-    if (harvestTouch && harvestTouch.world === G.world && harvestTouch.generation === G.harvestGestureVersion && !G.hasOpenModal() && e.changedTouches.length === 1) {
-      const p = toLocal(e.changedTouches[0]), t = G.screenToMapTile(p.x, p.y);
+    if (harvestTouch && harvestTouch.world === G.world && harvestTouch.game === G.game && harvestTouch.tool === G.tool && (!e.touches || e.touches.length===0) && harvestTouch.generation === G.harvestGestureVersion && !G.hasOpenModal() && e.changedTouches.length === 1) {
+      const p = toLocal(e.changedTouches[0]);
+      const r=G.cv.getBoundingClientRect();
+      const hit=document.elementFromPoint?.(e.changedTouches[0].clientX,e.changedTouches[0].clientY);
+      if ((Number.isFinite(r.width)&&(p.x<0||p.x>=r.width||p.y<0||p.y>=r.height)) || (hit&&hit!==G.cv)) { harvestTouch=null;G.cancelHarvestPlan();return; }
+      const t = G.screenToMapTile(p.x, p.y);
       G.selectHarvestCorner(t.tx, t.ty);
     }
     harvestTouch = null;

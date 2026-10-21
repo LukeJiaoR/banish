@@ -17,6 +17,7 @@
 <link rel="stylesheet" href="styles/jade-skin.css?v=jade-20261020-3">
 <link rel="stylesheet" href="styles/jade-layout.css?v=reference-8">
 <link rel="stylesheet" href="styles/desktop-workspace.css?v=workspace-1">
+<link rel="stylesheet" href="styles/harvest-map.css?v=direct-1">
 </head>
 <body>
   <div id="meal-transition-notice" role="status" hidden></div>
@@ -50,6 +51,10 @@
       <details id="coach-explanation"><summary>为什么？</summary><p id="coach-detail"></p></details>
       <div class="coach-actions"><button type="button" id="coach-action">查看</button><button type="button" id="coach-skip">跳过引导</button></div>
     </section>
+  </section>
+  <section id="harvest-map-controls" class="hidden" aria-label="地图采集工具">
+    <div><strong id="harvest-map-title">采集资源</strong><p id="harvest-map-status" role="status" aria-live="polite"></p></div>
+    <button type="button" id="harvest-exit" title="退出采集工具；已下达的任务保留">退出 <span aria-hidden="true">×</span></button>
   </section>
   <div id="placement-panel">
     <div id="harvest-range-controls" class="hidden" role="group" aria-label="采集范围预览">

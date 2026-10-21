@@ -42,7 +42,18 @@ test('world/tool/modal guards and empty rectangles are read-only',()=>{
 test('bounds clamp and huge range retains at most 601 targets and refuses truncation',()=>{
  const{G,w}=setup();w.rock.fill(1);range(G,-100,-100,w.N+100,w.N+100);assert.equal(G.harvestPlan.total,w.N*w.N);assert.equal(G.harvestPlan.targets.length,601);assert.equal(G.confirmHarvestRange().ok,false);assert.equal(w.markedRocks.size,0);
 });
-test('touch first corner supports single-cell confirm or a second corner',()=>{
- const{G,w}=setup();w.rock[3*w.N+3]=1;w.rock[3*w.N+4]=2;G.selectHarvestCorner(3,3);assert.equal(G.harvestRangeStatus().added.length,1);assert.equal(G.harvestPlan.awaitingSecond,true);G.selectHarvestCorner(4,3);assert.equal(G.harvestRangeStatus().added.length,2);assert.equal(G.harvestPlan.awaitingSecond,false);assert.equal(G.confirmHarvestRange().marked,2);
+test('touch first corner is inert and second corner immediately marks',()=>{
+ const{G,w}=setup();w.rock[3*w.N+3]=1;w.rock[3*w.N+4]=2;G.selectHarvestCorner(3,3);assert.equal(G.harvestPlan.awaitingSecond,true);assert.equal(G.confirmHarvestRange().ok,false);assert.equal(w.markedRocks.size,0);G.selectHarvestCorner(4,3);assert.equal(w.markedRocks.size,2);assert.equal(G.harvestPlan,null);
+});
+test('separate stone, iron and tree tools filter targets; all resources includes all three',()=>{
+ for(const [kind,trees,rocks] of [['collectstone',0,1],['collectiron',0,1],['fell',1,0],['gatherall',1,2]]){const{G,w}=setup(kind);G.addTree(w,3,3,-100);w.rock[3*w.N+4]=1;w.rock[3*w.N+5]=2;range(G,3,3,5,3);assert.equal(G.commitHarvestSelection().ok,true);assert.equal(w.marked.size,trees);assert.equal(w.markedRocks.size,rocks);if(kind==='collectstone')assert(w.markedRocks.has(3*w.N+4));if(kind==='collectiron')assert(w.markedRocks.has(3*w.N+5));}
+});
+test('all-resources capacity validation is atomic across two independent queues',()=>{
+ const{G,w}=setup('gatherall');for(let i=0;i<300;i++)w.markedRocks.add(i);G.addTree(w,3,5,-100);w.rock[5*w.N+4]=1;range(G,3,5,4,5);assert.equal(G.commitHarvestSelection().ok,false);assert.equal(w.marked.size,0);assert.equal(w.markedRocks.size,300);assert.equal(G.harvestPlan,null);
+});
+test('cancel removal only withdraws selected resource orders and free labor claims',()=>{
+ const{G,w}=setup('cancelremoval');G.addTree(w,3,3,-100);G.addTree(w,8,8,-100);const a=3*w.N+3,b=3*w.N+4,c=8*w.N+8;w.rock[b]=2;w.marked.add(a);w.marked.add(c);w.markedRocks.add(b);
+ const worker=w.citizens[0],other=w.citizens[1],owned=w.citizens[2];worker.task={kind:'chop',tx:3,ty:3,b:null};worker.pausedTask={kind:'clearrock',tx:4,ty:3,b:null};worker.state='haul';worker.carry={type:'wood',qty:3};worker.path=[{x:7,y:7}];other.task={kind:'chop',tx:8,ty:8,b:null};owned.task={kind:'chop',tx:3,ty:3,b:99};const before=JSON.stringify(G.game.res);w.markReachability={day:1};
+ range(G,3,3,4,3);const r=G.commitHarvestSelection();assert.equal(r.cancelled,2);assert.deepEqual([...w.marked],[c]);assert.equal(w.markedRocks.size,0);assert.equal(worker.task,null);assert.equal(worker.pausedTask,null);assert.equal(worker.state,'haul');assert.equal(worker.carry.qty,3);assert.equal(worker.path.length,1);assert(other.task);assert(owned.task);assert.equal(JSON.stringify(G.game.res),before);assert.equal(w.markReachability,null);assert.equal(w.rock[b],2);
 });
 console.log(`Harvest range: ${passed} passed`);

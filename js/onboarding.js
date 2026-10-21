@@ -15,13 +15,13 @@ G.onboarding = (() => {
   }) && (!G.workerLimitOf || G.workerLimitOf(b) > 0);
   function toolStep(tool, category, text, detail, stage) {
     const active = G.tool && (G.tool.kind === tool || G.tool.kind === 'build' && G.tool.type === tool);
-    if (active) return { stage, text, detail, target: ['fell', 'quarry'].includes(tool) ? '#harvest-confirm' : '#placement-info' };
+    if (active) return { stage, text, detail, target: ['fell', 'collectstone', 'collectiron'].includes(tool) ? '#game' : '#placement-info' };
     const build = byId('open-build');
     if (build && build.getAttribute('aria-expanded') !== 'true')
       return { stage, text: '点「建造」', detail, target: '#open-build' };
     if (G.ui.menuCategory !== category)
       return { stage, text: `选择「${{food:'食物生产',industry:'资源与加工',homes:'住房',land:'道路与采运'}[category]}」`, detail, target: `[data-category="${category}"]` };
-    return { stage, text: `选择「${G.BDEF[tool]?.name || (tool === 'fell' ? '砍伐' : '采石采铁')}」`, detail, target: `[data-tool="${tool}"]` };
+    return { stage, text: `选择「${G.BDEF[tool]?.name || ({fell:'砍伐',collectstone:'采石',collectiron:'采铁'}[tool] || tool)}」`, detail, target: `[data-tool="${tool}"]` };
   }
   function buildingStep(b, stage) {
     const view = text => ({ stage, text, detail: '点「查看」检查现场；引导不会代你调岗或施工。', buildingId: b.id });
@@ -30,11 +30,11 @@ G.onboarding = (() => {
       const s = G.constructionSummary(b);
       const missing = s.materials.find(m => m.missing > (G.game.res[m.type] || 0));
       if (missing && ['wood','stone','iron'].includes(missing.type)) {
-        const tool = missing.type === 'wood' ? 'fell' : 'quarry';
+        const tool = missing.type === 'wood' ? 'fell' : missing.type === 'iron' ? 'collectiron' : 'collectstone';
         const feedback = G.harvestFeedback();
         const pending = tool === 'fell' ? feedback.trees : [...(G.world.markedRocks || [])].filter(i => G.world.rock[i] === (missing.type === 'iron' ? 2 : 1)).length;
         if (!pending && !(feedback.carry?.[missing.type] > 0))
-          return toolStep(tool, 'land', tool === 'fell' ? '框选食物林外的树，确认标记' : `框选${missing.type === 'iron' ? '锈色铁矿' : '灰色岩石'}，确认标记`, `工地已放好；补${G.RES[missing.type].name}，送到现场后才能施工。`, stage);
+          return toolStep(tool, 'land', tool === 'fell' ? '框选食物林外的树，松开标记' : `框选${missing.type === 'iron' ? '锈色铁矿' : '灰色岩石'}，松开标记`, `工地已放好；补${G.RES[missing.type].name}，送到现场后才能施工。`, stage);
         if (G.game.paused) return { stage, text:'点「继续」，让工人采运', detail:'标记和随身货物仍在；送达才可用于施工。', target:'#quick-pause' };
         return view(`等待${G.RES[missing.type].name}采运；可查看工地`);
       }

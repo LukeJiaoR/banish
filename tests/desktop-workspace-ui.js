@@ -22,7 +22,8 @@ function test(name, fn) { fn(); passed++; console.log('ok', name); }
 test('workspace stylesheet loads once after every legacy skin', () => {
   const styles = [...html.matchAll(/<link\s+rel="stylesheet"\s+href="([^"]+)"/g)].map(match => match[1]);
   assert.equal(styles.filter(file => file.startsWith('styles/desktop-workspace.css')).length, 1);
-  assert(styles.at(-1).startsWith('styles/desktop-workspace.css'));
+  assert(styles.at(-2).startsWith('styles/desktop-workspace.css'));
+  assert(styles.at(-1).startsWith('styles/harvest-map.css'));
   assert(styles.indexOf('style.css') < styles.findIndex(file => file.startsWith('styles/jade-layout.css')));
 });
 
