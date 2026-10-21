@@ -1,0 +1,169 @@
+{
+  "engine": "Isolated offline native Canvas diagnostics, not browser/device performance",
+  "baseline": "cc9638a",
+  "candidateRendererSha256": "7bf4f67e20b995fdf23cec9f745a7d19c84554bd8d7b4c443f4b5ba67a824dae",
+  "cases": [
+    {
+      "N": 384,
+      "season": 1,
+      "name": "baseline",
+      "coldFullMs": 3055.592896,
+      "warmFullMedianMs": 2959.910614999999,
+      "dirtyMedianMs": 111.90714300000036,
+      "full": [
+        3055.592896,
+        2959.910614999999,
+        2890.4109180000014,
+        3138.0789099999984
+      ],
+      "dirty": [
+        98.15703500000018,
+        99.82495500000005,
+        134.64609000000019,
+        130.90313100000094,
+        155.40237499999967,
+        103.12763300000006,
+        97.54913399999896,
+        104.47218700000121,
+        111.90714300000036
+      ],
+      "repairTile": [
+        11,
+        2
+      ]
+    },
+    {
+      "N": 384,
+      "season": 1,
+      "name": "candidate",
+      "coldFullMs": 3213.4380739999997,
+      "warmFullMedianMs": 2821.3881709999996,
+      "dirtyMedianMs": 105.7246610000002,
+      "full": [
+        3213.4380739999997,
+        2821.3881709999996,
+        2880.1921380000003,
+        2657.202727
+      ],
+      "dirty": [
+        103.51625299999978,
+        110.75777800000105,
+        110.52888100000018,
+        112.17929299999923,
+        104.96828900000037,
+        105.7246610000002,
+        103.5626229999998,
+        102.62226199999895,
+        102.51640400000178
+      ],
+      "repairTile": [
+        11,
+        2
+      ]
+    },
+    {
+      "N": 384,
+      "season": 3,
+      "name": "baseline",
+      "coldFullMs": 3051.407622,
+      "warmFullMedianMs": 3187.197462,
+      "dirtyMedianMs": 106.95980400000008,
+      "full": [
+        3051.407622,
+        3169.576693000001,
+        3187.197462,
+        3310.7708380000004
+      ],
+      "dirty": [
+        119.29809100000057,
+        106.6378020000011,
+        106.95980400000008,
+        103.25733099999889,
+        104.39774000000034,
+        105.98914399999921,
+        114.3798569999999,
+        111.68652199999997,
+        111.34193400000004
+      ],
+      "repairTile": [
+        11,
+        2
+      ]
+    },
+    {
+      "N": 384,
+      "season": 3,
+      "name": "candidate",
+      "coldFullMs": 3346.495256,
+      "warmFullMedianMs": 3176.767915999999,
+      "dirtyMedianMs": 113.04681300000084,
+      "full": [
+        3346.495256,
+        3216.624715,
+        3042.7913150000004,
+        3176.767915999999
+      ],
+      "dirty": [
+        110.23831499999869,
+        107.89067499999874,
+        105.63389299999835,
+        107.27482400000008,
+        120.69174199999907,
+        116.31059199999982,
+        113.04681300000084,
+        111.82157500000176,
+        114.01115700000082
+      ],
+      "repairTile": [
+        11,
+        2
+      ]
+    }
+  ],
+  "memory": [
+    {
+      "N": 128,
+      "seed": 0,
+      "routes": 19,
+      "sourceVertices": 904,
+      "sampleCount": 5352,
+      "bufferBytes": 214080,
+      "incrementHeapBytes": -434552,
+      "incrementArrayBufferBytes": 214080,
+      "incrementExternalBytes": 197700
+    },
+    {
+      "N": 128,
+      "seed": 42,
+      "routes": 15,
+      "sourceVertices": 898,
+      "sampleCount": 5325,
+      "bufferBytes": 213000,
+      "incrementHeapBytes": 1608,
+      "incrementArrayBufferBytes": 211560,
+      "incrementExternalBytes": -278168
+    },
+    {
+      "N": 384,
+      "seed": 0,
+      "routes": 99,
+      "sourceVertices": 6601,
+      "sampleCount": 39453,
+      "bufferBytes": 1578120,
+      "incrementHeapBytes": -6616,
+      "incrementArrayBufferBytes": 1577160,
+      "incrementExternalBytes": 956480
+    },
+    {
+      "N": 384,
+      "seed": 42,
+      "routes": 102,
+      "sourceVertices": 6900,
+      "sampleCount": 41256,
+      "bufferBytes": 1650240,
+      "incrementHeapBytes": 18456,
+      "incrementArrayBufferBytes": 1646400,
+      "incrementExternalBytes": -2430792
+    }
+  ]
+}

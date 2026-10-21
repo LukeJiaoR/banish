@@ -47,3 +47,7 @@ After merged #120, a bounded [winter shoreline candidate](winter-shore.md) reuse
 ## 2026-10-21 mountain contour candidate
 
 After #121, a bounded [shared mountain-contour candidate](mountain-contour.md) relaxes component boundaries while retaining tile-owned depth, original blocked rock toes and shared picking. Actual generated terrain and minimum-zoom winter comparisons accompany independent topology and cost checks. It does not change map generation/collision/save data or close #87.
+
+## 2026-10-21 shore material candidate
+
+A modest [shore material variation candidate](shore-material.md) reduces the uniform gold-outline effect using cached, world-anchored widths and the original seasonal sand/pebble textures. The approved coast geometry and logical masks remain unchanged; overall #87 and actual PC acceptance remain open.
