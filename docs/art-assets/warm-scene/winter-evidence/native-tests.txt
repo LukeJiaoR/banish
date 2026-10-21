@@ -1,0 +1,9 @@
+PASS the original alpha-edged ice asset is byte-identical
+PASS winter atlas retains the original diamond projection on an opaque 64x32 backing
+PASS winter coast requires ice, never silently substitutes summer open water
+projection mean 3.586810889230244 seam 3.7963963963963963
+PASS native atlas preserves original ice projection across repeat seams
+PASS fully transparent ice still yields opaque winter water inside the curved coast
+PASS actual season-change callback restores identical summer pixels after winter, with no stale ice mask
+PASS replacing a loaded ice image invalidates its cached pattern and restoring it restores pixels
+Winter shore: 7 groups passed including native Canvas pixels
