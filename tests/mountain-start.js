@@ -21,7 +21,7 @@ test('explicit terrain config owns its version, classic canonical v1 remains unc
  for(const input of [{terrain:'volcano'},{terrain:1},{terrain:null},{v:1,terrain:'mountain'},{v:2},{v:2,terrain:'classic'},{v:3,terrain:'mountain'}])assert(!G.startConfigQuote({seed:0,preset:'hard',...input}).ok);
  assert.throws(()=>G.genWorld(1,{terrain:'mountain',mapVersion:1}));assert.throws(()=>G.genWorld(1,{mapVersion:2}));assert.throws(()=>G.genWorld(1,{mapVersion:0,starterResources:true}));
  assert.equal(G.genWorld(1,{mapVersion:0}).mapVersion,0);assert.equal(G.genWorld(1,{mapVersion:1}).mapVersion,1);
- assert(G.newGame(1).ok);assert.equal(G.game.startConfig.v,1);assert.equal(G.serializeGame().v,4);assert.equal(G.world.mountain.reduce((a,b)=>a+b,0),0);
+ assert(G.newGame(1).ok);assert.equal(G.game.startConfig.v,1);assert.equal(G.serializeGame().v,5);assert.equal(G.world.mountain.reduce((a,b)=>a+b,0),0);
 });
 
 test('both presets and fixed/boundary seeds repeat whole initial snapshots without ambient RNG',()=>{
@@ -121,8 +121,8 @@ test('authoritative save restores evolved terrain directly, never regenerates or
  const G=fresh(),w=G.world,r=w.startReport,p=r.plots[0],rock=Array.from(w.rock).findIndex(v=>v===1);
  G.clearRock(w,rock%w.N,Math.floor(rock/w.N));assert(G.addBuilding('house',p.x,p.y,{free:true,instant:true}).ok);
  const hut=r.plots.find(p=>p.type==='gatherer');for(const t of [...w.trees])if(Math.abs(t.x-hut.x)<=6&&Math.abs(t.y-hut.y)<=6)G.removeTree(w,t.x,t.y);
- G.game.res.wood=17;G.game.res.iron=3;G.game.day=100;G.game.year=3;G.game.townLedger=G.newTownLedger(G.game);const original=save(G),terrain=terrainHash(w),mountain=hash(Array.from(w.mountain));
- assert.equal(original.v,2);assert.equal(original.mapVersion,2);assert(JSON.stringify(original).length<250000);
+ G.game.res.wood=17;G.game.res.iron=3;G.game.day=100;G.game.year=3;G.advanceCropClimate();G.advanceDeer();G.game.townLedger=G.newTownLedger(G.game);const original=save(G),terrain=terrainHash(w),mountain=hash(Array.from(w.mountain));
+ assert.equal(original.v,5);assert.equal(original.mapVersion,2);assert(JSON.stringify(original).length<250000);
  G.genWorld=()=>{throw Error('must not generate a mature world');};G.mountainStartReport=()=>{throw Error('must not revalidate a mature start');};
  for(let j=0;j<4;j++){G.applySaveData(copy(j?save(G):original));assert.equal(terrainHash(G.world),terrain);assert.equal(hash(Array.from(G.world.mountain)),mountain);assert.equal(G.game.res.wood,17);assert.equal(G.game.res.iron,3);assert.equal(G.world.rock[rock],0);assert(G.world.rockCleared.includes(rock));assert.equal(G.world.buildings.length,2);assert.equal(G.game.startConfig.terrain,'mountain');}
  original.terrain.mountain.fill(0);assert.notEqual(hash(Array.from(G.world.mountain)),hash(original.terrain.mountain));

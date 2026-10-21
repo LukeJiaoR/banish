@@ -95,6 +95,7 @@ G.observeTownChallenges=function(){
 G.newGameState = function (startConfig = null) {
   const g = {
     startConfig: startConfig ? {...startConfig} : null,
+    climate: startConfig?.climate ? {v:G.CLIMATE_VERSION,type:startConfig.climate,lastDay:0} : null,
     h: 6, day: 0, season: 0, year: 1,
     speed: 1, paused: false,
     res: { wood: 80, stone: 48, iron: 0, tools: 15, food: 500, meat: 0, eggs:0, vegetables: 0, apples:0, pears:0, grain: 500, leather: 0, wool: 0, clothes: 0, warmCoats: 0, herbs: 0, coal: 0, steelTools: 0, ale: 0, firewood: 50 }, // 开局（原版中难度 5 家庭，工具 15 件≈第一轮磨损周期）；存粮较原版加厚：15 人 6 天食物跑道撑不到第一座采集屋建成
@@ -135,7 +136,7 @@ G.isRestTime = function () { const h = G.game.h; return h >= G.LIFE.restFrom || 
 /* ================= 时间推进 ================= */
 G.advanceSim = function (dtH) {
   const g = G.game;
-  if (g.over) return;
+  if (g.over || g.paused) return;
   g.h += dtH;
   let guard = 0;
   while (g.h >= G.DAY_H && guard++ < 20) { g.h -= G.DAY_H; G.endDay(); if (g.over) return; }
@@ -168,6 +169,7 @@ G.endDay = function () {
   g.year = Math.floor(g.day / G.YEAR_DAYS) + 1;
   if (g.season !== oldSeason) G.onSeasonChange(oldSeason, g.season);
   G.expireWinterFarms();
+  G.advanceCropClimate();
 
   G.advancePasturePests();
   G.advanceTownEconomy();
@@ -175,7 +177,7 @@ G.endDay = function () {
 
   // ---- 农田生长 ----
   for (const b of w.buildings) {
-    if (b.type === 'farm' && b.state === 'ok' && G.cropUnlocked(G.farmCropOf(b)) && b.sownAll && !b.earlyHarvestYield && b.growth < 1 && g.season !== 3)
+    if (!g.climate && b.type === 'farm' && b.state === 'ok' && G.cropUnlocked(G.farmCropOf(b)) && b.sownAll && !b.earlyHarvestYield && b.growth < 1 && g.season !== 3)
       b.growth = Math.min(1, b.growth + 1 / G.farmGrowDays(b));
   }
 
@@ -324,6 +326,7 @@ G.onSeasonChange = function (from, to) {
     }
   }
   if (to === 3) G.expireWinterFarms();
+  G.advanceCropClimate(); // Complete this day before the season autosave.
   G.needGround = true;          // 换季调色板变化，整图重绘
   if (G.groundDirty) G.groundDirty.clear();
   if (G.autosave) G.autosave();
@@ -2241,20 +2244,19 @@ G.completeTask = function (c) {
 
 G.resetFarm = function (b, applyChoice = G.game.season === 0) {
   if(applyChoice&&G.cropUnlocked(G.cropChoiceOf(b)))b.cropType=G.cropChoiceOf(b);
-  for (const f of b.farm) { f.sown = false; f.harvested = false; delete f.pestLost; }
+  for (const f of b.farm) { f.sown = false; f.harvested = false; delete f.pestLost; delete f.frostLost; }
   delete b.pestInfestation;
   b.sownAll = false; b.growth = 0; b.harvestDone = false; delete b.sowingCommitted; delete b.earlyHarvestYield;
-  // A commitment belongs to this crop season, not next year's empty field.
-  // Expire every old season's crop task, including paused tasks; keep actual cargo.
-  for (const c of G.world.citizens) {
-    const expired = t => t && t.b === b && (t.kind === 'sow' || t.kind === 'harvest');
-    if (expired(c.task)) {
-      c.task = null;
-      if (c.state === 'work' || (c.state === 'walk' && c.walkKind === 'task')) {
-        c.path = null; c.pi = 0; c.walkKind = ''; c.state = 'idle'; c.wanderT = 0.5;
-      }
-    }
-    if (expired(c.pausedTask)) c.pausedTask = null;
+  G.cancelFarmTasks(b);
+};
+
+/* Calendar cutoff cancels every outstanding field task, including a first sow
+ * not yet completed. Damage during the growing season only cancels lost tiles. */
+G.cancelFarmTasks=function(b,lostOnly=false){
+  for(const c of G.world.citizens){
+    const expired=t=>t&&t.b===b&&['sow','harvest'].includes(t.kind)&&(!lostOnly||b.farm[t.ti]?.frostLost);
+    if(expired(c.task)){c.task=null;if(c.state==='work'||c.state==='walk'&&c.walkKind==='task'){c.path=null;c.pi=0;c.walkKind='';c.state='idle';c.wanderT=.5;}}
+    if(expired(c.pausedTask))c.pausedTask=null;
   }
 };
 
@@ -4004,6 +4006,65 @@ G.tailorSummary=function(b){
 /* Crop diversity stays inside the three existing food classes. Selection is
  * next-season intent; a started field and its cargo keep the actual crop. */
 G.CROPS={wheat:{name:'小麦',output:'grain',growDays:24,perTile:14,sprite:'crop'},cabbage:{name:'卷心菜',output:'vegetables',growDays:24,perTile:14,sprite:'cabbage'},beans:{name:'早熟豆类',output:'vegetables',growDays:12,perTile:10,sprite:'bean',summerHarvest:true},squash:{name:'耐寒瓜',output:'vegetables',growDays:24,perTile:14,sprite:'squash',winterHarvestDays:2}};
+/* Pure, stateless daily climate. Never consumes the simulation RNG, which is
+ * reconstructed on load. The shared anomaly keeps Mild >= Fair >= Harsh. */
+G.climateHash=function(seed,day,salt){
+  let x=(seed|0)^Math.imul(day>>>0,0x9e3779b1)^Math.imul(Math.floor(day/0x100000000)|0,0x85ebca6b)^salt;
+  x=Math.imul(x^(x>>>16),0x7feb352d);x=Math.imul(x^(x>>>15),0x846ca68b);return ((x^(x>>>16))>>>0)/0x100000000;
+};
+G.temperatureFor=function(seed,day,type,v=G.CLIMATE_VERSION){
+  if(!Number.isInteger(seed)||seed < -0x80000000||seed>0xffffffff||!Number.isSafeInteger(day)||day<0||v!==1||!Object.hasOwn(G.CLIMATES,type))throw new Error('气候参数不受支持');
+  const p=G.CLIMATES[type],year=Math.floor(day/G.YEAR_DAYS),d=day%G.YEAR_DAYS;
+  const snapStart=27+Math.floor(G.climateHash(seed,year,0x31ca17)*7);
+  const anomaly=G.climateHash(seed,day,0x51c1a7)*2-1;
+  const temperature=10+14*Math.sin((d-4)*Math.PI*2/G.YEAR_DAYS)+p.offset+anomaly*p.variation-(d>=snapStart&&d<snapStart+2?p.snap:0);
+  return Math.round(temperature*10)/10;
+};
+G.climateWeather=function(day=G.game.day){
+  const c=G.game.climate;if(!c)return null;
+  return {day,temperature:G.temperatureFor(G.world.seed,day,c.type,c.v),climate:G.CLIMATES[c.type].name,type:c.type,v:c.v};
+};
+G.farmTemperatureFactor=function(b,temperature){
+  const r=G.CROP_TEMPERATURES[G.farmCropOf(b)];return G.clamp((temperature-r.growthMin)/(r.growthFull-r.growthMin),0,1);
+};
+/* Lost tiles are potential crops, never produced stock. Keep season ownership,
+ * harvested cargo and locked early-harvest yield. Only spring resets them. */
+G.damageFrostTiles=function(b,tiles){
+  if(!tiles.length)return 0;
+  for(const f of tiles){f.harvested=true;f.frostLost=true;G.markGroundDirty(f.x,f.y);}
+  b.sowingCommitted=true;b.harvestDone=b.farm.every(f=>f.harvested);
+  G.cancelFarmTasks(b,true);
+  if(!b.farm.some(f=>f.sown&&!f.harvested))delete b.pestInfestation;
+  G.game.schedT=0;return tiles.length;
+};
+G.advanceCropClimate=function(){
+  const g=G.game,c=g.climate;if(!c||c.lastDay>=g.day)return;
+  c.lastDay=g.day;
+  const weather=G.climateWeather();
+  for(const b of G.world.buildings){
+    if(b.type!=='farm'||b.state!=='ok'||!G.cropUnlocked(G.farmCropOf(b)))continue;
+    const threshold=G.CROP_TEMPERATURES[G.farmCropOf(b)].frostBelow;
+    if(weather.temperature<threshold){
+      const remaining=b.farm.filter(f=>f.sown&&!f.harvested);
+      const count=Math.ceil(b.farm.length*G.clamp((threshold-weather.temperature)*.04,.08,.4));
+      const lost=G.damageFrostTiles(b,remaining.slice(0,count));
+      if(lost)G.ui.toast(`${G.CROPS[G.farmCropOf(b)].name}田 ${weather.temperature}°C：霜害损失${lost}格未收作物；已采收及在途食物保留`,'warn');
+    }
+    if(b.sownAll&&!b.harvestDone&&!b.earlyHarvestYield&&b.growth<1&&g.season!==3)
+      b.growth=Math.min(1,b.growth+G.farmTemperatureFactor(b,weather.temperature)/G.farmGrowDays(b));
+  }
+};
+G.farmClimateSummary=function(b){
+  const weather=G.climateWeather();if(!weather)return null;
+  const frostBelow=G.CROP_TEMPERATURES[G.farmCropOf(b)].frostBelow;
+  const forecast=[1,2].map(offset=>G.climateWeather(G.game.day+offset));
+  const risk=forecast.find(day=>day.temperature<frostBelow);
+  const remaining=b.farm.some(f=>f.sown&&!f.harvested);
+  return {temperature:weather.temperature,growthFactor:G.game.season===3?0:G.farmTemperatureFactor(b,weather.temperature),frostBelow,lost:b.farm.filter(f=>f.frostLost).length,atRisk:remaining&&!!risk,
+    warning:(risk?`未来${risk.day-G.game.day}日 ${risk.temperature}°C，低于本季${G.CROPS[G.farmCropOf(b)].name}耐霜线${frostBelow}°C`:'未来两日未见低于本季耐霜线')+
+      (!remaining?'；本田无未收作物，无霜损对象':risk?'；可确认抢收，未采下的格仍会受霜害':weather.temperature<frostBelow?'；今日有霜害，已采收携货保留':'；冬季收割截止仍适用')};
+};
+
 G.seedUnlockKey=good=>good==='wheatSeed'?'wheat':good==='orchardSeed'?'orchard':good==='appleSeed'?'apple':good==='pearSeed'?'pear':good==='cabbageSeed'?'cabbage':good==='beanSeed'?'beans':good==='squashSeed'?'squash':null;
 G.seedTradeReason=function(good,qty){
   const key=G.seedUnlockKey(good);if(!key)return '';
@@ -4028,11 +4089,16 @@ G.farmWinterWindow=function(b,g=G.game){
 G.expireWinterFarms=function(){
   if(G.game.season!==3)return;
   for(const b of G.world.buildings){
-    if(b.type!=='farm'||!G.farmSeasonCommitted(b)||b.harvestDone||G.farmWinterWindow(b).active)continue;
+    if(b.type!=='farm'||!G.farmSeasonCommitted(b)||G.farmWinterWindow(b).active)continue;
+    if(G.game.climate)G.cancelFarmTasks(b);
+    if(b.harvestDone)continue;
     const remaining=b.farm.filter(f=>f.sown&&!f.harvested).length;
+    if(G.game.climate&&!remaining)continue;
     G.ui.toast(G.CROPS[G.farmCropOf(b)].winterHarvestDays?
       `耐寒瓜入冬后的前两日收获窗口已结束：${remaining}格未收作物冻死，已收获及在途蔬菜不受影响`:'农田里的作物被冻死了','bad');
-    G.resetFarm(b,false);G.markPestGround(b);G.game.schedT=0;
+    if(G.game.climate)G.damageFrostTiles(b,b.farm.filter(f=>f.sown&&!f.harvested));
+    else G.resetFarm(b,false);
+    G.markPestGround(b);G.game.schedT=0;
   }
 };
 G.farmMatureSeason=b=>G.game.season===2||(G.game.season===1&&G.CROPS[G.farmCropOf(b)].summerHarvest===true)||G.farmWinterWindow(b).active;
@@ -4056,7 +4122,7 @@ G.earlyHarvestQuote=function(b){
   const perTile=G.taskYield(base),fullPerTile=G.taskYield(G.farmBaseYield(b)),crop=G.farmCropOf(b);
   return {ok:true,base,perTile,fullPerTile,remaining,growth:b.growth,output:G.farmOutput(b),
     estimated:perTile*remaining,fullEstimated:fullPerTile*remaining,
-    key:[G.game.year,G.game.day,G.game.season,crop,b.growth,base,remaining,perTile,fullPerTile].join(':')};
+    key:[G.game.year,G.game.day,G.game.season,G.game.climate?.v||0,G.game.climate?.type||'legacy',crop,b.growth,base,remaining,perTile,fullPerTile].join(':')};
 };
 G.beginEarlyHarvest=function(b,key){
   const q=G.earlyHarvestQuote(b);
@@ -4069,7 +4135,7 @@ G.farmTaskCurrent=function(t){
   const b=t&&t.b,g=G.game;
   if(!b||G.world.bmap[b.id]!==b||b.type!=='farm'||b.state!=='ok'||!G.cropUnlocked(G.farmCropOf(b))||!b.farm[t.ti]||
     (t.crop&&t.crop!==G.farmCropOf(b))||(t.cropYear!==undefined&&t.cropYear!==g.year))return false;
-  return t.kind==='sow'?(g.season===0||g.season===1):t.kind==='harvest'&&G.farmHarvestReady(b);
+  return t.kind==='sow'?!b.farm[t.ti].sown&&(g.season===0||g.season===1):t.kind==='harvest'&&!b.farm[t.ti].harvested&&G.farmHarvestReady(b);
 };
 G.setFarmCrop=function(b,type){
   if(!b||G.world.bmap[b.id]!==b||b.type!=='farm'||b.state!=='ok'||!Object.hasOwn(G.CROPS,type)||!G.cropUnlocked(type))return false;
@@ -4143,15 +4209,15 @@ G.advanceFarmPests=function(){
 };
 G.farmSummary=function(b){
   const crop=G.farmCropOf(b),choice=G.cropChoiceOf(b),committed=G.farmSeasonCommitted(b),g=G.game;
-  const sown=b.farm.filter(f=>f.sown).length,harvested=b.farm.filter(f=>f.harvested&&!f.pestLost).length,winterWindow=G.farmWinterWindow(b);
+  const sown=b.farm.filter(f=>f.sown).length,harvested=b.farm.filter(f=>f.harvested&&!f.pestLost&&!f.frostLost).length,winterWindow=G.farmWinterWindow(b);
   const winterStatus=!winterWindow.enabled?'冬季休耕，等待下一春':b.harvestDone?'本季收获完成，冬季不能再播种':!winterWindow.active?'冬季休耕，等待下一春':!sown?'冬季不能播种，等待下一春':!b.sownAll?'耐寒瓜未播完：冬季不能补播或收获':b.earlyHarvestYield?`耐寒瓜冬季抢收 ${harvested}/${b.farm.length}（本季基础每格${b.earlyHarvestYield}）`:b.growth>=1?`耐寒瓜冬季收获 ${harvested}/${b.farm.length}`:`耐寒瓜生长冻结 ${Math.floor(b.growth*100)}%，可确认减产抢收`;
-  let status=!G.cropUnlocked(crop)?'尚无此作物种子：需在贸易站购买后才能播种':g.season===3?winterStatus:b.harvestDone?(b.farm.some(f=>f.pestLost)?'本季已结束（含虫害损失）':'本季收获完成'):!b.sownAll?
+  let status=!G.cropUnlocked(crop)?'尚无此作物种子：需在贸易站购买后才能播种':g.season===3?winterStatus:b.harvestDone?(b.farm.some(f=>f.frostLost)?'本季已结束（含霜害损失）':b.farm.some(f=>f.pestLost)?'本季已结束（含虫害损失）':'本季收获完成'):!b.sownAll?
     (g.season===2?'秋季已过播种窗口':G.goalPaused(G.farmOutput(b))&&!committed?'目标已达，暂停新季播种':`播种 ${sown}/${b.farm.length}`):
     b.earlyHarvestYield?`抢收 ${harvested}/${b.farm.length}（本季基础每格${b.earlyHarvestYield}）`:b.growth<1?`生长中 ${Math.floor(b.growth*100)}%`:G.farmMatureSeason(b)?`${g.season===1?'夏收':'秋收'} ${harvested}/${b.farm.length}`:'作物成熟，等待秋季';
   const reason=!G.cropUnlocked(crop)?'空田保留作物占位，不会自动播种；购买种子永久解锁后再种植':committed?'本季已开始：只改下一春，不改变已接任务、在田作物或在途收获':
     g.season===0||g.season===1?'空田尚未开始：已解锁作物可用于本季播种':'当前不能播种：选择留待下一春';
   return {crop,choice,output:G.CROPS[crop].output,choiceOutput:G.CROPS[choice].output,pending:crop!==choice,committed,
-    unlocked:Object.fromEntries(Object.keys(G.CROPS).map(k=>[k,G.cropUnlocked(k)])),growDays:G.farmGrowDays(b),fullPerTile:G.farmBaseYield(b),summerHarvest:G.CROPS[crop].summerHarvest===true,winterHarvestDays:winterWindow.days,winterWindow,status,reason,growth:b.growth,sown,harvested,total:b.farm.length,
+    climate:G.farmClimateSummary(b),unlocked:Object.fromEntries(Object.keys(G.CROPS).map(k=>[k,G.cropUnlocked(k)])),growDays:G.farmGrowDays(b),fullPerTile:G.farmBaseYield(b),summerHarvest:G.CROPS[crop].summerHarvest===true,winterHarvestDays:winterWindow.days,winterWindow,status,reason,growth:b.growth,sown,harvested,total:b.farm.length,
     grain:g.res.grain,vegetables:g.res.vegetables,workers:b.workers.filter(id=>G.world.cmap[id]&&!G.world.cmap[id].dead&&G.world.cmap[id].job===b.id).length};
 };
 
