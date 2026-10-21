@@ -2583,7 +2583,8 @@ G.addBuilding = function (type, x, y, opt) {
   if(def?.unbuildable)return {ok:false,reason:def.name+'不能主动建造或重新开发'};
   if(!def||(opt.farmSize!==undefined&&type!=='farm')||(opt.pastureSize!==undefined&&type!=='pasture')||(opt.orchardSize!==undefined&&type!=='orchard')||(opt.cemeterySize!==undefined&&type!=='cemetery'))return {ok:false,reason:type==='cemetery'?'墓园每边须为7至20格的整数':type==='pasture'?'牧场每边须为7至20格的整数':(type==='orchard'?'果园':'农田')+'每边须为4至15格的整数'};
   const w = G.world;
-  if (!opt.free) {
+  // Plans own no stock; only instant completion must pay up front.
+  if (opt.instant && !opt.free) {
     for (const k in def.cost) {
       if (G.game.res[k] < def.cost[k]) return { ok: false, reason: `${G.RES[k].name}不足（需要 ${def.cost[k]}）` };
     }
@@ -3583,7 +3584,6 @@ G.makeMineralTask = function (b, c) {
 
 G.addBridge = function(start,end) {
   const w=G.world,plan=G.planBridge(w,start,end);if(!plan.ok)return plan;
-  for(const [type,qty]of Object.entries(plan.materials))if(G.game.res[type]<qty)return {ok:false,reason:`${G.RES[type].name}不足（需要${qty}）`};
   const footprint={x:Math.min(start.x,end.x),y:Math.min(start.y,end.y),w:Math.abs(start.x-end.x)+1,h:Math.abs(start.y-end.y)+1},exits=new Map();
   if(w.mapVersion===2)for(const c of w.citizens){
     if(c.dead)continue;const cx=Math.round(c.x),cy=Math.round(c.y);

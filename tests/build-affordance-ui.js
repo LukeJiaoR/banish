@@ -19,14 +19,17 @@ assert(markup.includes('assets/icons/tool_house.png')); assert(!markup.includes(
 assert.equal(snapshot(),before);
 G.game.res.wood=0;G.game.res.stone=0;
 assert.match(ui.toolMaterialShortage('house'),/木材缺16、石头缺8/);
-assert.match(ui.toolButton('house'),/缺料 · 可选址/);
+assert.match(ui.toolButton('house'),/缺料 · 可规划/);
+const button={dataset:{tool:'house'},title:'木屋',classList:{toggle(){}},querySelector(){return null;}};
+ui.el.toolbar={querySelectorAll(){return [button];}};ui.refreshToolAffordability();
+assert.match(button.title,/可规划，等待材料到场/);assert(!button.title.includes('库存足额'));ui.el.toolbar=null;
 const empty=snapshot();G.setTool('house');assert.equal(G.tool.type,'house');assert.equal(snapshot(),empty);
 let position;
 for(let y=1;y<G.world.N-3&&!position;y++)for(let x=1;x<G.world.N-3;x++)if(G.canPlace(G.world,'house',x,y).ok){position={x,y};break;}
 assert(position);
 const buildings=G.world.buildings.length;
 G.tryPlace(position.x,position.y);
-assert.equal(G.world.buildings.length,buildings);assert.equal(G.game.res.wood,0);assert.equal(G.game.res.stone,0);
+assert.equal(G.world.buildings.length,buildings+1);assert.equal(G.game.res.wood,0);assert.equal(G.game.res.stone,0);
 G.game.res.wood=16;G.game.res.stone=8;
 assert.equal(ui.toolMaterialShortage('house'),'');
 G.tryPlace(position.x,position.y);

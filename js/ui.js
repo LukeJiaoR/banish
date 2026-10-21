@@ -378,11 +378,11 @@ G.ui = {
     const tip = action ? action.tip : t === 'tunnel' ? '隧道：选两个已清场陆地洞口，沿一个网格轴穿过连续山体；每格4石、3游戏施工小时（含两端）。只在首选洞口实运材料并施工，完工后按土路速度通行' : t === 'cemetery' ? '墓园：每边7–20格，选两个角或拖出矩形；预览实际墓位、石材和工时，确认后实运施工。拆围栏不清除墓碑' : t === 'farm' ? '农田：点击地图放置固定8×8；初始2名农夫，可调整0–4人；免费、12工时，先清场施工再播种' : t === 'pasture' ? '牧场：点击地图放置固定6×6；羊12头、牛10头或鸡24只，1名牧人，30木、50工时' : t === 'orchard' ? '果园：点击地图放置固定6×6；9株、2名农夫，12木、36工时' : ['road', 'stoneroad'].includes(t) ? `${t === 'stoneroad' ? '石路每个新铺/升级格需1石' : '土路无需材料'}：点选或拖出起终点预览连通路线，确认清场与施工，清完自动接续；每格1基础游戏施工小时为本作适配。确认排队，逐格实运施工后才提速；原道路仍可走` :
       `${def.name}（${this.resourceCost(def.cost, false)}${def.jobs ? ' · 岗位×' + def.jobs : ''}）— ${def.desc}`;
     const shortage = this.toolMaterialShortage(t);
-    return `<button type="button" class="tb${shortage ? ' is-short' : ''}" data-tool="${t}" title="${this.escHtml(tip)}" aria-pressed="false"><span class="ic" aria-hidden="true">${this.icon(t)}</span><span class="lb">${name}</span><span class="cost">${cost}</span><span class="material-badge${shortage ? '' : ' hidden'}" data-material-shortage="${t}">${shortage ? '缺料 · 可选址' : ''}</span></button>`;
+    return `<button type="button" class="tb${shortage ? ' is-short' : ''}" data-tool="${t}" title="${this.escHtml(tip)}" aria-pressed="false"><span class="ic" aria-hidden="true">${this.icon(t)}</span><span class="lb">${name}</span><span class="cost">${cost}</span><span class="material-badge${shortage ? '' : ' hidden'}" data-material-shortage="${t}">${shortage ? '缺料 · 可规划' : ''}</span></button>`;
   },
 
-  // Preview is always available. addBuilding/plan confirmation retains the
-  // authoritative public-stock check; opening a tool spends/reserves nothing.
+  // Shortages are informational: valid plans wait for actual public-stock pickup.
+  // Opening a tool or confirming a plan spends/reserves nothing.
   toolMaterialShortage: function (type) {
     const def = G.BDEF[type];
     if (!def || !G.game || ['road','stoneroad','bridge','tunnel','farm','pasture','orchard','cemetery'].includes(type)) return '';
@@ -396,10 +396,10 @@ G.ui = {
       const missing = this.toolMaterialShortage(btn.dataset.tool);
       btn.classList.toggle('is-short', !!missing);
       const badge = btn.querySelector('[data-material-shortage]');
-      if (badge) { badge.classList.toggle('hidden', !missing); badge.textContent = missing ? '缺料 · 可选址' : ''; badge.title = missing; }
+      if (badge) { badge.classList.toggle('hidden', !missing); badge.textContent = missing ? '缺料 · 可规划' : ''; badge.title = missing; }
       const base = btn._materialBaseTitle || btn.title || btn.getAttribute('title') || '';
       btn._materialBaseTitle = base;
-      btn.title = base + (missing ? `；${missing}。可先查看选址，正式落点仍需公共库存足额；不预扣。` : '');
+      btn.title = base + (missing ? `；${missing}。可规划，等待材料到场。` : '');
     });
   },
 
@@ -872,7 +872,7 @@ G.ui = {
       message = tunnel ? `隧道 ${r.length} 格（含两端） · ${r.axis==='x'?'东西':'南北'}直线穿山\n首选洞口 (${r.start.x},${r.start.y}) → 远端洞口 (${r.end.x},${r.end.y})\n材料：石头 ${status.materials.stone} · 建造 ${r.length*3} 游戏施工小时\n确认只建工地，不预扣或预留材料；材料只实运至首选洞口，并在此施工。原洞口道路仍可走，山内完工前不可通行\n完工后沿隧道轴按土路速度实际步行和搬运；无常驻岗位` : bridge ? `木桥 ${r.path.length} 格 · 直线跨水\n桥头 (${plan.start.x},${plan.start.y}) → (${plan.end.x},${plan.end.y})\n材料：木材 ${status.materials.wood} / 石头 ${status.materials.stone} · 建造 ${r.path.length*3} 工时\n确认只建工地；材料从仓实运到岸边，送齐才施工，完工前不可通行` :
         `路线 ${r.path.length} 格 · 待排施工 ${changed} · 复用已成路 ${reused} · 已排队 ${alreadyQueued} · 转弯 ${r.turns} 次\n${stone?'石路每个新铺/升级格1石，合计 '+status.materials.stone+' 石':'土路材料消耗：0'} · 尚需清树 ${status.trees.length} 棵、采石 ${(status.rocks||[]).filter(p=>p.rock===1).length} 处、采铁 ${(status.rocks||[]).filter(p=>p.rock===2).length} 处\n新增建造 ${status.work ?? changed} 基础游戏施工小时（每格1小时，为本作适配）；清场另需实际采伐与搬运，受工具和仓容影响\n确认只排队，不预扣或预留材料；原道路仍可走，每格实际完工后才提速。${stone?'石材先实运到临时堆料点，再由铺路工背至施工格。':''}`;
       const missing=Object.entries(status.materials).filter(([k,q])=>G.game.res[k]<q).map(([k,q])=>`${G.RES[k].name}差${Math.ceil(q-G.game.res[k])}`);
-      if(missing.length)message+='\n材料不足：'+missing.join(' · ')+(bridge||tunnel?'':'；仍可排队，等待可用石材');
+      if(missing.length)message+='\n材料不足：'+missing.join(' · ')+'；仍可规划，等待材料实运到场';
       if (plan.message) message += '\n' + plan.message;
     }
     message += G.tool.surface==='tunnel'?'\n点选/拖选两个洞口，终点吸附较长方向轴；两端清场陆地、中间连续山体，总长3–'+Math.min(G.world.N,128)+'格。二值山体、单端施工和游戏工时为本作适配。Esc/右键退出。':G.tool.surface==='bridge'?'\n点选/拖选两岸，终点吸附较长方向轴；需连续水面和清场桥头。Esc/右键退出。':'\n手机或点选：选择起终点后确认。鼠标拖动预览实际路线，松开排队；有树或矿物则同时标记清除，清完自动施工，无需二次确认。暂停或取消铺路保留独立清场标记，可用取消采集工具框选撤销。水面、山体和建筑需绕行；石头/铁矿可选作端点或经过，清完再铺。点选施工标记可暂停、优先或取消剩余铺路。Esc/右键退出。';
@@ -5298,9 +5298,9 @@ G.placementInfo = function (type, x, y) {
   const w = G.world, def = G.BDEF[type], p = G.PROD[type] || {};
   const check = G.canPlace(w, type, x, y, type==='farm'?[8,8]:undefined);
   const affordable = Object.keys(def.cost).every(k => G.game.res[k] >= def.cost[k]);
-  const result = { ok: check.ok && affordable, affordable, radius: type === 'market' ? G.SUPPLY.marketRadius : p.radius || p.waterR || 0, warning: false };
+  const result = { ok: check.ok, affordable, radius: type === 'market' ? G.SUPPLY.marketRadius : p.radius || p.waterR || 0, warning: !affordable };
   result.bounds = [Math.max(0,x-result.radius), Math.max(0,y-result.radius), Math.min(w.N,x+result.radius+1), Math.min(w.N,y+result.radius+1)];
-  const lines = [`${def.name} · ${!check.ok ? '不能建：' + check.reason : !affordable ? '材料不足' : '可建造'}`];
+  const lines = [`${def.name} · ${!check.ok ? '不能建：' + check.reason : !affordable ? '可规划，等待材料' : '可建造'}`];
   lines.push('材料（现有/需要）：' + (Object.keys(def.cost).map(k => `${G.RES[k].name} ${Math.floor(G.game.res[k])}/${def.cost[k]}`).join(' · ') || '无需建材，仍需施工'));
   if (Object.keys(def.cost).length) lines.push('确认只创建工地，不预扣/预留库存；工人沿路到仓领料，实运送齐后才施工。');
   if (p.radius) {

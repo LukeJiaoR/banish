@@ -78,10 +78,9 @@ test('invalid coordinates never commit and non-finite input leaves the last prev
   assert.equal(G.world.buildings.length,0);
 });
 
-for (const changed of ['stock','terrain','occupied']) test('confirmation rechecks changed ' + changed, () => {
+for (const changed of ['terrain','occupied']) test('confirmation rechecks changed ' + changed, () => {
   const {G} = bindInput();
   G.stageBuildingPlacement(10,10); const pending = G.pendingBuildingPlacement;
-  if (changed === 'stock') G.game.res.wood = 0;
   if (changed === 'terrain') G.world.water[pending.oy*G.world.N+pending.ox] = 1;
   if (changed === 'occupied') assert(G.addBuilding('house',pending.ox,pending.oy).ok);
   const before = snapshot(G), uid = G._peekUid();
@@ -89,9 +88,24 @@ for (const changed of ['stock','terrain','occupied']) test('confirmation recheck
   assert.equal(G.confirmBuildingPlacement(pending).ok,false);
   assert.equal(snapshot(G),before); assert.equal(G._peekUid(),uid);
   assert.equal(G.pendingBuildingPlacement,pending);
-  if (changed === 'stock') {
-    G.game.res.wood = G.BDEF.house.cost.wood;
-    assert(G.confirmBuildingPlacement(pending).ok);
+});
+
+test('stock disappearing after preview still confirms exactly one waiting site', () => {
+  const {G}=bindInput(); G.stageBuildingPlacement(10,10); const pending=G.pendingBuildingPlacement;
+  G.game.res.wood=0; G.game.res.stone=0;
+  const status=G.buildingPlacementStatus(); assert(status.ok); assert.equal(status.affordable,false);
+  const result=G.confirmBuildingPlacement(pending); assert(result.ok,result.reason);
+  assert.equal(G.constructionSummary(result.b).phase,'materials'); assert.equal(result.b.progress,0);
+  assert.equal(G.game.res.wood,0); assert.equal(G.game.res.stone,0);
+  assert.equal(G.confirmBuildingPlacement(pending).ok,false); assert.equal(G.world.buildings.length,1);
+});
+
+test('area previews treat shortages as warnings while maintaining valid footprint checks',()=>{
+  const {G}=bindInput(); G.game.res.wood=0;G.game.res.stone=0;
+  for(const type of ['pasture','orchard','cemetery']){
+    G[type+'Plan']={world:G.world,game:G.game,start:{x:10,y:10},end:{x:16,y:16}};
+    const status=G[type+'PlanStatus']();assert(status.ok,type+': '+status.reason);assert.equal(status.affordable,false);assert.match(status.reason,/等待材料/);
+    G.world.water[10*G.world.N+10]=1;assert.equal(G[type+'PlanStatus']().ok,false);G.world.water[10*G.world.N+10]=0;
   }
 });
 
@@ -236,11 +250,11 @@ test('real frame keeps a read-only staged sprite in scene depth order when hover
   assert.equal(sprites.length,2);
   assert.equal(snapshot(G),before);
   const stock=G.game.res.wood;G.game.res.wood=0;G.frame(0);
-  assert.equal(sprites.length,2,'shortage keeps the error grid without showing a valid-building sprite');
+  assert.equal(sprites.length,3,'shortage keeps a valid planned-building sprite');
   G.game.res.wood=stock;w.water[pending.oy*w.N+pending.ox]=1;G.frame(0);
-  assert.equal(sprites.length,2,'blocked terrain does not show a valid-building sprite');
+  assert.equal(sprites.length,3,'blocked terrain does not show a valid-building sprite');
   G.setTool(null); G.frame(0); assert.equal(G._ghost,null);
-  assert.equal(sprites.length,2,'cancel removes the sprite as well as the grid');
+  assert.equal(sprites.length,3,'cancel removes the sprite as well as the grid');
   // Preview alignment uses the actual art and geometry, without going through
   // drawBuilding or producing its activity/smoke markers.
   let activityCalls=0;G.drawBuildingActivity=()=>activityCalls++;

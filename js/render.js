@@ -1586,7 +1586,7 @@ G.frame = function (dtReal) {
       for (let i = 0; i < def.w; i++) {
         const [sx, sy] = G.T2S(ox + i, oy + j);
         G.diamondPath(ctx, sx, sy);
-        ctx.fillStyle = (!chk.ok || (preview && !preview.affordable)) ? 'rgba(230,90,80,0.4)' : (preview && preview.warning) ? 'rgba(235,180,65,0.4)' : 'rgba(120,230,140,0.4)';
+        ctx.fillStyle = !chk.ok ? 'rgba(230,90,80,0.4)' : (preview && preview.warning) ? 'rgba(235,180,65,0.4)' : 'rgba(120,230,140,0.4)';
         ctx.fill();
       }
     G._ghost = { ox, oy };
