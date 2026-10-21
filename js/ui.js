@@ -24,7 +24,7 @@ G.ui = {
       blacksmith: 'tool_blacksmith', hunting: 'tool_hunting', house: 'tool_house', storage: 'tool_storage', stockpile: 'tool_stockpile',
       gatherer: 'tool_gatherer', forester: 'tool_forester', woodcutter: 'tool_woodcutter', dock: 'tool_dock',
       school: 'tool_school', herbalist: 'tool_herbalist', hospital: 'tool_hospital', townhall: 'tool_townhall', tavern: 'tool_tavern', farm: 'tool_farm', road: 'tool_road', stoneroad: 'tool_stoneroad', bridge: 'tool_bridge', demolish: 'tool_demolish' };
-    const special = { demolish: '🚫', fell: '🪚', quarry: '⛏' };
+    const special = { demolish: '🚫', fell: '🪚', quarry: '⛏', gatherall: '🌲', collectstone: '🪨', collectiron: '⛏', cancelremoval: '↩' };
     if (Object.hasOwn(G.BDEF || {}, name) || Object.hasOwn(special, name)) {
       const symbol = Object.hasOwn(special, name) ? special[name] : G.BDEF[name].icon;
       const image = Object.hasOwn(toolAssets, name) ? `assets/icons/${toolAssets[name]}.png` :
@@ -306,14 +306,14 @@ G.ui = {
 
   // Keep every real tool mounted: switching category never recreates buttons.
   initToolbar: function () {
-    const special = ['fell', 'quarry', 'demolish'];
-    const available = t => !['burntruins', 'mineralpit'].includes(t) && (special.includes(t) || !!G.BDEF[t]);
+    const special = ['gatherall', 'fell', 'collectstone', 'collectiron', 'cancelremoval', 'demolish'];
+    const available = t => !['burntruins', 'mineralpit', 'quarry'].includes(t) && (special.includes(t) || !!G.BDEF[t]);
     this.toolGroups = [
       { id: 'homes', name: '住房', icon: '🏠', tools: ['house', 'stonehouse', 'boarding'] },
       { id: 'food', name: '食物生产', icon: '🌾', tools: ['gatherer', 'hunting', 'dock', 'farm', 'orchard', 'pasture'] },
       { id: 'industry', name: '资源与加工', icon: '⚒️', tools: ['forester', 'woodcutter', 'stonequarry', 'mine', 'blacksmith', 'tailor', 'tavern'] },
       { id: 'services', name: '城镇服务', icon: '🏘️', tools: ['storage', 'stockpile', 'market', 'well', 'school', 'herbalist', 'hospital', 'chapel', 'tradingpost', 'townhall', 'cemetery'] },
-      { id: 'land', name: '道路与采运', icon: '🛣️', tools: ['road', 'stoneroad', 'bridge', 'tunnel', 'fell', 'quarry', 'demolish'] },
+      { id: 'land', name: '道路与采运', icon: '🛣️', tools: ['road', 'stoneroad', 'bridge', 'tunnel', 'gatherall', 'fell', 'collectstone', 'collectiron', 'cancelremoval', 'demolish'] },
     ].map(group => ({ ...group, tools: group.tools.filter(available) })).filter(group => group.tools.length);
     const registered = new Set(this.toolGroups.flatMap(group => group.tools));
     const extra = (G.TOOLBAR || []).filter(t => available(t) && !registered.has(t));
@@ -364,9 +364,13 @@ G.ui = {
 
   toolButton: function (t) {
     const special = {
-      demolish: { name: '拆除', icon: '🚫', cost: '建筑 · 道路', tip: '拆除：点击建筑或道路移除；树木请用砍伐，岩石和铁矿请用采石采铁' },
-      quarry: { name: '采石采铁', icon: '⛏', cost: '灰石 · 锈铁', tip: '采石采铁：框选预览并确认矿石；灰色岩石产石头，锈色铁矿产铁，散工开采后搬运入库' },
-      fell: { name: '砍伐', icon: '🪚', cost: '免费', tip: '标记砍伐：框选预览并确认树木，散工砍倒再搬运入库；未受教育 2 原木、受教育 3 原木' },
+      demolish: { name: '拆除', icon: '🚫', cost: '建筑 · 道路', tip: '拆除：点击建筑或道路移除；树木、岩石和铁矿请用对应采集工具' },
+      gatherall: { name: '采集所有资源', icon: '🌲', cost: '树木 · 石头 · 铁', tip: '拖选地图范围，松开下达树木、石头和铁矿采集任务；散工完成后搬运入库' },
+      collectstone: { name: '采集石头', icon: '🪨', cost: '石头', tip: '拖选地图范围，松开标记石头；散工开采后搬运入库' },
+      collectiron: { name: '采集铁矿', icon: '⛏', cost: '铁矿', tip: '拖选地图范围，松开标记铁矿；散工开采后搬运入库' },
+      cancelremoval: { name: '取消采集', icon: '↩', cost: '框选撤销', tip: '拖选范围取消其中的资源采集标记；已采货物仍送仓，不取消建筑或道路' },
+      quarry: { name: '采石采铁', icon: '⛏', cost: '灰石 · 锈铁', tip: '采石采铁：拖选范围，松开标记矿石；灰色岩石产石头，锈色铁矿产铁，散工开采后搬运入库' },
+      fell: { name: '砍伐树木', icon: '🪚', cost: '免费', tip: '标记砍伐：拖选范围，松开标记树木，散工砍倒再搬运入库；未受教育 2 原木、受教育 3 原木' },
     };
     const def = G.BDEF[t], action = special[t];
     const name = action ? action.name : def.name, icon = action ? action.icon : def.icon;
@@ -432,8 +436,8 @@ G.ui = {
     if (path) path.textContent = group ? `建造与管理 / ${group.name}` : '建造与管理';
     if (status) {
       const t = G.tool && (G.tool.kind === 'build' ? G.tool.type : G.tool.kind==='road' ? (G.tool.surface==='tunnel'?'tunnel':G.tool.surface==='bridge'?'bridge':G.tool.surface==='stone'?'stoneroad':'road') : G.tool.kind);
-      const names = { fell: '砍伐', quarry: '采石采铁', demolish: '拆除', road: '铺路' };
-      status.textContent = t ? `当前：${names[t] || G.BDEF[t].name} · ${t === 'demolish' ? '点击建筑或道路拆除；已开采的有限矿点须确认永久废坑' : ['fell', 'quarry'].includes(t) ? '框选范围后确认标记' : ['road','stoneroad','bridge','tunnel'].includes(t) ? '选起终点后预览并确认' : t==='farm'?'点击地图放置固定8×8，可连续建造' : t==='pasture'||t==='orchard'?'点击地图放置固定6×6，可连续建造' : t==='cemetery'?'选两个角或拖出矩形，再确认建园' : '点击地图放置，可连续建造'} · Esc / 右键取消${this.mineralBuildRisk(t) ? '\n' + this.mineralBuildRisk(t) : ''}` :
+      const names = { gatherall: '采集所有资源', fell: '砍伐树木', collectstone: '采集石头', collectiron: '采集铁矿', cancelremoval: '取消采集', quarry: '采石采铁', demolish: '拆除', road: '铺路' };
+      status.textContent = t ? `当前：${names[t] || G.BDEF[t].name} · ${t === 'demolish' ? '点击建筑或道路拆除；已开采的有限矿点须确认永久废坑' : ['gatherall', 'fell', 'collectstone', 'collectiron', 'cancelremoval', 'quarry'].includes(t) ? '拖选地图范围，松开执行' : ['road','stoneroad','bridge','tunnel'].includes(t) ? '选起终点后预览并确认' : t==='farm'?'点击地图放置固定8×8，可连续建造' : t==='pasture'||t==='orchard'?'点击地图放置固定6×6，可连续建造' : t==='cemetery'?'选两个角或拖出矩形，再确认建园' : '点击地图放置，可连续建造'} · Esc / 右键取消${this.mineralBuildRisk(t) ? '\n' + this.mineralBuildRisk(t) : ''}` :
         group ? '未选择工具。点击一项开始；返回分类可切换功能。' : '选择分类，再选择建筑或操作。';
     }
   },
@@ -469,62 +473,43 @@ G.ui = {
   },
 
   initHarvestRangeControls: function () {
-    const confirm = document.getElementById('harvest-confirm'), cancel = document.getElementById('harvest-preview-cancel');
-    if (!confirm || !cancel) return;
-    let armed = null, keyHeld = false;
-    const capture = e => {
-      if (e.type === 'mousedown' && armed && armed.source === 'touchstart') return;
-      keyHeld = false;
-      armed = confirm._harvestIntent ? { ...confirm._harvestIntent, source: e.type } : null;
-    };
-    for (const name of (window.PointerEvent ? ['pointerdown'] : ['mousedown', 'touchstart'])) confirm.addEventListener(name, capture);
-    confirm.addEventListener('keydown', e => {
-      if (!['Enter', ' '].includes(e.key) || e.repeat) return;
-      keyHeld = true;
-      armed = confirm._harvestIntent ? { ...confirm._harvestIntent, source: 'keyboard' } : null;
-    });
-    confirm.addEventListener('keyup', e => { if (['Enter', ' '].includes(e.key)) keyHeld = false; });
-    confirm.addEventListener('pointercancel', () => { armed = null; keyHeld = false; });
-    confirm.addEventListener('touchcancel', () => { armed = null; keyHeld = false; });
-    window.addEventListener('blur', () => { armed = null; keyHeld = false; });
-    confirm.addEventListener('click', e => {
+    const exit = document.getElementById('harvest-exit');
+    if (!exit) return;
+    exit.addEventListener('click', e => {
       e.preventDefault(); e.stopPropagation();
-      const intent = armed || confirm._harvestIntent;
-      if (!keyHeld) armed = null;
-      if (!intent) { this.refreshHarvestRangeControls(); return; }
-      const result = G.confirmHarvestRange(intent);
-      if (result.reason) this.toast(result.reason, 'warn');
-      else if (result.ok) this.toast(`已新增 ${result.marked} 处采集标记；工人仍需作业和搬运`, 'good');
-      this.refreshHarvestRangeControls();
-    });
-    cancel.addEventListener('click', e => {
-      e.preventDefault(); e.stopPropagation();
-      if (G.hasOpenModal()) return;
-      G.cancelHarvestPlan(); this.refreshHarvestRangeControls();
+      if (G.hasOpenModal?.()) return;
+      G.setTool(null);
     });
   },
-  refreshHarvestRangeControls: function (force = true) {
-    const el = document.getElementById('harvest-range-controls'); if (!el) return;
-    const visible = !!G.world && !!G.tool && ['fell', 'quarry'].includes(G.tool.kind);
-    if (!visible && el.contains(document.activeElement)) {
-      const tool = G.tool ? (G.tool.kind === 'build' ? G.tool.type : G.tool.kind==='road' ? (G.tool.surface==='tunnel'?'tunnel':G.tool.surface==='bridge'?'bridge':G.tool.surface==='stone'?'stoneroad':'road') : G.tool.kind) : this._harvestRangeTool;
-      const button = tool && this.el.toolbar.querySelector(`[data-tool="${tool}"]`);
-      if (button) button.focus({ preventScroll: true });
+  refreshHarvestRangeControls: function () {
+    // Collection happens on the map, never in the construction workspace.
+    const active = !!G.world && !!G.tool && ['gatherall', 'fell', 'collectstone', 'collectiron', 'cancelremoval', 'quarry'].includes(G.tool.kind);
+    const strip = document.getElementById('harvest-map-controls');
+    const hud = this.el.hud || document.getElementById('hud');
+    hud?.classList.toggle('is-harvesting', active);
+    const toolbar = this.el.toolbar;
+    if (toolbar) toolbar.inert = active;
+    document.getElementById('harvest-range-controls')?.classList.add('hidden');
+    if (!strip) return;
+    const wasActive = this._harvestMapActive;
+    strip.classList.toggle('hidden', !active);
+    this._harvestMapActive = active;
+    if (active) {
+      this._harvestRangeTool = G.tool.kind;
+      const names = { gatherall: '采集所有资源', fell: '砍伐树木', collectstone: '采集石头', collectiron: '采集铁矿', cancelremoval: '取消采集', quarry: '采石采铁' };
+      const title = document.getElementById('harvest-map-title');
+      if (title) title.textContent = names[G.tool.kind];
+      const text = document.getElementById('harvest-map-status');
+      const message = G.tool.kind === 'cancelremoval'
+        ? '拖选范围，松开取消采集标记。手机点两个角。'
+        : '拖选范围，松开下达采集任务。手机点两个角。';
+      if (text && text.textContent !== message) text.textContent = message;
+      if (!wasActive && toolbar?.contains(document.activeElement)) document.getElementById('harvest-exit')?.focus({ preventScroll: true });
+    } else if (wasActive && strip.contains(document.activeElement)) {
+      const selected = G.tool ? (G.tool.kind === 'build' ? G.tool.type : G.tool.kind) : this._harvestRangeTool;
+      const button = toolbar?.querySelector(`[data-tool="${selected}"]`);
+      button?.focus({ preventScroll: true });
     }
-    el.classList.toggle('hidden', !visible); if (!visible) return;
-    this._harvestRangeTool = G.tool.kind;
-    const now = Date.now(), stamp = [G.harvestPlan, G.world, G.tool.kind, G.hasOpenModal(), G.world.marked.size, G.world.markedRocks.size];
-    if (!force && this._rangeStamp && stamp.every((v, i) => v === this._rangeStamp[i]) && now - this._rangeRefreshAt < 250) return;
-    this._rangeStamp = stamp; this._rangeRefreshAt = now;
-    const text = document.getElementById('harvest-range-status'), button = document.getElementById('harvest-confirm');
-    if (!text || !button) return;
-    const s = G.harvestRangeStatus();
-    let message = s.reason || '';
-    if (s.counts) message = `树木 ${s.counts.wood} 棵 · 石头 ${s.counts.stone} 处 · 铁矿 ${s.counts.iron} 处\n新增 ${s.added.length} 处 · 已标记 ${s.existing} 处` + (s.reason ? '\n' + s.reason : '');
-    message += '\n鼠标拖出矩形；手机点两个角。单格也可确认。退出预览不撤销已下达任务。';
-    if (text.textContent !== message) text.textContent = message;
-    button._harvestIntent = s.ok ? { plan: s.plan, signature: s.signature } : null;
-    button.disabled = !s.ok || !s.added.length || G.hasOpenModal();
   },
 
   initFarmPlanControls: function(){
@@ -890,7 +875,7 @@ G.ui = {
       if(missing.length)message+='\n材料不足：'+missing.join(' · ')+(bridge||tunnel?'':'；仍可排队，等待可用石材');
       if (plan.message) message += '\n' + plan.message;
     }
-    message += G.tool.surface==='tunnel'?'\n点选/拖选两个洞口，终点吸附较长方向轴；两端清场陆地、中间连续山体，总长3–'+Math.min(G.world.N,128)+'格。二值山体、单端施工和游戏工时为本作适配。Esc/右键退出。':G.tool.surface==='bridge'?'\n点选/拖选两岸，终点吸附较长方向轴；需连续水面和清场桥头。Esc/右键退出。':'\n手机或点选：选择起终点后确认。鼠标拖动预览实际路线，松开排队；有树或矿物则同时标记清除，清完自动施工，无需二次确认。暂停或取消铺路保留独立清场标记，可在砍伐/采石采铁工具撤销。水面、山体和建筑需绕行；石头/铁矿可选作端点或经过，清完再铺。点选施工标记可暂停、优先或取消剩余铺路。Esc/右键退出。';
+    message += G.tool.surface==='tunnel'?'\n点选/拖选两个洞口，终点吸附较长方向轴；两端清场陆地、中间连续山体，总长3–'+Math.min(G.world.N,128)+'格。二值山体、单端施工和游戏工时为本作适配。Esc/右键退出。':G.tool.surface==='bridge'?'\n点选/拖选两岸，终点吸附较长方向轴；需连续水面和清场桥头。Esc/右键退出。':'\n手机或点选：选择起终点后确认。鼠标拖动预览实际路线，松开排队；有树或矿物则同时标记清除，清完自动施工，无需二次确认。暂停或取消铺路保留独立清场标记，可用取消采集工具框选撤销。水面、山体和建筑需绕行；石头/铁矿可选作端点或经过，清完再铺。点选施工标记可暂停、优先或取消剩余铺路。Esc/右键退出。';
     if (G.roadDrag?.live) message += '\n正在预览实际路线；松开提交，右键取消。';
     if (text.textContent !== message) text.textContent = message;
     button._roadIntent = status.ok ? { plan, mode: status.tunnel?'tunnel':status.bridge?'bridge':(status.trees.length || status.rocks?.length) ? 'clear' : 'pave', trees: status.trees.map(p => p.y * G.world.N + p.x).join(','), rocks:G.roadRockSignature(status) } : null;
@@ -900,58 +885,13 @@ G.ui = {
 
   // Persistent buttons are separate from the text-only, frame-refreshed preview.
   initHarvestControls: function () {
-    for (const [kind, btn] of [['trees', this.el.cancelTrees], ['rocks', this.el.cancelRocks]]) {
-      if (!btn) continue;
-      btn.addEventListener('click', e => {
-        e.preventDefault();
-        e.stopPropagation();
-        if (!G.world || !G.tool || !['fell', 'quarry'].includes(G.tool.kind) ||
-            (G.hasOpenModal && G.hasOpenModal())) return;
-        const marks = kind === 'trees' ? G.world.marked : G.world.markedRocks;
-        // Read live state, not the previous animation frame's count.
-        if (!marks || !marks.size) { this.refreshHarvestControls(); return; }
-        const result = G.cancelResourceMarks(kind);
-        const name = kind === 'trees' ? '树' : '矿';
-        if (this.el.cancelStatus) this.el.cancelStatus.textContent =
-          `已取消 ${result.marks} 处${name}标记；停止执行 ${result.active} 项、夜间保留 ${result.paused} 项。已采货物仍送仓。`;
-        this.refreshHarvest();
-        this.refreshHUD();
-      });
-    }
+    // Retained initialization hook; legacy cancel-all controls have no actions.
   },
 
   refreshHarvestControls: function () {
-    const el = this.el.harvestCancel;
-    if (!el) return;
-    const visible = !!G.world && !!G.tool && ['fell', 'quarry'].includes(G.tool.kind);
-    if (!visible) {
-      // Escape or a tool switch must not leave keyboard focus in a hidden group.
-      if (el.contains(document.activeElement)) {
-        const tool = G.tool ? (G.tool.kind === 'build' ? G.tool.type : G.tool.kind==='road' ? (G.tool.surface==='tunnel'?'tunnel':G.tool.surface==='bridge'?'bridge':G.tool.surface==='stone'?'stoneroad':'road') : G.tool.kind) : this._harvestTool;
-        const btn = tool && this.el.toolbar.querySelector(`[data-tool="${tool}"]`);
-        if (btn) btn.focus({ preventScroll: true });
-      }
-      el.classList.add('hidden');
-      if (this.el.cancelStatus) this.el.cancelStatus.textContent = '';
-      return;
-    }
-    if (this._harvestControlWorld !== G.world) {
-      this._harvestControlWorld = G.world;
-      if (this.el.cancelStatus) this.el.cancelStatus.textContent = '';
-    }
-    this._harvestTool = G.tool.kind;
-    const blocked = !!(G.hasOpenModal && G.hasOpenModal());
-    for (const [marks, btn, name] of [[G.world.marked, this.el.cancelTrees, '树'], [G.world.markedRocks, this.el.cancelRocks, '矿']]) {
-      if (!btn) continue;
-      const count = marks ? marks.size : 0;
-      const text = `取消全部${name}标记（${count}）`;
-      if (btn.textContent !== text) btn.textContent = text;
-      // aria-disabled retains the focus target after cancelling the last mark.
-      // The click handler independently guards every disabled state.
-      const disabled = String(blocked || count === 0);
-      if (btn.getAttribute('aria-disabled') !== disabled) btn.setAttribute('aria-disabled', disabled);
-    }
-    el.classList.remove('hidden');
+    // Legacy cancellation APIs remain available to saves/tests, not as a page.
+    this.el.harvestCancel?.classList.add('hidden');
+    if (this.el.harvestCancel) this.el.harvestCancel.inert = true;
   },
 
   toast: function (msg, cls) {
@@ -1240,37 +1180,10 @@ G.ui = {
   },
 
   refreshHarvest: function () {
-    if (this.refreshHarvestRangeControls) this.refreshHarvestRangeControls(false);
-    if (this.refreshHarvestControls) this.refreshHarvestControls();
-    const el = this.el.placement;
-    if (!el || !G.world) return;
+    this.refreshHarvestRangeControls();
+    this.refreshHarvestControls();
     this._placementKey = null;
-    const h = G.harvestFeedback(), fell = G.tool.kind === 'fell';
-    const cargo = G.RES_KEYS.filter(k => h.carry[k]).map(k => `${G.RES[k].name} ${h.carry[k]}`).join(' · ');
-    const lines = [fell ? '砍伐：框选预览并确认树木' : '采石采铁：框选预览并确认；灰色岩石产石头，锈色铁矿产铁',
-      `标记：树 ${h.trees} · 矿 ${h.rocks}；待领 ${h.queued} · 执行 ${h.active}（含赶路） · 夜间保留 ${h.paused}`,
-      `散工 ${h.laborers} 人（含执行、搬运）；每 2 游戏小时自动调度。`];
-    if (!fell) {
-      const { tx, ty } = G.hover, w = G.world;
-      const mineral = tx >= 0 && ty >= 0 && tx < w.N && ty < w.N ? w.rock[ty * w.N + tx] : 0;
-      if (mineral) lines.push(`指向：${mineral === 2 ? '铁矿 → 铁' : '岩石 → 石头'}；开采后搬运入库。`);
-      else lines.push('指向地块没有可采矿石；本工具只标记岩石和铁矿。');
-    }
-    if (cargo) lines.push(`随身待入库：${cargo}；搬运 ${h.haulers} 人 / 待送 ${h.waitingCarriers} 人（不计入库存）。`);
-    if (h.blockedMineralCarriers) lines.push(`${h.blockedMineralCarriers} 人仓满带矿等待空间；使用石铁库存或建成新仓库后继续送仓。`);
-    if (h.blockedMineralMarks) lines.push(`${h.blockedMineralMarks} 处矿石因该资源仓满暂不接新开采；标记保留，另一未满矿种仍可采。`);
-    if (h.reason) lines.push(h.reason);
-    const check = G.world.markReachability;
-    if (check && h.total && Number.isFinite(check.day) && Number.isFinite(check.h) && check.unreachable > 0)
-      lines.push(`最近派工检查：${check.unreachable} 处不可达（累计第 ${check.day + 1} 天 ${Math.floor(check.h)} 时；通路或标记变化后待复查）。`);
-    if (h.trees && h.rocks) lines.push('散工接新任务时先砍树，再清矿。');
-    if (h.trees >= 300 || h.rocks >= 300) lines.push('单类标记上限 300，达到上限后不再新增。');
-    lines.push('绿色虚线为采集/狩猎食物林；砍树会降低食物产出。');
-    lines.push('右键/Esc 退出工具；已画下的标记仍会执行。');
-    const text = lines.join('\n');
-    if (el.textContent !== text) el.textContent = text;
-    el.dataset.state = h.reason ? 'warning' : 'ready';
-    el.classList.remove('hidden');
+    this.el.placement?.classList.add('hidden');
   },
 
   refreshPlacement: function (type, x, y) {
@@ -1491,8 +1404,8 @@ G.ui = {
       materials: material || '土路无需建材；每格仍须由工人实际施工。',
       progress: `剩余 ${number(s.workLeft)} / 总计 ${number(s.totalWork)} 基础游戏施工小时。每格1基础小时为本作适配，实际速度受工具和居民状态影响。`,
       delivery: `工程首格是临时堆料点 (${b.x},${b.y})，该格完工后仍保留至工程结束，可点选管理；其他完工格释放。确认不预扣或预留公共库存；到仓领取时才出库。${s.surface === 'stone' ? `仓库→堆料点携带 ${number(s.fetchCarried)} 石，堆料点→施工格携带 ${number(s.pavingCarried)} 石（两项合计为上方携带数，不重复计入到场或已投入）。石材送到施工格才投入。` : ''}施工标记不封路，已有路面和速度保持，每格完工后才按新路面提速。`,
-      losses: '暂停保留已完工路面、已做工时和未用到场石材；已领随身材料仍须实际退仓，满仓保留。恢复后继续剩余铺路，不重复扣料。暂停或取消铺路不撤销独立清场标记；若也要停清场，请在砍伐/采石采铁工具撤销对应标记（会撤销全图此类标记）。',
-      refund: `取消剩余铺路：当前可立即返还 ${refund}，只含堆料点未用建材，直接返公共库存。携带中的材料另行实运退仓，不计入此数；尚未领出的计划不退款，已投入石材不返还。已完工路面和原有道路保留，已采树木矿物不恢复；独立清场标记仍保留，可在砍伐/采石采铁工具撤销。`,
+      losses: '暂停保留已完工路面、已做工时和未用到场石材；已领随身材料仍须实际退仓，满仓保留。恢复后继续剩余铺路，不重复扣料。暂停或取消铺路不撤销独立清场标记；若也要停清场，请用取消采集工具框选对应标记。',
+      refund: `取消剩余铺路：当前可立即返还 ${refund}，只含堆料点未用建材，直接返公共库存。携带中的材料另行实运退仓，不计入此数；尚未领出的计划不退款，已投入石材不返还。已完工路面和原有道路保留，已采树木矿物不恢复；独立清场标记仍保留，可用取消采集工具框选撤销。`,
     };
   },
   siteInfoMarkup: function (data) {

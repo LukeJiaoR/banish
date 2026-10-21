@@ -217,7 +217,7 @@ G.BDEF = {
 };
 
 /* 工具栏顺序 */
-G.TOOLBAR = ['fell', 'quarry', 'house', 'stonehouse', 'boarding', 'storage', 'mine', 'blacksmith', 'gatherer', 'forester', 'woodcutter', 'dock', 'hunting', 'school', 'chapel', 'farm', 'road', 'demolish'];
+G.TOOLBAR = ['gatherall', 'fell', 'collectstone', 'collectiron', 'cancelremoval', 'house', 'stonehouse', 'boarding', 'storage', 'mine', 'blacksmith', 'gatherer', 'forester', 'woodcutter', 'dock', 'hunting', 'school', 'chapel', 'farm', 'road', 'demolish'];
 
 /* 产出参数（workH: 每次工作小时数；专业岗位按本作真实运输成本校准） */
 G.PROD = {

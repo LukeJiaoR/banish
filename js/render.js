@@ -1515,8 +1515,24 @@ G.frame = function (dtReal) {
   for(const b of w.buildings)if(b.type==='bridge')G.drawBridge(ctx,b);
   for(const b of w.buildings)if(b.type==='roadwork')G.drawRoadWorkGround(ctx,b,{tx0,ty0,tx1,ty1});
 
-  const harvesting = G.tool && (G.tool.kind === 'fell' || G.tool.kind === 'quarry');
-  if (harvesting) G.drawFoodForestBounds(ctx);
+  const harvesting = G.isHarvestTool();
+  if (harvesting && ['fell','gatherall'].includes(G.tool.kind)) G.drawFoodForestBounds(ctx);
+  // Eligible resource cells are visible as soon as a collection tool is selected.
+  // The red fill is only the current rectangle; queued designations use orange Xs.
+  if (harvesting) {
+    const p=G.harvestPlan, current=p && p.world===w && p.tool===G.tool;
+    const x0=current?Math.min(p.start.x,p.end.x):0,x1=current?Math.max(p.start.x,p.end.x):-1;
+    const y0=current?Math.min(p.start.y,p.end.y):0,y1=current?Math.max(p.start.y,p.end.y):-1;
+    ctx.save();
+    for(let y=ty0;y<=ty1;y++)for(let x=tx0;x<=tx1;x++) {
+      const target=G.harvestTarget(w,y*w.N+x,G.tool.kind);if(!target)continue;
+      const [sx,sy]=G.T2S(x,y);G.diamondPath(ctx,sx,sy);
+      const selected=current&&x>=x0&&x<=x1&&y>=y0&&y<=y1;
+      ctx.fillStyle=selected?'rgba(213,65,48,.48)':'rgba(69,151,116,.16)';ctx.fill();
+      ctx.strokeStyle=selected?'#d54130':'rgba(100,181,143,.8)';ctx.lineWidth=1/G.cam.z;ctx.stroke();
+    }
+    ctx.restore();
+  }
 
   // 建造幽灵：贴着地面画、在建筑之前——后面的建筑/树会正确把它挡住，
   // 不会出现“绿色预览浮在已有建筑上”的误导
@@ -1555,31 +1571,13 @@ G.frame = function (dtReal) {
   G.drawOrchardPlan(ctx);
   G.drawCemeteryPlan(ctx);
 
-  // 矿石与道路工具悬停（同样贴地）
-  if (G.tool && G.tool.kind === 'quarry' && G.hover.tx >= 0 && G.hover.ty >= 0 && G.hover.tx < w.N && G.hover.ty < w.N) {
-    const mineral = w.rock[G.hover.ty * w.N + G.hover.tx];
-    const [sx, sy] = G.T2S(G.hover.tx, G.hover.ty);
-    G.diamondPath(ctx, sx, sy);
-    ctx.fillStyle = mineral ? 'rgba(120,230,140,0.4)' : 'rgba(230,90,80,0.25)';
-    ctx.fill();
-  }
-
-  if (harvesting && G.harvestPlan && G.harvestPlan.world === w && G.harvestPlan.kind === G.tool.kind) {
+  if (harvesting && G.harvestPlan && G.harvestPlan.world === w && G.harvestPlan.tool === G.tool) {
     const p = G.harvestPlan, a = p.start, b = p.end;
     const x0 = Math.min(a.x, b.x), y0 = Math.min(a.y, b.y), x1 = Math.max(a.x, b.x), y1 = Math.max(a.y, b.y);
     ctx.save(); ctx.beginPath();
-    // Four outside diamond vertices enclose the complete inclusive rectangle.
     const corners = [[x0, y0], [x1 + 1, y0], [x1 + 1, y1 + 1], [x0, y1 + 1]];
-    corners.forEach(([x, y], i) => { const [sx, sy] = G.T2S(x, y); if (i) ctx.lineTo(sx, sy); else ctx.moveTo(sx, sy); });
-    ctx.closePath(); ctx.fillStyle = 'rgba(235,180,65,.08)'; ctx.fill();
-    ctx.strokeStyle = '#ffd17a'; ctx.lineWidth = 2 / G.cam.z; ctx.stroke(); ctx.restore();
-    if (p.frozen) for (const t of p.targets) {
-      const x = t.i % w.N, y = Math.floor(t.i / w.N);
-      if (x < tx0 || x > tx1 || y < ty0 || y > ty1) continue;
-      if (t.tree ? w.treeIdx[t.i] < 0 || w.trees[w.treeIdx[t.i]] !== t.tree : w.rock[t.i] !== t.rock) continue;
-      const [sx, sy] = G.T2S(x, y); G.diamondPath(ctx, sx, sy);
-      ctx.fillStyle = (t.tree ? w.marked : w.markedRocks).has(t.i) ? 'rgba(110,190,230,.55)' : 'rgba(235,180,65,.55)'; ctx.fill();
-    }
+    corners.forEach(([x, y], i) => { const [sx, sy] = G.T2S(x, y); if (i) ctx.lineTo(sx, sy); else ctx.moveTo(sx,sy); });
+    ctx.closePath(); ctx.strokeStyle = '#d54130'; ctx.lineWidth = 2 / G.cam.z; ctx.stroke(); ctx.restore();
   }
 
   // Bridges/tunnels retain an endpoint guide; ordinary roads show the cached live tile route.
@@ -1659,18 +1657,12 @@ G.frame = function (dtReal) {
       G.drawTree(ctx, it.t, it.v);
       if (it.marked) { // 待砍标记（原版 Harvest Trees 的选中态）
         const [msx, msy] = G.T2S(it.x, it.y);
-        G.diamondPath(ctx, msx, msy);
-        ctx.strokeStyle = 'rgba(255,170,60,0.85)';
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
+        G.drawResourceDesignation(ctx,msx,msy);
       }
     }
     else if (it.k === 3) { // 待清除岩石标记
       const [msx, msy] = G.T2S(it.x, it.y);
-      G.diamondPath(ctx, msx, msy);
-      ctx.strokeStyle = 'rgba(255,170,60,0.85)';
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
+      G.drawResourceDesignation(ctx,msx,msy);
     }
     else if (it.k === 4) G.drawFarmCrop(ctx, it.b, it.f);
     else if (it.k === 5) G.drawEconomyFieldPart(ctx, it);
@@ -1826,4 +1818,10 @@ G.drawRoadWorkGround=function(ctx,b,bounds){const selected=G.sel?.kind==='b'&&G.
  for(const p of b.roadWork.cells){if(p.done||bounds&&(p.x<bounds.tx0||p.x>bounds.tx1||p.y<bounds.ty0||p.y>bounds.ty1))continue;const [x,y]=G.T2S(p.x,p.y);ctx.strokeStyle=b.sitePaused?'#8c8678':p.used?'#c19762':selected?'#d2ae75':'#a18a65';ctx.setLineDash(selected?[4,4]:[2,10]);G.diamondPath(ctx,x,y);ctx.stroke();if(p.workLeft<G.ROAD_WORK_H){ctx.setLineDash([]);ctx.strokeStyle='#d3b784';ctx.beginPath();ctx.moveTo(x-9,y+16);ctx.lineTo(x-9+18*(1-p.workLeft/G.ROAD_WORK_H),y+16);ctx.stroke();}}
  if(!bounds||b.x>=bounds.tx0&&b.x<=bounds.tx1&&b.y>=bounds.ty0&&b.y<=bounds.ty1){const [x,y]=G.T2S(b.x,b.y);ctx.setLineDash([]);ctx.strokeStyle='#765e43';ctx.lineWidth=1.2;ctx.beginPath();ctx.moveTo(x-10,y+22);ctx.lineTo(x-10,y+9);ctx.stroke();ctx.fillStyle=b.sitePaused?'#989184':'#c69a64';ctx.fillRect(x-10,y+9,8,5);const n=Math.min(4,Math.ceil((b.construction.onsite.stone||0)/5));for(let i=0;i<n;i++){ctx.fillStyle=i%2?'#aaa391':'#8c8b80';ctx.beginPath();ctx.ellipse(x+1+(i%2)*4,y+21-Math.floor(i/2)*3,3.5,2,0,0,Math.PI*2);ctx.fill();}if(selected){ctx.fillStyle='#e1cda9';ctx.font='9px sans-serif';ctx.textAlign='center';ctx.fillText('料',x-6,y+5);}}
  ctx.restore();
+};
+
+// Original primitives only: an orange X at the resource's ground position.
+G.drawResourceDesignation = function(ctx,x,y) {
+  ctx.save();ctx.beginPath();ctx.moveTo(x-7,y-3);ctx.lineTo(x+7,y+3);ctx.moveTo(x+7,y-3);ctx.lineTo(x-7,y+3);
+  ctx.strokeStyle='#efa447';ctx.lineWidth=2/G.cam.z;ctx.stroke();ctx.restore();
 };

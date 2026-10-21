@@ -1,0 +1,12 @@
+/* Collection tools operate directly on the map. Never reopen the build page. */
+#hud.is-harvesting #toolbar,
+#hud.is-harvesting #placement-panel,
+#harvest-range-controls,
+#harvest-cancel { display:none !important; }
+#harvest-map-controls { position:absolute; left:50%; bottom:max(76px,calc(env(safe-area-inset-bottom) + 64px)); transform:translateX(-50%); display:flex; align-items:center; gap:16px; width:max-content; max-width:calc(100vw - 24px); box-sizing:border-box; padding:10px 12px 10px 16px; border:1px solid #c8c9ad; border-radius:14px; color:#29483c; background:linear-gradient(135deg,#fffdf3,#f1efdf); box-shadow:0 4px 16px #24463924; pointer-events:auto; }
+#harvest-map-controls.hidden { display:none; }
+#harvest-map-controls strong { font-size:15px; }
+#harvest-map-controls p { margin:3px 0 0; font-size:12px; line-height:1.5; }
+#harvest-map-controls button { flex-shrink:0; min-width:64px; min-height:44px; border:1px solid #a4b598; border-radius:9px; background:#e3ead9; color:#29483c; font:inherit; cursor:pointer; }
+#harvest-map-controls button:focus-visible { outline:3px solid #547b61; outline-offset:3px; }
+@media(max-width:760px) { #harvest-map-controls { gap:10px; padding:8px 10px; width:calc(100vw - 24px); } #harvest-map-controls>div { flex:1; min-width:0; } }

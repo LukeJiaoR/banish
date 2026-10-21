@@ -62,6 +62,9 @@ function fixture() {
     vm.runInContext(fs.readFileSync(path.join(root, 'js', name + '.js'), 'utf8'), ctx, { filename: name + '.js' });
   const G = ctx.G;
   const hud = element('hud'); hud.parentNode = doc;
+  const strip=hud.appendChild(element('harvest-map-controls'));
+  strip.appendChild(element('harvest-map-title'));strip.appendChild(element('harvest-map-status'));
+  const exit=strip.appendChild(element('harvest-exit','BUTTON'));
   const panel = hud.appendChild(element('placement-panel'));
   const controls = panel.appendChild(element('harvest-cancel'));
   const trees = controls.appendChild(element('cancel-tree-marks', 'BUTTON'));
@@ -69,7 +72,7 @@ function fixture() {
   const status = controls.appendChild(element('harvest-cancel-status'));
   const placement = panel.appendChild(element('placement-info'));
   const toolbar = hud.appendChild(element('toolbar'));
-  for (const kind of ['fell', 'quarry', 'demolish', 'farm', 'road']) {
+  for (const kind of ['gatherall','fell','collectstone','collectiron','cancelremoval','quarry', 'demolish', 'farm', 'road']) {
     const btn = toolbar.appendChild(element('tool-' + kind, 'BUTTON')); btn.dataset.tool = kind;
     btn.addEventListener('click', () => { if (!G.hasOpenModal()) G.setTool(kind); });
   }
@@ -88,7 +91,7 @@ function fixture() {
   function markTrees(count = 2) { for (const t of G.world.trees.slice(0, count)) G.world.marked.add(t.i); }
   function markRock() { const i = G.world.rock.findIndex(x => x > 0); G.world.markedRocks.add(i); return i; }
   function click(btn) { btn.emit('mousedown'); btn.focus(); btn.emit('mouseup'); return btn.emit('click'); }
-  return { G, ctx, doc, toolbar, panel, controls, placement, trees, rocks, status, calls, click, markTrees, markRock };
+  return { G, ctx, doc, toolbar, panel, strip, exit, controls, placement, trees, rocks, status, calls, click, markTrees, markRock };
 }
 function state(G) {
   return JSON.stringify({ world: G.world, game: G.game, cam: G.cam, keys: G.keys, tool: G.tool, sel: G.sel,
@@ -100,181 +103,60 @@ function test(name, fn) {
   catch (error) { failed++; console.error('FAIL ' + name + '\n' + error.stack); }
 }
 
-test('persistent native buttons are siblings of the frame-replaced text and have safe accessible defaults', () => {
-  assert.match(html, /id="placement-panel"[\s\S]*?id="harvest-cancel"[\s\S]*?id="placement-info"/);
-  for (const id of ['cancel-tree-marks', 'cancel-rock-marks'])
-    assert.match(html, new RegExp('<button type="button" id="' + id + '" aria-disabled="true">'));
-  assert.match(html, /id="harvest-cancel-status" role="status" aria-live="polite" aria-atomic="true"/);
-  assert.match(html, /护林和工地清场继续/); assert.match(html, /已耗工时不返还/); assert.match(html, /退出工具不撤销标记/);
-  const { controls, placement } = fixture(); assert.equal(placement.contains(controls), false);
-});
-
-test('zero marks have a visible disabled state and repeated activation has no effect', () => {
-  const f = fixture(), { G, trees, rocks, calls, click } = f;
-  G.setTool('fell');
-  for (const btn of [trees, rocks]) { assert.equal(btn.getAttribute('aria-disabled'), 'true'); assert.match(btn.textContent, /（0）/); }
-  const before = state(G); for (let n = 0; n < 4; n++) { click(trees); click(rocks); }
-  assert.equal(calls.length, 0); assert.equal(state(G), before);
-});
-
-test('tree cancellation is one-shot, immediately refreshes its count, and leaves ore and time controls unchanged', () => {
-  const f = fixture(), { G, trees, rocks, calls, click, status } = f;
-  f.markTrees(); f.markRock(); G.setTool('fell');
-  assert.match(trees.textContent, /（2）/); assert.match(rocks.textContent, /（1）/);
-  const pause = G.game.paused, speed = G.game.speed; click(trees); click(trees);
-  assert.deepEqual(calls, ['trees']); assert.equal(G.world.marked.size, 0); assert.equal(G.world.markedRocks.size, 1);
-  assert.equal(trees.getAttribute('aria-disabled'), 'true'); assert.equal(rocks.getAttribute('aria-disabled'), 'false');
-  assert.equal(G.game.paused, pause); assert.equal(G.game.speed, speed); assert.equal(G.tool.kind, 'fell');
-  assert.match(status.textContent, /已取消 2 处树标记/); assert.match(status.textContent, /已采货物仍送仓/);
-});
-
-test('ore cancellation works from either harvest tool and never cancels tree marks', () => {
-  for (const tool of ['fell', 'quarry']) {
-    const f = fixture(); f.markTrees(); f.markRock(); f.G.setTool(tool); f.click(f.rocks);
-    assert.deepEqual(f.calls, ['rocks']); assert.equal(f.G.world.marked.size, 2); assert.equal(f.G.world.markedRocks.size, 0);
-    assert.match(f.status.textContent, /1 处矿标记/);
+test('legacy cancel-all controls stay hidden, inert and cannot mutate from scripted activation',()=>{
+  for(const tool of ['gatherall','fell','collectstone','collectiron','cancelremoval','quarry']) {
+    const f=fixture();f.markTrees();f.markRock();f.G.setTool(tool);
+    assert(f.controls.classList.contains('hidden'));assert.equal(f.controls.inert,true);
+    const before=state(f.G);for(const button of [f.trees,f.rocks])for(let n=0;n<3;n++)f.click(button);
+    assert.equal(state(f.G),before);assert.equal(f.calls.length,0);
   }
 });
-
-test('real active and overnight tasks report separately while harvested cargo and independent work remain', () => {
-  const f = fixture(), { G } = f; f.markTrees(3);
-  const [a, b, c, independent] = G.world.citizens;
-  const [t1, t2, t3] = G.world.trees;
-  const claim = t => ({ kind: 'chop', tx: t.x, ty: t.y, tree: t, b: null, workLeft: 2 });
-  a.task = claim(t1); a.state = 'work'; a.job = null;
-  b.pausedTask = claim(t2); b.task = null; b.state = 'rest'; b.job = null;
-  c.carry = { type: 'wood', qty: 3 }; c.state = 'haul'; c.task = null;
-  independent.task = { ...claim(t3), b: { id: 991, type: 'forester' } };
-  const cargo = c.carry, ownTask = independent.task, resources = JSON.stringify(G.game.res);
-  G.setTool('fell'); f.click(f.trees);
-  assert.match(f.status.textContent, /停止执行 1 项、夜间保留 1 项/);
-  assert.equal(a.task, null); assert.equal(b.pausedTask, null); assert.equal(b.state, 'rest');
-  assert.equal(c.carry, cargo); assert.equal(c.state, 'haul'); assert.equal(independent.task, ownTask);
-  assert.equal(JSON.stringify(G.game.res), resources);
+test('map strip is outside the legacy page and has only an exit action',()=>{
+  assert(html.indexOf('id="harvest-map-controls"')<html.indexOf('id="placement-panel"'));
+  const markup=html.match(/<section id="harvest-map-controls"[\s\S]*?<\/section>/)[0];
+  assert.equal((markup.match(/<button/g)||[]).length,1);assert.match(markup,/id="harvest-exit"/);
+  const css=fs.readFileSync(path.join(root,'styles/harvest-map.css'),'utf8');
+  assert.match(css,/#hud\.is-harvesting #toolbar/);assert.match(css,/#harvest-cancel[^}]*display:none !important/);
 });
-
-test('live mark counts defeat both stale enabled and stale disabled button states', () => {
-  const f = fixture(); f.markTrees(); f.G.setTool('fell'); f.G.world.marked.clear();
-  f.click(f.trees); assert.equal(f.calls.length, 0); assert.equal(f.trees.getAttribute('aria-disabled'), 'true');
-  f.markTrees(1); f.click(f.trees); assert.deepEqual(f.calls, ['trees']);
+test('exit preserves current work, overnight claims, cargo, stock and time controls',()=>{
+  const f=fixture(),{G}=f;f.markTrees();f.markRock();
+  const [a,b,c]=G.world.citizens;const t=G.world.trees[0];
+  a.task={kind:'chop',tree:t,tx:t.x,ty:t.y,b:null,workLeft:2};
+  b.pausedTask={kind:'clearrock',tx:20,ty:20,b:null,workLeft:3};
+  c.carry={type:'wood',qty:3};G.setTool('fell');
+  const before=JSON.stringify({world:G.world,game:G.game,trees:[...G.world.marked],rocks:[...G.world.markedRocks]});
+  f.click(f.exit);assert.equal(G.tool,null);assert(f.strip.classList.contains('hidden'));
+  assert.equal(JSON.stringify({world:G.world,game:G.game,trees:[...G.world.marked],rocks:[...G.world.markedRocks]}),before);
+  assert.equal(f.doc.activeElement,f.toolbar.querySelector('[data-tool="fell"]'));
 });
-
-test('raw stale marker entries remain visible and cancellable', () => {
-  const f = fixture(); const i = f.G.world.treeIdx.findIndex(v => v < 0);
-  f.G.world.marked.add(i); f.G.setTool('fell'); assert.match(f.trees.textContent, /（1）/);
-  f.click(f.trees); assert.equal(f.G.world.marked.size, 0); assert.match(f.status.textContent, /1 处树标记/);
-});
-
-test('switching harvest tools and exiting preserve marks; hidden controls cannot cancel', () => {
-  const f = fixture(); f.markTrees(); f.markRock(); f.G.setTool('fell');
-  f.G.setTool('quarry'); assert.equal(f.controls.classList.contains('hidden'), false);
-  const before = [Array.from(f.G.world.marked), Array.from(f.G.world.markedRocks)];
-  for (const tool of ['farm', 'road', 'demolish', null]) {
-    f.G.setTool(tool); assert.equal(f.controls.classList.contains('hidden'), true);
-    f.click(f.trees); f.click(f.rocks); assert.equal(f.calls.length, 0);
-  }
-  assert.deepEqual([Array.from(f.G.world.marked), Array.from(f.G.world.markedRocks)], before);
-});
-
-test('focus and button identity survive frame refreshes and cancellation to zero', () => {
-  const f = fixture(); f.markTrees(); f.G.setTool('fell'); f.trees.focus();
-  const buttons = [f.trees, f.rocks], writes = buttons.map(b => [b.textWrites, b.attrWrites]);
-  const before = state(f.G);
-  for (let n = 0; n < 120; n++) f.G.ui.refreshHarvest();
-  assert.equal(state(f.G), before); assert.equal(f.doc.activeElement, f.trees);
-  assert.deepEqual(buttons.map(b => [b.textWrites, b.attrWrites]), writes);
-  assert.equal(f.controls.children[0], buttons[0]); assert.equal(f.controls.children[1], buttons[1]);
-  f.click(f.trees); for (let n = 0; n < 120; n++) f.G.ui.refreshHarvest();
-  assert.equal(f.doc.activeElement, f.trees); assert.equal(f.trees.getAttribute('aria-disabled'), 'true');
-});
-
-test('Escape from a cancel button exits without clearing marks and restores visible toolbar focus', () => {
-  const f = fixture(); f.markTrees(); f.G.setTool('fell'); f.trees.focus();
-  const event = f.trees.emit('keydown', { key: 'Escape' });
-  assert.equal(event.defaultPrevented, true); assert.equal(f.G.tool, null); assert.equal(f.G.world.marked.size, 2);
-  assert.equal(f.doc.activeElement, f.toolbar.querySelector('[data-tool="fell"]')); assert.equal(f.calls.length, 0);
-});
-
-test('a tool switch restores focus to its toolbar control without touching game state', () => {
-  const f = fixture(); f.markTrees(); f.G.setTool('fell'); f.trees.focus();
-  f.G.setTool('farm'); assert.equal(f.doc.activeElement, f.toolbar.querySelector('[data-tool="farm"]'));
-  assert.equal(f.G.world.marked.size, 2); assert.equal(f.G.game.paused, true); assert.equal(f.G.game.speed, 2);
-});
-
-test('all overlays guard cancellation even before the disabled appearance is refreshed', () => {
-  for (const id of ['help', 'saves', 'errs', 'fb', 'over']) {
-    const f = fixture(); f.markTrees(); f.markRock(); f.G.setTool('fell');
-    f.doc.getElementById(id).classList.remove('hidden'); const before = state(f.G);
-    f.click(f.trees); f.click(f.rocks); assert.equal(f.calls.length, 0); assert.equal(state(f.G), before);
-    f.G.ui.refreshHarvest(); assert.equal(f.trees.getAttribute('aria-disabled'), 'true'); assert.equal(f.rocks.getAttribute('aria-disabled'), 'true');
-    f.doc.getElementById(id).classList.add('hidden'); f.G.ui.refreshHarvest();
-    assert.equal(f.trees.getAttribute('aria-disabled'), 'false'); f.click(f.trees); assert.deepEqual(f.calls, ['trees']);
+test('all overlays guard Exit without altering tool or simulation',()=>{
+  const f=fixture();f.markTrees();f.G.setTool('fell');
+  for(const id of ['help','saves','errs','over','fb','production-goals']) {
+    f.doc.getElementById(id).classList.remove('hidden');const before=state(f.G);
+    f.click(f.exit);assert.equal(state(f.G),before,id);
+    f.doc.getElementById(id).classList.add('hidden');
   }
 });
-
-test('native button key events preserve Enter/Space activation without triggering game hotkeys', () => {
-  for (const key of ['Enter', ' ']) {
-    const f = fixture(); f.markTrees(); f.G.setTool('fell'); f.trees.focus();
-    for (const hotkey of ['w', 'a', 's', 'd', 'ArrowUp', '1', '2', '3', '?']) f.trees.emit('keydown', { key: hotkey });
-    const down = f.trees.emit('keydown', { key }); f.trees.emit('keyup', { key });
-    assert.equal(!!down.defaultPrevented, false, 'browser retains native button activation');
-    // Browser-generated activation itself is represented explicitly in this DOM fixture.
-    f.trees.emit('click', { detail: 0 });
-    assert.deepEqual(f.calls, ['trees']); assert.equal(f.G.game.paused, true); assert.equal(f.G.game.speed, 2);
-    assert.ok(!Object.values(f.G.keys).some(Boolean)); assert.equal(f.G.hasOpenModal(), false);
+test('frame refresh keeps only direct map instruction and does not recreate controls',()=>{
+  const f=fixture();f.G.setTool('collectiron');const exit=f.exit;
+  f.exit.focus();for(let n=0;n<120;n++)f.G.ui.refreshHarvest();
+  assert.equal(f.doc.getElementById('harvest-exit'),exit);assert.equal(f.doc.activeElement,exit);
+  assert(f.placement.classList.contains('hidden'));assert(f.controls.classList.contains('hidden'));
+  assert.match(f.doc.getElementById('harvest-map-title').textContent,/铁矿/);
+  assert.match(f.doc.getElementById('harvest-map-status').textContent,/松开/);
+  assert.doesNotMatch(f.doc.getElementById('harvest-map-status').textContent,/确认/);
+});
+test('Escape exits from strip and preserves designations',()=>{
+  const f=fixture();f.markTrees();f.G.setTool('fell');f.exit.focus();
+  f.ctx.emit('keydown',{key:'Escape',target:f.exit});
+  assert.equal(f.G.tool,null);assert.equal(f.G.world.marked.size,2);assert(f.strip.classList.contains('hidden'));
+});
+test('tool switches and new games leave legacy controls inert and hidden',()=>{
+  const f=fixture();f.markTrees();f.G.setTool('fell');
+  for(const tool of ['collectstone','collectiron','cancelremoval','farm',null]) {
+    f.G.setTool(tool);assert(f.controls.classList.contains('hidden'));assert.equal(f.controls.inert,true);
   }
-});
-
-test('cancel pointer events cannot place, demolish, select, or mark a map tile', () => {
-  const f = fixture(); f.markTrees(); f.markRock(); f.G.setTool('quarry');
-  const unexpected = [];
-  for (const key of ['tryPlace', 'demolishAt', 'selectAt', 'markFellAt', 'markRockAt', 'paintRoad']) f.G[key] = () => unexpected.push(key);
-  f.click(f.trees); f.click(f.rocks); assert.deepEqual(unexpected, []); assert.deepEqual(f.calls, ['trees', 'rocks']);
-});
-
-test('canvas drags stop on the harvest panel and never resume when the pointer returns', () => {
-  for (const [tool, button] of [['fell', 0], ['quarry', 0], [null, 2]]) for (const target of ['panel', 'placement', 'trees']) {
-    const f = fixture(), { G } = f; G.setTool(tool);
-    const actions = [];
-    for (const key of ['markFellAt', 'markRockAt', 'paintFell', 'paintRockLine', 'demolishAt', 'selectAt'])
-      G[key] = () => actions.push(key);
-    G.cv.emit('mousedown', { button, clientX: 12, clientY: 12 });
-    const initial = actions.slice(), camera = JSON.stringify(G.cam);
-    f[target].emit('mousemove', { button, clientX: 16, clientY: 16 });
-    f.trees.emit('mouseup', { button, clientX: 16, clientY: 16 });
-    G.cv.emit('mousemove', { button, clientX: 20, clientY: 20 });
-    G.cv.emit('mouseup', { button, clientX: 20, clientY: 20 });
-    assert.deepEqual(actions, initial, `${tool || 'pan'} continued beneath/after the panel`);
-    assert.equal(JSON.stringify(G.cam), camera);
-    // A new intentional canvas gesture must still work after the interrupted one.
-    G.cv.emit('mousedown', { button, clientX: 12, clientY: 12 });
-    G.cv.emit('mousemove', { button, clientX: 20, clientY: 20 });
-    G.cv.emit('mouseup', { button, clientX: 20, clientY: 20 });
-    if (tool) { assert.equal(actions.length, initial.length); assert.ok(G.harvestPlan && G.harvestPlan.frozen); }
-    else assert.notEqual(JSON.stringify(G.cam), camera);
-  }
-});
-
-test('a demolish gesture released over a cancel control cannot delete even without an intervening move event', () => {
-  const f = fixture(), { G } = f; G.setTool('demolish');
-  let deletes = 0; G.demolishAt = () => deletes++;
-  G.cv.emit('mousedown', { clientX: 12, clientY: 12 });
-  f.trees.emit('mouseup', { clientX: 12, clientY: 12 });
-  G.cv.emit('mouseup', { clientX: 12, clientY: 12 });
-  assert.equal(deletes, 0);
-});
-
-test('new worlds clear old cancellation status and refresh their own counts', () => {
-  const f = fixture(); f.markTrees(); f.G.setTool('fell'); f.click(f.trees); assert.ok(f.status.textContent);
-  f.G.newGame(45); f.G.setTool('fell'); assert.equal(f.status.textContent, ''); assert.match(f.trees.textContent, /（0）/);
-});
-
-test('static compact-layout contracts keep controls above feedback in one bounded scroll area', () => {
-  const panel = css.match(/#placement-panel\s*\{([^}]+)\}/)[1];
-  assert.match(panel, /max-height:\s*calc\(100vh - 214px\)/); assert.match(panel, /overflow-y:\s*auto/); assert.match(panel, /pointer-events:\s*auto/);
-  assert.match(css, /@media \(max-width: 600px\)[^\n]*#placement-panel\s*\{\s*max-height:\s*calc\(100vh - 260px\)/);
-  assert.match(css, /@media \(max-height: 620px\).*#survival-guide.*display:\s*none/);
-  assert.match(css, /grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/); assert.match(css, /button:focus-visible/);
+  f.G.newGame(45);const before=state(f.G);f.click(f.trees);f.click(f.rocks);assert.equal(state(f.G),before);
 });
 
 // Real input-handler boundaries for the dedicated surface-mineral tool.
@@ -293,12 +175,12 @@ test('dedicated mineral clicks distinguish stone and iron and only mark, never g
   const f = fixture(), { G } = f, w = G.world;
   const a = emptyTile(G, 20, 20), b = emptyTile(G, 21, 20); w.rock[a] = 1; w.rock[b] = 2;
   const before = JSON.stringify(G.game.res); G.setTool('quarry');
-  for (const x of [20, 21, 20]) { canvasClick(G, x, 20); assert.ok(G.harvestPlan.frozen); G.confirmHarvestRange(); }
+  for (const x of [20, 21, 20]) { canvasClick(G, x, 20); assert.equal(G.harvestPlan,null); }
   assert.equal(G.tool.kind, 'quarry'); assert.equal(w.markedRocks.size, 2);
   assert.equal(w.rock[a], 1); assert.equal(w.rock[b], 2); assert.equal(JSON.stringify(G.game.res), before);
-  G.hover = { tx: 20, ty: 20 }; G.ui.refreshHarvest(); assert.match(f.placement.textContent, /岩石 → 石头/);
-  G.hover = { tx: 21, ty: 20 }; G.ui.refreshHarvest(); assert.match(f.placement.textContent, /铁矿 → 铁/);
-  G.hover = { tx: -1, ty: -1 }; G.ui.refreshHarvest(); assert.match(f.placement.textContent, /没有可采矿石/);
+  G.hover = { tx: 20, ty: 20 }; G.ui.refreshHarvest(); assert(f.placement.classList.contains('hidden'));
+  G.hover = { tx: 21, ty: 20 }; G.ui.refreshHarvest(); assert(f.placement.classList.contains('hidden'));
+  G.hover = { tx: -1, ty: -1 }; G.ui.refreshHarvest(); assert(f.placement.classList.contains('hidden'));
 });
 test('mineral input marks run through real mining and hauling to exactly one deposit per type', () => {
   const { G } = fixture(), w = G.world, c = w.citizens.find(c => c.adult);
@@ -308,7 +190,7 @@ test('mineral input marks run through real mining and hauling to exactly one dep
     for (let i = 0; i < w.rock.length; i++) if (w.rock[i] === value) candidates.push(i);
     candidates.sort((a, b) => G.d2(a % w.N, Math.floor(a / w.N), c.x, c.y) - G.d2(b % w.N, Math.floor(b / w.N), c.x, c.y));
     const i = candidates.find(i => G.findPath(w, Math.round(c.x), Math.round(c.y), i % w.N, Math.floor(i / w.N)));
-    assert.notEqual(i, undefined); canvasClick(G, i % w.N, Math.floor(i / w.N)); G.confirmHarvestRange();
+    assert.notEqual(i, undefined); canvasClick(G, i % w.N, Math.floor(i / w.N));
   }
   assert.equal(w.markedRocks.size, 2);
   let steps = 0;
@@ -316,14 +198,14 @@ test('mineral input marks run through real mining and hauling to exactly one dep
   assert.equal(w.markedRocks.size, 0); assert.equal(G.game.res.stone, before.stone + 10); assert.equal(G.game.res.iron, before.iron + 10);
   assert.equal(w.citizens.filter(c => c.carry).length, 0);
 });
-test('confirmed mineral range marks both minerals and preserves trees and roads', () => {
+test('direct mineral range marks both minerals and preserves trees and roads', () => {
   const { G } = fixture(), w = G.world;
   for (let x = 20; x <= 24; x++) emptyTile(G, x, 20);
   w.rock[20 * w.N + 20] = 1; w.rock[20 * w.N + 24] = 2;
   G.addTree(w, 21, 20, -200); w.road[20 * w.N + 22] = 1;
   G.setTool('quarry'); G.cv.emit('mousedown', { clientX: 20, clientY: 20 });
   G.cv.emit('mousemove', { clientX: 24, clientY: 20 }); G.cv.emit('mouseup', { clientX: 24, clientY: 20 });
-  assert.equal(w.markedRocks.size, 0); assert.equal(G.confirmHarvestRange().marked, 2);
+  assert.equal(G.harvestPlan,null);
   assert.equal(w.markedRocks.size, 2); assert.ok(w.treeIdx[20 * w.N + 21] >= 0);
   assert.equal(w.road[20 * w.N + 22], 1); assert.equal(w.marked.size, 0);
 });

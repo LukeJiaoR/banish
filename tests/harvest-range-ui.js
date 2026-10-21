@@ -84,7 +84,7 @@ function fixture(pointerEvents = false) {
   G.world.marked.clear(); G.world.markedRocks.clear();
   G.game.paused = true; G.game.speed = 2;
   const cancel = G.cancelResourceMarks; const calls = [];
-  G.cancelResourceMarks = kind => { calls.push(kind); return cancel(kind); };
+  G.cancelResourceMarks = (...args) => { calls.push(args[0]); return cancel(...args); };
   function markTrees(count = 2) { for (const t of G.world.trees.slice(0, count)) G.world.marked.add(t.i); }
   function markRock() { const i = G.world.rock.findIndex(x => x > 0); G.world.markedRocks.add(i); return i; }
   function click(btn) { btn.emit('mousedown'); btn.focus(); btn.emit('mouseup'); return btn.emit('click'); }
@@ -102,37 +102,41 @@ function harvestFixture(pointerEvents=false) {
  return f;
 }
 let passed=0;function test(name,fn){fn();passed++;console.log('ok '+name)}
-test('mouse drag previews a full rectangle and explicit button confirms, not the travelled line',()=>{
+test('mouse release immediately marks full rectangle and remains in collection mode',()=>{
  const f=harvestFixture(),{G}=f,w=G.world;w.rock[3*w.N+3]=1;w.rock[4*w.N+3]=2;w.rock[3*w.N+5]=1;
- f.drag([5,4],[3,3]);assert.equal(w.markedRocks.size,0);assert.equal(G.harvestRangeStatus().added.length,3);f.click(f.confirm);assert.equal(w.markedRocks.size,3);assert.equal(G.harvestPlan,null);
+ f.drag([5,4],[3,3]);assert.equal(w.markedRocks.size,3);assert.equal(G.harvestPlan,null);assert.equal(G.tool.kind,'quarry');
+ w.rock[7*w.N+7]=1;f.drag([7,7],[7,7]);assert.equal(w.markedRocks.size,4);
 });
-test('single-finger two-corner taps and one-cell confirmation need no hover',()=>{
- const f=harvestFixture(),{G}=f,w=G.world;w.rock[3*w.N+3]=1;w.rock[4*w.N+4]=2;f.touch(3,3);assert.equal(G.harvestPlan.awaitingSecond,true);f.touch(4,4);assert.equal(G.harvestRangeStatus().added.length,2);assert.equal(w.markedRocks.size,0);f.click(f.confirm);assert.equal(w.markedRocks.size,2);
- w.rock[7*w.N+7]=1;f.touch(7,7);f.click(f.confirm);assert(w.markedRocks.has(7*w.N+7));
+test('touch second corner commits, including same-cell selection, without confirmation',()=>{
+ const f=harvestFixture(),{G}=f,w=G.world;w.rock[3*w.N+3]=1;w.rock[4*w.N+4]=2;f.touch(3,3);assert.equal(G.harvestPlan.awaitingSecond,true);assert.equal(w.markedRocks.size,0);f.touch(4,4);assert.equal(w.markedRocks.size,2);assert.equal(G.harvestPlan,null);
+ w.rock[7*w.N+7]=1;f.touch(7,7);f.touch(7,7);assert(w.markedRocks.has(7*w.N+7));
 });
-test('dragging across controls cancels unfinished preview without markings or later mouseup revival',()=>{
- const f=harvestFixture(),{G}=f;G.world.rock[3*G.world.N+3]=1;G.cv.emit('mousedown',{clientX:3,clientY:3});f.panel.emit('mousemove',{clientX:5,clientY:5});G.cv.emit('mouseup',{clientX:5,clientY:5});assert.equal(G.harvestPlan,null);assert.equal(G.world.markedRocks.size,0);
+test('release over controls or window cancels selection',()=>{
+ for(const target of ['panel','ctx']){const f=harvestFixture(),{G}=f;G.world.rock[3*G.world.N+3]=1;G.cv.emit('mousedown',{clientX:3,clientY:3});f[target].emit('mouseup',{clientX:3,clientY:3});G.cv.emit('mouseup',{clientX:3,clientY:3});assert.equal(G.harvestPlan,null);assert.equal(G.world.markedRocks.size,0);}
 });
-test('touch movement, multitouch and cancellation do not confirm or retain stale corners',()=>{
- const f=harvestFixture(),{G}=f;G.cv.emit('touchstart',{touches:[{clientX:3,clientY:3}]});G.cv.emit('touchmove',{touches:[{clientX:30,clientY:3}]});G.cv.emit('touchend',{changedTouches:[{clientX:30,clientY:3}]});assert.equal(G.harvestPlan,null);
- f.touch(3,3);G.cv.emit('touchcancel');assert.equal(G.harvestPlan,null);G.cv.emit('touchstart',{touches:[{},{}]});G.cv.emit('touchend',{changedTouches:[{clientX:3,clientY:3}]});assert.equal(G.harvestPlan,null);
+test('pointercancel, blur, Escape and tool round-trip invalidate mouse release',()=>{
+ for(const action of ['pointercancel','blur','Escape','switch']){const f=harvestFixture(),{G}=f;G.world.rock[3*G.world.N+3]=1;G.cv.emit('mousedown',{clientX:3,clientY:3});if(action==='pointercancel')G.cv.emit(action);else if(action==='blur')f.ctx.emit(action);else if(action==='Escape')f.ctx.emit('keydown',{key:'Escape'});else{G.setTool('fell');G.setTool('quarry');}G.cv.emit('mouseup',{clientX:3,clientY:3});assert.equal(G.world.markedRocks.size,0);assert.equal(G.harvestPlan,null);}
 });
-test('tool generation, background and world replacement reject late touch completion',()=>{
+test('mixed-button release and middle-button pan do not mark',()=>{
+ const f=harvestFixture(),{G}=f;G.world.rock[3*G.world.N+3]=1;G.cv.emit('mousedown',{button:1,clientX:3,clientY:3});G.cv.emit('mousemove',{clientX:20,clientY:3});G.cv.emit('mouseup',{button:0,clientX:3,clientY:3});assert.equal(G.world.markedRocks.size,0);assert.equal(G.harvestPlan,null);
+});
+test('middle-button interruption clears an unfinished left-button selection',()=>{
+ const f=harvestFixture(),{G}=f;G.world.rock[3*G.world.N+3]=1;G.cv.emit('mousedown',{clientX:3,clientY:3});G.cv.emit('mousedown',{button:1,clientX:3,clientY:3});G.cv.emit('mouseup',{button:1,clientX:3,clientY:3});assert.equal(G.harvestPlan,null);G.cv.emit('mouseup',{clientX:3,clientY:3});assert.equal(G.world.markedRocks.size,0);
+});
+test('touch release outside canvas or over an overlay cannot apply the second corner',()=>{
+ for(const overlay of [false,true]){const f=harvestFixture(),{G}=f;G.world.rock[3*G.world.N+3]=1;G.cv.getBoundingClientRect=()=>({left:0,top:0,width:10,height:10});f.touch(3,3);if(overlay)f.doc.elementFromPoint=()=>f.panel;G.cv.emit('touchstart',{touches:[{clientX:3,clientY:3}]});G.cv.emit('touchend',{touches:[],changedTouches:[{clientX:overlay?3:12,clientY:3}]});assert.equal(G.world.markedRocks.size,0);assert.equal(G.harvestPlan,null);}
+});
+test('touch movement, multitouch and cancellation discard stale first corner',()=>{
+ for(const action of ['move','multi','cancel']){const f=harvestFixture(),{G}=f;G.world.rock[3*G.world.N+3]=1;f.touch(3,3);G.cv.emit('touchstart',{touches:action==='multi'?[{},{}]:[{clientX:3,clientY:3}]});if(action==='move')G.cv.emit('touchmove',{touches:[{clientX:30,clientY:3}]});if(action==='cancel')G.cv.emit('touchcancel');G.cv.emit('touchend',{touches:[],changedTouches:[{clientX:3,clientY:3}]});assert.equal(G.harvestPlan,null);assert.equal(G.world.markedRocks.size,0);}
+});
+test('tool generation, background and world replacement reject late touch',()=>{
  const f=harvestFixture(),{G}=f;G.cv.emit('touchstart',{touches:[{clientX:3,clientY:3}]});G.setTool('fell');G.setTool('quarry');G.cv.emit('touchend',{changedTouches:[{clientX:3,clientY:3}]});assert.equal(G.harvestPlan,null);
  f.touch(3,3);f.doc.visibilityState='hidden';f.doc.emit('visibilitychange');assert.equal(G.harvestPlan,null);f.doc.visibilityState='visible';f.touch(3,3);G.newGame(1);assert.equal(G.harvestPlan,null);
 });
-test('modal and Escape guards preserve world; preview cancel does not cancel previously issued jobs',()=>{
- const f=harvestFixture(),{G,doc}=f,w=G.world;w.rock[3*w.N+3]=1;f.drag([3,3],[3,3]);doc.getElementById('production-goals').classList.remove('hidden');f.click(f.confirm);assert.equal(w.markedRocks.size,0);doc.getElementById('production-goals').classList.add('hidden');f.click(f.confirm);assert.equal(w.markedRocks.size,1);
- f.drag([3,3],[3,3]);f.click(doc.getElementById('harvest-preview-cancel'));assert.equal(G.harvestPlan,null);assert.equal(w.markedRocks.size,1);f.confirm.focus();f.ctx.emit('keydown',{key:'Escape',target:f.confirm});assert.equal(G.tool,null);assert.equal(f.doc.activeElement,f.toolbar.querySelector('[data-tool="quarry"]'));assert.equal(w.markedRocks.size,1);
+test('modal blocks release, Escape never revokes already-issued orders',()=>{
+ const f=harvestFixture(),{G,doc}=f,w=G.world;w.rock[3*w.N+3]=1;G.cv.emit('mousedown',{clientX:3,clientY:3});doc.getElementById('production-goals').classList.remove('hidden');G.cv.emit('mouseup',{clientX:3,clientY:3});assert.equal(w.markedRocks.size,0);doc.getElementById('production-goals').classList.add('hidden');f.drag([3,3],[3,3]);assert.equal(w.markedRocks.size,1);f.ctx.emit('keydown',{key:'Escape'});assert.equal(G.tool,null);assert.equal(w.markedRocks.size,1);
 });
-test('pressed confirmation cannot adopt a different range or silently accept changed target count',()=>{
- const f=harvestFixture(),{G}=f,w=G.world;w.rock[3*w.N+3]=1;w.rock[3*w.N+4]=2;f.drag([3,3],[4,3]);f.confirm.emit('mousedown');w.rock[3*w.N+4]=0;G.ui.refreshHarvestRangeControls();f.confirm.emit('click');assert.equal(w.markedRocks.size,0);f.click(f.confirm);assert.equal(w.markedRocks.size,1);
+test('empty and over-cap rectangles discard their selection without partial orders',()=>{
+ const f=harvestFixture(),{G}=f,w=G.world;f.drag([3,3],[4,4]);assert.equal(G.harvestPlan,null);for(let i=0;i<300;i++)w.markedRocks.add(i);w.rock[5*w.N+5]=1;f.drag([5,5],[5,5]);assert.equal(w.markedRocks.size,300);assert.equal(G.harvestPlan,null);
 });
-test('held Enter does not confirm a later range and fresh activation works',()=>{
- const f=harvestFixture(),{G}=f,w=G.world;w.rock[3*w.N+3]=1;w.rock[4*w.N+4]=2;f.drag([3,3],[3,3]);f.confirm.emit('keydown',{key:'Enter'});f.confirm.emit('click');assert.equal(w.markedRocks.size,1);
- G.beginHarvestRange(4,4);G.finishHarvestRange(4,4);G.ui.refreshHarvestRangeControls();f.confirm.emit('keydown',{key:'Enter',repeat:true});f.confirm.emit('click');assert.equal(w.markedRocks.size,1);f.confirm.emit('keyup',{key:'Enter'});f.confirm.emit('keydown',{key:'Enter'});f.confirm.emit('click');assert.equal(w.markedRocks.size,2);
-});
-test('native pointer capture, persistent focus and 44px controls retain boundaries',()=>{
- const f=harvestFixture(true),{G}=f,w=G.world;w.rock[3*w.N+3]=1;f.drag([3,3],[3,3]);f.confirm.focus();f.confirm.emit('pointerdown');G.ui.refreshHarvestRangeControls();assert.equal(f.doc.activeElement,f.confirm);f.confirm.emit('click');assert.equal(w.markedRocks.size,1);assert.match(css,/#harvest-range-controls button[^}]*min-height: 44px/);
-});
-console.log(`Harvest range UI: ${passed} passed (DOM/event fixtures, not real phone validation)`);
+console.log(`Harvest direct input: ${passed} passed (DOM/event fixtures, not real phone validation)`);

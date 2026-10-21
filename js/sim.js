@@ -1558,13 +1558,16 @@ G.arrive = function (c) {
 /* ================= 任务系统 ================= */
 /* 撤销一种玩家采集命令；不撤销护林/清场岗位，也不退工时或已产出的货。
  * 只中止任务路线，回家、休息、送仓保持原样；新派工仍走正常调度。 */
-G.cancelResourceMarks = function (kind) {
+G.cancelResourceMarks = function (kind, selection = null) {
   const result = { marks: 0, active: 0, paused: 0 }, w = G.world;
   if (!w || (kind !== 'trees' && kind !== 'rocks')) return result;
   const marks = kind === 'trees' ? w.marked : w.markedRocks;
   const taskKind = kind === 'trees' ? 'chop' : 'clearrock';
-  if (marks) { result.marks = marks.size; marks.clear(); }
-  const matches = t => t && !t.b && t.kind === taskKind;
+  if (marks) {
+    if (selection) { for (const i of selection) if (marks.delete(i)) result.marks++; }
+    else { result.marks = marks.size; marks.clear(); }
+  }
+  const matches = t => t && !t.b && t.kind === taskKind && (!selection || selection.has(t.ty*w.N+t.tx));
   for (const c of w.citizens) {
     const task = c.task, paused = c.pausedTask;
     if (matches(task)) {

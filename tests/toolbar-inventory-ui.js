@@ -6,7 +6,7 @@ const assert = require('node:assert/strict');
 const {fixture} = require('./helpers/field-ui');
 
 const roadSurfaces = {road: 'dirt', stoneroad: 'stone', bridge: 'bridge', tunnel: 'tunnel'};
-const actions = ['fell', 'quarry', 'demolish'];
+const actions = ['gatherall', 'fell', 'collectstone', 'collectiron', 'cancelremoval', 'demolish'];
 function setup() {
   const f = fixture();
   f.G.ui.initToolbar();
@@ -29,19 +29,19 @@ function selected(f, type) {
 let passed = 0;
 function test(name, fn) { fn(setup()); passed++; console.log('ok', name); }
 
-test('all 31 buildable definitions and three actions appear exactly once in five categories', f => {
+test('all 31 buildable definitions and six actions appear exactly once in five categories', f => {
   const {G, toolbar} = f, buttons = toolbar.querySelectorAll('[data-tool]');
   const buildable = Object.keys(G.BDEF).filter(type => !G.BDEF[type].unbuildable);
   const tools = buttons.map(button => button.dataset.tool);
   assert.equal(buildable.length, 31);
-  assert.equal(buttons.length, 34);
+  assert.equal(buttons.length, 37);
   assert.equal(new Set(tools).size, tools.length);
   assert.deepEqual([...tools].sort(), [...buildable, ...actions].sort());
   assert.deepEqual(Array.from(G.ui.toolGroups, group => [group.id, group.tools.length]),
-    [['homes', 3], ['food', 6], ['industry', 7], ['services', 11], ['land', 7]]);
-  for (const type of ['burntruins', 'mineralpit', 'graveremnant', 'roadwork']) assert(!f.tool(type));
+    [['homes', 3], ['food', 6], ['industry', 7], ['services', 11], ['land', 10]]);
+  for (const type of ['burntruins', 'mineralpit', 'graveremnant', 'roadwork', 'quarry']) assert(!f.tool(type));
   for (const button of buttons) {
-    const name = G.BDEF[button.dataset.tool]?.name || {fell: '砍伐', quarry: '采石采铁', demolish: '拆除'}[button.dataset.tool];
+    const name = G.BDEF[button.dataset.tool]?.name || {gatherall: '采集所有资源', fell: '砍伐', collectstone: '采集石头', collectiron: '采集铁矿', cancelremoval: '取消采集', demolish: '拆除'}[button.dataset.tool];
     assert(button.textContent.includes(name));
     assert(button.getAttribute('title'));
     assert.equal(button.disabled, false);
@@ -135,4 +135,4 @@ test('modal guards keep the active road, category and pending preview unchanged'
   selected(f, 'bridge');
 });
 
-console.log(`Toolbar inventory/routing: ${passed} contract groups passed (34 tools and all 16 road pairs; no browser geometry claim).`);
+console.log(`Toolbar inventory/routing: ${passed} contract groups passed (37 tools and all 16 road pairs; no browser geometry claim).`);

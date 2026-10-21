@@ -47,23 +47,45 @@ async function withinWorkspace(page,selector){
 async function catalog(page,id){
   await click(page,'#open-build');await inside(page,'#toolbar');
   const groups=await page.evaluate(()=>G.ui.toolGroups.map(g=>({id:g.id,tools:[...g.tools]})));
-  const expected=await page.evaluate(()=>[...Object.keys(G.BDEF).filter(t=>!G.BDEF[t].unbuildable),'fell','quarry','demolish'].sort());
+  const expected=await page.evaluate(()=>[...Object.keys(G.BDEF).filter(t=>!G.BDEF[t].unbuildable),'gatherall','fell','collectstone','collectiron','cancelremoval','demolish'].sort());
   const actual=await page.locator('#toolbar [data-tool]').evaluateAll(nodes=>nodes.map(n=>n.dataset.tool).sort());
-  assert.equal(actual.length,34);assert.equal(new Set(actual).size,34);assert.deepEqual(actual,expected);
+  assert.equal(actual.length,37);assert.equal(new Set(actual).size,37);assert.deepEqual(actual,expected);
   const visited=[];
   for(const group of groups){
     await click(page,`[data-category="${group.id}"]`);
     await captured(page,id+'-catalog-'+group.id+'-first');
     for(const type of group.tools){
       const selector=`[data-tool="${type}"]`;
-      await click(page,selector);await page.locator(selector).scrollIntoViewIfNeeded();await withinWorkspace(page,selector);
-      assert(await page.locator(selector+' .lb').isVisible(),type+' needs a visible name');
+      await withinWorkspace(page,selector);
+      assert(await page.locator(selector+' .lb').isVisible(),type+' needs a visible name before selection');
+      await click(page,selector);
       const surfaces={road:'dirt',stoneroad:'stone',bridge:'bridge',tunnel:'tunnel'};
-      const wanted=surfaces[type]?{kind:'road',surface:surfaces[type]}:['fell','quarry','demolish'].includes(type)?{kind:type}:{kind:'build',type};
+      const wanted=surfaces[type]?{kind:'road',surface:surfaces[type]}:['gatherall','fell','collectstone','collectiron','cancelremoval','demolish'].includes(type)?{kind:type}:{kind:'build',type};
       assert.deepEqual(await page.evaluate(()=>G.tool&&JSON.parse(JSON.stringify(G.tool))),wanted);
       assert.equal(await page.locator(selector).getAttribute('aria-pressed'),'true');
-      await page.locator('#jade-build-title').scrollIntoViewIfNeeded();await withinWorkspace(page,'#jade-build-title');
-      await click(page,'#toolbar-cancel');assert.equal(await page.evaluate(()=>G.tool),null);
+      const harvest=['gatherall','fell','collectstone','collectiron','cancelremoval'].includes(type);
+      if(harvest){
+        assert.equal(await page.locator('#toolbar').isVisible(),false);
+        assert.equal(await page.locator('#placement-panel').isVisible(),false);
+        assert.equal(await page.locator('#harvest-confirm').isVisible(),false);
+        assert.equal(await page.locator('#harvest-cancel').isVisible(),false);
+        assert.equal(await page.locator('#toolbar').evaluate(n=>n.inert),true);
+        await inside(page,'#harvest-map-controls');await inside(page,'#harvest-exit');
+        assert.match(await page.locator('#harvest-map-status').textContent(),/松开/);
+        assert.doesNotMatch(await page.locator('#harvest-map-status').textContent(),/确认/);
+        const marks=await page.evaluate(()=>({trees:[...G.world.marked],rocks:[...G.world.markedRocks]}));
+        await captured(page,id+'-collection-'+type);
+        await click(page,'#harvest-exit');
+        assert.deepEqual(await page.evaluate(()=>({trees:[...G.world.marked],rocks:[...G.world.markedRocks]})),marks);
+        assert.equal(await page.locator('#harvest-map-controls').isVisible(),false);
+        assert.equal(await page.locator('#toolbar').evaluate(n=>n.inert),false);
+        await inside(page,'#toolbar');
+      }else{
+        await withinWorkspace(page,selector);
+        await page.locator('#jade-build-title').scrollIntoViewIfNeeded();await withinWorkspace(page,'#jade-build-title');
+        await click(page,'#toolbar-cancel');
+      }
+      assert.equal(await page.evaluate(()=>G.tool),null);
       assert(await page.locator(selector).evaluate(n=>n===document.activeElement));visited.push(type);
     }
     await page.locator(`[data-tool="${group.tools.at(-1)}"]`).scrollIntoViewIfNeeded();

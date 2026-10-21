@@ -93,11 +93,12 @@ window.addEventListener('DOMContentLoaded', () => {
     const group=ui.toolGroups.find(g=>g.id===ui.menuCategory);
     const picture=type||categoryArt[group?.id]||'house';
     if(previousArt!==picture){art.innerHTML=artwork(picture);previousArt=picture;}
-    const name=type?(G.BDEF[type]?.name||({fell:'砍伐',quarry:'采石采铁',demolish:'拆除'}[type]||'道路规划')):group?.name||'建造小镇';
+    const name=type?(G.BDEF[type]?.name||({gatherall:'采集所有资源',fell:'砍伐树木',collectstone:'采集石头',collectiron:'采集铁矿',cancelremoval:'取消采集',quarry:'采石采铁',demolish:'拆除'}[type]||'道路规划')):group?.name||'建造小镇';
     syncSelection();titleLabel.textContent=name;hint.textContent=G.tool?.kind==='build'?'点地图建造':type?'地图选取':'选择一项';
     $('toolbar-cancel').textContent='取消'; $('close-build').textContent='收起';
     // Navigation owns close.hidden; use CSS for the mutually-exclusive action.
     hud.classList.toggle('jade-has-tool',!!type);
+    hud.classList.toggle('is-harvesting', ['gatherall','fell','collectstone','collectiron','cancelremoval','quarry'].includes(type));
     head.dataset.selected=type||'';
     head.dataset.planning=String(!!type && (G.tool.kind!=='build'||type==='cemetery'));
     for(const b of toolbar.querySelectorAll('[data-tool]'))b.title=b.getAttribute('title')||G.BDEF[b.dataset.tool]?.name||b.dataset.tool;

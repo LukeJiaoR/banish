@@ -176,6 +176,11 @@ function fixture() {
   sysButton.setAttribute('aria-label', '保存');
   const toolbar = mount('toolbar', hud), placement = mount('placement-panel', hud);
   mount('placement-info', placement);
+  const harvestStrip=mount('harvest-map-controls',hud,'section','hidden');
+  mount('harvest-map-title',harvestStrip);mount('harvest-map-status',harvestStrip);
+  mount('harvest-exit',harvestStrip,'button');
+  mount('harvest-range-controls',placement,'div','hidden');
+  mount('harvest-cancel',placement,'div','hidden');
   const dock = mount('town-dock', hud);
   for (const id of ['open-town', 'open-build', 'close-build']) mount(id, dock, 'button');
   const town = mount('town-controls', hud); town.hidden = true;
@@ -212,23 +217,23 @@ function fixture() {
   const main=read('js/main.js');
   vm.runInContext(main.slice(main.indexOf('// Ordinary buildings keep'),main.indexOf('G.paintRoad =')),ctx,{filename:'main.js (placement APIs)'});
   const ui = G.ui;
-  ui.el = {hud, toolbar, info, guide};
+  ui.el = {hud, toolbar, info, guide, placement:document.getElementById('placement-info'), harvestCancel:document.getElementById('harvest-cancel')};
   ui.refreshHUD = () => { hudReads++; return 'hud-result'; };
   ui.showInfo = () => info.classList.remove('hidden');
   ui.hideInfo = () => { G.sel = null; info.classList.add('hidden'); };
   const toasts=[];ui.toast=(...args)=>toasts.push(args);
-  for (const name of ['refreshHarvestControls', 'refreshHarvestRangeControls', 'refreshRoadControls',
+  for (const name of ['refreshRoadControls',
     'refreshFarmPlanControls', 'refreshPasturePlanControls', 'refreshOrchardPlanControls', 'refreshCemeteryPlanControls']) ui[name] = () => {};
   G.setTool = type => {
     G.cancelBuildingPlacement();
-    G.tool = type ? ['fell', 'quarry', 'demolish'].includes(type) ? {kind: type} : {kind: 'build', type} : null;
+    G.tool = type ? ['gatherall', 'fell', 'collectstone', 'collectiron', 'cancelremoval', 'quarry', 'demolish'].includes(type) ? {kind: type} : {kind: 'build', type} : null;
     ui.setToolActive();
   };
   let originalCancel;
   // Mirrors main.js: initialization is registered before navigation and jade,
   // but installs toolbar/capture handlers only when DOMContentLoaded fires.
   window.addEventListener('DOMContentLoaded', () => {
-    ui.initToolbar(); ui.refreshToolbarNavigation();
+    ui.initToolbar(); ui.initHarvestRangeControls(); ui.refreshToolbarNavigation();
     originalCancel = document.getElementById('toolbar-cancel');
     sysButton.addEventListener('click', () => { if (!modal) saves++; });
     window.addEventListener('keydown', event => {
@@ -534,5 +539,42 @@ test('focus loss after Enter activation rejects a delayed click against a new si
   confirm.focus(); f.key('Enter'); confirm.click();
   assert.equal(f.G.world.buildings.length,2);
 });
+
+test('collection catalogue separates resource types and omits legacy combined mining', f => {
+  const tools=f.ui.toolGroups.flatMap(group=>group.tools);
+  for(const type of ['gatherall','fell','collectstone','collectiron','cancelremoval']) assert(tools.includes(type));
+  assert(!tools.includes('quarry'));
+});
+for(const type of ['gatherall','fell','collectstone','collectiron','cancelremoval']) test(type+' uses map strip with no detail page and Exit restores tool focus',f=>{
+  f.get('open-build').click();f.ui.openToolCategory('land');
+  const button=f.toolbar.querySelector(`[data-tool="${type}"]`);button.focus();button.click();
+  assert.equal(f.G.tool.kind,type);
+  assert(f.hud.classList.contains('is-harvesting'));
+  assert.equal(f.toolbar.inert,true);
+  assert(!f.get('harvest-map-controls').classList.contains('hidden'));
+  assert(f.get('harvest-range-controls').classList.contains('hidden'));
+  assert(f.get('harvest-cancel').classList.contains('hidden'));
+  assert.equal(f.document.activeElement,f.get('harvest-exit'));
+  assert.match(f.get('harvest-map-status').textContent,/松开/);
+  assert.doesNotMatch(f.get('harvest-map-status').textContent,/确认/);
+  for(let i=0;i<20;i++)f.ui.refreshHarvest();
+  assert(f.get('placement-info').classList.contains('hidden'));
+  f.modal(true);f.get('harvest-exit').click();assert.equal(f.G.tool.kind,type);
+  f.modal(false);f.get('harvest-exit').click();
+  assert.equal(f.G.tool,null);assert.equal(f.toolbar.inert,false);
+  assert(!f.hud.classList.contains('is-harvesting'));
+  assert(f.get('harvest-map-controls').classList.contains('hidden'));
+  assert.equal(f.document.activeElement,button);
+});
+test('switching collection to a building restores normal workspace',f=>{
+  f.get('open-build').click();f.ui.openToolCategory('land');f.G.setTool('collectiron');
+  f.ui.openToolCategory('homes');f.G.setTool('house');
+  assert.equal(f.G.tool.type,'house');assert(!f.hud.classList.contains('is-harvesting'));
+  assert.equal(f.toolbar.inert,false);assert(f.get('harvest-map-controls').classList.contains('hidden'));
+});
+const mapCss=read('styles/harvest-map.css');
+assert.match(mapCss,/#hud\.is-harvesting #toolbar,[\s\S]*?display:none !important/);
+assert.match(mapCss,/#harvest-map-controls button[^}]*min-height:44px/);
+assert(html.indexOf('styles/harvest-map.css')>html.indexOf('styles/desktop-workspace.css'));
 
 console.log(`Jade composition: ${passed} behavioral groups passed (real toolbar/navigation/layout scripts; minimal DOM, no browser hit-testing).`);

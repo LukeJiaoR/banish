@@ -6,14 +6,15 @@ const path = require('node:path');
 const { loadGame } = require('./helpers/playability');
 const G = loadGame(path.resolve(__dirname, '..'));
 global.window = global; global.G = G;
-global.document = { getElementById() { return null; }, addEventListener() {} };
+const nodes=new Map();
+global.document = { getElementById(id) { return nodes.get(id)||null; }, addEventListener() {} };
 require('../js/ui.js');
 const guide = G.ui.refreshGuide, refreshHarvest = G.ui.refreshHarvest, refreshPlacement = G.ui.refreshPlacement;
 const renderInfo = G.ui.renderInfo, escHtml = G.ui.escHtml;
 const heatDemand = G.ui.heatDemand, citizenStatus = G.ui.citizenStatus;
 const realUi = G.ui;
 G.ui = { ...realUi, heatDemand, citizenStatus, toast() {}, refreshHUD() {}, hideInfo() {}, setToolActive() {},
-  toggleHelp() {}, refreshHarvestRangeControls() {} };
+  toggleHelp() {} };
 let passed = 0;
 function fresh() {
   G.newGame(44);
@@ -23,7 +24,9 @@ function fresh() {
   w.citizens = []; w.cmap = {}; w.families = [];
   w.buildings = []; w.bmap = {};
   G.game.h = 12; G.game.res.wood = 0; G.tool = { kind: 'fell' };
-  G.ui.el = { guide: { textContent: '' }, placement: { textContent: '', dataset: {}, classList: { remove() {}, add() {} } } };
+  const element=()=>{const classes=new Set();return {textContent:'',dataset:{},contains(){return false;},classList:{add(v){classes.add(v)},remove(v){classes.delete(v)},toggle(v,on){if(on)classes.add(v);else classes.delete(v)},contains(v){return classes.has(v)}}};};
+  for(const id of ['hud','harvest-map-controls','harvest-map-title','harvest-map-status','harvest-range-controls'])nodes.set(id,element());
+  G.ui.el = { guide: { textContent: '' }, placement: element() };
   return w;
 }
 function adult(w, options = {}) {
@@ -89,20 +92,21 @@ test('night-time feedback does not diagnose pending marks as unreachable', w => 
   assert.match(G.harvestFeedback().reason, /夜间休息/);
   assert.doesNotMatch(G.harvestFeedback().reason, /不可达/);
 });
-test('render feedback never pathfinds and dates reachability as a previous check', w => {
-  tree(w); adult(w); w.markReachability = { day: 0, h: 10, total: 1, count: 0, unreachable: 1 };
-  const findPath = G.findPath; G.findPath = () => { throw Error('UI must not pathfind'); };
-  try { refreshHarvest.call(G.ui); } finally { G.findPath = findPath; }
-  const text = G.ui.el.placement.textContent;
-  assert.match(text, /框选预览并确认/); assert.match(text, /最近派工检查/); assert.match(text, /第 1 天 10 时/);
-  assert.match(text, /变化后待复查/); assert.match(text, /已画下的标记仍会执行/);
+test('map instruction never pathfinds or opens the old detail page',w=>{
+  tree(w);adult(w);w.markReachability={day:0,h:10,total:1,count:0,unreachable:1};
+  const old=G.findPath;G.findPath=()=>{throw Error('UI must not pathfind')};
+  try{refreshHarvest.call(G.ui)}finally{G.findPath=old}
+  assert(G.ui.el.placement.classList.contains('hidden'));
+  assert.match(nodes.get('harvest-map-status').textContent,/松开下达采集任务/);
+  assert.doesNotMatch(nodes.get('harvest-map-status').textContent,/确认/);
+  assert.equal(w.markReachability.unreachable,1);
 });
 test('switching build to harvest and back rebuilds placement feedback at the same tile', () => {
   const placementInfo = G.placementInfo; let calls = 0;
   G.placementInfo = () => ({ ok: true, text: 'build preview ' + ++calls });
   try {
     refreshPlacement.call(G.ui, 'farm', 10, 10); assert.equal(calls, 1);
-    refreshHarvest.call(G.ui); assert.match(G.ui.el.placement.textContent, /框选预览并确认/);
+    refreshHarvest.call(G.ui); assert(G.ui.el.placement.classList.contains('hidden'));
     refreshPlacement.call(G.ui, 'farm', 10, 10); assert.equal(calls, 2);
     assert.equal(G.ui.el.placement.textContent, 'build preview 2');
   } finally { G.placementInfo = placementInfo; }
@@ -110,7 +114,7 @@ test('switching build to harvest and back rebuilds placement feedback at the sam
 test('an idle carrier is shown as waiting to deliver with the exact cargo quantity', w => {
   const c = adult(w, { name: '搬工', sex: 'm', age: 30, hunger: 0, cold: 0, familyId: null, carry: { type: 'wood', qty: 2 } });
   G.sel = { kind: 'c', id: c.id };
-  G.ui.el.info = { innerHTML: '', querySelectorAll() { return []; } }; G.ui.escHtml = escHtml;
+  G.ui.el.info = { innerHTML: '', classList:{add(){},toggle(){}}, querySelector(){return null;}, querySelectorAll() { return []; } }; G.ui.escHtml = escHtml;
   const document = global.document;
   global.document = { getElementById() { return { addEventListener() {} }; } };
   try { renderInfo.call(G.ui); } finally { global.document = document; }
@@ -126,18 +130,18 @@ test('food forest overlay uses exact square production bounds and clips the map'
   G.drawFoodForestBounds(ctx);
   assert.equal(vertices.length, 8); assert.deepEqual(vertices[0], G.T2S(0, 0)); assert.deepEqual(vertices[2], G.T2S(r + 2, r + 2));
 });
-test('help describes the implemented rectangle preview and explicit confirmation', () => {
+test('help describes direct rectangle release without confirmation', () => {
   const html = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
-  assert.match(html, /鼠标拖出矩形或手机点两个角预览，再确认标记树木/); assert.doesNotMatch(html, /拖拽沿线标记树木/);
+  assert.match(html, /松开.*下达|松开.*标记|松开.*执行/); assert.doesNotMatch(html, /拖拽沿线标记树木/);
 });
 test('full mineral cargo is explained without pathfinding or changing inventory', w => {
   G.tool = {kind:'quarry'}; G.game.res.stone=500;
   const c=adult(w,{carry:{type:'stone',qty:9},state:'waitStorage',haulPending:true,haulWait:'space'});
   const old=G.findPath;G.findPath=()=>{throw Error('feedback must not pathfind')};
-  try {const before=JSON.stringify({res:G.game.res,c});const h=G.harvestFeedback();assert.equal(h.blockedMineralCarriers,1);assert.equal(h.carry.stone,9);assert.match(citizenStatus(c),/仓满.*等待空间/);refreshHarvest.call(G.ui);assert.match(G.ui.el.placement.textContent,/使用石铁库存或建成新仓库/);assert.equal(JSON.stringify({res:G.game.res,c}),before);}finally{G.findPath=old}
+  try {const before=JSON.stringify({res:G.game.res,c});const h=G.harvestFeedback();assert.equal(h.blockedMineralCarriers,1);assert.equal(h.carry.stone,9);assert.match(citizenStatus(c),/仓满.*等待空间/);refreshHarvest.call(G.ui);assert(G.ui.el.placement.classList.contains('hidden'));assert.equal(JSON.stringify({res:G.game.res,c}),before);}finally{G.findPath=old}
 });
 test('full mineral marks report storage cause rather than idle/path failure', w => {
   G.tool={kind:'quarry'};G.game.res.iron=500;const i=w.rock.findIndex(v=>v===2);assert(i>=0);w.markedRocks.add(i);adult(w);
-  const h=G.harvestFeedback();assert.equal(h.blockedMineralMarks,1);assert.match(h.reason,/仓位已满/);refreshHarvest.call(G.ui);assert.match(G.ui.el.placement.textContent,/另一未满矿种仍可采/);
+  const h=G.harvestFeedback();assert.equal(h.blockedMineralMarks,1);assert.match(h.reason,/仓位已满/);refreshHarvest.call(G.ui);assert(G.ui.el.placement.classList.contains('hidden'));
 });
 console.log(`Harvest feedback: ${passed} checks passed (headless fixtures and renderer contracts only).`);
