@@ -1,0 +1,199 @@
+{
+  "baseline": "97bb129",
+  "rendererSha256": "2d716bacb061f75ab07606481190955352e1ad8d1a45b833f2061879866d5260",
+  "engine": "offline production Canvas, not browser/device",
+  "cases": [
+    {
+      "fixture": "real",
+      "season": 1,
+      "narrow": false,
+      "zoom": 1,
+      "choice": "baseline",
+      "name": "real-s1-desktop-baseline.png"
+    },
+    {
+      "fixture": "real",
+      "season": 1,
+      "narrow": false,
+      "zoom": 1,
+      "choice": "candidate",
+      "name": "real-s1-desktop-candidate.png"
+    },
+    {
+      "fixture": "real",
+      "season": 1,
+      "narrow": true,
+      "zoom": 0.55,
+      "choice": "baseline",
+      "name": "real-s1-narrow-baseline.png"
+    },
+    {
+      "fixture": "real",
+      "season": 1,
+      "narrow": true,
+      "zoom": 0.55,
+      "choice": "candidate",
+      "name": "real-s1-narrow-candidate.png"
+    },
+    {
+      "fixture": "real",
+      "season": 3,
+      "narrow": false,
+      "zoom": 1,
+      "choice": "baseline",
+      "name": "real-s3-desktop-baseline.png"
+    },
+    {
+      "fixture": "real",
+      "season": 3,
+      "narrow": false,
+      "zoom": 1,
+      "choice": "candidate",
+      "name": "real-s3-desktop-candidate.png"
+    },
+    {
+      "fixture": "real",
+      "season": 3,
+      "narrow": true,
+      "zoom": 0.55,
+      "choice": "baseline",
+      "name": "real-s3-narrow-baseline.png"
+    },
+    {
+      "fixture": "real",
+      "season": 3,
+      "narrow": true,
+      "zoom": 0.55,
+      "choice": "candidate",
+      "name": "real-s3-narrow-candidate.png"
+    },
+    {
+      "fixture": "stress",
+      "season": 1,
+      "narrow": false,
+      "zoom": 1,
+      "choice": "baseline",
+      "name": "stress-s1-desktop-baseline.png"
+    },
+    {
+      "fixture": "stress",
+      "season": 1,
+      "narrow": false,
+      "zoom": 1,
+      "choice": "candidate",
+      "name": "stress-s1-desktop-candidate.png"
+    },
+    {
+      "fixture": "stress",
+      "season": 1,
+      "narrow": true,
+      "zoom": 0.55,
+      "choice": "baseline",
+      "name": "stress-s1-narrow-baseline.png"
+    },
+    {
+      "fixture": "stress",
+      "season": 1,
+      "narrow": true,
+      "zoom": 0.55,
+      "choice": "candidate",
+      "name": "stress-s1-narrow-candidate.png"
+    },
+    {
+      "fixture": "stress",
+      "season": 3,
+      "narrow": false,
+      "zoom": 1,
+      "choice": "baseline",
+      "name": "stress-s3-desktop-baseline.png"
+    },
+    {
+      "fixture": "stress",
+      "season": 3,
+      "narrow": false,
+      "zoom": 1,
+      "choice": "candidate",
+      "name": "stress-s3-desktop-candidate.png"
+    },
+    {
+      "fixture": "stress",
+      "season": 3,
+      "narrow": true,
+      "zoom": 0.55,
+      "choice": "baseline",
+      "name": "stress-s3-narrow-baseline.png"
+    },
+    {
+      "fixture": "stress",
+      "season": 3,
+      "narrow": true,
+      "zoom": 0.55,
+      "choice": "candidate",
+      "name": "stress-s3-narrow-candidate.png"
+    },
+    {
+      "fixture": "tunnel",
+      "season": 1,
+      "narrow": false,
+      "zoom": 1,
+      "choice": "baseline",
+      "name": "tunnel-s1-desktop-baseline.png"
+    },
+    {
+      "fixture": "tunnel",
+      "season": 1,
+      "narrow": false,
+      "zoom": 1,
+      "choice": "candidate",
+      "name": "tunnel-s1-desktop-candidate.png"
+    },
+    {
+      "fixture": "tunnel",
+      "season": 1,
+      "narrow": true,
+      "zoom": 0.55,
+      "choice": "baseline",
+      "name": "tunnel-s1-narrow-baseline.png"
+    },
+    {
+      "fixture": "tunnel",
+      "season": 1,
+      "narrow": true,
+      "zoom": 0.55,
+      "choice": "candidate",
+      "name": "tunnel-s1-narrow-candidate.png"
+    },
+    {
+      "fixture": "tunnel",
+      "season": 3,
+      "narrow": false,
+      "zoom": 1,
+      "choice": "baseline",
+      "name": "tunnel-s3-desktop-baseline.png"
+    },
+    {
+      "fixture": "tunnel",
+      "season": 3,
+      "narrow": false,
+      "zoom": 1,
+      "choice": "candidate",
+      "name": "tunnel-s3-desktop-candidate.png"
+    },
+    {
+      "fixture": "tunnel",
+      "season": 3,
+      "narrow": true,
+      "zoom": 0.55,
+      "choice": "baseline",
+      "name": "tunnel-s3-narrow-baseline.png"
+    },
+    {
+      "fixture": "tunnel",
+      "season": 3,
+      "narrow": true,
+      "zoom": 0.55,
+      "choice": "candidate",
+      "name": "tunnel-s3-narrow-candidate.png"
+    }
+  ]
+}

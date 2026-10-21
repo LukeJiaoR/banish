@@ -1,0 +1,85 @@
+{
+  "node": "v24.19.0",
+  "candidateSha256": "2d716bacb061f75ab07606481190955352e1ad8d1a45b833f2061879866d5260",
+  "baseline": "97bb129",
+  "warmGeometryCallsPerTrial": 0,
+  "pickCallsPerTrial": 20000,
+  "trials": 7,
+  "cases": [
+    {
+      "seed": 0,
+      "baseline": {
+        "tiles": 3808,
+        "boundaryTiles": 939,
+        "faces": 8243,
+        "geometryCalls": 38080,
+        "coldAllTilesMs": 104.92878700000006,
+        "warmGeometryMs": 77.48047799999995,
+        "pick20000Ms": 1001.5096269999999,
+        "pickMicroseconds": 50.07548134999999,
+        "sink": 9368384.101249965
+      },
+      "reviewed": {
+        "tiles": 3808,
+        "boundaryTiles": 939,
+        "faces": 8820,
+        "geometryCalls": 38080,
+        "coldAllTilesMs": 137.5610859999997,
+        "warmGeometryMs": 26.8834480000005,
+        "pick20000Ms": 883.1510429999998,
+        "pickMicroseconds": 44.157552149999994,
+        "sink": 9370082.654999962
+      }
+    },
+    {
+      "seed": 1,
+      "baseline": {
+        "tiles": 4672,
+        "boundaryTiles": 891,
+        "faces": 9959,
+        "geometryCalls": 46720,
+        "coldAllTilesMs": 115.65139500000078,
+        "warmGeometryMs": 101.35073600000032,
+        "pick20000Ms": 1009.0184010000012,
+        "pickMicroseconds": 50.450920050000065,
+        "sink": 9121341.874999909
+      },
+      "reviewed": {
+        "tiles": 4672,
+        "boundaryTiles": 891,
+        "faces": 10616,
+        "geometryCalls": 46720,
+        "coldAllTilesMs": 133.42659000000276,
+        "warmGeometryMs": 32.558295999999245,
+        "pick20000Ms": 856.5666249999995,
+        "pickMicroseconds": 42.82833124999998,
+        "sink": 9122494.987499919
+      }
+    },
+    {
+      "seed": 42,
+      "baseline": {
+        "tiles": 3318,
+        "boundaryTiles": 580,
+        "faces": 7049,
+        "geometryCalls": 33180,
+        "coldAllTilesMs": 79.76321899999311,
+        "warmGeometryMs": 66.27248399999371,
+        "pick20000Ms": 941.901128999998,
+        "pickMicroseconds": 47.0950564499999,
+        "sink": 7293319.836250133
+      },
+      "reviewed": {
+        "tiles": 3318,
+        "boundaryTiles": 580,
+        "faces": 7409,
+        "geometryCalls": 33180,
+        "coldAllTilesMs": 102.00769099999889,
+        "warmGeometryMs": 23.310010000001057,
+        "pick20000Ms": 830.4865430000063,
+        "pickMicroseconds": 41.52432715000032,
+        "sink": 7294540.912500125
+      }
+    }
+  ]
+}

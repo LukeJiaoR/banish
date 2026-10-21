@@ -87,16 +87,52 @@ G.mountainCornerHeight = function(w,x,y) {
   const ripple=Math.min(1,inset/1.5)*(18*Math.sin(x*.73+phase)*Math.cos(y*.51+phase)+9*Math.sin(x*.31-y*.67));
   heights[i]=Math.max(3,Math.min(G.MOUNTAIN_MAX_RISE,3+24*Math.pow(inset,.82)+ripple));return heights[i];
 };
-G.mountainPolygons = function(w,x,y) {
+// Presentation-only boundary relaxation. All tile centers and the authoritative
+// mountain array stay fixed; shared grid vertices are cached once per world.
+G.mountainContours = new WeakMap();
+G.mountainContourVertices = function(w){
+  const heights=G.mountainHeights.get(w);let cached=G.mountainContours.get(w);
+  if(cached&&cached.heights===heights)return cached.vertices;
+  const vertices=new Map(),counts=new Map();
+  const routes=G.coastPresentation.boundaryPaths({N:w.N,water:w.mountain},true);
+  const key=p=>p[0]+','+p[1];
+  for(const r of routes)for(const p of r.points)counts.set(key(p),(counts.get(key(p))||0)+1);
+  for(const r of routes)for(let i=0;i<r.points.length;i++){
+    const p=r.points[i],k=key(p);if(counts.get(k)>1||p[0]===0||p[1]===0||p[0]===w.N||p[1]===w.N)continue;
+    const a=r.points[(i+r.points.length-1)%r.points.length],b=r.points[(i+1)%r.points.length];
+    vertices.set(k,[(a[0]+2*p[0]+b[0])/4,(a[1]+2*p[1]+b[1])/4]);
+  }
+  G.mountainContours.set(w,{heights,vertices});return vertices;
+};
+G.makeMountainPolygons = function(w,x,y) {
   if(!G.isMountain||!G.isMountain(w,x,y))return [];
   const [sx,sy]=G.T2S(x,y),heights=[[x,y],[x+1,y],[x+1,y+1],[x,y+1]].map(([xx,yy])=>G.mountainCornerHeight(w,xx,yy));
-  const top=[[sx,sy-heights[0]],[sx+32,sy+16-heights[1]],[sx,sy+32-heights[2]],[sx-32,sy+16-heights[3]]];
+  const corners=[[x,y],[x+1,y],[x+1,y+1],[x,y+1]],vertices=G.mountainContourVertices(w);
+  const ground=corners.map(p=>G.T2S(...(vertices.get(p[0]+','+p[1])||p)));
+  const top=ground.map((p,i)=>[p[0],p[1]-heights[i]]);
+  const moved=corners.some((p,i)=>{const q=G.T2S(...p);return q[0]!==ground[i][0]||q[1]!==ground[i][1];});
   const out=[];
-  if(!G.isMountain(w,x,y+1))out.push({kind:'left',points:[top[3],top[2],[sx,sy+32],[sx-32,sy+16]]});
-  if(!G.isMountain(w,x+1,y))out.push({kind:'right',points:[top[2],top[1],[sx+32,sy+16],[sx,sy+32]]});
+  // Original rocky footprint remains visible at reduced contrast; its exact
+  // ground polygon also owns hover/picking when the relaxed ridge recedes.
+  if(moved)out.push({kind:'toe',points:corners.map(p=>G.T2S(...p))});
+  if(!G.isMountain(w,x,y+1))out.push({kind:'left',points:[top[3],top[2],ground[2],ground[3]]});
+  if(!G.isMountain(w,x+1,y))out.push({kind:'right',points:[top[2],top[1],ground[1],ground[2]]});
   out.push({kind:'topX',points:[top[0],top[1],top[2]],heights:[heights[0],heights[1],heights[2]]});
   out.push({kind:'topY',points:[top[0],top[2],top[3]],heights:[heights[0],heights[2],heights[3]]});
   return out;
+};
+G.mountainMeshes = new WeakMap();
+G.mountainPolygons = function(w,x,y){
+  if(!G.isMountain(w,x,y))return [];
+  G.mountainCornerHeight(w,x,y);
+  const heights=G.mountainHeights.get(w);let mesh=G.mountainMeshes.get(w);
+  if(!mesh||mesh.heights!==heights){mesh={heights,tiles:new Map()};G.mountainMeshes.set(w,mesh);}
+  const key=y*w.N+x;let faces=mesh.tiles.get(key);
+  if(!faces){
+    faces=G.makeMountainPolygons(w,x,y).filter(f=>Math.abs(f.points.reduce((a,p,i)=>{const q=f.points[(i+1)%f.points.length];return a+p[0]*q[1]-q[0]*p[1];},0))>1e-7);
+    mesh.tiles.set(key,faces);
+  }
+  return faces;
 };
 G.mountainPolygonPath = function(ctx,points) {
   ctx.beginPath();points.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.closePath();
@@ -143,12 +179,19 @@ G.mountainMaterialTransform = function(points,uv) {
 G.drawMountain = function(ctx,w,x,y) {
   const snowy=G.game.season===3,name=snowy?'mountain_rock_snow':'mountain_rock',im=G.SPR&&G.SPR.get(name);
   const faces=G.mountainPolygons(w,x,y),tops=faces.filter(f=>f.kind.startsWith('top'));
+  const toe=faces.find(f=>f.kind==='toe');
+  if(toe){
+    ctx.save();G.mountainPolygonPath(ctx,toe.points);ctx.clip();ctx.globalAlpha=.48;
+    const [sx,sy]=G.T2S(x,y);ctx.fillStyle=(im?.width&&ctx.createPattern?ctx.createPattern(im,'repeat'):null)||(snowy?'#a99b83':'#a3957d');
+    ctx.fillRect(sx-32,sy,64,32);ctx.restore();
+  }
   // One continuous backing prevents separately antialiased texture triangles
   // revealing the winter ground through their shared diagonal. Exact vertices,
   // no stroke expansion: this does not paint outside the picked footprint.
   const backing=snowy?'#a99b83':'#a3957d';
   if(tops.length===2){G.mountainPolygonPath(ctx,[tops[0].points[0],tops[0].points[1],tops[0].points[2],tops[1].points[2]]);ctx.fillStyle=backing;ctx.fill();}
   for(const face of faces){
+    if(face.kind==='toe')continue;
     ctx.save();G.mountainPolygonPath(ctx,face.points);ctx.clip();
     ctx.fillStyle=backing;ctx.fill();
     if(face.kind.startsWith('top')){
