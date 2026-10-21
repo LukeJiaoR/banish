@@ -1,0 +1,31 @@
+PASS all 2x2 configurations, diagonal chains and map edges preserve tile centers and bounded vertices
+PASS point-touching components remain separate and no shared vertex moves into a diagonal gap
+PASS cached shared facets have nonzero area and reset with world/height invalidation
+PASS visible retained rock toe owns receded blocked corners at desktop and zoom-out scales
+PASS default toe fallback is visible without assets and hover exposes original blocked diamond
+Mountain contour: 5 groups passed
+{
+  masks: 1533,
+  faces: 28644,
+  ownershipSamples: 118632,
+  removedDegenerateSides: 364,
+  minGroundCellArea: 0.25
+}
+ok isolated mountain retains full rocky64x32 toe, rounded top and both front sides
+ok continuous neighboring ridge removes internal side walls without changing collision
+ok visible top and side centroids select their actual blocked tile under all camera scales
+ok overlapping raised faces pick the last depth-painted mountain, not hidden ground
+ok flat classic maps preserve the plane inverse exactly
+ok warm/winter rendering uses original generated texture names and never changes world state
+ok contiguous ridge rises inward and shares exact neighboring edge vertices without collision edits
+ok actual seed-zero map edge and interior surfaces match exhaustive painter-order hit ownership
+ok new opaque256px textures are loaded by production sprite manifest
+ok warm-art revision keeps low perimeter and underpaints the exact shared top before texture clips
+Mountain render: 10 offline suites passed.
+ok existing mountain polygons and authoritative mask remain byte-identical around completion
+ok construction draws crossed timber rather than a completed dark mouth
+ok actual portal polygons own their visible mouth pointer hits at all ordinary camera scales
+ok underground citizens are hidden without changing their physical coordinates or cargo
+ok mouth positions remain inside their reserved tile and scale with the two-to-one projection
+ok drawing an unselected tunnel adds no A/B text or axis guide, selected guide is read-only
+Tunnel render: 6 offline suites passed.

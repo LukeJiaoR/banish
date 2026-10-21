@@ -43,3 +43,7 @@ A subsequent local candidate addresses the visible stepped shore and regular rid
 ## 2026-10-21 winter continuity candidate
 
 After merged #120, a bounded [winter shoreline candidate](winter-shore.md) reuses the unchanged alpha-edged ice over an opaque winter-water backing, so winter can share the same curved coast. Its new evidence is separate from the historical #120 report. It preserves nonwinter scene pixels and does not close the broader #87 art issue.
+
+## 2026-10-21 mountain contour candidate
+
+After #121, a bounded [shared mountain-contour candidate](mountain-contour.md) relaxes component boundaries while retaining tile-owned depth, original blocked rock toes and shared picking. Actual generated terrain and minimum-zoom winter comparisons accompany independent topology and cost checks. It does not change map generation/collision/save data or close #87.
