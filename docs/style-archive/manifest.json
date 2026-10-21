@@ -1,0 +1,122 @@
+{
+  "schemaVersion": 1,
+  "statusDefinitions": {
+    "adopted": "Explicitly chosen within approvedScope only.",
+    "proposed": "Generated candidate awaiting user decision.",
+    "reference": "Retained historical/reference experiment; not adopted."
+  },
+  "entries": [
+    {
+      "id": "banish-ui-a-visual-baseline",
+      "title": "A · 青玉轻界面",
+      "version": "original",
+      "path": "docs/ui-reference/selected-a.png",
+      "decisionStatus": "adopted",
+      "approvedScope": "已采用视觉方向基准；不代表新整套布局、实现或浏览器验收已获采用。",
+      "source": {
+        "kind": "original-generated-concept",
+        "record": "docs/ui-reference/README.md",
+        "promptAvailability": "Original exact prompt was not retained; do not reconstruct."
+      },
+      "limitations": [
+        "概念图，不是游戏截图。",
+        "保持现有同侧工作区、完整工具目录及真实玩法语义；示意数字不定义玩法。"
+      ],
+      "sha256": "cad13e5d332baa8358faf837e8160ffd6aafb9dfdebc321d506f8c696702cb97",
+      "sizeBytes": 3215680,
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "issue": "https://github.com/LukeJiaoR/banish/issues/87",
+      "archivedOn": "2026-10-21"
+    },
+    {
+      "id": "banish-ui-a-suite-v1-page1",
+      "title": "A 风格整套界面方案 第一版 第1页",
+      "version": "1.0",
+      "path": "docs/style-archive/proposed/ui-v1/concept-board-v1.png",
+      "decisionStatus": "proposed",
+      "approvedScope": "仅授权生成、归档与评审；尚未采用布局或作为生产切图。",
+      "source": {
+        "kind": "image_gen",
+        "references": [
+          "banish-ui-a-visual-baseline"
+        ],
+        "prompt": "docs/style-archive/proposed/ui-v1/generation-prompts.json#page1"
+      },
+      "limitations": [
+        "竖屏分图纵横比不正确，须修订。",
+        "图中文字、图标、数值为概念展示，不是可直接投产资源或功能承诺。",
+        "不是运行截图。"
+      ],
+      "sha256": "1f9645dcc3f8a0e4342de230fb036866d857548c4b24f15f5c67ad80ee1f5557",
+      "sizeBytes": 3511309,
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "issue": "https://github.com/LukeJiaoR/banish/issues/87",
+      "archivedOn": "2026-10-21"
+    },
+    {
+      "id": "banish-ui-a-suite-v1-page2",
+      "title": "A 风格整套界面方案 第一版 第2页",
+      "version": "1.0",
+      "path": "docs/style-archive/proposed/ui-v1/concept-board-v1-page2.png",
+      "decisionStatus": "proposed",
+      "approvedScope": "仅授权生成、归档与评审；尚未采用布局或作为生产切图。",
+      "source": {
+        "kind": "image_gen",
+        "references": [
+          "banish-ui-a-visual-baseline",
+          "banish-ui-a-suite-v1-page1"
+        ],
+        "prompt": "docs/style-archive/proposed/ui-v1/generation-prompts.json#page2"
+      },
+      "limitations": [
+        "菜单、设置和用工数值仅示意，不自动成为新增功能承诺。",
+        "提示词 approved-direction 仅指 A 的视觉方向，不是用户批准第1页。",
+        "不是运行截图或最终切图。"
+      ],
+      "sha256": "ff8a41f8b5cf9f6c4e4b548d07b6c4e4023a1b634d4721eaa1ab113946d83cf7",
+      "sizeBytes": 2943819,
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "issue": "https://github.com/LukeJiaoR/banish/issues/87",
+      "archivedOn": "2026-10-21"
+    },
+    {
+      "id": "banish-ui-a-bitmap-surface-trial",
+      "title": "A 原图局部切图试验（仅参考）",
+      "version": "last-unpublished-review",
+      "path": "docs/style-archive/reference/bitmap-surface-trial/preview.png",
+      "decisionStatus": "reference",
+      "approvedScope": "仅归档局部切图试验及审阅结论，不接入游戏、不视为采用。",
+      "source": {
+        "kind": "offline-pixel-mock",
+        "references": [
+          "banish-ui-a-visual-baseline"
+        ],
+        "cropRecord": "docs/style-archive/reference/bitmap-surface-trial/source-crops.json"
+      },
+      "limitations": [
+        "保留预览仅含 paper、card、card-selected 三片。",
+        "整面板因横向明暗带未通过；象牙按钮因竖向明暗块未通过；青玉按钮因右侧14px接缝未通过。",
+        "普通卡片右边界已从 x512 修到 x518；局部通过不等于全套 UI 采用。",
+        "较新的完整 UI 方案方向取代该局部试切交付路线。",
+        "不是浏览器截图。"
+      ],
+      "sha256": "efde050b96cfff5de48648bcd7866aa92e4e4854871ea2a1c9ab8e6bbcb42983",
+      "sizeBytes": 33943,
+      "dimensions": [
+        1024,
+        650
+      ],
+      "issue": "https://github.com/LukeJiaoR/banish/issues/87",
+      "archivedOn": "2026-10-21"
+    }
+  ]
+}

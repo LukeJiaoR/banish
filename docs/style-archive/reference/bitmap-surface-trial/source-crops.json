@@ -1,0 +1,148 @@
+{
+  "source": "docs/ui-reference/selected-a.png",
+  "sha256": "cad13e5d332baa8358faf837e8160ffd6aafb9dfdebc321d506f8c696702cb97",
+  "assets": {
+    "paper": {
+      "crop": [
+        1288,
+        600,
+        1320,
+        632
+      ],
+      "size": [
+        32,
+        32
+      ]
+    },
+    "card": {
+      "patches": [
+        [
+          403,
+          863,
+          413,
+          873
+        ],
+        [
+          414,
+          863,
+          424,
+          873
+        ],
+        [
+          508,
+          863,
+          518,
+          873
+        ],
+        [
+          403,
+          944,
+          413,
+          954
+        ],
+        [
+          416,
+          866,
+          420,
+          870
+        ],
+        [
+          508,
+          944,
+          518,
+          954
+        ],
+        [
+          403,
+          965,
+          413,
+          975
+        ],
+        [
+          414,
+          965,
+          424,
+          975
+        ],
+        [
+          508,
+          965,
+          518,
+          975
+        ]
+      ],
+      "slice": 10,
+      "size": [
+        30,
+        30
+      ],
+      "alpha": "rounded exterior only; source RGB unchanged",
+      "sampling": "selected vertical strips nearest; other smaller patches tiled"
+    },
+    "card-selected": {
+      "patches": [
+        [
+          282,
+          863,
+          292,
+          873
+        ],
+        [
+          298,
+          863,
+          308,
+          873
+        ],
+        [
+          385,
+          863,
+          395,
+          873
+        ],
+        [
+          282,
+          873,
+          292,
+          965
+        ],
+        [
+          288,
+          873,
+          291,
+          965
+        ],
+        [
+          385,
+          873,
+          395,
+          965
+        ],
+        [
+          282,
+          965,
+          292,
+          975
+        ],
+        [
+          298,
+          965,
+          308,
+          975
+        ],
+        [
+          385,
+          965,
+          395,
+          975
+        ]
+      ],
+      "slice": 10,
+      "size": [
+        30,
+        30
+      ],
+      "alpha": "rounded exterior only; source RGB unchanged",
+      "sampling": "selected vertical strips nearest; other smaller patches tiled"
+    }
+  }
+}
