@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <base href="../../"><title>归园 · Canvas / Pixi 渲染实验</title>
+  <link rel="stylesheet" href="experiments/render-compare/style.css">
+</head>
+<body>
+<header><p class="eyebrow">归园 / 独立渲染实验</p><h1>同一片山林，两条渲染路径</h1><p>锁定地图、相机和素材。Pixi 原生精灵与山体网格；地面沿用一次性静态缓存。此页不会读取或写入游戏存档。</p></header>
+<section class="controls" aria-label="实验设置">
+  <label>种子 <input id="seed" value="0" type="number" min="-2147483648" max="4294967295" step="1"></label>
+  <label>地图 <select id="size"><option>128</option><option>192</option></select></label>
+  <label>季节 <select id="season"><option value="1">夏</option><option value="3">冬</option></select></label>
+  <button id="rebuild" disabled>重建固定场景</button>
+  <label>相机 <select id="camera"><option value="village">起始小镇</option><option value="ridge" selected>山林边缘</option><option value="overview">全图</option><option value="pan-zoom">平移与缩放</option></select></label>
+  <label>路径 <input id="step" type="range" min="0" max="100" value="0"></label>
+  <button id="benchmark" disabled>运行浏览器测量</button><button id="cancel" disabled>停止测量</button><button id="download" disabled>导出 JSON</button>
+</section>
+<p id="status" role="status">正在加载本地游戏脚本与固定版本 PixiJS…</p>
+<main>
+  <div class="panes">
+    <article id="canvas-pane"><h2>Canvas 2D · 共享场景适配器</h2><canvas id="canvas" width="960" height="600" aria-label="Canvas shared scene"></canvas></article>
+    <article id="pixi-pane"><h2>PixiJS 8.22.0 · WebGL 原生渲染</h2><canvas id="pixi" width="960" height="600" aria-label="Pixi shared scene"></canvas></article>
+  </div>
+  <p id="counts"></p>
+  <details id="production-detail"><summary>查看现有生产 Canvas 参考（不是等量工作负载计时对手）</summary><p>使用未修改的 G.frame、相同世界的独立展示副本和同一相机，地面缓存比例一致（0.5 请求值受生产像素预算限制）。额外的人物描边和阴影仍可见；冬季粒子在此静态参考中关闭。</p><canvas id="production" width="960" height="600" aria-label="Unchanged production Canvas reference"></canvas></details>
+  <section class="notes"><h2>这次测什么</h2><p>只比较固定新局的地图展示。两种适配器使用相同的深度顺序、可见性测试、图片和网格。测量轮流单独绘制，记录 JS 绘制提交耗时和 requestAnimationFrame 间隔；不等同于 GPU 完成时间、真实设备帧率或全游戏性能。</p><ul id="omissions"></ul><p>原始地面生成、分块、场景构造与首次绘制开销独立记录。地图生成质量并不会随更换渲染器自动提升。</p></section>
+  <section><h2>本机结果</h2><pre id="report">尚未运行测量。</pre></section>
+</main>
+<script type="module" src="experiments/render-compare/app.mjs"></script>
+</body></html>
