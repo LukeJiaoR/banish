@@ -45,6 +45,8 @@ G.startConfigQuote = function (input) {
   if(!G.MAP_SIZES.includes(mapSize))return fail('请选择128×128或192×192地图');
   const version=mapSize===192?3:terrain==='mountain'?2:1;
   if(input.v!==undefined&&input.v!==version)return fail('开局设置版本不受支持');
+  const climate=input.climate;
+  if(climate!==undefined&&(typeof climate!=='string'||!Object.hasOwn(G.CLIMATES,climate)))return fail('请选择 Mild、Fair 或 Harsh 气候');
   const preset=input.preset===undefined?'classic':input.preset;
   if(typeof preset!=='string'||!Object.hasOwn(G.START_PRESETS,preset))return fail('请选择经典或困难开局');
   let seed=input.seed;
@@ -54,8 +56,9 @@ G.startConfigQuote = function (input) {
   }
   if(!Number.isInteger(seed)||seed < -0x80000000||seed > 0xffffffff)return fail('地图种子须为整数（-2147483648 至 4294967295）');
   const config=mapSize===192?{v:3,preset,seed,terrain,mapSize}:terrain==='mountain'?{v:2,preset,seed,terrain}:{v:1,preset,seed},p=G.START_PRESETS[preset],families=p.kidPlan.length,children=p.kidPlan.reduce((n,k)=>n+k,0);
+  if(climate!==undefined)config.climate=climate;
   const resources=Object.fromEntries(G.RES_KEYS.map(k=>[k,p.stocks[k]||0]));resources.food=G.FOOD_KEYS.reduce((n,k)=>n+resources[k],0);
-  return {ok:true,config,key:JSON.stringify(config),mapSizeSummary:{size:mapSize,name:mapSize+'×'+mapSize,note:mapSize===192?'面积为默认的2.25倍；同等开局库存与资源密度，远处资源须实际采运。采用权威地形存档（山地v3／新经典v4），旧版不能读取；手机性能尚未实测。':'默认尺寸与开局库存不变；新经典村使用v4地形存档，旧程序不能读取；已有村庄不补矿'},terrainSummary:{name:G.START_TERRAINS[terrain].name,mapVersion:terrain==='mountain'?2:3,
+  return {ok:true,config,key:JSON.stringify(config),climateSummary:climate===undefined?null:{name:G.CLIMATES[climate].name,note:G.CLIMATES[climate].note+'；日气温与农田规则为48日历适配，取暖与果园仍沿用季节规则；v5存档须使用新版'},mapSizeSummary:{size:mapSize,name:mapSize+'×'+mapSize,note:climate!==undefined?'新气候村使用v5存档，旧程序不能读取；128/192格地形保持原规则，192格手机性能尚未实测':mapSize===192?'面积为默认的2.25倍；同等开局库存与资源密度，远处资源须实际采运。采用权威地形存档（山地v3／新经典v4），旧版不能读取；手机性能尚未实测。':'默认尺寸与开局库存不变；新经典村使用v4地形存档，旧程序不能读取；已有村庄不补矿'},terrainSummary:{name:G.START_TERRAINS[terrain].name,mapVersion:terrain==='mountain'?2:3,
     note:terrain==='mountain'?'41×37初始山谷为本作明确保底：有限木石铁与成熟食物林须劳动取得；山体阻路；可从陆地洞口规划隧道，实运建成后才通行':'沿用原地形与镇址；初始仓库落位后分别保证附近可达石头和铁矿，仍须实际采运'},presetSummary:{name:p.name,families,population:families*2+children,adults:families*2,children,resources,
     unlockedSeeds:p.wheat?['wheat']:[],seedNote:p.wheat?'已有小麦种子；其他作物与果树种子须贸易购买':'没有作物或果树种子，也没有牲畜；种子须贸易购买，永久解锁',
     equipmentNote:'衣物库存0、无预穿衣；工具默认共用池，寿命规则沿用现有系统',adaptationNote:'家庭数参考原版难度；人口组成与库存数量为本作适配'}};
@@ -113,7 +116,7 @@ G.prepareNewGame = function (config) {
 
 G.newGame = function (seed, options) {
   options=options||{};
-  const quote=G.startConfigQuote({preset:options.preset,terrain:options.terrain,mapSize:options.mapSize,seed:seed===undefined?((Math.random()*0x100000000)>>>0):seed});
+  const quote=G.startConfigQuote({preset:options.preset,terrain:options.terrain,mapSize:options.mapSize,climate:options.climate===undefined?'fair':options.climate,seed:seed===undefined?((Math.random()*0x100000000)>>>0):seed});
   if(!quote.ok)return quote;
   let candidate;
   try {candidate=G.prepareNewGame(quote.config);}catch(e){return {ok:false,reason:'新局生成失败：'+e.message};}
@@ -144,7 +147,7 @@ G.confirmNewGame = function (request) {
   if(request.key!==q.key)return {ok:false,reason:'开局设置已改变，请重新确认'};
   const visible=id=>{const el=document.getElementById(id);return el&&!el.classList.contains('hidden');};
   if(!visible('new-game-settings')||['fb','errs','saves','production-goals','help'].some(visible))return {ok:false,reason:'请先关闭其他窗口，再确认开局设置'};
-  return G.newGame(q.config.seed,{preset:q.config.preset,terrain:q.config.terrain,mapSize:q.config.mapSize});
+  return G.newGame(q.config.seed,{preset:q.config.preset,terrain:q.config.terrain,mapSize:q.config.mapSize,climate:q.config.climate});
 };
 
 /* ---------- 存档 ---------- */
@@ -159,10 +162,11 @@ G.serializeGame = function () {
   G.reconcileDeerHabitat(deerWorld,g);
   G.upgradeWildlife(deerWorld,g);
   return {
-    v: w.mapVersion===3?4:w.N===192?3:w.mapVersion===2?2:1, seed: w.seed, N: w.N, mapVersion: w.mapVersion || 0, // N：地图尺寸（旧档跨尺寸迁移裸索引用）
+    v: g.climate?5:w.mapVersion===3?4:w.N===192?3:w.mapVersion===2?2:1, seed: w.seed, N: w.N, mapVersion: w.mapVersion || 0, // N：地图尺寸（旧档跨尺寸迁移裸索引用）
     ...(w.mapVersion===2||w.mapVersion===3||w.N===192?{terrain:{water:Array.from(w.water),rock:Array.from(w.rock),mountain:Array.from(w.mountain),start:{...w.start}}}:{}),
     game: {
       v: G.VERSION, startConfig:g.startConfig ? {...g.startConfig} : null,
+      ...(g.climate?{climate:{...g.climate}}:{}),
       h: g.h, day: g.day, season: g.season, year: g.year,
       res: g.res, stats: g.stats, prevFood: g.prevFood, foodNet: g.foodNet, foodUrgent: g.foodUrgent, warned: g.warned,
       supplyMode:g.supplyMode,mealRuleVersion:g.mealRuleVersion,mealTransitionStart:g.mealTransitionStart,mealTransitionEnd:g.mealTransitionEnd,clothingSupply:g.clothingSupply,supplyStartedDay:g.supplyStartedDay,supplyUsed:g.supplyUsed,supplyLost:g.supplyLost,
@@ -197,7 +201,7 @@ G.serializeGame = function () {
       cemeterySize:b.type==='cemetery'&&b.cemeterySize?[...b.cemeterySize]:undefined,
       grave:b.type==='graveremnant'?{...b.grave}:undefined,graveSource:b.type==='graveremnant'?{...b.graveSource,...(b.graveSource.cemeterySize?{cemeterySize:[...b.graveSource.cemeterySize]}:{})}:undefined,
       w:b.pastureSize||b.orchardSize||b.cemeterySize||b.type==='graveremnant'?b.w:undefined,h:b.pastureSize||b.orchardSize||b.cemeterySize||b.type==='graveremnant'?b.h:undefined,
-      farm: b.farm ? b.farm.map(f => [f.sown ? 1 : 0, f.harvested ? 1 : 0, f.pestLost ? 1 : 0]) : undefined,
+      farm: b.farm ? b.farm.map(f => [f.sown ? 1 : 0, f.harvested ? 1 : 0, f.pestLost ? 1 : 0, ...(g.climate?[f.frostLost ? 1 : 0]:[])]) : undefined,
       sownAll: b.sownAll, growth: b.growth, harvestDone: b.harvestDone, cropType:b.cropType, cropChoice:b.cropChoice,
       sowingCommitted: b.sowingCommitted, pestInfestation:b.pestInfestation, lastPestCrop:b.lastPestCrop, earlyHarvestYield:b.earlyHarvestYield, productionPaused: b.productionPaused,
       tradeInventory: b.tradeInventory, tradeTargets: b.tradeTargets, merchant: b.merchant, nextMerchantDay: b.nextMerchantDay, merchantVisits:b.merchantVisits, merchantOrders:b.merchantOrders, autoTrade:b.autoTrade, autoTradeLast:b.autoTradeLast,
@@ -328,8 +332,9 @@ G.prepareSaveData = function (d) {
     if(G.supplySum(stock)>limit+1e-6)bad(field+'容量');return stock;
   };
   record(d, '根对象');
-  if (d.v !== undefined && ![1,2,3,4].includes(d.v)) bad('版本不受支持');
-  const mineralStart=d.v===4,expanded=d.v===3||mineralStart&&d.N===192,authoritative=d.v===2||expanded||mineralStart;
+  if (d.v !== undefined && ![1,2,3,4,5].includes(d.v)) bad('版本不受支持');
+  const climateFormat=d.v===5,mineralStart=d.v===4||climateFormat&&d.mapVersion===3,expanded=d.v===3||(mineralStart||climateFormat)&&d.N===192,authoritative=d.v===2||expanded||mineralStart||climateFormat;
+  if(climateFormat&&![2,3].includes(d.mapVersion))bad('气候存档地图版本');
   if(mineralStart?d.mapVersion!==3:expanded?![1,2].includes(d.mapVersion):authoritative?d.mapVersion!==2:d.mapVersion!==undefined&&d.mapVersion!==0&&d.mapVersion!==1)bad('地图生成版本不受支持');
   if(!authoritative&&d.terrain!==undefined)bad('旧版本不能携带新地形');
   integer(d.seed, '地图种子', -0x80000000, 0xffffffff);
@@ -340,6 +345,7 @@ G.prepareSaveData = function (d) {
     const config=record(gd.startConfig,'开局设置');
     const mountain=d.mapVersion===2,configVersion=expanded?3:mountain?2:1;
     const keys=expanded?['v','preset','seed','terrain','mapSize']:mountain?['v','preset','seed','terrain']:['v','preset','seed'];
+    if(climateFormat)keys.push('climate');
     if(config.v!==configVersion||typeof config.preset!=='string'||typeof config.seed!=='number'||Object.keys(config).length!==keys.length||Object.keys(config).some(k=>!keys.includes(k))||(expanded||mountain)&&config.terrain!==(mountain?'mountain':'classic')||expanded&&config.mapSize!==d.N)bad('开局设置');
     const q=G.startConfigQuote(config);if(!q.ok||q.config.seed!==d.seed)bad('开局设置');
     g.startConfig={...q.config};
@@ -348,6 +354,13 @@ G.prepareSaveData = function (d) {
   if(authoritative&&!g.startConfig)bad('权威地形开局来源缺失');
   g.h = number(gd.h, '小时', 0, G.DAY_H); if (g.h === G.DAY_H) bad('小时');
   g.day = integer(gd.day, '天数'); g.season = integer(gd.season, '季节', 0, 3); g.year = integer(gd.year, '年份', 1);
+  if(climateFormat!==Object.hasOwn(gd,'climate'))bad('气候版本标记缺失或不匹配');
+  if(climateFormat){
+    const c=record(gd.climate,'气候规则');
+    if(Object.keys(c).length!==3||Object.keys(c).some(k=>!['v','type','lastDay'].includes(k))||c.v!==G.CLIMATE_VERSION||typeof c.type!=='string'||!Object.hasOwn(G.CLIMATES,c.type)||g.startConfig?.climate!==c.type)bad('气候规则版本或新局配置');
+    if(g.season!==G.seasonOf(g.day)||g.year!==Math.floor(g.day/G.YEAR_DAYS)+1)bad('气候日历');
+    g.climate={v:c.v,type:c.type,lastDay:integer(c.lastDay,'气候结算日期',g.day,g.day)};
+  }
   const currentConstruction=gd.constructionVersion!==undefined;
   if(currentConstruction&&gd.constructionVersion!==1)bad('建材配送版本');
   if(currentConstruction!==(gd.constructionLost!==undefined))bad('建材配送损失记录缺失');
@@ -842,14 +855,16 @@ G.prepareSaveData = function (d) {
       if(!G.cropUnlocked(b.cropChoice,g)&&b.cropChoice!==b.cropType)bad('下一季作物种子未解锁');
       if (!Array.isArray(bd.farm) || bd.farm.length !== b.w * b.h) bad('农田格数');
       b.farm = bd.farm.map((row, k) => {
-        if (!Array.isArray(row) || ![2,3].includes(row.length) || !row.every(v => v === 0 || v === 1 || v === false || v === true)) bad('农田状态');
+        if (!Array.isArray(row) || !(climateFormat?row.length===4:[2,3].includes(row.length)) || !row.every(v => v === 0 || v === 1 || v === false || v === true)) bad('农田状态');
         if(row[2]&&(!row[0]||!row[1]))bad('虫害损失格状态');
-        return { x: x + k % b.w, y: y + Math.floor(k / b.w), sown: !!row[0], harvested: !!row[1], ...(row[2]?{pestLost:true}:{}) };
+        if(row[3]&&(!row[0]||!row[1]||row[2]))bad('霜害损失格状态');
+        return { x: x + k % b.w, y: y + Math.floor(k / b.w), sown: !!row[0], harvested: !!row[1], ...(row[2]?{pestLost:true}:{}),...(row[3]?{frostLost:true}:{}) };
       });
       if(bd.lastPestCrop!==undefined){if(typeof bd.lastPestCrop!=='string'||!Object.hasOwn(G.CROPS,bd.lastPestCrop))bad('上次虫害作物');b.lastPestCrop=bd.lastPestCrop;}
       if(bd.pestInfestation!==undefined){const p=record(bd.pestInfestation,'农田虫害');if(p.crop!==b.cropType||b.state!=='ok'||!g.farmPests.enabled)bad('农田虫害状态');
         b.pestInfestation={crop:p.crop,startedDay:integer(p.startedDay,'虫害发现日',0,g.day)};
       }
+      if(climateFormat&&(typeof bd.sownAll!=='boolean'||typeof bd.harvestDone!=='boolean'))bad('气候农田完成标记');
       b.sownAll = !!bd.sownAll; b.harvestDone = !!bd.harvestDone;
       if (bd.sowingCommitted !== undefined && typeof bd.sowingCommitted !== 'boolean') bad('农田本季承诺');
       if (bd.sowingCommitted === true) b.sowingCommitted = true;
@@ -858,9 +873,10 @@ G.prepareSaveData = function (d) {
       if(!G.cropUnlocked(b.cropType,g)&&(b.farm.some(f=>f.sown||f.harvested)||b.sownAll||b.harvestDone||b.sowingCommitted||b.growth||b.pestInfestation||bd.earlyHarvestYield!==undefined))bad('未解锁作物不能已有播种或收获');
       // The new winter crop cannot import a planted field beyond its cutoff.
       // Fully harvested fields and every real carried batch remain valid.
-      if(b.cropType==='squash'){
+      if(b.cropType==='squash'||climateFormat){
         if(b.farm.some(f=>f.harvested&&!f.sown)||b.sownAll!==b.farm.every(f=>f.sown)||b.harvestDone!==b.farm.every(f=>f.harvested)||b.growth>0&&!b.sownAll)bad('耐寒瓜田格与季节进度不符');
-        if(g.season===3&&!G.farmWinterWindow(b,g).active&&G.farmSeasonCommitted(b)&&!b.harvestDone)bad('耐寒瓜冬季收获窗口已结束');
+        if(climateFormat&&b.farm.some(f=>f.frostLost)&&!b.sowingCommitted)bad('霜害农田缺少本季承诺');
+        if(g.season===3&&!G.farmWinterWindow(b,g).active&&G.farmSeasonCommitted(b)&&(climateFormat?b.farm.some(f=>f.sown&&!f.harvested):!b.harvestDone))bad('耐寒瓜冬季收获窗口已结束');
       }
       if(bd.earlyHarvestYield!==undefined){
         b.earlyHarvestYield=integer(bd.earlyHarvestYield,'抢收基础产量',1,G.farmBaseYield(b));

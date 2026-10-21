@@ -277,6 +277,13 @@
             <button type="button" id="new-game-terrain-classic" aria-pressed="true"><strong>原地形</strong><span>河流、森林与地表矿石</span></button>
             <button type="button" id="new-game-terrain-mountain" aria-pressed="false"><strong>山地</strong><span>阻路山脊与开局保障谷地</span></button>
           </div>
+          <h3>气候</h3>
+          <div id="new-game-climate" class="start-presets" role="group" aria-label="选择新村气候" aria-describedby="new-game-climate-note">
+            <button type="button" id="new-game-climate-mild" aria-pressed="false"><strong>温和 · Mild</strong></button>
+            <button type="button" id="new-game-climate-fair" aria-pressed="true"><strong>均衡 · Fair</strong></button>
+            <button type="button" id="new-game-climate-harsh" aria-pressed="false"><strong>严寒 · Harsh</strong></button>
+          </div>
+          <p id="new-game-climate-note">仅新村启用：温度影响农田成长，低温可能提前损失未收作物；冬季收割截止仍保留。取暖与果园沿用原规则。气候新村使用 v5 存档，旧程序无法读取。</p>
           <h3>地图大小</h3>
           <div id="new-game-map-size" class="start-presets" role="group" aria-label="选择新村地图大小">
             <button type="button" id="new-game-size-128" aria-pressed="true"><strong>128×128 · 默认</strong><span>原有地图范围</span></button>
@@ -295,7 +302,7 @@
         </details>
         <details id="new-game-help" class="start-settings-details">
           <summary tabindex="0">种子、地图与存档说明</summary>
-          <p>同种子、同配置与同版本会重建初始村庄，不是中途存档回放。地图尺寸与地形只用于新村，不扩张现有村庄；气候与开局物资保持原规则，可选灾难仍默认关闭。</p>
+          <p>同种子、同配置与同版本会重建初始村庄，不是中途存档回放。地图尺寸、地形与气候只用于新村，不扩张或改变现有村庄。旧村保留原季节规则；气候不改变开局物资，可选灾难仍默认关闭。</p>
           <p>打开、修改与取消不会替换当前村或删除存档。导出只会请求浏览器下载；请自行核对文件已保存，再重新检查并确认。</p>
         </details>
       </div>

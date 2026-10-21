@@ -1073,9 +1073,10 @@ G.ui = {
       netEl.className = net < 0 ? 'neg' : 'pos';
       netEl.title = physical ? '全村食物净变（包括已配送物资）；左侧数字仅为公共库存' : '食物净变';
     }
-    const hh = Math.floor(g.h);
-    this.el.date.innerHTML = `${this.icon ? this.icon('clock') : ''}<span>第 ${g.year} 年 · ${G.SEASON_NAMES[g.season]} ${(g.day % G.SEASON_DAYS) + 1} 日 · ${String(hh).padStart(2, '0')}:00</span>`;
-    this.el.date.title = '游戏时间；时钟图标不代表日照或居民作息';
+    const hh = Math.floor(g.h), weather = G.climateWeather?.();
+    const temperature = weather ? ` · 今日 ${weather.temperature}°C` : '';
+    this.el.date.innerHTML = `${this.icon ? this.icon('clock') : ''}<span>第 ${g.year} 年 · ${G.SEASON_NAMES[g.season]} ${(g.day % G.SEASON_DAYS) + 1} 日 · ${String(hh).padStart(2, '0')}:00${temperature}</span>`;
+    this.el.date.title = '游戏时间；时钟图标不代表日照或居民作息' + (weather ? `；${weather.climate}，今日 ${weather.temperature}°C，影响农田成长与霜损；住房取暖和果园仍沿用原规则` : '');
     const w = G.world;
     const adults = w.citizens.filter(c => c.adult).length;
     const children = w.citizens.length - adults;
@@ -1126,6 +1127,10 @@ G.ui = {
     }
     const cold = alive.filter(c => c.cold >= 1).length;
     if (cold) add('cold', 'urgent', 2, `${cold} 人受冻 · 检查住房与实际供暖`, '居民正在受冻；库存估算不保证每户有燃料，检查住房、配送和返家通路。');
+    if(g.climate){
+      const fields=w.buildings.filter(b=>b.type==='farm'&&b.state==='ok').map(b=>G.farmClimateSummary(b)).filter(s=>s.atRisk);
+      if(fields.length)add('crop-frost','recommend',2.1,`${fields.length}块农田有近两日霜害风险 · 查看农田判断抢收`,`${fields.length}块农田有近两日霜害风险。${fields[0].warning}；已采收和在途粮食保留。`);
+    }
     if (g.res.wood < 2) {
       const detail = harvest.carry.wood ? `木材库存耗尽：另有 ${harvest.carry.wood} 随身待入库，送达后才能使用。`
         : harvest.trees ? `木材库存耗尽：${harvest.trees} 棵已标记，查看采运进度；砍倒后仍需送仓。`
@@ -2721,7 +2726,7 @@ G.ui = {
   farmInfoData: function (b) {
     if (b.type !== 'farm' || b.state !== 'ok' || !G.farmSummary) return null;
     const s = G.farmSummary(b), pests = G.farmPestSummary(b), crops = G.CROPS;
-    const crop = crops[s.crop], choice = crops[s.choice], winter = s.winterWindow;
+    const crop = crops[s.crop], choice = crops[s.choice], winter = s.winterWindow, climate = s.climate || null;
     const workerNames = b.workers.map(id => G.world.cmap[id]).filter(c => c && !c.dead && c.job === b.id).map(c => c.name);
     const target = type => {
       const value = G.productionGoalOf(type);
@@ -2730,14 +2735,15 @@ G.ui = {
     return { summary: s, pests, data: {
       status: s.status,
       workers: `${s.workers} 人${workerNames.length ? ' · ' + workerNames.join('、') : '（等待可用农夫）'}`,
-      plot: `地块 ${b.w}×${b.h} · ${s.total}格 · 成熟满收理论 ${s.total*G.farmBaseYield(b)} 食物；实际受种收工时、工具、冬损和仓容影响`,
+      plot: `地块 ${b.w}×${b.h} · ${s.total}格 · 成熟满收理论 ${s.total*G.farmBaseYield(b)} 食物；实际受种收工时、工具、${climate ? '温度成长、霜损、冬损' : '冬损'}和仓容影响`,
       current: `本季作物：${crop.name} → ${G.RES[s.output].name}`,
       choice: `下季 / 空田选择：${choice.name} → ${G.RES[s.choiceOutput].name}${s.pending ? '（下一春生效）' : '（与本季一致）'}`,
-      timing: `本季${crop.name}：全田播完后成长 ${s.growDays} 天，${s.summerHarvest ? '夏、秋全熟后正常收获' : s.winterHarvestDays ? '秋季全熟后正常收获；入冬后的前两日仍可收割，冬季不成长' : '秋季全熟后正常收获'}；基础每格 ${G.farmBaseYield(b)} ${G.RES[s.output].name}，每年只种收一季`,
-      cold: winter?.enabled ? `耐寒时限（48日年适配）：入冬后的前两日可继续实收，冬季不播种、不成长；第3日零时清除未收作物，已背起的收成保留。${winter.active ? `当前窗口还剩 ${Math.max(0,winter.hoursRemaining).toFixed(1)} 小时；未全熟可确认抢收，不能靠冬季等待增产。` : G.game.season === 3 ? '本冬收割窗口已结束。' : '秋季仍应尽早收获，不保证延后两日就能收完。'}` : '本季作物不耐寒：入冬即清除未收部分；已背起的收成保留。改选下季耐寒瓜不会保护本季作物。',
+      timing: `本季${crop.name}：全田播完后成长 ${s.growDays} ${climate ? '有效日（按温度累计）' : '天'}，${s.summerHarvest ? '夏、秋全熟后正常收获' : s.winterHarvestDays ? '秋季全熟后正常收获；入冬后的前两日仍可收割，冬季不成长' : '秋季全熟后正常收获'}；基础每格 ${G.farmBaseYield(b)} ${G.RES[s.output].name}，每年只种收一季`,
+      cold: (climate ? `气候农田：低于 ${climate.frostBelow}°C 时未收作物可能提前霜损，耐寒不等于免霜；既有冬季截止仍适用。` : '') + (winter?.enabled ? `耐寒时限（48日年适配）：入冬后的前两日可继续实收，冬季不播种、不成长；第3日零时清除未收作物，已背起的收成保留。${winter.active ? `当前窗口还剩 ${Math.max(0,winter.hoursRemaining).toFixed(1)} 小时；未全熟可确认抢收，不能靠冬季等待增产。` : G.game.season === 3 ? '本冬收割窗口已结束。' : '秋季仍应尽早收获，不保证延后两日就能收完。'}` : '本季作物不耐寒：入冬即清除未收部分；已背起的收成保留。改选下季耐寒瓜不会保护本季作物。'),
       reason: s.reason,
       seeds: `种子：${Object.keys(crops).map(type => `${crops[type].name}${s.unlocked[type] ? '已永久解锁' : '未解锁，需贸易购买' + crops[type].name + '种子'}`).join(' · ')}（永久解锁，不是库存物品，不占仓位）`,
-      progress: `播种 ${s.sown}/${s.total} · 成长 ${Math.floor(s.growth * 100)}% · 实际收获 ${s.harvested}/${s.total} · 虫害损失 ${pests.lost}/${s.total}`,
+      progress: `播种 ${s.sown}/${s.total} · 成长 ${Math.floor(s.growth * 100)}% · 实际收获 ${s.harvested}/${s.total} · 虫害损失 ${pests.lost}/${s.total}${climate ? ` · 本季霜损 ${climate.lost}/${s.total}` : ''}`,
+      ...(climate ? { climate: `今日 ${climate.temperature}°C · 温度成长倍率 ×${Number(climate.growthFactor.toFixed(2))}（冬季不成长） · 霜损阈值低于 ${climate.frostBelow}°C。${climate.warning} 提前抢收后未收格仍可能霜损，须实际收割并送仓。` } : {}),
       pestField: this.farmPestFieldText(pests),
       rotation: this.farmRotationText(pests),
       yield: `收获产出：按当前工具状态，每格 ${G.taskYield(G.farmHarvestBase(b))} ${G.RES[s.output].name}；每筐达到 ${G.PROD.farm.haulCap} 后送仓，入仓后才可用`,
@@ -2752,7 +2758,7 @@ G.ui = {
         <select id="farm-crop" aria-describedby="farm-crop-note">${Object.keys(G.CROPS).map(type => `<option value="${type}"${type === facts.summary.choice ? ' selected' : ''}${facts.summary.unlocked[type] ? '' : ' disabled'}>${this.escHtml(G.CROPS[type].name)}${facts.summary.unlocked[type] ? '' : '（需购买种子）'}</option>`).join('')}</select>
         <p class="desc" id="farm-crop-note">春、夏尚未开始播种的空田立即应用；已接第一播种任务、已播种、生长或已收获的本季作物锁定，改选留到下一春。已背起的粮食不变。空田默认显示小麦；困难开局须先购种子。旧档缺少小麦解锁字段时保留可种。</p>
       </div>
-      ${['current','progress','reason','pestField'].map(key => `<p class="row" data-farm="${key}">${this.escHtml(facts.data[key])}</p>`).join('')}<details class="building-help"><summary>种植、成长与目标明细</summary>${Object.keys(facts.data).filter(key => !['status','workers','current','progress','reason','pestField'].includes(key)).map(key => `<p class="row" data-farm="${key}">${this.escHtml(facts.data[key])}</p>`).join('')}</details>
+      ${['current','progress','climate','reason','pestField'].filter(key => Object.hasOwn(facts.data,key)).map(key => `<p class="row" data-farm="${key}">${this.escHtml(facts.data[key])}</p>`).join('')}<details class="building-help"><summary>种植、成长与目标明细</summary>${Object.keys(facts.data).filter(key => !['status','workers','current','progress','climate','reason','pestField'].includes(key)).map(key => `<p class="row" data-farm="${key}">${this.escHtml(facts.data[key])}</p>`).join('')}</details>
       <details class="building-task"><summary>农田虫害设置</summary><div class="farm-pests-setting" data-farm-pests-setting>
         <p class="row" data-farm-pests-status>${this.escHtml(this.farmPestSettingText(facts.pests))}</p>
         <div class="economy-actions"><button type="button" id="farm-pests-toggle" aria-describedby="farm-pests-note" aria-expanded="false">${facts.pests.enabled ? '关闭全镇农田虫害' : '开启全镇农田虫害…'}</button></div>
@@ -2769,8 +2775,8 @@ G.ui = {
         <div class="economy-actions"><button type="button" id="early-harvest-confirm">确认本季抢收</button><button type="button" id="early-harvest-cancel">继续等待</button></div>
       </div>
       <p class="economy-message" data-farm-message role="status" aria-live="polite"></p>
-      <details class="building-help"><summary>收割与过冬规则</summary><p class="desc">全田播完才开始成长；小麦、卷心菜和耐寒瓜成长 ${G.CROPS.wheat.growDays} 天、秋季全熟后收获；早熟豆类成长 ${G.CROPS.beans.growDays} 天，夏、秋全熟即可正常收获。早熟的代价是基础每格 ${G.CROPS.beans.perTile} 蔬菜，低于小麦、卷心菜和耐寒瓜的 ${G.CROPS.wheat.perTile}。播种、走路、收割和送仓仍需时间，大田或农夫不足会推迟入库，不保证夏初就有粮。每年只种收一季，收完不能在夏季再次播种。</p>
-      <p class="desc">也可确认提前抢收，按当时成熟度锁定较低产量并停止继续成长，本季不能复种。等待能提高成熟产量；若开启虫害，等候和收割期间仍可能损失未收格。小麦、卷心菜和豆类入冬即损失未收作物；耐寒瓜可延至入冬后的前两日，第3日零时清除未收部分。所有作物冬季都不播种、不成长；农夫仍须收割并实际搬运入仓。耐寒窗口是48日历适配，不是气温模拟。</p>
+      <details class="building-help"><summary>收割与过冬规则</summary><p class="desc">全田播完才开始成长；小麦、卷心菜和耐寒瓜成长 ${G.CROPS.wheat.growDays} ${facts.summary.climate ? '有效日（按温度累计）' : '天'}、秋季全熟后收获；早熟豆类成长 ${G.CROPS.beans.growDays} ${facts.summary.climate ? '有效日' : '天'}，夏、秋全熟即可正常收获。早熟的代价是基础每格 ${G.CROPS.beans.perTile} 蔬菜，低于小麦、卷心菜和耐寒瓜的 ${G.CROPS.wheat.perTile}。播种、走路、收割和送仓仍需时间，大田或农夫不足会推迟入库，不保证夏初就有粮。每年只种收一季，收完不能在夏季再次播种。</p>
+      <p class="desc">也可确认提前抢收，按当时成熟度锁定较低产量并停止继续成长，本季不能复种。等待能提高成熟产量；若开启虫害，等候和收割期间仍可能损失未收格。小麦、卷心菜和豆类入冬即损失未收作物；耐寒瓜可延至入冬后的前两日，第3日零时清除未收部分。所有作物冬季都不播种、不成长；农夫仍须收割并实际搬运入仓。${facts.summary.climate ? '温度决定有效成长日，低温可在冬季截止前损失未收格；耐寒瓜霜损阈值更低，仍不保证免霜。提前抢收只锁定产量，未收格仍可能霜损。' : '耐寒窗口是48日历适配，不是气温模拟。'}</p>
       <p class="desc">营养仍分肉类（含鸡蛋）、蔬菜（含苹果和梨）、主食三组。小麦产主食，卷心菜产蔬菜，早熟豆类和耐寒瓜也计入蔬菜；多种作物不额外增加饮食类别，也不产肉。</p>
       </details></section>`;
   },
@@ -2892,7 +2898,7 @@ G.ui = {
   },
   earlyHarvestText:function(q){
     if(!q.ok)return q.reason;
-    return `现成熟${Math.floor(q.growth*100)}%，基础每格${q.base}。按当前工具，每格${q.perTile}，剩余${q.remaining}格预计${q.estimated} ${G.RES[q.output].name}；等全熟预计${q.fullEstimated}，较全熟估算少${q.fullEstimated-q.estimated}。这是在田估算，仓满、工具变化或冬季未收完会影响实际入库。`;
+    return `现成熟${Math.floor(q.growth*100)}%，基础每格${q.base}。按当前工具，每格${q.perTile}，剩余${q.remaining}格预计${q.estimated} ${G.RES[q.output].name}；等全熟预计${q.fullEstimated}，较全熟估算少${q.fullEstimated-q.estimated}。这是在田估算，仓满、工具变化或冬季未收完会影响实际入库。${G.game.climate ? '提前抢收不免霜：低温仍可能损失未收格，须尽快实际收割并送仓。' : ''}`;
   },
   refreshEarlyHarvest:function(b){
     const el=this.el.info,panel=el.querySelector('[data-farm-panel]');if(!panel)return;
@@ -4901,11 +4907,12 @@ G.ui = {
     seed?.addEventListener('change',()=>{if(current(this._startSession))this.invalidateStartDraft();});
     for(const preset of ['classic','hard'])bind('new-game-preset-'+preset,s=>{s.preset=preset;this.invalidateStartDraft();});
     for(const terrain of ['classic','mountain'])bind('new-game-terrain-'+terrain,s=>{s.terrain=terrain;this.invalidateStartDraft();});
+    for(const climate of Object.keys(G.CLIMATES || {}))bind('new-game-climate-'+climate,s=>{s.climate=climate;this.invalidateStartDraft();});
     for(const mapSize of G.MAP_SIZES)bind('new-game-size-'+mapSize,s=>{s.mapSize=mapSize;this.invalidateStartDraft();});
     bind('new-game-random',()=>{seed.value=String(Math.floor(Math.random()*0x100000000));this.invalidateStartDraft('随机数只用于本次草稿，当前村未改变。');});
     bind('new-game-reuse',s=>{seed.value=String(s.world.seed);this.invalidateStartDraft('已复用当前地图种子；开局配置仍按下方选择。');});
     bind('new-game-review-button',s=>{
-      if(s.phase!=='edit')return;const q=G.startConfigQuote({seed:seed.value,preset:s.preset,terrain:s.terrain,mapSize:s.mapSize});
+      if(s.phase!=='edit')return;const q=G.startConfigQuote({seed:seed.value,preset:s.preset,terrain:s.terrain,mapSize:s.mapSize,climate:s.climate});
       if(!q.ok){s.message=q.reason;return;}
       s.intent={world:s.world,game:s.game,key:q.key,config:{...q.config}};s.phase='review';s.rev++;s.message='请核对新村参数和旧进度处理，再单独确认。';
       this.refreshNewGameSettings();document.getElementById('new-game-body').scrollTop=0;document.getElementById('new-game-confirm')?.focus();
@@ -4913,7 +4920,7 @@ G.ui = {
     bind('new-game-back',()=>{this.invalidateStartDraft('已返回修改，尚未创建新村。');document.getElementById('new-game-body').scrollTop=0;seed?.focus();});
     bind('new-game-confirm',s=>{
       if(s.phase!=='review'||!s.intent)return;
-      const q=G.startConfigQuote({seed:seed.value,preset:s.preset,terrain:s.terrain,mapSize:s.mapSize});
+      const q=G.startConfigQuote({seed:seed.value,preset:s.preset,terrain:s.terrain,mapSize:s.mapSize,climate:s.climate});
       if(!q.ok||q.key!==s.intent.key){this.invalidateStartDraft('参数已变，请重新检查开局。');return;}
       let result;try{result=G.confirmNewGame(s.intent);}catch(error){result={ok:false,reason:error.message||'新村生成失败'};}
       if(result.ok)this.closeNewGameSettings(true);
@@ -4937,11 +4944,15 @@ G.ui = {
     if(!modal.classList.contains('hidden'))return;
     this.initNewGameSettings();
     const esc=value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-    this._startSession={world:G.world,game:G.game,paused:!!G.game.paused,preset:'classic',terrain:'classic',mapSize:128,phase:'edit',rev:0,intent:null,message:''};
+    this._startSession={world:G.world,game:G.game,paused:!!G.game.paused,preset:'classic',terrain:'classic',mapSize:128,climate:'fair',phase:'edit',rev:0,intent:null,message:''};
     G.game.paused=true;document.getElementById('new-game-seed').value=String(Math.floor(Math.random()*0x100000000));
     for(const preset of ['classic','hard']){
       const p=G.startConfigQuote({seed:0,preset}).presetSummary,card=document.getElementById('new-game-preset-'+preset);
       card.innerHTML=`<strong>${esc(p.name)}</strong><span>${p.families}家庭 · ${p.population}人（${p.adults}成人 / ${p.children}儿童）</span><span>${['food','tools'].map(k=>`${this.resourceIcon(k)}${G.RES[k].name} ${p.resources[k]}`).join(' · ')}</span><span>${esc(p.seedNote)}</span>`;
+    }
+    for(const [type,p] of Object.entries(G.CLIMATES || {})){
+      const card=document.getElementById('new-game-climate-'+type);
+      if(card)card.innerHTML=`<strong>${esc(p.name)}</strong><span>${esc(p.note || '')}</span>`;
     }
     for(const id of ['new-game-details','new-game-help'])document.getElementById(id).open=false;
     document.getElementById('new-game-body').scrollTop=0;
@@ -4971,21 +4982,25 @@ G.ui = {
     };
     if(s.world!==G.world||s.game!==G.game){s.phase='edit';s.intent=null;phase(false);check.disabled=confirm.disabled=true;write('new-game-status','当前村已改变，此设置已过期；请取消后重新打开。');return;}
     const recorded=G.game.startConfig,known=recorded&&G.startConfigQuote(recorded),currentName=known?.ok?known.presetSummary.name:'旧档未记录开局配置（不根据现存资源猜测）';
-    write('new-game-current',`当前村：种子 ${G.world.seed} · ${G.world.N}×${G.world.N} · ${currentName} · ${G.world.mapVersion===2?'山地':'原地形'}`);
+    const currentClimate=G.game.climate && G.CLIMATES?.[G.game.climate.type];
+    write('new-game-current',`当前村：种子 ${G.world.seed} · ${G.world.N}×${G.world.N} · ${currentName} · ${G.world.mapVersion===2?'山地':'原地形'} · ${currentClimate ? currentClimate.name : '原季节规则（未启用温度气候）'}`);
     for(const preset of ['classic','hard'])document.getElementById('new-game-preset-'+preset).setAttribute('aria-pressed',String(s.preset===preset));
     for(const terrain of ['classic','mountain'])document.getElementById('new-game-terrain-'+terrain)?.setAttribute('aria-pressed',String(s.terrain===terrain));
+    for(const climate of Object.keys(G.CLIMATES || {}))document.getElementById('new-game-climate-'+climate)?.setAttribute('aria-pressed',String(s.climate===climate));
     for(const size of G.MAP_SIZES)document.getElementById('new-game-size-'+size)?.setAttribute('aria-pressed',String(s.mapSize===size));
     const terrainName=s.terrain==='mountain'?'山地（开局保障谷地）':'原地形';
-    const terrainNote=s.terrain==='mountain'?'山体通常不能步行或建造；可在道路分类规划直线隧道，实运施工完工后通行。开局谷地保障住房用地、可达水岸与有限原料，仍需自行采运施工；没有额外库存或住房。128格山地使用 v2 地形存档，192格使用 v3；旧版本不能读取相应新格式。':'原地形与镇址保持；新村附近分别保证至少3处可达石头和3处铁矿，工人仍须采运。新经典村使用v4地形存档，旧程序不能读取；已存村庄不补矿。';
-    const q=G.startConfigQuote({seed:seed.value,preset:s.preset,terrain:s.terrain,mapSize:s.mapSize});
+    const terrainNote=s.terrain==='mountain'?'山体通常不能步行或建造；可在道路分类规划直线隧道，实运施工完工后通行。开局谷地保障住房用地、可达水岸与有限原料，仍需自行采运施工；没有额外库存或住房。':'原地形与镇址保持；新村附近分别保证至少3处可达石头和3处铁矿，工人仍须采运。已存村庄不补矿。';
+    const q=G.startConfigQuote({seed:seed.value,preset:s.preset,terrain:s.terrain,mapSize:s.mapSize,climate:s.climate});
     seed.setAttribute('aria-invalid',String(!q.ok));
+    const climateName=q.climateSummary ? ` · ${q.climateSummary.name}` : '';
+    const climateNote=q.climateSummary ? `${q.climateSummary.note} 气候新村使用 v5 存档，旧程序无法读取；住房取暖和果园温度差异尚未实现。` : '';
     if(q.ok){const p=q.presetSummary;
-      write('new-game-preview',`已选：${p.name} · ${terrainName} · ${q.mapSizeSummary.name} · ${p.population}人`);
-      write('new-game-summary',`新村预览：种子 ${q.config.seed} · ${p.name} · ${terrainName} · ${q.mapSizeSummary.name}\n${q.mapSizeSummary.note}\n${p.families}家庭 / ${p.population}人（${p.adults}成人、${p.children}儿童）；仅有储物车，住房需自行建设\n${['wood','stone','iron','food','firewood','tools'].map(k=>`${G.RES[k].name} ${p.resources[k]}`).join(' · ')}\n${p.seedNote}\n${p.equipmentNote} ${p.adaptationNote}\n${terrainNote}`);
+      write('new-game-preview',`已选：${p.name} · ${terrainName} · ${q.mapSizeSummary.name}${climateName} · ${p.population}人`);
+      write('new-game-summary',`新村预览：种子 ${q.config.seed} · ${p.name} · ${terrainName} · ${q.mapSizeSummary.name}${climateName}\n${climateNote}\n${q.mapSizeSummary.note}\n${p.families}家庭 / ${p.population}人（${p.adults}成人、${p.children}儿童）；仅有储物车，住房需自行建设\n${['wood','stone','iron','food','firewood','tools'].map(k=>`${G.RES[k].name} ${p.resources[k]}`).join(' · ')}\n${p.seedNote}\n${p.equipmentNote} ${p.adaptationNote}\n${terrainNote}`);
     }else{write('new-game-preview',q.reason);write('new-game-summary',q.reason);}
     const reviewing=s.phase==='review'&&!!s.intent&&q.ok&&s.intent.key===q.key;
     phase(reviewing);check.disabled=!q.ok;confirm.disabled=!reviewing;
-    if(reviewing)write('new-game-confirm-summary',`地图种子 ${s.intent.config.seed}\n${q.presetSummary.name} · ${terrainName} · ${q.mapSizeSummary.name}\n${q.presetSummary.families}家庭 / ${q.presetSummary.population}人 · 仅有储物车，住房需自行建设\n${q.presetSummary.seedNote}`);
+    if(reviewing)write('new-game-confirm-summary',`地图种子 ${s.intent.config.seed}\n${q.presetSummary.name} · ${terrainName} · ${q.mapSizeSummary.name}${climateName}\n${climateNote}\n${q.presetSummary.families}家庭 / ${q.presetSummary.population}人 · 仅有储物车，住房需自行建设\n${q.presetSummary.seedNote}`);
     write('new-game-status',s.message||(!q.ok?q.reason:'当前村已暂停。先检查开局，再单独确认。'));
   },
 

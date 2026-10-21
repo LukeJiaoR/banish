@@ -184,6 +184,7 @@ test('dedicated mineral clicks distinguish stone and iron and only mark, never g
 });
 test('mineral input marks run through real mining and hauling to exactly one deposit per type', () => {
   const { G } = fixture(), w = G.world, c = w.citizens.find(c => c.adult);
+  G.game.paused = false; // Real simulation now honors the fixture's paused state.
   G.setTool('quarry'); const before = { stone: G.game.res.stone, iron: G.game.res.iron };
   for (const value of [1, 2]) {
     const candidates = [];

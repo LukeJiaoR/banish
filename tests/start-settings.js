@@ -98,7 +98,7 @@ test('settings preview suppresses automatic local/server callbacks, while manual
 });
 test('hard config and wheat lock round-trip without resetting progressed stocks or other toggles',()=>{
   const {G}=fresh();G.game.res.wood=17;G.game.res.grain=G.game.res.food=321;G.game.farmPests.enabled=true;const d=saved(G);G.applySaveData(d);
-  assert.deepEqual(copy(G.game.startConfig),{v:1,preset:'hard',seed:1});assert.equal(G.game.unlocks.wheat,false);assert.equal(G.game.res.wood,17);assert.equal(G.game.res.food,321);assert(G.game.farmPests.enabled);
+  assert.deepEqual(copy(G.game.startConfig),{v:1,preset:'hard',seed:1,climate:'fair'});assert.equal(G.game.unlocks.wheat,false);assert.equal(G.game.res.wood,17);assert.equal(G.game.res.food,321);assert(G.game.farmPests.enabled);
   d.game.startConfig.preset='classic';assert.equal(G.game.startConfig.preset,'hard');
 });
 test('malformed new configs and omitted/invalid wheat flags reject atomically',()=>{
@@ -141,7 +141,7 @@ test('seed orders and automatic buying use existing 25-percent premium and perma
   const {G}=fieldTown();G.world.water[7*G.world.N+20]=1;let b=G.addBuilding('tradingpost',20,8,{instant:true,free:true}).b;G.ensureEconomyBuilding(b);G.arriveMerchant(b);assert(G.orderMerchantGoods(b,'wheatSeed',1,b.merchant).ok);
   b.tradeInventory.firewood=1000;assert(G.setAutoTrade(b,{enabled:true,good:'wheatSeed',qty:1,payment:'firewood',maxPrice:3125},G.game).ok);assert(!G.cropUnlocked('wheat'));
   G.applySaveData(saved(G));b=G.world.bmap[b.id];assert.equal(b.merchantOrders.general.good,'wheatSeed');assert.equal(b.autoTrade.good,'wheatSeed');
-  G.game.day=48;G.game.year=2;G.game.season=0;G.game.townLedger=G.newTownLedger(G.game);b.merchant=null;b.merchantVisits=3;G.arriveMerchant(b);
+  G.game.day=48;G.game.year=2;G.game.season=0;G.advanceCropClimate();G.game.townLedger=G.newTownLedger(G.game);b.merchant=null;b.merchantVisits=3;G.arriveMerchant(b);
   assert.equal(G.merchantPrice(b,'wheatSeed'),3125);assert.equal(b.tradeInventory.firewood,218);assert.equal(b.autoTradeLast.paid,782);assert(G.cropUnlocked('wheat'));assert.equal(b.merchant.stock.wheatSeed,0);assert(!G.runArrivalAutoTrade(b,b.merchant));assert.equal(b.tradeInventory.firewood,218);
 });
 if(process.env.BANISH_BASELINE_ROOT)test('actual unmodified baseline save loads preserving stocks, citizens, families, features and unknown preset',()=>{

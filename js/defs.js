@@ -15,6 +15,21 @@ G.START_PRESETS = Object.freeze({
   hard: Object.freeze({name:'困难（无种子）',kidPlan:Object.freeze([2,2,1,0]),stocks:Object.freeze({grain:400,firewood:40,tools:12}),wheat:false}),
 });
 
+/* Celsius temperatures and 48-day timing are this game's adaptation, not the
+ * original engine's undocumented weather formula. Version 1 is save-stable. */
+G.CLIMATE_VERSION = 1;
+G.CLIMATES = Object.freeze({
+  mild: Object.freeze({name:'温和 · Mild',offset:3,variation:1.2,snap:2,note:'温差较小，农田生长期较长；仍有霜害与冬季收割截止'}),
+  fair: Object.freeze({name:'均衡 · Fair',offset:0,variation:2.4,snap:6,note:'季节温差适中，秋季可能提前降霜；留意预警并按需抢收'}),
+  harsh: Object.freeze({name:'严寒 · Harsh',offset:-3,variation:3.6,snap:8,note:'春季生长较慢、秋霜更早；早熟、耐寒与非农食物更重要'}),
+});
+G.CROP_TEMPERATURES = Object.freeze({
+  wheat: Object.freeze({growthMin:1,growthFull:10,frostBelow:0}),
+  cabbage: Object.freeze({growthMin:2,growthFull:11,frostBelow:-2}),
+  beans: Object.freeze({growthMin:4,growthFull:14,frostBelow:2}),
+  squash: Object.freeze({growthMin:0,growthFull:10,frostBelow:-5}),
+});
+
 G.START_TERRAINS = Object.freeze({classic: Object.freeze({name:'现行地形',mapVersion:1}), mountain: Object.freeze({name:'山地山谷',mapVersion:2})});
 
 /* 建筑（w/h 为占地格数；cost 为建造消耗；buildWork 为建造所需工时（游戏小时））
