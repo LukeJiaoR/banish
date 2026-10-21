@@ -507,4 +507,32 @@ test('Space release keeps the original captured position and a fresh press can r
   assert.equal(f.G.world.buildings.length,1);assert.equal(f.G.world.buildings[0].x,20);
 });
 
+// A key can be released after focus/window visibility has changed, so its
+// keyup never reaches the confirmation button. A later fresh press must work.
+for (const interrupt of ['button-blur', 'window-blur', 'hidden'])
+  for (const key of ['Enter', ' ']) test(interrupt+' releases interrupted '+(key===' '?'Space':key)+' confirmation', f => {
+    selectHouse(f); stage(f);
+    const confirm=f.get('jade-build-confirm'); confirm.focus(); f.key(key);
+    if(interrupt==='button-blur') f.event(confirm,'blur');
+    else if(interrupt==='window-blur') f.windowEvent('blur');
+    else { f.document.visibilityState='hidden'; f.documentEvent('visibilitychange'); f.document.visibilityState='visible'; }
+    // A delayed activation from the interrupted gesture remains rejected.
+    confirm.click(); assert.equal(f.G.world.buildings.length,0);
+    // The old key was released elsewhere. No keyup is delivered to this button.
+    confirm.focus(); const fresh=f.key(key);
+    assert.equal(fresh.defaultPrevented,false,'fresh keyboard input must not stay latched');
+    if(key===' ') f.event(confirm,'keyup',{key});
+    confirm.click(); assert.equal(f.G.world.buildings.length,1);
+  });
+
+test('focus loss after Enter activation rejects a delayed click against a new site', f => {
+  selectHouse(f); stage(f); const confirm=f.get('jade-build-confirm');
+  confirm.focus(); f.key('Enter'); confirm.click();
+  assert.equal(f.G.world.buildings.length,1);
+  f.event(confirm,'blur'); stage(f,20,20);
+  confirm.click(); assert.equal(f.G.world.buildings.length,1);
+  confirm.focus(); f.key('Enter'); confirm.click();
+  assert.equal(f.G.world.buildings.length,2);
+});
+
 console.log(`Jade composition: ${passed} behavioral groups passed (real toolbar/navigation/layout scripts; minimal DOM, no browser hit-testing).`);

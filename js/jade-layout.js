@@ -39,7 +39,9 @@ window.addEventListener('DOMContentLoaded', () => {
   toolbar.prepend(toolbar.querySelector('.toolbar-heading'));toolbar.append(actions);
   let confirmIntent;let confirmArmed=false,confirmKeyHeld=false,confirmKeyUsed=false;
   const arm=e=>{if(e.button!==undefined&&e.button!==0)return;confirmIntent=G.pendingBuildingPlacement;confirmArmed=true;if(e.type!=='keydown'){confirmKeyHeld=false;confirmKeyUsed=false;}};
-  const disarm=()=>{if(confirmArmed){confirmIntent=null;confirmArmed=true;}};confirm.addEventListener('pointercancel',disarm);confirm.addEventListener('touchcancel',disarm);confirm.addEventListener('blur',disarm);window.addEventListener('blur',disarm);document.addEventListener('visibilitychange',()=>{if(document.hidden)disarm();});
+  // Keyup may occur outside this button after focus/visibility changes. Clear
+  // its held-key latch, but keep the cancelled intent to reject a delayed click.
+  const disarm=()=>{if(confirmArmed||confirmKeyHeld){confirmIntent=null;confirmArmed=true;}confirmKeyHeld=false;confirmKeyUsed=false;};confirm.addEventListener('pointercancel',disarm);confirm.addEventListener('touchcancel',disarm);confirm.addEventListener('blur',disarm);window.addEventListener('blur',disarm);document.addEventListener('visibilitychange',()=>{if(document.hidden)disarm();});
   confirm.addEventListener('pointerdown',arm);confirm.addEventListener('mousedown',arm);
   confirm.addEventListener('keydown',e=>{if(!['Enter',' '].includes(e.key))return;if(e.repeat||confirmKeyHeld){e.preventDefault();return;}confirmKeyHeld=true;confirmKeyUsed=false;arm(e);});
   confirm.addEventListener('keyup',e=>{if(['Enter',' '].includes(e.key))confirmKeyHeld=false;});
