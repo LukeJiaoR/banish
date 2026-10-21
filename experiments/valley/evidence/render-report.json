@@ -1,0 +1,370 @@
+{
+  "kind": "Offline generated terrain; not browser, playable new-game, or device acceptance",
+  "generator": "29b060047ef1e3dc82c648f8ea71dc9e3b90dfd8b1ab9dbbb8bb2b5f91fe8b55",
+  "runtimeSources": {
+    "js/core.js": "23085a07f2cfd577fac7eb2965b3befe5e65be88680144d3a73888e770af8f29",
+    "js/defs.js": "210d76e413f7beb032ed149f67d0a48f3e4c969b83d5c2e12c916bc44fc06d0e",
+    "js/map.js": "bb8a850d8208938a7aced19fc54ba8939ea67681b7671b00887840e323fd51cd",
+    "js/sim.js": "052a6903e60a866a39b07d9a724db72ff27dd8f3acfd4f2b760a1b2beee1c1c9",
+    "js/fire.js": "65cb0990fe7c594d4b0759cd07cec21ab93c485d4e4b3be4807664bf7fd0fb15",
+    "js/supply.js": "1ac2ed61caff77d53714dfa1d8e5c345cd39db68978f791e7a5dafd9c3efc977",
+    "js/sprites.js": "516340232a47b67a353638dc8bb011bd8f66a2d7cd51892296aec1da209cc7c3",
+    "js/render.js": "03b08ef23728e840b02f070ec31392024b72402a606750baf9422fc199493093",
+    "js/main.js": "d02575948098c43463c2c5aa1ccc9702492c7e74c3ca7bf6810d6ca372396da4"
+  },
+  "assetManifest": "831ba11ee858b7d0c626547e8db3cd4304e58980848f563ff2d128e20ce8c87b",
+  "cases": [
+    {
+      "seed": 0,
+      "size": 128,
+      "start": {
+        "x": 56,
+        "y": 62
+      },
+      "proof": {
+        "reachable": 2814,
+        "nearby": 782,
+        "matureTrees": 297,
+        "stone": 10,
+        "iron": 3,
+        "shoreApproaches": 38,
+        "shoreTarget": 8260,
+        "removedTrees": 0,
+        "removedRocks": 0,
+        "additions": [
+          {
+            "kind": 2,
+            "i": 7988
+          },
+          {
+            "kind": 2,
+            "i": 8887
+          },
+          {
+            "kind": 2,
+            "i": 8629
+          }
+        ],
+        "terrainEdits": 0,
+        "cartCells": [
+          7863,
+          7864,
+          7865,
+          7991,
+          7992,
+          7993,
+          8119,
+          8120,
+          8121
+        ],
+        "resourceTargets": {
+          "stone": [
+            8239,
+            8625,
+            8111
+          ],
+          "iron": [
+            7988,
+            8887,
+            8629
+          ]
+        },
+        "scope": "offline experiment; three deposits each and 32 mature trees, not a first-winter economy proof"
+      },
+      "water": 1329,
+      "mountain": 6482,
+      "trees": 2119
+    },
+    {
+      "seed": 1,
+      "size": 128,
+      "start": {
+        "x": 78,
+        "y": 60
+      },
+      "proof": {
+        "reachable": 4428,
+        "nearby": 940,
+        "matureTrees": 262,
+        "stone": 13,
+        "iron": 3,
+        "shoreApproaches": 25,
+        "shoreTarget": 8003,
+        "removedTrees": 0,
+        "removedRocks": 0,
+        "additions": [
+          {
+            "kind": 2,
+            "i": 7754
+          },
+          {
+            "kind": 2,
+            "i": 8524
+          },
+          {
+            "kind": 2,
+            "i": 8274
+          }
+        ],
+        "terrainEdits": 0,
+        "cartCells": [
+          7629,
+          7630,
+          7631,
+          7757,
+          7758,
+          7759,
+          7885,
+          7886,
+          7887
+        ],
+        "resourceTargets": {
+          "stone": [
+            10318,
+            10446,
+            10319
+          ],
+          "iron": [
+            7754,
+            8524,
+            8274
+          ]
+        },
+        "scope": "offline experiment; three deposits each and 32 mature trees, not a first-winter economy proof"
+      },
+      "water": 1300,
+      "mountain": 6711,
+      "trees": 2127
+    },
+    {
+      "seed": 7,
+      "size": 128,
+      "start": {
+        "x": 86,
+        "y": 64
+      },
+      "proof": {
+        "reachable": 4789,
+        "nearby": 980,
+        "matureTrees": 216,
+        "stone": 28,
+        "iron": 3,
+        "shoreApproaches": 23,
+        "shoreTarget": 8521,
+        "removedTrees": 0,
+        "removedRocks": 0,
+        "additions": [
+          {
+            "kind": 2,
+            "i": 8657
+          },
+          {
+            "kind": 2,
+            "i": 8153
+          },
+          {
+            "kind": 2,
+            "i": 8024
+          }
+        ],
+        "terrainEdits": 0,
+        "cartCells": [
+          8149,
+          8150,
+          8151,
+          8277,
+          8278,
+          8279,
+          8405,
+          8406,
+          8407
+        ],
+        "resourceTargets": {
+          "stone": [
+            8157,
+            8029,
+            7773
+          ],
+          "iron": [
+            8657,
+            8153,
+            8024
+          ]
+        },
+        "scope": "offline experiment; three deposits each and 32 mature trees, not a first-winter economy proof"
+      },
+      "water": 1327,
+      "mountain": 6504,
+      "trees": 2248
+    },
+    {
+      "seed": 42,
+      "size": 128,
+      "start": {
+        "x": 72,
+        "y": 68
+      },
+      "proof": {
+        "reachable": 3876,
+        "nearby": 867,
+        "matureTrees": 310,
+        "stone": 23,
+        "iron": 7,
+        "shoreApproaches": 21,
+        "shoreTarget": 9018,
+        "removedTrees": 4,
+        "removedRocks": 0,
+        "additions": [],
+        "terrainEdits": 0,
+        "cartCells": [
+          8647,
+          8648,
+          8649,
+          8775,
+          8776,
+          8777,
+          8903,
+          8904,
+          8905
+        ],
+        "resourceTargets": {
+          "stone": [
+            8397,
+            8140,
+            8527
+          ],
+          "iron": [
+            10177,
+            10305,
+            7502
+          ]
+        },
+        "scope": "offline experiment; three deposits each and 32 mature trees, not a first-winter economy proof"
+      },
+      "water": 1262,
+      "mountain": 6871,
+      "trees": 2549
+    },
+    {
+      "seed": 999,
+      "size": 128,
+      "start": {
+        "x": 82,
+        "y": 62
+      },
+      "proof": {
+        "reachable": 4308,
+        "nearby": 918,
+        "matureTrees": 265,
+        "stone": 30,
+        "iron": 34,
+        "shoreApproaches": 21,
+        "shoreTarget": 8261,
+        "removedTrees": 5,
+        "removedRocks": 3,
+        "additions": [],
+        "terrainEdits": 0,
+        "cartCells": [
+          7889,
+          7890,
+          7891,
+          8017,
+          8018,
+          8019,
+          8145,
+          8146,
+          8147
+        ],
+        "resourceTargets": {
+          "stone": [
+            8915,
+            7763,
+            9171
+          ],
+          "iron": [
+            8909,
+            9424,
+            9166
+          ]
+        },
+        "scope": "offline experiment; three deposits each and 32 mature trees, not a first-winter economy proof"
+      },
+      "water": 1317,
+      "mountain": 6735,
+      "trees": 1992
+    },
+    {
+      "seed": -1,
+      "size": 128,
+      "start": {
+        "x": 54,
+        "y": 54
+      },
+      "proof": {
+        "reachable": 2167,
+        "nearby": 693,
+        "matureTrees": 195,
+        "stone": 3,
+        "iron": 3,
+        "shoreApproaches": 51,
+        "shoreTarget": 8886,
+        "removedTrees": 3,
+        "removedRocks": 1,
+        "additions": [
+          {
+            "kind": 1,
+            "i": 7736
+          },
+          {
+            "kind": 1,
+            "i": 6835
+          },
+          {
+            "kind": 1,
+            "i": 7863
+          },
+          {
+            "kind": 2,
+            "i": 6962
+          },
+          {
+            "kind": 2,
+            "i": 7355
+          },
+          {
+            "kind": 2,
+            "i": 7099
+          }
+        ],
+        "terrainEdits": 0,
+        "cartCells": [
+          6837,
+          6838,
+          6839,
+          6965,
+          6966,
+          6967,
+          7093,
+          7094,
+          7095
+        ],
+        "resourceTargets": {
+          "stone": [
+            7736,
+            6835,
+            7863
+          ],
+          "iron": [
+            6962,
+            7355,
+            7099
+          ]
+        },
+        "scope": "offline experiment; three deposits each and 32 mature trees, not a first-winter economy proof"
+      },
+      "water": 1346,
+      "mountain": 7039,
+      "trees": 1864
+    }
+  ]
+}
