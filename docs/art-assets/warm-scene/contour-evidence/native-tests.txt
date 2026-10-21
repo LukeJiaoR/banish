@@ -1,0 +1,14 @@
+PASS coast topology preserves open exits, islands and diagonal components
+PASS one bounded smoothing pass keeps original boundary vertices within quarter cell per axis
+PASS mountain UV field is repeatable and no longer repeats after four cells
+PASS UV triangles remain oriented and gently scaled over supported map range
+PASS affine sampling maps every shared UV vertex to exact raised face vertex
+PASS new presentation helpers consume no gameplay random stream and change no world data
+  Distant dirty repairs: 288 tiles, not 147456
+PASS two distant contour repairs stay bounded on a 384-cell map
+PASS native smoothed water masks preserve every tile center including single pond, channel and diagonal contacts
+PASS building placement/removal occupancy does not stale or alter cached coast pixels
+PASS overlapping and distant edits produce stable clustered native repairs
+  Native repair diagnostic: max channel delta 20; differing channels 7694; means < 0.08/255
+PASS native full/dirty ground repairs are bounded, stable, seasonal and leave world state unchanged
+Scene contours: 11 groups passed including native Canvas pixels

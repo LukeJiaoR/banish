@@ -35,3 +35,7 @@ All other cases can be reproduced with the command above. Both original runtime 
 Current checks: 159 manifest PNG paths and building/carry coverage; terrain seasonal routing, pattern reuse/replacement/fallback and world coordinates; 10 mountain geometry/render/hit suites; exact-byte adoption and preserved mountain signatures; 36 offline production-render cases with unchanged gameplay state. Older browser results are historical evidence only.
 
 #87 remains open. Obvious stepped sand banks and broad mountain repetition still exist, and no claim of fully unified scenery is made. This batch intentionally does not modify shoreline geometry, mountain assets or the riverbay experiment. Actual browser/mobile layout, touch behavior, device performance, sustained play and a truly dense late-game save are unverified. A 390px Canvas is not a physical-phone acceptance test. Future work should address these specific visible defects rather than restarting good buildings or adding noisy new material sets.
+
+## 2026-10-21 contour candidate
+
+A subsequent local candidate addresses the visible stepped shore and regular ridge sampling, rather than recoloring another PNG. See [contour scope, contracts, provenance and offline verification](contours.md). It preserves #119 UI and original assets, has a separate same-state baseline comparison, and does not close #87 or claim browser/mobile/A-style acceptance.
