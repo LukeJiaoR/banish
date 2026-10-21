@@ -156,20 +156,15 @@ G.ui = {
     return '等待下一项任务';
   },
 
-  // Read-only estimate at the current occupancy. endDay has already charged the
-  // current winter day, so only later daily deductions belong in futureWinter.
+  // Shared read-only budget at current occupancy. The remaining window excludes
+  // the current calendar day, including a pre-burn season autosave on reload.
   // Keep demand unrounded for stock comparisons; only displayed totals round up.
   heatDemand: function () {
-    const g = G.game, w = G.world;
-    const fullWinter = w.buildings.reduce((n, b) =>
-      n + (G.isOccupiedHome(w, b) ? G.BDEF[b.type].warmWoodPerYear : 0), 0);
-    const winter = g.season === 3;
-    const futureDays = winter ? Math.max(0, G.SEASON_DAYS - 1 - g.day % G.SEASON_DAYS) : G.SEASON_DAYS;
-    return { fullWinter, winter, futureDays, futureWinter: fullWinter * futureDays / G.SEASON_DAYS };
+    return G.townHeatingBudget();
   },
 
   heatDemandText: function (heat) {
-    return `当前已入住住房：整冬约需 ${heat.fullWinter} 柴火` + (G.heatingPolicy?.().allowCoal?`当量（煤补柴已开，可用煤 ${G.heatingCoalAvailable().toFixed(2)}，1煤=2柴）`:'') +
+    return `当前已入住住房：整冬约需 ${Math.ceil(heat.fullWinter)} 柴火` + (G.heatingPolicy?.().allowCoal?`当量（煤补柴已开，可用煤 ${G.heatingCoalAvailable().toFixed(2)}，1煤=2柴）`:'') +
       (heat.winter ? `；本冬此后约需 ${Math.ceil(heat.futureWinter)}（还剩 ${heat.futureDays} 次扣除）` : '');
   },
 
@@ -1076,7 +1071,7 @@ G.ui = {
     const hh = Math.floor(g.h), weather = G.climateWeather?.();
     const temperature = weather ? ` · 今日 ${weather.temperature}°C` : '';
     this.el.date.innerHTML = `${this.icon ? this.icon('clock') : ''}<span>第 ${g.year} 年 · ${G.SEASON_NAMES[g.season]} ${(g.day % G.SEASON_DAYS) + 1} 日 · ${String(hh).padStart(2, '0')}:00${temperature}</span>`;
-    this.el.date.title = '游戏时间；时钟图标不代表日照或居民作息' + (weather ? `；${weather.climate}，今日 ${weather.temperature}°C，影响农田成长与霜损；住房取暖和果园仍沿用原规则` : '');
+    this.el.date.title = '游戏时间；时钟图标不代表日照或居民作息' + (weather ? `；${weather.climate}，今日 ${weather.temperature}°C，影响农田成长与霜损；${G.game.heatRules?'冬季住房耗柴随气温变化，果园仍沿用原规则':'住房取暖和果园仍沿用原规则'}` : '');
     const w = G.world;
     const adults = w.citizens.filter(c => c.adult).length;
     const children = w.citizens.length - adults;
@@ -1451,7 +1446,7 @@ G.ui = {
     return {
       stock: `${b.type === 'supplycamp' ? '临时补给点' : '屋内'}现货：${this.supplyStockText(s.stock)}`,
       capacity: `本地存量 ${this.supplyNumber(G.supplySum(s.stock))} / ${G.SUPPLY.homeCap}；当前 ${s.people} 人`,
-      days: physical ? `${b.houseFire ? '火情封存，目前不可食用或取暖；以下仅按存量折算。' : ''}仅本地现货：口粮 ${this.supplyNumber(s.foodDays)} 天；取暖燃料 ${this.supplyNumber(s.fuelDays)} 个冬季日（临时补给点不能代替住房取暖）。在途未到不算可用。` : '自动供给：每日仍直接使用公共粮柴；本地储备天数尚不适用。',
+      days: physical ? `${b.houseFire ? '火情封存，目前不可食用或取暖；以下仅按存量折算。' : ''}仅本地现货：口粮 ${this.supplyNumber(s.foodDays)} 天；取暖燃料 ${this.supplyNumber(s.fuelDays)} 个冬季日${s.climate?'（从后续冬季扣料起，按逐日气温顺序累计，最多计至本冬结束；临时补给点不能代替住房取暖）':'（临时补给点不能代替住房取暖）'}。在途未到不算可用。` : '自动供给：每日仍直接使用公共粮柴；本地储备天数尚不适用。',
       incoming: `实际在途：${this.supplyStockText(s.incoming)}`,
       buyers: `正在采购/送回：${s.buyers.length ? s.buyers.map(c => c.name).join('、') : '无人'}；本户健康成人候选 ${candidates.length} 人（先收尾当前任务，不代表已出发）。${!candidates.length && s.people ? '无健康成人采购者，需空闲散工协助；学生和病人不采购。' : ''}`,
       reason: s.reason,
@@ -1777,9 +1772,11 @@ G.ui = {
   heatingInfoData:function(b){
     const s=G.homeHeatingSummary(b);if(!s)return null;
     const last=s.last,physical=G.supplyEnabled&&G.supplyEnabled(),local=physical?G.householdSupplySummary(b).stock:null;
+    const winter=G.isWinter(),costDay=winter?'今日':'入冬首日';
     return {summary:s,data:{policy:`全镇策略：${s.allowCoal?'柴火不足时允许煤补足':'仅烧柴火，不动用煤'}；取暖保留煤底线 ${s.coalReserve}`,
       stock:physical?`本屋柴火 ${this.supplyNumber(local.firewood)} · 煤 ${this.supplyNumber(local.coal)}；取暖只用本地现货，公共煤 ${s.coalStock.toFixed(2)} 不能直接暖屋`:`煤库存 ${s.coalStock.toFixed(2)} · 可用于取暖 ${s.coalAvailable.toFixed(2)} · 当前燃料约 ${s.fuel.toFixed(2)} 柴火当量`,
-      home:`本屋${s.occupied?'已入住':'空置不耗燃料'}，冬季每日需要 ${s.perDay.toFixed(2)} 柴火当量。${G.isWinter()&&s.occupied&&s.unheated?'当前未供暖，住户仍会受冻。':''}`,
+      home:`本屋${s.occupied?'已入住':'空置不耗燃料'}，${s.climate?`${costDay}气温 ${s.temperature}°C；${s.occupied?'':'入住时'}${costDay}需要`:'冬季每日需要'} ${s.perDay.toFixed(2)} 柴火当量。${winter&&s.occupied&&s.unheated?'当前未供暖，住户仍会受冻。':''}`,
+      budget:`按本屋入住计算，整冬 ${G.SEASON_DAYS} 日合计约 ${this.supplyNumber(s.fullWinter)} 柴火当量。${s.climate?'按本年逐日气温累计，不能用今日耗量乘天数；':'沿用固定冬季日耗；'}空屋不扣料。`,
       receipt:last?`最近结算：第 ${last.day+1} 天，实际烧柴 ${last.wood.toFixed(2)}、煤 ${last.coal.toFixed(2)} / 需求 ${last.need.toFixed(2)} 柴火当量${last.wood+last.coal*s.ratio+1e-8<last.need?'（当时燃料未足）':''}`:'暂无本屋冬季取暖结算记录；旧档不编造用量',
       rule:(physical?'真实配送只烧本屋现货，先柴后煤；煤底线仅限制公共库存向住宅配送，屋内已配送煤依当前策略使用。':'全镇先烧柴再用底线以上的煤补缺。')+'1煤=2柴热量为本作适配。底线只约束取暖，钢工具/贸易仍能使用煤。'+(physical?'修改影响后续配送和下一次冬季日界扣料':'修改仅影响下一次冬季日界扣料')+'，不会立即暖屋；粮柴账本不包含煤耗。'}};
   },
@@ -2108,7 +2105,7 @@ G.ui = {
       displaced: `开始后搬出：${quote.families} 户 / ${quote.people} 人；施工期间不能住在这里。`,
       housing: `全镇其余空屋 ${quote.freeHomes} 户 · 宿舍空位 ${quote.boardingSlots} 户。仅为全镇统计，未核实对住户是否可达，也不会预留床位。`,
       cold: `${quote.winter ? '⚠ 当前正值寒冬。' : '冬季风险：'}搬出后若无可达住处和柴火，住户可能受冻；即使全镇有空位也不能保证入住。`,
-      fuel: `本作取暖：有人入住时，每屋每年约 ${quote.oldFuel} → ${quote.newFuel} 柴火（冬季集中消耗，省三分之一）。`,
+      fuel: `本作取暖：有人入住时，每屋${G.game.heatRules?'本年整冬':'每年'}约 ${this.supplyNumber(quote.oldFuel)} → ${this.supplyNumber(quote.newFuel)} 柴火（冬季集中消耗，省三分之一）。`,
       reason: quote.ok ? '当前库存和可达建筑工人满足开始条件，补料运到场后才能施工；其他工地可能先领取库存。' : `暂不能升级：${quote.reason || '请检查建材和可用建筑工人。'}`,
     } };
   },
@@ -4993,7 +4990,7 @@ G.ui = {
     const q=G.startConfigQuote({seed:seed.value,preset:s.preset,terrain:s.terrain,mapSize:s.mapSize,climate:s.climate});
     seed.setAttribute('aria-invalid',String(!q.ok));
     const climateName=q.climateSummary ? ` · ${q.climateSummary.name}` : '';
-    const climateNote=q.climateSummary ? `${q.climateSummary.note} 气候新村使用 v5 存档，旧程序无法读取；住房取暖和果园温度差异尚未实现。` : '';
+    const climateNote=q.climateSummary ? `${q.climateSummary.note} 气候新村使用 v6 存档，旧程序无法读取；冬季住房耗柴随气温变化，果园沿用原规则。` : '';
     if(q.ok){const p=q.presetSummary;
       write('new-game-preview',`已选：${p.name} · ${terrainName} · ${q.mapSizeSummary.name}${climateName} · ${p.population}人`);
       write('new-game-summary',`新村预览：种子 ${q.config.seed} · ${p.name} · ${terrainName} · ${q.mapSizeSummary.name}${climateName}\n${climateNote}\n${q.mapSizeSummary.note}\n${p.families}家庭 / ${p.population}人（${p.adults}成人、${p.children}儿童）；仅有储物车，住房需自行建设\n${['wood','stone','iron','food','firewood','tools'].map(k=>`${G.RES[k].name} ${p.resources[k]}`).join(' · ')}\n${p.seedNote}\n${p.equipmentNote} ${p.adaptationNote}\n${terrainNote}`);

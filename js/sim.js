@@ -96,6 +96,7 @@ G.newGameState = function (startConfig = null) {
   const g = {
     startConfig: startConfig ? {...startConfig} : null,
     climate: startConfig?.climate ? {v:G.CLIMATE_VERSION,type:startConfig.climate,lastDay:0} : null,
+    heatRules: startConfig?.climate ? {v:1,lastDay:0} : null,
     h: 6, day: 0, season: 0, year: 1,
     speed: 1, paused: false,
     res: { wood: 80, stone: 48, iron: 0, tools: 15, food: 500, meat: 0, eggs:0, vegetables: 0, apples:0, pears:0, grain: 500, leather: 0, wool: 0, clothes: 0, warmCoats: 0, herbs: 0, coal: 0, steelTools: 0, ale: 0, firewood: 50 }, // 开局（原版中难度 5 家庭，工具 15 件≈第一轮磨损周期）；存粮较原版加厚：15 人 6 天食物跑道撑不到第一座采集屋建成
@@ -217,16 +218,9 @@ G.endDay = function () {
   // ---- 工具磨损：每个成人每天磨损 1/toolLifeDays 把；用尽则全员生产减半 ----
   const adultsNow = w.citizens.filter(c => !c.dead && c.adult).length;
   if(!G.personalToolsEnabled())G.wearTools(adultsNow);
-  // 有人住的房子才烧柴（含石屋/宿舍；取暖量按建筑类型，石屋比木屋省三分之一）
-  const houses = w.buildings.filter(b => G.isOccupiedHome(w, b));
-  // 本作预算：木屋每年烧30柴火（石屋20），集中在冬季消耗；柴火按屋支付，付不起的屋子挨冻
-  for (const h of houses) h.unheated = false;
-  if (winter && houses.length) {
-    for (const h of houses) {
-      const perHouse = G.BDEF[h.type].warmWoodPerYear / G.SEASON_DAYS;
-      G.heatHome(h,perHouse);
-    }
-  }
+  // Retain the original post-autosave/meal heating boundary. A loaded season
+  // autosave never catches up the skipped bill; only this new day is settled.
+  G.advanceHomeHeating();
 
   // 学堂学生数（每天重算，供入学容量判断）
   const schoolCount = {};
@@ -272,11 +266,11 @@ G.endDay = function () {
   if (pop > 0 && foodStock > pop * G.LIFE.eatPerDay * 8) g.warned.hunger = false;
   if (pop > 0 && g.season === 2) {
     // 按实际取暖需求警告：需求 ≈ Σ 有人住的房屋年取暖量（冬季集中烧完）
-    const warmNeed = w.buildings.reduce((s, b) => s + (G.isOccupiedHome(w, b) ? G.BDEF[b.type].warmWoodPerYear : 0), 0);
+    const warmNeed = G.townHeatingBudget().fullWinter;
     if (G.usableHeatingFuel() >= warmNeed) g.warned.firewood = false;
     else if (!g.warned.firewood) {
       g.warned.firewood = true;
-      G.ui.toast(G.heatingPolicy().allowCoal?`⚠ 冬天将至，取暖燃料不足（可用约 ${Math.floor(G.usableHeatingFuel())} 柴火当量，需求约 ${warmNeed}）`:`⚠ 冬天将至，柴火不足（现有 ${Math.floor(g.res.firewood)}，需求约 ${warmNeed}）`, 'warn');
+      G.ui.toast(G.heatingPolicy().allowCoal?`⚠ 冬天将至，取暖燃料不足（可用约 ${Math.floor(G.usableHeatingFuel())} 柴火当量，需求约 ${Math.ceil(warmNeed)}）`:`⚠ 冬天将至，柴火不足（现有 ${Math.floor(g.res.firewood)}，需求约 ${Math.ceil(warmNeed)}）`, 'warn');
     }
   } else g.warned.firewood = false;
   if (pop > 0 && !g.warned.foodLow && foodStock < pop * G.LIFE.eatPerDay * 3) {
@@ -2540,7 +2534,7 @@ G.scheduleJobs = function () {
     }
     // 供体 4：秋收窗口宝贵 → 从伐木/护林抽人抢收
     if ((harvestSeason || G.farmHarvestReady(b)) && b.type === 'farm') {
-      const winterNeed = w.buildings.reduce((n, x) => n + (G.isOccupiedHome(w, x) ? G.BDEF[x.type].warmWoodPerYear : 0), 0);
+      const winterNeed = G.townHeatingBudget().fullWinter;
       const d = w.buildings.find(x => x.state === 'ok' && x.type === 'forester' && x.workers.length > 0 && available(x)) ||
         w.buildings.find(x => x.state === 'ok' && x.type === 'woodcutter' && x.workers.length > 0 && G.usableHeatingFuel() >= winterNeed && available(x));
       if (d) { give(d); return; }
@@ -2764,7 +2758,7 @@ G.houseUpgradeQuote=function(b){
   const reason=missing.length?'补料不足：'+missing.map(([k,qty])=>G.RES[k].name+'需'+qty).join('、'):!builder?'没有成人能到达这间房屋施工，请先打通道路':'可升级：住户立即搬出，完成施工后才能重新入住';
   const key=JSON.stringify([b.id,cost,salvage,due,families.map(f=>[f.id,...f.members]),people,freeHomes,boardingSlots,winter,!missing.length,builder]);
   return {ok:!missing.length&&builder,reason,key,cost,salvage,due,families:families.length,people,freeHomes,boardingSlots,winter,
-    oldFuel:G.BDEF.house.warmWoodPerYear,newFuel:G.BDEF.stonehouse.warmWoodPerYear};
+    oldFuel:G.homeHeatingWinterBudget({type:'house'}),newFuel:G.homeHeatingWinterBudget({type:'stonehouse'})};
 };
 G.upgradeHouse=function(b,expectedKey){
   const q=G.houseUpgradeQuote(b);
@@ -3755,7 +3749,7 @@ G.townHallSummary = function(b) {
     averageHealth:pop?cs.reduce((s,c)=>s+G.healthOf(c),0)/pop:0,sick:cs.filter(G.isSick).length,
     doctors:w.buildings.filter(h=>h.type==='hospital'&&h.state==='ok').reduce((s,h)=>s+h.workers.filter(id=>w.cmap[id]&&!w.cmap[id].dead&&!G.isSick(w.cmap[id])).length,0),herbs:g.res.herbs,
     foodDays:pop?g.res.food/(pop*G.LIFE.eatPerDay):0,offer,offerPeople:people,offerFamilies:offeredFamilies,offerAdults:offeredFamilies*2,offerChildren:people-offeredFamilies*2,
-    foodDaysAfter:pop+people?g.res.food/((pop+people)*G.LIFE.eatPerDay):0,addedFoodPerDay:people*G.LIFE.eatPerDay,addedFuelPerWinter:offeredFamilies*30,
+    foodDaysAfter:pop+people?g.res.food/((pop+people)*G.LIFE.eatPerDay):0,addedFoodPerDay:people*G.LIFE.eatPerDay,addedFuelPerWinter:offeredFamilies*G.homeHeatingWinterBudget({type:'house'}),
     arriving:cs.filter(G.isArriving).length,nextDay:n.nextDay,accepted:n.accepted,declined:n.declined};
 };
 
@@ -4534,6 +4528,49 @@ G.cemeterySummary=function(b){
 
 /* Coal can replace missing firewood only after an explicit town policy choice.
  * Reserve is a heating floor, not a reservation against industry or trade. */
+/* Heating v1 is frozen independently from crop climate. Do not alter these
+ * constants for old v6 bills: a future balance change needs a new heat version.
+ * Winter only; Fair's multi-seed winter mean stays near the former 30/20/75.
+ * Inputs are explicit so candidate saves never consult the live world. */
+G.HEAT_V1=Object.freeze({base:Object.freeze({house:30,stonehouse:20,boarding:75}),offset:2.4,scale:20,min:.5,max:1.5});
+G.heatingNeedFor=function(type,day,seed,climate,heatRules){
+  if(!heatRules)return G.seasonOf(day)===3?(G.BDEF[type]?.warmWoodPerYear||0)/G.SEASON_DAYS:0;
+  if(heatRules.v!==1||!climate||climate.v!==1||!Object.hasOwn(G.HEAT_V1.base,type))throw new Error('取暖规则不受支持');
+  const temperature=G.temperatureFor(seed,day,climate.type,climate.v);
+  if(G.seasonOf(day)!==3)return 0;
+  const r=G.HEAT_V1;return r.base[type]/12*G.clamp(1-(temperature+r.offset)/r.scale,r.min,r.max);
+};
+G.homeHeatingNeed=(b,day=G.game.day,g=G.game,w=G.world)=>G.heatingNeedFor(b.type,day,w.seed,g.climate,g.heatRules);
+G.heatingWinterStart=g=>Math.floor(g.day/G.YEAR_DAYS)*G.YEAR_DAYS+G.SEASON_DAYS*3;
+G.homeHeatingTotal=function(b,start,days,g=G.game,w=G.world){let need=0;for(let d=start;d<start+days;d++)need+=G.homeHeatingNeed(b,d,g,w);return need;};
+G.homeHeatingWinterBudget=(b,g=G.game,w=G.world)=>g.heatRules?G.homeHeatingTotal(b,G.heatingWinterStart(g),G.SEASON_DAYS,g,w):(G.BDEF[b.type]?.warmWoodPerYear||0);
+G.townHeatingBudget=function(g=G.game,w=G.world){
+  const homes=w.buildings.filter(b=>G.isOccupiedHome(w,b)),winter=g.season===3;
+  const fullWinter=homes.reduce((n,b)=>n+G.homeHeatingWinterBudget(b,g,w),0);
+  const futureDays=winter?Math.max(0,G.SEASON_DAYS-1-g.day%G.SEASON_DAYS):G.SEASON_DAYS;
+  const futureWinter=winter?(g.heatRules?homes.reduce((n,b)=>n+G.homeHeatingTotal(b,g.day+1,futureDays,g,w),0):fullWinter*futureDays/G.SEASON_DAYS):fullWinter;
+  return {fullWinter,winter,futureDays,futureWinter};
+};
+// In autumn stage the first winter bills; in winter stage only future bills.
+// The legacy fixed four/two-day reserve is deliberately unchanged at year end.
+G.heatingSupplyStart=(g=G.game)=>g.season===3?g.day+1:G.heatingWinterStart(g);
+G.homeSupplyHeat=function(b,days,g=G.game,w=G.world){
+  if(!G.BDEF[b.type]?.warmWoodPerYear)return 0;
+  return g.heatRules?G.homeHeatingTotal(b,G.heatingSupplyStart(g),days,g,w):G.BDEF[b.type].warmWoodPerYear/G.SEASON_DAYS*days;
+};
+G.homeFuelDays=function(b,fuel,g=G.game,w=G.world){
+  if(!G.BDEF[b.type]?.warmWoodPerYear)return 0;
+  if(!g.heatRules)return fuel/(G.BDEF[b.type].warmWoodPerYear/G.SEASON_DAYS);
+  const start=G.heatingSupplyStart(g),end=G.heatingWinterStart(g)+G.SEASON_DAYS;let days=0;
+  for(let day=start;day<end;day++){const need=G.homeHeatingNeed(b,day,g,w);if(fuel<need)return days+Math.max(0,fuel)/need;fuel-=need;days++;}return days;
+};
+G.advanceHomeHeating=function(){
+  const g=G.game;if(g.heatRules&&g.heatRules.lastDay>=g.day)return;
+  for(const b of G.world.buildings.filter(b=>G.isOccupiedHome(G.world,b))){
+    if(g.season===3)G.heatHome(b,G.homeHeatingNeed(b));else b.unheated=false;
+  }
+  if(g.heatRules)g.heatRules.lastDay=g.day;
+};
 G.COAL_HEAT=2;
 G.heatingPolicy=()=>G.game.heating||{allowCoal:false,coalReserve:20};
 G.heatingCoalAvailable=function(){const p=G.heatingPolicy();return p.allowCoal?Math.max(0,G.game.res.coal-p.coalReserve):0;};
@@ -4547,6 +4584,7 @@ G.setHeatingPolicy=function(allowCoal,coalReserve){
   G.game.heating={allowCoal,coalReserve};G.game.warned.firewood=false;return true;
 };
 G.heatHome=function(b,need){
+  if(G.game.heatRules){if(!G.isOccupiedHome(G.world,b)||G.game.season!==3||b.lastHeating?.day===G.game.day)return;need=G.homeHeatingNeed(b);}
   if(G.supplyEnabled&&G.supplyEnabled()){G.heatSuppliedHome(b,need);return;}
   const r=G.game.res,wood=Math.min(r.firewood,need),coal=Math.min(G.heatingCoalAvailable(),Math.max(0,need-wood)/G.COAL_HEAT);
   G.ledgerRecord('used','firewood',wood);r.firewood-=wood;r.coal-=coal;
@@ -4557,7 +4595,8 @@ G.homeHeatingSummary=function(b){
   const p=G.heatingPolicy(),last=b.lastHeating;
   return {allowCoal:p.allowCoal,coalReserve:p.coalReserve,coalStock:G.game.res.coal,coalAvailable:G.heatingCoalAvailable(),fuel:G.usableHeatingFuel(),
     ratio:G.COAL_HEAT,occupied:G.isOccupiedHome(G.world,b),unheated:!!b.unheated,
-    last:last?{...last}:null,perDay:G.BDEF[b.type].warmWoodPerYear/G.SEASON_DAYS};
+    last:last?{...last}:null,climate:!!G.game.heatRules,temperature:G.game.heatRules?G.climateWeather(G.game.season===3?G.game.day:G.heatingWinterStart(G.game)).temperature:null,
+    perDay:G.homeHeatingNeed(b,G.game.season===3?G.game.day:G.heatingWinterStart(G.game)),fullWinter:G.homeHeatingWinterBudget(b),supplyStartDay:G.heatingSupplyStart()};
 };
 
 

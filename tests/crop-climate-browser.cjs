@@ -45,7 +45,7 @@ async function inside(page, selector) {
     await page.locator('#new-game-seed').fill('17');
     await click(page, '#new-game-review-button'); await inside(page, '#new-game-confirm');
     assert.match(await page.locator('#new-game-confirm-summary').textContent(), /严寒 · Harsh/);
-    assert.match(await page.locator('#new-game-confirm-summary').textContent(), /v5.*旧程序无法读取/);
+    assert.match(await page.locator('#new-game-confirm-summary').textContent(), /v6.*旧程序无法读取/);
     await page.screenshot({ path: path.join(output, `${viewport.width}-climate-review.png`) });
     await click(page, '#new-game-back'); await click(page, '#new-game-climate-mild');
     assert.equal(await page.locator('#new-game-confirm').isVisible(), false);
@@ -61,6 +61,7 @@ async function inside(page, selector) {
       if (!b) throw new Error('Synthetic browser farm cannot be placed');
       b.farm.forEach(tile => { tile.sown = true; }); b.sownAll = true; b.growth = .5;
       G.game.day = 30; G.game.season = 2; G.game.year = 1; G.game.climate.lastDay = G.game.day;
+      G.advanceHomeHeating(); // Settle the synthetic autumn day through the real heating path.
       G.damageFrostTiles(b, b.farm.slice(0, 3));
       G.sel = { kind: 'b', id: b.id }; G.ui.showInfo(); G.ui.refreshHUD();
       return { warning: G.farmClimateSummary(b).warning, temperature: G.climateWeather().temperature };

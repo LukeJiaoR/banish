@@ -9,7 +9,9 @@ const args=process.argv.slice(2),arg=(k,d)=>args.includes(k)?args[args.indexOf(k
 const root=path.resolve(arg('--root',path.join(__dirname,'..')));
 const near=(a,b)=>assert(Math.abs(a-b)<1e-7,`${a} != ${b}`);
 function fixture({type='stonehouse',fuel=50,cutter=true,physical=false}={}){
- const G=loadGame(root);G.newGame(5);const w=G.world;
+ const G=loadGame(root);G.newGame(5);
+ // This historical 30/20/75 budget benchmark explicitly retains legacy v4 heating.
+ G.game.climate=null;G.game.heatRules=null;delete G.game.startConfig.climate;const w=G.world;
  for(const key of ['water','rock','road'])w[key].fill(0);
  w.bgrid.fill(-1);w.treeIdx.fill(-1);w.trees=[];w.buildings=[];w.bmap={};w.citizens=[];w.cmap={};w.families=[];w.marked.clear();w.markedRocks.clear();G.bumpNavigation(w);
  G.addBuilding('storage',10,10,{instant:true,free:true});

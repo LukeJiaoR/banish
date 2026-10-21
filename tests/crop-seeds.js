@@ -3,7 +3,7 @@
 const assert=require('node:assert/strict'),path=require('node:path');
 const {loadGame}=require('./helpers/playability');let passed=0;
 function fresh(){
-  const G=loadGame(path.resolve(__dirname,'..'));G.newGame(1);G.game.climate=null;delete G.game.startConfig.climate; // Legacy calendar contract.
+  const G=loadGame(path.resolve(__dirname,'..'));G.newGame(1);G.game.climate=null;G.game.heatRules=null;delete G.game.startConfig.climate; // Legacy calendar contract.
 const w=G.world;
   for(const key of ['water','rock','road'])w[key].fill(0);w.bgrid.fill(-1);w.treeIdx.fill(-1);
   w.trees=[];w.buildings=[];w.bmap={};w.citizens=[];w.cmap={};w.families=[];w.marked.clear();w.markedRocks.clear();G.bumpNavigation(w);

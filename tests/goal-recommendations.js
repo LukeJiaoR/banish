@@ -34,9 +34,11 @@ test('empty population emits no zero shutdowns; absent housing leaves fuel alone
  const zero=G.recommendProductionGoals('winter',context({population:0}));assert.equal(Object.keys(zero.values).length,0);assert.match(zero.warnings.join(''),/没有在世居民/);
  const unhoused=G.recommendProductionGoals('winter',context({occupiedHomes:0,fullWinter:0}));assert.equal(unhoused.values.firewood,undefined);assert.match(unhoused.warnings.join(''),/不能解决露宿/);
 });
-test('mixed occupied homes use exact wood stone and boarding heating, excluding empty sites and fire',()=>{
+test('legacy mixed occupied homes use exact 30/20/75 heating, excluding empty sites and fire',()=>{
+ G.game.heatRules=null; // Preserve this fixed-budget recommendation contract as v5.
+ // Historical fixture arithmetic was stale: stone homes use 20, so 30+20+75=125.
  const w=G.world;w.buildings=[{id:1,type:'house',state:'ok',family:1},{id:2,type:'stonehouse',state:'ok',family:2},{id:3,type:'boarding',state:'ok',family:null},{id:4,type:'house',state:'ok',family:null},{id:5,type:'house',state:'site',family:3},{id:6,type:'house',state:'ok',family:4,houseFire:true}];w.families=[{id:1,houseId:1},{id:2,houseId:2},{id:3,houseId:3}];
- const before=JSON.stringify(w),c=G.goalRecommendationContext();assert.equal(c.occupiedHomes,3);assert.equal(c.fullWinter,120);assert.equal(G.recommendProductionGoals('winter',c).values.firewood,150);assert.equal(JSON.stringify(w),before);
+ const before=JSON.stringify(w),c=G.goalRecommendationContext();assert.equal(c.occupiedHomes,3);assert.equal(c.fullWinter,125);assert.equal(G.recommendProductionGoals('winter',c).values.firewood,157);assert.equal(JSON.stringify(w),before);
 });
 test('local limits and exact individual food drafts warn without being overwritten',()=>{
  const c=context({localLimits:[{type:'firewood',limit:0},{type:'tools',limit:3}],specificGoals:{meat:0,grain:100}}),before=JSON.stringify(c),r=G.recommendProductionGoals('winter',c);
