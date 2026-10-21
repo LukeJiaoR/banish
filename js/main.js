@@ -154,9 +154,10 @@ G.serializeGame = function () {
   const w = G.world, g = G.game;
   G.reconcileFood(g);
   // Build a detached wildlife snapshot; saving never moves live prey or claims.
-  const deerWorld={...w,deer:w.deer?.map(d=>({...d}))};
+  const deerWorld={...w,deer:w.deer?.map(d=>({...d,route:d.route?.map(p=>({...p}))})),wildlife:w.wildlife?JSON.parse(JSON.stringify(w.wildlife)):undefined};
   if(deerWorld.deer===undefined)G.initializeDeer(deerWorld,g);
   G.reconcileDeerHabitat(deerWorld,g);
+  G.upgradeWildlife(deerWorld,g);
   return {
     v: w.mapVersion===3?4:w.N===192?3:w.mapVersion===2?2:1, seed: w.seed, N: w.N, mapVersion: w.mapVersion || 0, // N：地图尺寸（旧档跨尺寸迁移裸索引用）
     ...(w.mapVersion===2||w.mapVersion===3||w.N===192?{terrain:{water:Array.from(w.water),rock:Array.from(w.rock),mountain:Array.from(w.mountain),start:{...w.start}}}:{}),
@@ -170,7 +171,8 @@ G.serializeGame = function () {
       heating:g.heating, fishingRules:g.fishingRules, fireDisasters:g.fireDisasters, farmPests:g.farmPests, pasturePests:g.pasturePests, townLedger:g.townLedger, industryLedger:G.industryLedgerForSave(g), challenges:g.challenges, hist: g.hist, buildLog: g.buildLog, toolMode:g.toolMode,toolRemainders:g.toolRemainders,toolWear: g.toolWear, steelToolWear: g.steelToolWear, healthStartDay: g.healthStartDay, nomads:g.nomads, unlocks: g.unlocks, livestock: g.livestock,
       productionGoals: g.productionGoals && { ...g.productionGoals }, productionPaused: g.productionPaused && { ...g.productionPaused },
     },
-    deer:deerWorld.deer.map(d=>({...d})),
+    deer:deerWorld.deer.map(d=>({...d,route:d.route.map(p=>({...p}))})),
+    wildlife:deerWorld.wildlife,
     roads: Array.from(w.road).flatMap((road, i) => road ? [i] : []),
     stoneRoads: Array.from(w.road).flatMap((road, i) => road === 2 ? [i] : []),
     trees: w.trees.map(t => [t.i, t.x, t.y, t.b]),
@@ -351,6 +353,7 @@ G.prepareSaveData = function (d) {
   if(currentConstruction!==(gd.constructionLost!==undefined))bad('建材配送损失记录缺失');
   g.constructionLost={};if(currentConstruction){record(gd.constructionLost,'建材损失');for(const [k,n]of Object.entries(gd.constructionLost)){if(!G.RES_KEYS.includes(k))bad('建材损失类型');g.constructionLost[k]=number(n,'建材损失数量',0);}}
   const currentDeer=d.deer!==undefined;
+  const herdVersion=d.wildlife!==undefined;if(herdVersion&&!currentDeer)bad('鹿群生态缺少动物');
   if(currentDeer!==(gd.huntingLost!==undefined))bad('鹿群存档状态不完整');
   if(currentDeer){const loss=record(gd.huntingLost,'猎获损失');
     if(Object.keys(loss).length!==2||Object.keys(loss).some(k=>!['meat','leather'].includes(k)))bad('猎获损失字段');
@@ -889,21 +892,39 @@ G.prepareSaveData = function (d) {
   for(const b of w.buildings)if(b.type==='roadwork'&&G.roadWorkClearance(w,b).length&&(b.constructionStarted||b.progress!==0||b.roadWork.cells.some(p=>p.used||p.done||p.workLeft!==G.ROAD_WORK_H)||Object.values(b.construction.onsite).some(n=>n>0)))bad('清场未完的道路不能投料或开工');
   if(currentDeer){
     const rows=array(d.deer,'鹿群');if(rows.length!==G.HUNTING.population)bad('鹿群槽位数量');
-    const seen=new Set(),activeTiles=new Set(),keys=['id','x','y','homeX','homeY','returnDay','moveDay','generation'];
+    const seen=new Set(),activeTiles=new Set(),keys=['id','x','y','homeX','homeY','returnDay','moveDay','generation',...(herdVersion?['herdId','route','progress']:[])];
     w.deer=rows.map(row=>{
       record(row,'鹿群槽位');if(Object.keys(row).length!==keys.length||Object.keys(row).some(k=>!keys.includes(k)))bad('鹿群槽位字段');
       const deer={id:integer(row.id,'鹿群 ID',1,G.HUNTING.population),x:integer(row.x,'鹿群 x',0,w.N-1),y:integer(row.y,'鹿群 y',0,w.N-1),
         homeX:integer(row.homeX,'鹿群栖息地 x',0,w.N-1),homeY:integer(row.homeY,'鹿群栖息地 y',0,w.N-1),
-        returnDay:row.returnDay===null?null:number(row.returnDay,'鹿群回归日期',0,G.huntingNow(g)+G.HUNTING.replenishDays),
-        moveDay:integer(row.moveDay,'鹿群下次移动日',0,g.day+G.HUNTING.moveDays),generation:integer(row.generation,'鹿群代次',0)};
-      if(authoritative&&(G.isMountain(w,deer.x,deer.y)||G.isMountain(w,deer.homeX,deer.homeY)))bad('鹿群位置或旧栖地与山体冲突');
+        returnDay:row.returnDay===null?null:number(row.returnDay,'鹿群回归日期',0,G.huntingNow(g)+(herdVersion?G.YEAR_DAYS:G.HUNTING.replenishDays)),
+        moveDay:(herdVersion?number:integer)(row.moveDay,'鹿群下次移动日',0,G.huntingNow(g)+G.HUNTING.moveDays),generation:integer(row.generation,'鹿群代次',0)};
+      if(!herdVersion&&authoritative&&(G.isMountain(w,deer.x,deer.y)||G.isMountain(w,deer.homeX,deer.homeY)))bad('鹿群位置或旧栖地与山体冲突');
       if(seen.has(deer.id))bad('重复鹿群 ID');seen.add(deer.id);
-      if(Math.abs(deer.x-deer.homeX)>G.HUNTING.roamRadius||Math.abs(deer.y-deer.homeY)>G.HUNTING.roamRadius)bad('鹿群越出本地栖息地');
+      if(!herdVersion&&(Math.abs(deer.x-deer.homeX)>G.HUNTING.roamRadius||Math.abs(deer.y-deer.homeY)>G.HUNTING.roamRadius))bad('鹿群越出本地栖息地');
       if(deer.returnDay===null){
-        const tile=deer.y*w.N+deer.x;if(!G.deerHabitat(w,deer.x,deer.y)||activeTiles.has(tile))bad('鹿群位置非法或重叠');activeTiles.add(tile);
+        const tile=deer.y*w.N+deer.x;if((herdVersion?!G.deerTraversable(w,deer.x,deer.y):!G.deerHabitat(w,deer.x,deer.y))||activeTiles.has(tile))bad('鹿群位置非法或重叠');activeTiles.add(tile);
       }
+      if(herdVersion){
+        deer.herdId=integer(row.herdId,'鹿群归属',1,3);if(deer.herdId!==Math.floor((deer.id-1)/8)+1)bad('鹿群归属不匹配');
+        deer.progress=number(row.progress,'鹿群移动进度',0,1);if(deer.progress===1)bad('鹿群移动未提交');
+        const route=array(row.route,'鹿群路线');if(route.length>256||(!route.length&&deer.progress!==0)||deer.returnDay!==null&&(route.length||deer.progress))bad('鹿群路线状态');
+        let x=deer.x,y=deer.y;
+        deer.route=route.map(p=>{record(p,'鹿群路点');if(Object.keys(p).length!==2)bad('鹿群路点字段');const q={x:integer(p.x,'鹿群路点x',0,w.N-1),y:integer(p.y,'鹿群路点y',0,w.N-1)};
+          // Routes can become blocked after construction. Geometry is preserved
+          // and the simulation waits/replans; no invalid long edge is accepted.
+          if(Math.abs(q.x-x)>1||Math.abs(q.y-y)>1||q.x===x&&q.y===y)bad('鹿群非法跨格');x=q.x;y=q.y;return q;});
+      }
+      if(herdVersion&&deer.progress>0&&!G.walkEdgeAllowed(w,deer.x,deer.y,deer.route[0].x,deer.route[0].y))bad('鹿群移动边不可通行');
       return deer;
     });
+    if(herdVersion){
+      const e=record(d.wildlife,'鹿群生态');if(e.v!==2||Object.keys(e).length!==4)bad('鹿群生态版本');
+      const herds=array(e.herds,'鹿群群组');if(herds.length!==3)bad('鹿群群数');
+      w.wildlife={v:2,lastTime:number(e.lastTime,'生态时钟',0,G.huntingNow(g)),nextBirthDay:number(e.nextBirthDay,'繁殖日',G.huntingNow(g),G.huntingNow(g)+G.YEAR_DAYS),herds:herds.map((h,i)=>{
+        record(h,'鹿群群组');if(Object.keys(h).length!==4||h.id!==i+1)bad('鹿群群组字段');return {id:h.id,x:integer(h.x,'鹿群草场x',0,w.N-1),y:integer(h.y,'鹿群草场y',0,w.N-1),nextMoveDay:number(h.nextMoveDay,'鹿群迁徙日',0,G.huntingNow(g)+4)};
+      })};
+    }else G.upgradeWildlife(w,g);
   }else G.initializeDeer(w,g);
   if(w.buildings.filter(b=>b.pastureInfestation).length>G.PASTURE_PESTS.maxActive)bad('牧场疫情上限');
   // Loading is not a daily mortality event; old settlement timestamps never replay.

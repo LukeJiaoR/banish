@@ -1174,12 +1174,13 @@ G.pastureAnimalPoint=function(b,spot,i){
   return {x:b.x+G.clamp(x+dx,.55,b.w-.55),y:b.y+G.clamp(y+dy,.55,b.h-.55),pose};
 };
 G.deerDisplayPoint=function(deer){
-  const pose=G.animalPose(deer.id);
+  const pose=G.animalPose(deer.id),at=G.deerPosition?G.deerPosition(deer):deer;
   // Stay inside the actual habitat tile; never move prey across a shoreline,
   // building or hunting-range boundary for the sake of an animation.
   const reduced=G.buildingReducedMotion();
   if(reduced)pose.flip=deer.id%2===0;
-  return {x:deer.x+(reduced?0:(pose.dx+.32)*.6),y:deer.y+(reduced?0:(pose.dy+.22)*.6),pose};
+  if(deer.route?.length){const target=deer.route[0];pose.flip=target.x+target.y<deer.x+deer.y;return {x:at.x,y:at.y,pose};}
+  return {x:at.x+(reduced?0:(pose.dx+.32)*.6),y:at.y+(reduced?0:(pose.dy+.22)*.6),pose};
 };
 
 // Work uses integer tiles; new tree feet sit at those tiles' visual centers.

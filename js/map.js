@@ -496,6 +496,7 @@ G.areaLand = function (w, x, y, ww, hh) {
 };
 
 /* ---------- 通行 ---------- */
+G.wildlifeInFootprint=(w,b)=>(w.deer||[]).some(d=>{if(d.returnDay!==null)return false;const cells=[{x:d.x,y:d.y}],p=d.progress>0&&d.route?.[0];if(p){cells.push(p);if(p.x!==d.x&&p.y!==d.y)cells.push({x:p.x,y:d.y},{x:d.x,y:p.y});}return cells.some(p=>p.x>=b.x&&p.x<b.x+b.w&&p.y>=b.y&&p.y<b.y+b.h);});
 G.tileBlocked = function (w, x, y) {
   if (x < 0 || y < 0 || x >= w.N || y >= w.N) return true;
   const i = y * w.N + x;
@@ -824,6 +825,9 @@ G.canPlace = function (w, type, ox, oy, fieldSize) {
         return { ok: false, reason: '与其他建筑贴得太近：会挡住它' };
     }
   }
+  // A site may intersect a future route, which wildlife will replan, but
+  // cannot appear around an animal already standing/crossing this footprint.
+  if(w.wildlife&&G.wildlifeInFootprint(w,{x:ox,y:oy,w:def.w,h:def.h}))return {ok:false,reason:'有野鹿正在经过占地，请稍后放置'};
   if (type === 'dock' || type === 'tradingpost') {
     for (let j = oy - 1; j <= oy + def.h; j++)
       for (let i = ox - 1; i <= ox + def.w; i++) {
@@ -957,12 +961,14 @@ G.planBridge = function(w,start,end,options={}) {
     if(w.rock[i]||w.treeIdx[i]>=0)return {ok:false,reason:'桥头需先清除树木或矿石，再重新预览'};
     if(G.roadWorkAt(w,p.x,p.y))return {ok:false,reason:'桥线与未结束铺路工程冲突'};
     if(w.bgrid[i]>=0&&w.bgrid[i]!==options.ignoreId)return {ok:false,reason:'桥线被已有建筑或桥工地占用'};
+    if(options.ignoreId===undefined&&G.wildlifeInFootprint(w,{...p,w:1,h:1}))return {ok:false,reason:'桥头有野鹿正在经过，请稍后规划'};
     path.push(p);
   }
   return {ok:true,path,length,steps:length-1,turns:0,newTiles:length,reusedTiles:0,clearTrees:[],materials:{wood:4*length,stone:length},axis:dx?'x':'y',start,end};
 };
 G.bridgeRemovalStatus = function(w,b) {
   if(b.state!=='ok')return {ok:true};
+  if(G.wildlifeInFootprint(w,b))return {ok:false,reason:'桥上有野鹿，请等它完全离开后再拆除'};
   if(w.citizens.some(c=>!c.dead&&Math.round(c.x)>=b.x&&Math.round(c.x)<b.x+b.w&&Math.round(c.y)>=b.y&&Math.round(c.y)<b.y+b.h))return {ok:false,reason:'桥上有人，请等居民离桥后再拆除'};
   const copy={...w,bmap:{...w.bmap}};delete copy.bmap[b.id];
   // A bridge may also connect a side island. Preserve every adjacent land
@@ -1017,7 +1023,8 @@ G.planTunnel=function(w,start,end,options={}){
   if(mouth?G.isMountain(w,p.x,p.y):!G.isMountain(w,p.x,p.y))return {ok:false,reason:mouth?'两端洞口须在陆地':'洞口间必须是连续山体，不能跨空地、弯折或中途出入口'};
   if(w.water[i]===1||w.rock[i]||w.treeIdx[i]>=0||(!mouth&&w.road[i]))return {ok:false,reason:'隧道不能穿水、露矿或树木；洞口须先清场'};
   if(G.roadWorkAt(w,p.x,p.y))return {ok:false,reason:'隧道与未结束铺路工程冲突'};
-  if(w.bgrid[i]>=0&&w.bgrid[i]!==options.ignoreId)return {ok:false,reason:'隧道或洞口与建筑/工地重叠，不能交叉'};path.push(p);
+  if(w.bgrid[i]>=0&&w.bgrid[i]!==options.ignoreId)return {ok:false,reason:'隧道或洞口与建筑/工地重叠，不能交叉'};
+  if(options.ignoreId===undefined&&G.wildlifeInFootprint(w,{...p,w:1,h:1}))return {ok:false,reason:'洞口有野鹿正在经过，请稍后规划'};path.push(p);
  }
  return {ok:true,path,length,steps:length-1,turns:0,newTiles:length,reusedTiles:0,clearTrees:[],materials:{stone:4*length},axis:dx?'x':'y',start:{...start},end:{...end}};
 };

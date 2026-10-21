@@ -4,7 +4,7 @@ const {loadGame}=require('./helpers/playability');
 const G=loadGame(path.resolve(__dirname,'..'));G.newGame(1);const w=G.world;
 for(const k of ['water','rock','road'])w[k].fill(0);
 w.bgrid.fill(-1);w.treeIdx.fill(-1);w.trees=[];w.buildings=[];w.bmap={};w.citizens=[];w.cmap={};w.families=[];w.marked.clear();w.markedRocks.clear();
-G.bumpNavigation(w);G.game.h=12;G.game.res.wood=1000;
+G.bumpNavigation(w);G.initializeDeer();G.game.h=12;G.game.res.wood=1000;
 const generate=G.genWorld;G.genWorld=(seed,opt)=>{const n=generate(seed,opt);n.water.set(w.water);n.rock.set(w.rock);return n;};
 const fields=[['pasture',2,2,{}],['orchard',12,2,{}],['pasture',2,15,{pastureSize:[20,20],instant:true,free:true}],['orchard',30,15,{orchardSize:[15,15],instant:true,free:true}]];
 for(const [type,x,y,opt]of fields){const r=G.addBuilding(type,x,y,opt);assert(r.ok,r.reason);}
