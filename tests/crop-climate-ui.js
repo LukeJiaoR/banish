@@ -59,7 +59,7 @@ test('actual HTML exposes three labelled climates and visible scope/save warning
   const note = node(f, 'climate-note');
   assert.equal(group.getAttribute('aria-describedby'), note.id);
   assert(!insideDetails(note));
-  assert.match(note.textContent, /仅新村.*农田成长.*提前.*冬季.*住房耗柴随气温变化.*果园沿用原规则.*v6.*旧程序无法读取.*v1–v5.*原取暖规则/);
+  assert.match(note.textContent, /仅新村.*农田成长.*提前.*冬季.*住房耗柴随气温变化.*秋霜损失树上未采果实.*提前采果.*v8.*旧程序无法读取.*v1–v6.*原果园规则.*v1–v5.*原固定取暖.*v1–v7.*不启用提前采果/);
 });
 
 test('default Fair draft does not silently upgrade a legacy village', () => {
@@ -88,10 +88,10 @@ for (const type of ['mild', 'fair', 'harsh']) test(type + ' survives review, act
   seed(f, 17); press(f, 'climate-' + type); press(f, 'review-button');
   assert.equal(G.ui._startSession.intent.config.climate, type);
   assert(node(f, 'confirm-summary').textContent.includes(G.CLIMATES[type].name));
-  assert.match(node(f, 'confirm-summary').textContent, /v6.*旧程序无法读取.*冬季住房耗柴随气温变化.*果园沿用原规则/);
+  assert.match(node(f, 'confirm-summary').textContent, /v8.*旧程序无法读取.*冬季住房耗柴随气温变化.*秋霜仅损失树上未采果实.*v1–v6.*不启用果园冷害.*v1–v7.*不启用提前采果/);
   press(f, 'confirm');
   assert.equal(G.game.climate.type, type); assert.equal(G.game.startConfig.climate, type);
-  const data = JSON.parse(snapshot(G)); assert.equal(data.v, 6);
+  const data = JSON.parse(snapshot(G)); assert.equal(data.v, 8);
   assert.deepEqual(data.game.heatRules, { v: 1, lastDay: 0 });
   const loaded = G.prepareSaveData(data); assert.equal(loaded.game.climate.type, type);
   assert.equal(loaded.game.startConfig.climate, type);

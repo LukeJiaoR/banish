@@ -28,7 +28,10 @@ function fixture() {
       appendChild(child) { this.children.push(child); child.parentNode = this; return child; },
       descendants() { return this.children.flatMap(child => [child, ...child.descendants()]); },
       contains(child) { for (; child; child = child.parentNode) if (child === this) return true; return false; },
+      get options() { return this.tagName === 'SELECT' ? this.descendants().filter(child => child.tagName === 'OPTION') : undefined; },
       querySelectorAll(selector) {
+        const descendant = selector.match(/^(#[\w-]+)\s+([\w-]+)$/);
+        if (descendant) return this.querySelector(descendant[1])?.querySelectorAll(descendant[2]) || [];
         return this.descendants().filter(child => {
           if (selector[0] === '#') return child.id === selector.slice(1);
           if (selector === '.mini-tog') return child.classList.contains('mini-tog');
@@ -110,7 +113,7 @@ function fixture() {
 let passed=0;function test(name,fn){fn();passed++;console.log('ok '+name);}
 function setup(){const f=fixture();f.b=f.building('orchard',{orchardTrees:f.G.newOrchardTrees(),orchardDay:0,orchardReplant:true});f.G.game.unlocks.orchard=true;f.select(f.b);return f;}
 const input=(f,id)=>f.info.querySelector('#'+id),live=(f,k)=>f.info.querySelector('[data-economy-live="orchard-'+k+'"]').textContent;
-test('future 50-fruit help distinguishes existing fruit and actual storage from the seasonal maximum',()=>{const f=setup();assert.match(f.info.innerHTML,/每株未来秋季最多50果，已结旧果不补发，搬运后才入库/);assert.match(f.G.BDEF.orchard.desc,/9株、2名农夫/);assert.match(f.G.BDEF.orchard.desc,/50果（全园450）/);});
+test('future 50-fruit help distinguishes existing fruit and actual storage from the seasonal maximum',()=>{const f=setup();assert.match(f.info.innerHTML,/每株每年最多50果（新村随气温生长，可提前采；旧村仍秋季一次结果），已结旧果不补发，搬运后才入库/);assert.match(f.G.BDEF.orchard.desc,/9株、2名农夫/);assert.match(f.G.BDEF.orchard.desc,/50果（全园450）/);});
 test('nine empty slots and applied replant choice are explicit; selecting alone does not apply',()=>{const f=setup();assert.match(live(f,'age'),/空位 9.*幼树 0.*成树 0/);input(f,'orchard-replant').value='off';f.G.ui.refreshEconomyInfo(f.b);assert(f.b.orchardReplant);assert.match(live(f,'renewal'),/允许/);input(f,'orchard-replant-form').emit('submit');assert.equal(f.b.orchardReplant,false);assert.match(live(f,'renewal'),/暂停/);assert.match(f.info.querySelector('[data-economy-message]').textContent,/已开始的工作继续/);});
 test('per-tree age fruit and warning reflect actual trees without mutating stock or swallowing edited value',()=>{const f=setup(),t=f.b.orchardTrees[0];Object.assign(t,{planted:true,age:f.G.orchardLifetime(0)-20,fruit:17,season:1});f.G.syncOrchardTotals(f.b);f.G.game.season=2;const field=input(f,'orchard-replant');field.value='off';field.focus();const before=JSON.stringify(f.G.serializeGame()),writes=f.info.htmlWrites;for(let i=0;i<20;i++)f.G.ui.renderInfo();assert.equal(JSON.stringify(f.G.serializeGame()),before);assert.equal(field.value,'off');assert.equal(f.doc.activeElement,field);assert.equal(f.info.htmlWrites,writes);assert.match(live(f,'renewal'),/一年内将枯尽 1.*20 树龄日/);assert.match(live(f,'harvest'),/本季未采果实合计 17/);assert.match(live(f,'trees'),/第1株.*待采蔬菜 17/);});
 test('stale selection old DOM hidden panel modal and changed world cannot apply replant',()=>{for(const mode of ['selection','dom','hidden','modal','world']){const f=setup(),form=input(f,'orchard-replant-form');input(f,'orchard-replant').value='off';if(mode==='selection')f.select(f.building('orchard'));if(mode==='dom'){f.G.ui._infoWorld=null;f.G.ui.renderInfo(true);}if(mode==='hidden')f.info.classList.add('hidden');if(mode==='modal')f.G.hasOpenModal=()=>true;if(mode==='world'){f.G.world={...f.G.world};f.G.game=f.G.newGameState();}form.emit('submit');assert(f.b.orchardReplant);}});

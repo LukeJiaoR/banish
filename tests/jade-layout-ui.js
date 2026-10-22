@@ -430,15 +430,14 @@ for(const event of ['pointerdown','mousedown','Enter',' '])test(event+' captures
   assert.equal(f.G.world.buildings.length,1);assert.equal(f.G.world.buildings[0].x,20);
 });
 
-test('blocked placement shows its current reason and disabled action, then recovers with stock',f=>{
+test('material shortage keeps a legal plan confirmable without inventing or spending stock',f=>{
   selectHouse(f);f.G.game.res.wood=0;stage(f);
-  const confirm=f.get('jade-build-confirm'),benefit=f.get('jade-build-benefit');
-  assert.equal(confirm.disabled,true);assert.match(benefit.textContent,/木材不足/);
-  assert(benefit.classList.contains('is-blocked'));assert.match(f.get('jade-build-costs').innerHTML,/is-short/);
-  confirm.click();assert.equal(f.G.world.buildings.length,0);
-  f.G.game.res.wood=80;f.ui.refreshHUD();
-  assert.equal(confirm.disabled,false);assert(!benefit.classList.contains('is-blocked'));
+  const confirm=f.get('jade-build-confirm');
+  assert.equal(confirm.disabled,false);assert.match(f.get('jade-build-costs').innerHTML,/is-short/);
+  const before={...f.G.game.res};
   confirm.click();assert.equal(f.G.world.buildings.length,1);
+  assert.equal(f.G.world.buildings[0].state,'site');
+  assert.deepEqual({...f.G.game.res},before);
 });
 
 test('details Escape closes only the details and Back restores categories with correct aria',f=>{
