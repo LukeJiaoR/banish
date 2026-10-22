@@ -1,0 +1,74 @@
+[
+  {
+    "source_path": "assets/buildings/house.png",
+    "evidence_path": "docs/art-system/historical/house.png",
+    "first_introduction_commit": "04620b586bf5fd293cf2f6d1d605a6e82e8df860",
+    "author_date": "2026-10-06T21:39:06+08:00",
+    "first_blob": "bce381c6afd1eae6c048dabed2e9b56d85514bd9",
+    "first_sha256": "5f90cd68dc9eb0ebdc1f4dc10cc9f8e828f36cccd27c7222f3334662f9f35458",
+    "current_local_blob": "8d702a238efe7d8d6a2a0eed03dc9df34f63490c"
+  },
+  {
+    "source_path": "assets/buildings/storage.png",
+    "evidence_path": "docs/art-system/historical/storage.png",
+    "first_introduction_commit": "04620b586bf5fd293cf2f6d1d605a6e82e8df860",
+    "author_date": "2026-10-06T21:39:06+08:00",
+    "first_blob": "2710c0a1aace558988f2011ab1246b6dc9b3a4ac",
+    "first_sha256": "32a965b1c48d5b85837493d75acdc6752b31c668023629844e61f31d6ea0514d",
+    "current_local_blob": "cdc81a5f9514cd02bdcf0236945e1b2551489c90"
+  },
+  {
+    "source_path": "assets/props/tree_mature.png",
+    "evidence_path": "docs/art-system/historical/tree_mature.png",
+    "first_introduction_commit": "04620b586bf5fd293cf2f6d1d605a6e82e8df860",
+    "author_date": "2026-10-06T21:39:06+08:00",
+    "first_blob": "794adaccc8cedea076b0a29d5833bfb1b473e336",
+    "first_sha256": "10541fa073d19f9efc2ba1e901af81397d45b1816af4207d776cbe3a31ab228a",
+    "current_local_blob": "64dd190ec23e9b4e7a884dc25c14f88206151dc1"
+  },
+  {
+    "source_path": "assets/props/tree_young.png",
+    "evidence_path": "docs/art-system/historical/tree_young.png",
+    "first_introduction_commit": "04620b586bf5fd293cf2f6d1d605a6e82e8df860",
+    "author_date": "2026-10-06T21:39:06+08:00",
+    "first_blob": "1193f89e52fb864d41ec676824ebe42c2956453c",
+    "first_sha256": "ced38f6b61b8d693cc448c1dbbdcf8d27c33c519f021d786fa752b5134895ec9",
+    "current_local_blob": "b61a62703eeda7b5db10e7a1e2eefa192a4a6360"
+  },
+  {
+    "source_path": "assets/props/tree_sapling.png",
+    "evidence_path": "docs/art-system/historical/tree_sapling.png",
+    "first_introduction_commit": "04620b586bf5fd293cf2f6d1d605a6e82e8df860",
+    "author_date": "2026-10-06T21:39:06+08:00",
+    "first_blob": "c4082691eff1a75d09a1e3b1eeac437992ce8b28",
+    "first_sha256": "c12648f79dbcc18e0afe57099163b12f9465d0e2c454deff454d7f18814200a0",
+    "current_local_blob": "922bd2b8b45cb23b91a1636eac8916449d478ad9"
+  },
+  {
+    "source_path": "assets/props/tree_mature_snow.png",
+    "evidence_path": "docs/art-system/historical/tree_mature_snow.png",
+    "first_introduction_commit": "04620b586bf5fd293cf2f6d1d605a6e82e8df860",
+    "author_date": "2026-10-06T21:39:06+08:00",
+    "first_blob": "daa8911a86d40b2ab1e20a35f6a636bd5b022c97",
+    "first_sha256": "efa0886b872ed2c812ea9eb7cd822be0228d92f1e6edefe14e1cae1df8b865b3",
+    "current_local_blob": "60a3cca501ead5c8ac0415a3923b6117e152d9a2"
+  },
+  {
+    "source_path": "assets/props/tree_young_snow.png",
+    "evidence_path": "docs/art-system/historical/tree_young_snow.png",
+    "first_introduction_commit": "04620b586bf5fd293cf2f6d1d605a6e82e8df860",
+    "author_date": "2026-10-06T21:39:06+08:00",
+    "first_blob": "42f6c53ff124ff0541313346034c1f9fe489f088",
+    "first_sha256": "652d2b83af7ca26c1432837cf2d87c5bf6c214f8ce0b4830a799c2eae76a4195",
+    "current_local_blob": "ac014f9801e00d98ac92c42f0cad3671fbf69280"
+  },
+  {
+    "source_path": "assets/props/tree_sapling_snow.png",
+    "evidence_path": "docs/art-system/historical/tree_sapling_snow.png",
+    "first_introduction_commit": "04620b586bf5fd293cf2f6d1d605a6e82e8df860",
+    "author_date": "2026-10-06T21:39:06+08:00",
+    "first_blob": "c3e5311b669646b563c6d8796f04808c6e40e141",
+    "first_sha256": "4440cc3064ca6f403eb9eb9c754ef5da3433d09034dddb999b736e1d3d0415a3",
+    "current_local_blob": "7e93e881d34ee71bca81421c8ed25147cae286a2"
+  }
+]

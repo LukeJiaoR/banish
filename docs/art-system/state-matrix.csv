@@ -1,0 +1,8 @@
+category,states_or_identity,source_at_main,existing_visual,missing_or_next,status
+home,"vacant/home/away; occupied/atHome","render.js:356-367;421-430;1470; sim.js:4772-4782","same base plus markers/windows/heating smoke","layered occupancy cues; never infer atHome from household assignment",partly_connected
+workshop,"process/fetching/returning/hauling/unstaffed/paused/blocked/hosting/idle","render.js:327;343-387; sim.js:1733","blacksmith woodcutter tailor tavern task-aware effects","other industries need task-specific mapping; produced is cumulative",four_types_connected
+citizen_identity,"id sex age adult name; job building ID","sim.js:570-596; main.js:224-226;1095","shared adult/child sprites","stable face/body/accessory mapping and elder appearance",missing_visual_identity
+citizen_action,"walk idle carry work task state","render.js:1372-1420","shared adult/child walk idle carry plus two work poses","profession accessories without face reroll",partly_connected
+portrait,"stable person id; occupation derived from building","ui.js:4026-4033","generic citizen icon","stable portrait identity linked to in-world appearance",not_implemented
+wild_tree,"i x y b; three age stages","map.js:403-408;521-524; main.js:188; render.js:784-796","three stages times normal/snow; deterministic scale","actual species and multiple silhouettes; unused variant must be wired",limited_existing
+orchard,"type planted age fruit season cycle","sim.js:3422 onward; render.js:1269-1278","apple/pear fruity/leafy; generic uses apple","style variety must retain maturation and frost truth",connected_existing_rules
