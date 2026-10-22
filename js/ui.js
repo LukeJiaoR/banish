@@ -1071,7 +1071,7 @@ G.ui = {
     const hh = Math.floor(g.h), weather = G.climateWeather?.();
     const temperature = weather ? ` · 今日 ${weather.temperature}°C` : '';
     this.el.date.innerHTML = `${this.icon ? this.icon('clock') : ''}<span>第 ${g.year} 年 · ${G.SEASON_NAMES[g.season]} ${(g.day % G.SEASON_DAYS) + 1} 日 · ${String(hh).padStart(2, '0')}:00${temperature}</span>`;
-    this.el.date.title = '游戏时间；时钟图标不代表日照或居民作息' + (weather ? `；${weather.climate}，今日 ${weather.temperature}°C，影响农田成长与霜损；${G.game.heatRules?'冬季住房耗柴随气温变化，果园仍沿用原规则':'住房取暖和果园仍沿用原规则'}` : '');
+    this.el.date.title = '游戏时间；时钟图标不代表日照或居民作息' + (weather ? `；${weather.climate}，今日 ${weather.temperature}°C，影响农田成长与霜损；${G.game.heatRules?'冬季住房耗柴随气温变化，':G.game.orchardRules?'住房取暖仍沿用原规则；':'住房取暖和'}${G.game.orchardRules?'秋霜损失树上未采果实但不冻死树':'果园仍沿用原规则'}${G.game.orchardHarvestRules?'；成树果实随气温生长，可提前采果，每树每年只采一次':''}` : '');
     const w = G.world;
     const adults = w.citizens.filter(c => c.adult).length;
     const children = w.citizens.length - adults;
@@ -5024,7 +5024,7 @@ G.ui = {
     const q=G.startConfigQuote({seed:seed.value,preset:s.preset,terrain:s.terrain,mapSize:s.mapSize,climate:s.climate});
     seed.setAttribute('aria-invalid',String(!q.ok));
     const climateName=q.climateSummary ? ` · ${q.climateSummary.name}` : '';
-    const climateNote=q.climateSummary ? `${q.climateSummary.note} 气候新村使用 v7 存档，旧程序无法读取；冬季住房耗柴随气温变化，秋霜仅损失树上未采果实，既有 v1–v6 村不启用果园冷害。` : '';
+    const climateNote=q.climateSummary ? `${q.climateSummary.note} 气候新村使用 ${q.terrainSummary.mapVersion===4?'v9':'v8'} 存档，旧程序无法读取；冬季住房耗柴随气温变化，秋霜仅损失树上未采果实，既有 v1–v6 村不启用果园冷害，既有 v1–v7 村不启用提前采果。` : '';
     if(q.ok){const p=q.presetSummary;
       write('new-game-preview',`已选：${p.name} · ${terrainName} · ${q.mapSizeSummary.name}${climateName} · ${p.population}人`);
       write('new-game-summary',`新村预览：种子 ${q.config.seed} · ${p.name} · ${terrainName} · ${q.mapSizeSummary.name}${climateName}\n${climateNote}\n${q.mapSizeSummary.note}\n${p.families}家庭 / ${p.population}人（${p.adults}成人、${p.children}儿童）；仅有储物车，住房需自行建设\n${['wood','stone','iron','food','firewood','tools'].map(k=>`${G.RES[k].name} ${p.resources[k]}`).join(' · ')}\n${p.seedNote}\n${p.equipmentNote} ${p.adaptationNote}\n${terrainNote}`);

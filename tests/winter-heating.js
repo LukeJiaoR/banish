@@ -9,6 +9,8 @@ const save=G=>copy(G.serializeGame());
 function test(name,fn){fn();passed++;console.log('ok '+name);}
 function fresh(type='fair',seed=1,root=ROOT){
  const G=loadGame(root);assert(G.newGame(seed,{climate:type}).ok);const w=G.world;
+ // Synthetic heating-only village retains v8; new-village v9 is tested separately.
+ if(w.waterNavigation){delete w.waterNavigation;w.mapVersion=3;}
  for(const k of ['water','rock','road','mountain'])w[k].fill(0);w.bgrid.fill(-1);w.treeIdx.fill(-1);w.trees=[];w.buildings=[];w.bmap={};w.citizens=[];w.cmap={};w.families=[];w.marked.clear();w.markedRocks.clear();w.rockCleared=[];G.bumpNavigation(w);
  G.game.h=12;G.rng=()=>.5;G.addBuilding('storage',2,2,{instant:true,free:true});Object.assign(G.game.res,{wood:500,stone:500,iron:500,grain:1000,food:1000,tools:300,firewood:200,coal:100});
  G.game.townLedger=G.newTownLedger(G.game);G.game.industryLedger=G.newIndustryLedger(G.game);return G;
@@ -16,14 +18,26 @@ function fresh(type='fair',seed=1,root=ROOT){
 function home(G,type='house',x=10,y=10){const b=G.addBuilding(type,x,y,{instant:true,free:true}).b;assert(b);const c=G.spawnCitizen({x:x-1,y,age:30,sex:'m'}),f={id:G.nextId(),members:[c.id],houseId:b.id,coupleIds:[]};G.world.families.push(f);c.familyId=f.id;if(type!=='boarding')b.family=f.id;return {b,c,f};}
 // Controlled calendar setup explicitly runs both daily rules; it is not a
 // survival simulation or a direct rewrite of their last-settled markers.
-function day(G,d){G.game.day=d;G.game.season=G.seasonOf(d);G.game.year=Math.floor(d/48)+1;G.game.h=12;G.game.townLedger=G.newTownLedger(G.game);G.game.industryLedger=G.newIndustryLedger(G.game);G.advanceDeer();G.advanceCropClimate();if(G.advanceHomeHeating)G.advanceHomeHeating();}
+function day(G,d){G.game.day=d;G.game.season=G.seasonOf(d);G.game.year=Math.floor(d/48)+1;G.game.h=12;G.game.townLedger=G.newTownLedger(G.game);G.game.industryLedger=G.newIndustryLedger(G.game);G.advanceDeer();G.advanceCropClimate();if(G.advanceHomeHeating)G.advanceHomeHeating();if(G.advanceOrchardClimate)G.advanceOrchardClimate();}
 function winter(G){day(G,35);G.game.h=23.9;G.advanceSim(.2);assert.equal(G.game.day,36);}
 function stable(G){const before=save(G),w=G.world,g=G.game,rng=G.rng,uid=G._peekUid();return bad=>{assert.throws(()=>G.applySaveData(bad));assert.equal(G.world,w);assert.equal(G.game,g);assert.equal(G.rng,rng);assert.equal(G._peekUid(),uid);assert.deepEqual(save(G),before);};}
 function inventories(G){const out={wood:G.game.res.firewood,coal:G.game.res.coal};for(const b of G.world.buildings){out.wood+=b.supplyStock?.firewood||0;out.coal+=b.supplyStock?.coal||0;}return out;}
 
-test('genuine new villages use v6 and independent heat-v1; crop/weather version stays v1',()=>{
- const G=loadGame(ROOT);assert(G.newGame(0).ok);assert.equal(G.game.climate.type,'fair');assert.deepEqual(copy(G.game.heatRules),{v:1,lastDay:0});assert.equal(save(G).v,6);assert.equal(G.game.climate.v,1);G.applySaveData(save(G));assert.equal(save(G).v,6);
- for(const type of ['mild','fair','harsh']){assert(G.newGame(17,{climate:type}).ok);assert.equal(save(G).v,6);assert.equal(G.game.heatRules.v,1);}
+test('genuine new villages use v9 and independent heat-v1; crop/weather version stays v1',()=>{
+ const G=loadGame(ROOT);assert(G.newGame(0).ok);assert.equal(G.game.climate.type,'fair');assert.deepEqual(copy(G.game.heatRules),{v:1,lastDay:0});assert.equal(save(G).v,9);assert.equal(G.game.climate.v,1);G.applySaveData(save(G));assert.equal(save(G).v,9);
+ for(const type of ['mild','fair','harsh']){assert(G.newGame(17,{climate:type}).ok);assert.equal(save(G).v,9);assert.equal(G.game.heatRules.v,1);}
+});
+
+test('synthetic v6 and v7 empty-village saves preserve their orchard rule boundaries',()=>{
+ for(const version of [6,7]){
+  const G=loadGame(ROOT);assert(G.newGame(17,{climate:'fair'}).ok);
+  const legacy=save(G);delete legacy.waterNavigation;legacy.mapVersion=3;legacy.v=version;delete legacy.game.orchardHarvestRules;
+  if(version===6)delete legacy.game.orchardRules;
+  G.applySaveData(legacy);assert.equal(save(G).v,version);
+  assert.equal(G.game.orchardHarvestRules,null);assert.equal(!!G.game.orchardRules,version===7);
+  const canonical=save(G);G.applySaveData(canonical);assert.deepEqual(save(G),canonical);
+  const forged=copy(canonical);forged.game.orchardHarvestRules={v:1};stable(G)(forged);
+ }
 });
 
 test('deterministic frozen rule, ordered climate demand, winter-only and Fair baseline calibration',()=>{
@@ -105,13 +119,13 @@ test('historical bills validate against their recorded day and candidate seed, n
  const reject=stable(G),bad=copy(later);bad.buildings.find(x=>x.id===b.id).lastHeating.need=G.homeHeatingNeed(h,84);reject(bad);
 });
 
-test('v6 missing/unknown/downgraded/contradictory rules and forged bills reject atomically',()=>{
+test('v8 missing/unknown/downgraded/contradictory rules and forged bills reject atomically',()=>{
  const G=fresh('fair',7),{b}=home(G);winter(G);const good=save(G),reject=stable(G),bill=d=>d.buildings.find(x=>x.id===b.id).lastHeating;
  const edits=[d=>delete d.game.heatRules,d=>d.game.heatRules=null,d=>d.game.heatRules.v=2,d=>d.game.heatRules.extra=true,d=>delete d.game.heatRules.lastDay,d=>d.game.heatRules.lastDay=34,d=>d.game.heatRules.lastDay=37,d=>d.v=5,d=>d.v=4,d=>d.game.heatRules.lastDay=35,d=>bill(d).need+=.01,d=>bill(d).day=35,d=>bill(d).wood=-1,d=>bill(d).coal=Infinity,d=>bill(d).coal=bill(d).need,d=>d.buildings.find(x=>x.id===b.id).unheated=true,d=>{d.seed=99;d.game.startConfig.seed=99;}];
  for(const edit of edits){const bad=copy(good);edit(bad);reject(bad);}G.endDay();const normal=save(G),bad=copy(normal);bad.game.heatRules.lastDay=36;stable(G)(bad);
 });
 
-if(OLD)test('actual pre-heating v5 villages stay fixed in both supply modes, and old engine rejects new v6',()=>{
+if(OLD)test('actual pre-heating v5 villages stay fixed in both supply modes, and old engine rejects new v8',()=>{
  assert(fs.existsSync(path.join(OLD,'js/main.js')),'actual pre-heating engine is required');
  for(const physical of [false,true]){const old=fresh('harsh',7,OLD),{b}=home(old,'stonehouse');if(physical){old.enablePhysicalSupplyPrototype();b.supplyStock.firewood=50;b.supplyStock.grain=100;}day(old,35);old.game.h=23.9;old.advanceSim(.2);const legacy=save(old);assert.equal(legacy.v,5);assert(!legacy.game.heatRules);near(legacy.buildings.find(x=>x.id===b.id).lastHeating.need,20/12);
   const G=loadGame(ROOT);G.applySaveData(legacy);assert(!G.game.heatRules);assert.equal(save(G).v,5);const before=save(G);G.applySaveData(before);assert.deepEqual(save(G),before);G.endDay();near(G.world.bmap[b.id].lastHeating.need,20/12);
