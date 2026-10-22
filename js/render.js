@@ -224,6 +224,27 @@ G.drawMountainHover = function(ctx,w,x,y) {
 /* ---------- 精灵辅助（assets/ 图片；任一缺失时调用方回退程序化绘制） ---------- */
 /* 以「脚点」(cx, by=底边中心) 画一张精灵，按 G.SPRITE_SIZES 或 opts.w 定尺寸。
  * 命中返回 [dw, dh]，缺失返回 null。opts.flip = 水平镜像。 */
+// Original A-style source pixels stay intact. Calibrated source-space anchors,
+// not canvas edges, land on the existing world footpoints. No save/RNG changes.
+G.A_ART = Object.freeze({
+ 'house-a-v2-square-empty': {source:[1536,1024], anchor:[768,975], span:1056},
+ 'house-a-v2-square-occupied': {source:[1536,1024], anchor:[768,975], span:1056},
+ 'tree-a-v1-broadleaf': {source:[1536,1024], anchor:[820,984], height:960, displayHeight:88},
+ 'tree-a-v1-willow': {source:[1536,1024], anchor:[770,990], height:980, displayHeight:92},
+ 'tree-a-v1-broadleaf-winter': {source:[1536,1024], anchor:[820,984], height:960, displayHeight:88},
+ 'tree-a-v1-willow-winter': {source:[1536,1024], anchor:[770,990], height:980, displayHeight:92}
+});
+G.drawCalibratedArt=function(ctx,name,x,y,size){
+ const spec=G.A_ART[name],im=G.SPR?.get(name);
+ if(!spec||!im||im.width!==spec.source[0]||im.height!==spec.source[1])return null;
+ const k=size/(spec.span||spec.height);
+ ctx.drawImage(im,x-spec.anchor[0]*k,y-spec.anchor[1]*k,im.width*k,im.height*k);
+ return [im.width*k,im.height*k];
+};
+G.houseArtName=function(b){
+ if(b?.type!=='house'||b.state!=='ok'||b.houseFire)return null;
+ return G.renderBuildingActivity(b)?.atHome>0?'house-a-v2-square-occupied':'house-a-v2-square-empty';
+};
 G.sprDraw = function (ctx, name, cx, by, opts) {
   const im = G.SPR && G.SPR.get(name);
   if (!im || !im.width) return null;
@@ -790,6 +811,8 @@ G.drawTree = function (ctx, t, variation) {
   const by = sy + 16;
   const stage = G.treeStage(t);
   const winter = G.isWinter();
+  const matureArt=(v.variant?'tree-a-v1-willow':'tree-a-v1-broadleaf')+(winter?'-winter':'');
+  if(stage===2&&G.drawCalibratedArt(ctx,matureArt,sx,by,G.A_ART[matureArt].displayHeight*v.scale))return;
   const sprName = 'tree_' + ['sapling', 'young', 'mature'][stage] + (winter ? '_snow' : '');
   const baseH = (G.SPRITE_SIZES[sprName] || {}).h;
   if (G.sprDraw(ctx, sprName, sx, by, baseH ? { h: baseH * v.scale } : undefined)) return;
@@ -913,9 +936,17 @@ G.drawBuilding = function (ctx, b, time) {
   const sprW = (b.w + b.h) * 32 * (G.BUILD_SPR_W[b.type] || 1.08);
   // 贸易站按原图50%显示；补偿底角下方3px透明余量，让石基脚点贴合占地底角。
   const sprFootY = B[1] + ((b.type === 'tradingpost'||b.type==='market') ? 1.5 : b.type === 'mineralpit' ? 2 : b.type==='burntruins'?2.5:b.type==='well'?1:b.type==='chapel'?6:0);
-  const spr = G.sprDraw(ctx, b.type, B[0], sprFootY, { w: sprW, omitSmokeAir:true });
+  const houseArt=G.houseArtName(b);
+  const calibrated=houseArt&&G.drawCalibratedArt(ctx,houseArt,B[0],sprFootY,(b.w+b.h)*32);
+  const spr = calibrated||G.sprDraw(ctx, b.type, B[0], sprFootY, { w: sprW, omitSmokeAir:true });
   if (spr) {
-    G.drawBuildingActivity(ctx,b,spr,B[0],sprFootY);
+    if(calibrated){
+      // New roof has no chimney. Keep factual state markers, never reuse old
+      // image-relative window/smoke anchors or imply consumed heating fuel.
+      delete b._chimney;
+      const activity=G.renderBuildingActivity(b);
+      if(activity)G.drawBuildingStateMarker(ctx,activity,B[0]+7,sprFootY+5,false);
+    }else G.drawBuildingActivity(ctx,b,spr,B[0],sprFootY);
     if(b.houseFire)G.drawHouseFire(ctx,b,time,spr);
     return;
   }

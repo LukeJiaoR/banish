@@ -1,0 +1,9 @@
+# First A-style house and mature-tree integration
+
+Original generated PNGs remain unchanged. The renderer uses source-space anchors rather than the full-canvas bottom edge. House variants share anchor (768,975), source1536x1024 and ground span1056, mapped to the existing 2x2 ground width128. The house visible roof is approximately138 game pixels wide, versus the existing larger warehouse; this is a small dwelling, not a warehouse replacement. No canvas stretching or source-image editing occurs.
+
+House occupied artwork is selected only when the existing buildingActivity atHome count is positive. Assigned residents away from home use the empty artwork, while existing markers distinguish away from vacant. New artwork has no chimney; obsolete old-image window/chimney overlays are not reused. Warm painted windows are an occupancy cue, not a heating/fuel claim.
+
+Mature trees use the existing seed+coordinate variant, without new species or yield rules. Broadleaf anchor(820,984), effective height960, display height88; willow anchor(770,990), effective height980, display height92. Existing stable scale0.94–1.06 remains. Matching winter variants retain each species, source dimensions, anchor and display height, with snow on the same branches. Juvenile artwork stays original; stage shape continuity is a known incomplete art family. Fruit trees are unchanged. Missing or unexpected-dimension new sprites fall back to old sprites and then existing procedural rendering.
+
+Verification uses production Canvas G.frame with explicitly constructed away/home/vacant states at1x/2x in summer and winter, actual state lookup, adjacent warehouse/citizen/forest occlusion and identical serialized saves before/after each frame. This does not claim complete daily-cycle, browser/mobile or whole A-style art acceptance. Source images and complete visual families still need broader review.
