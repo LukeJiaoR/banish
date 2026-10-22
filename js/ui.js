@@ -1126,6 +1126,10 @@ G.ui = {
       const fields=w.buildings.filter(b=>b.type==='farm'&&b.state==='ok').map(b=>G.farmClimateSummary(b)).filter(s=>s.atRisk);
       if(fields.length)add('crop-frost','recommend',2.1,`${fields.length}块农田有近两日霜害风险 · 查看农田判断抢收`,`${fields.length}块农田有近两日霜害风险。${fields[0].warning}；已采收和在途粮食保留。`);
     }
+    if(g.orchardRules){
+      const orchards=w.buildings.filter(b=>b.type==='orchard'&&b.state==='ok').map(b=>G.orchardClimateSummary(b)).filter(s=>s.atRisk);
+      if(orchards.length)add('orchard-frost','recommend',2.2,`${orchards.length}座果园有近两日霜害风险 · 安排秋收与送仓`,`${orchards.length}座果园仍有未采果实。${orchards[0].warning}；不自动采果，已采携果与库存保留。`);
+    }
     if (g.res.wood < 2) {
       const detail = harvest.carry.wood ? `木材库存耗尽：另有 ${harvest.carry.wood} 随身待入库，送达后才能使用。`
         : harvest.trees ? `木材库存耗尽：${harvest.trees} 棵已标记，查看采运进度；砍倒后仍需送仓。`
@@ -4174,7 +4178,7 @@ G.ui = {
     </section>`;
     if(b.type==='orchard')return `<section class="economy-details" data-economy="orchard">
       <p data-economy-live="orchard-area"></p><p class="desc" data-economy-live="orchard-area-rule"></p><p data-economy-live="orchard-age"></p><p data-economy-live="orchard-harvest"></p><p data-economy-live="orchard-renewal"></p>
-      <p data-economy-live="orchard-types"></p><p data-economy-live="orchard-stock"></p><p data-economy-live="orchard-logistics"></p>
+      <p data-economy-live="orchard-types"></p><p class="desc" data-economy-live="orchard-climate"></p><p data-economy-live="orchard-stock"></p><p data-economy-live="orchard-logistics"></p>
       <details class="building-task"><summary>以后种植品种</summary><form id="orchard-type-form" class="economy-form"><label for="orchard-type">以后空位种植品种</label><select id="orchard-type">${Object.entries(G.ORCHARD_TYPES).map(([type, def]) => `<option value="${type}"${G.orchardTypeOf(b) === type ? ' selected' : ''}${!G.game.unlocks?.[def.unlock] ? ' disabled' : ''}>${this.escHtml(def.name)} → ${G.RES[def.output].name}${!G.game.unlocks?.[def.unlock] ? '（尚未解锁）' : ''}</option>`).join('')}</select><div class="economy-actions"><button type="submit" id="orchard-type-apply">应用以后种植品种</button><button type="button" id="orchard-type-cancel">取消未应用选择</button></div><p data-economy-live="orchard-selection"></p></form></details>
       <details class="building-task"><summary>补种设置</summary><form id="orchard-replant-form" class="economy-form"><label for="orchard-replant">空位补种</label><select id="orchard-replant"><option value="on"${b.orchardReplant!==false?' selected':''}>允许农夫补种</option><option value="off"${b.orchardReplant===false?' selected':''}>暂停新补种</option></select><button type="submit">应用补种设置</button></form></details>
       <details class="building-help"><summary>果树生长与品种规则</summary>      <p class="desc">苹果和梨种子各2500，分别购买一次永久解锁；购买后仍需在此明确应用，只改变以后新接的种植任务。旧通用果树种子仅解锁旧通用树，继续产蔬菜，不赠苹果、梨或新种子。已有树的品种、年龄、待采果实和已接任务/在途货不改换；买新果种不必先买通用种子。</p>
@@ -4688,6 +4692,8 @@ G.ui = {
       const output=el.querySelector('[data-pasture-output]');if(output){const html='产出：'+G.productionOutputsOf(b).filter(k=>k!=='food').map(k=>`${this.resourceIcon(k)}${G.RES[k].name}`).join(' · ');if(output.innerHTML!==html)output.innerHTML=html;}
     } else {
       const d=G.orchardSummary(b), types=G.ORCHARD_TYPES, chosen=types[G.orchardTypeOf(b)], trees=b.orchardTrees||[];
+      const climate=G.orchardClimateSummary(b);
+      set('[data-economy-live="orchard-climate"]',climate?`今日 ${climate.temperature}°C · 果实耐霜线低于 ${climate.frostBelow}°C · 本年霜损 ${this.supplyNumber(climate.lost)}。${climate.warning}；只损未采果实，不冻死树，已采携果和库存保留。`:'本村保留原果园季节规则：秋季采果，入冬未采果损失；不启用温度冷害。');
       const layout=G.orchardLayout(b);
       set('[data-economy-live="orchard-area"]',`果园 ${b.w}×${b.h} · ${b.w*b.h}格 · ${layout.count}树位 · 农夫上限可设0–${G.workerMaximumOf(b)}人${layout.legacy?'（固定容量）':''}`);
       set('[data-economy-live="orchard-area-rule"]',layout.legacy?'固定6×6果园：9株、3×3树位、2岗位和12木/36工时；已有果园不会重新排树。':`已建面积果园：东西${layout.columns}列，每2格一树；南北${layout.rows}行，每3格一行。成本按周长、工时按面积、岗位最多3人为本作适配；大园仍受实际劳动和秋收搬运限制。`);
@@ -4990,7 +4996,7 @@ G.ui = {
     const q=G.startConfigQuote({seed:seed.value,preset:s.preset,terrain:s.terrain,mapSize:s.mapSize,climate:s.climate});
     seed.setAttribute('aria-invalid',String(!q.ok));
     const climateName=q.climateSummary ? ` · ${q.climateSummary.name}` : '';
-    const climateNote=q.climateSummary ? `${q.climateSummary.note} 气候新村使用 v6 存档，旧程序无法读取；冬季住房耗柴随气温变化，果园沿用原规则。` : '';
+    const climateNote=q.climateSummary ? `${q.climateSummary.note} 气候新村使用 v7 存档，旧程序无法读取；冬季住房耗柴随气温变化，秋霜仅损失树上未采果实，既有 v1–v6 村不启用果园冷害。` : '';
     if(q.ok){const p=q.presetSummary;
       write('new-game-preview',`已选：${p.name} · ${terrainName} · ${q.mapSizeSummary.name}${climateName} · ${p.population}人`);
       write('new-game-summary',`新村预览：种子 ${q.config.seed} · ${p.name} · ${terrainName} · ${q.mapSizeSummary.name}${climateName}\n${climateNote}\n${q.mapSizeSummary.note}\n${p.families}家庭 / ${p.population}人（${p.adults}成人、${p.children}儿童）；仅有储物车，住房需自行建设\n${['wood','stone','iron','food','firewood','tools'].map(k=>`${G.RES[k].name} ${p.resources[k]}`).join(' · ')}\n${p.seedNote}\n${p.equipmentNote} ${p.adaptationNote}\n${terrainNote}`);

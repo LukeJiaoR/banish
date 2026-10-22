@@ -18,6 +18,9 @@ G.START_PRESETS = Object.freeze({
 /* Celsius temperatures and 48-day timing are this game's adaptation, not the
  * original engine's undocumented weather formula. Version 1 is save-stable. */
 G.CLIMATE_VERSION = 1;
+// Orchard frost v1: local 48-day adaptation, not original-game constants.
+// Same capped depth curve as crop frost; apple, pear and legacy fruit share it.
+G.ORCHARD_FROST = Object.freeze({v:1,frostBelow:0,perDegree:.04,minRate:.08,maxRate:.40});
 G.CLIMATES = Object.freeze({
   mild: Object.freeze({name:'温和 · Mild',offset:3,variation:1.2,snap:2,note:'温差较小，农田生长期较长；仍有霜害与冬季收割截止'}),
   fair: Object.freeze({name:'均衡 · Fair',offset:0,variation:2.4,snap:6,note:'季节温差适中，秋季可能提前降霜；留意预警并按需抢收'}),

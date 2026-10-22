@@ -97,6 +97,7 @@ G.newGameState = function (startConfig = null) {
     startConfig: startConfig ? {...startConfig} : null,
     climate: startConfig?.climate ? {v:G.CLIMATE_VERSION,type:startConfig.climate,lastDay:0} : null,
     heatRules: startConfig?.climate ? {v:1,lastDay:0} : null,
+    orchardRules: startConfig?.climate ? {v:G.ORCHARD_FROST.v,lastDay:0} : null,
     h: 6, day: 0, season: 0, year: 1,
     speed: 1, paused: false,
     res: { wood: 80, stone: 48, iron: 0, tools: 15, food: 500, meat: 0, eggs:0, vegetables: 0, apples:0, pears:0, grain: 500, leather: 0, wool: 0, clothes: 0, warmCoats: 0, herbs: 0, coal: 0, steelTools: 0, ale: 0, firewood: 50 }, // 开局（原版中难度 5 家庭，工具 15 件≈第一轮磨损周期）；存粮较原版加厚：15 人 6 天食物跑道撑不到第一座采集屋建成
@@ -171,6 +172,7 @@ G.endDay = function () {
   if (g.season !== oldSeason) G.onSeasonChange(oldSeason, g.season);
   G.expireWinterFarms();
   G.advanceCropClimate();
+  G.advanceOrchardClimate();
 
   G.advancePasturePests();
   G.advanceTownEconomy();
@@ -321,6 +323,7 @@ G.onSeasonChange = function (from, to) {
   }
   if (to === 3) G.expireWinterFarms();
   G.advanceCropClimate(); // Complete this day before the season autosave.
+  G.advanceOrchardClimate(); // v7 only: fruit formation/loss is saved atomically.
   G.needGround = true;          // 换季调色板变化，整图重绘
   if (G.groundDirty) G.groundDirty.clear();
   if (G.autosave) G.autosave();
@@ -2705,7 +2708,7 @@ G.addBuilding = function (type, x, y, opt) {
   if(type==='cemetery')b.graves=[];
   if(type==='tavern'){b.reserveDays=12;b.brewRecipe='grain';}
   if(type==='tailor'){b.coatRecipe='basic';b.coatMaterial='auto';}
-  if(type==='orchard'){b.orchardType='legacy';b.orchardTrees=G.newOrchardTrees(b);b.orchardDay=G.game.day;b.orchardReplant=true;G.syncOrchardTotals(b);}
+  if(type==='orchard'){b.orchardType='legacy';b.orchardTrees=G.newOrchardTrees(b);b.orchardDay=G.game.day;b.orchardReplant=true;if(G.game.orchardRules)b.orchardFrost={year:G.game.year,lost:0};G.syncOrchardTotals(b);}
   if (type === 'woodcutter') b.fuelLimit = G.PROD.woodcutter.fuelLimit; // 燃料上限（原版 Fuel Limit）
   if (G.game && G.game.buildLog) { // 建造/拆除记录（反馈分析用；负号前缀 = 拆除）
     G.game.buildLog.push({ d: G.game.day, t: type });
@@ -3390,6 +3393,45 @@ G.advanceOrchard=function(b){
   if(expired)G.ui.toast(`果园有${expired}株老树枯尽，空位${b.orchardReplant?'等待农夫补种':'已暂停补种'}；已有携果不受影响`,'warn');
   const soon=b.orchardTrees.some((t,i)=>t.planted&&G.orchardLifetime(i)-t.age<=G.YEAR_DAYS);
   if(soon&&b.orchardWarnYear!==g.year){b.orchardWarnYear=g.year;G.ui.toast('果园有老树将在一年内枯尽；查看空位与补种，保留其他食物来源','warn');}
+};
+/* Only v7 new villages opt in. No catch-up on load and no new weather draw.
+ * Advance trees before frost so autumn fruit cannot be regenerated after loss.
+ * The same daily guard covers normal midnight and pre-autosave settlement. */
+G.advanceOrchardClimate=function(){
+  const g=G.game,r=g.orchardRules;if(!r||r.lastDay>=g.day)return;
+  r.lastDay=g.day;
+  const weather=G.climateWeather(),rule=G.ORCHARD_FROST;
+  for(const b of G.world.buildings){
+    if(b.type!=='orchard'||b.state!=='ok')continue;
+    G.advanceOrchard(b);
+    if(b.orchardFrost.year!==g.year)b.orchardFrost={year:g.year,lost:0};
+    if(g.season!==2||weather.temperature>=rule.frostBelow)continue;
+    const perTree=Math.ceil(G.ORCHARD.fruit*G.clamp((rule.frostBelow-weather.temperature)*rule.perDegree,rule.minRate,rule.maxRate));
+    let lost=0;
+    for(const tree of b.orchardTrees){
+      if(!tree.planted||!G.orchardUnlocked(G.orchardTreeType(tree))||tree.fruit<=0)continue;
+      const amount=Math.min(tree.fruit,perTree);tree.fruit-=amount;lost+=amount;
+    }
+    if(!lost)continue;
+    b.orchardFrost.lost+=lost;G.syncOrchardTotals(b);
+    // Only depleted harvest targets expire. Partial fruit is read at completion;
+    // carried fruit and planting/tending work never belong to frost settlement.
+    for(const c of G.world.citizens)for(const task of [c.task,c.pausedTask]){
+      if(task?.kind==='orchard'&&task.b===b&&task.phase==='harvest'&&!G.orchardTaskCurrent(c,task))G.dropBlockedTask(c,task);
+    }
+    g.schedT=0;
+    G.ui.toast(`果园 ${weather.temperature}°C：霜害损失${lost}未采果实；果树、已采携果与库存保留`,'warn');
+  }
+};
+G.orchardClimateSummary=function(b){
+  if(!G.game.orchardRules)return null;
+  const weather=G.climateWeather(),rule=G.ORCHARD_FROST;
+  const fruit=(b.orchardTrees||[]).reduce((n,t)=>n+t.fruit,0);
+  const risk=[1,2].map(offset=>G.climateWeather(G.game.day+offset)).find(day=>G.seasonOf(day.day)===2&&day.temperature<rule.frostBelow);
+  const atRisk=G.game.season===2&&fruit>0&&!!risk;
+  return {temperature:weather.temperature,frostBelow:rule.frostBelow,lost:b.orchardFrost?.year===G.game.year?b.orchardFrost.lost:0,atRisk,
+    warning:atRisk?`未来${risk.day-G.game.day}日 ${risk.temperature}°C，低于果实耐霜线；安排农夫秋收并保持送仓通路`:
+      fruit>0&&G.game.season===2?'未来两日未见秋季霜害；入冬未采果仍按原规则损失':'当前没有可受秋霜影响的待采果实'};
 };
 G.setOrchardReplant=function(b,enabled){if(!b||G.world.bmap[b.id]!==b||b.type!=='orchard'||b.state!=='ok'||typeof enabled!=='boolean')return false;G.ensureOrchard(b);b.orchardReplant=enabled;b.noWork=false;b.warnText='';G.game.schedT=0;return true;};
 G.orchardSummary=function(b){
