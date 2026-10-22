@@ -4111,6 +4111,7 @@ G.ui = {
   },
   economyStatus: function (b) {
     if (G.productionLimited(b) && G.buildingGoalStatus(b)) return G.buildingGoalStatus(b);
+    if(b.type==='tradingpost'&&!b.merchant&&!G.tradeWaterAccess(G.world,b).ok)return '水路不通，商船不会到访；备货仍可搬回';
     if (b.type === 'tradingpost') return b.merchant && b.merchant.leaveDay > G.game.day ? '商船停靠，可交易' : b.workers.length ? '等待商船，商人按目标搬运备货' : '等待商人岗位分配';
     if (b.type === 'pasture') return G.pastureSummary(b).status;
     if(b.type==='orchard')return G.orchardSummary(b).status;
@@ -4648,7 +4649,8 @@ G.ui = {
       if (panel._merchant !== b.merchant) return false;
       const merchant = b.merchant && b.merchant.leaveDay > G.game.day;
       const profile = G.merchantProfile(b), order = G.merchantOrderSummary(b);
-      set('[data-economy-live="merchant"]', merchant ? `${profile.name}停靠中，将在 ${b.merchant.leaveDay - G.game.day} 天后离开。` : `下一艘商船约 ${Math.max(0, (b.nextMerchantDay || G.game.day) - G.game.day)} 天后到达；不一定是已订货的商人。`);
+      const waterAccess=G.tradeWaterAccess(G.world,b);
+      set('[data-economy-live="merchant"]', !merchant&&!waterAccess.ok?waterAccess.reason:merchant ? `${profile.name}停靠中，将在 ${b.merchant.leaveDay - G.game.day} 天后离开。` : `下一艘商船约 ${Math.max(0, (b.nextMerchantDay || G.game.day) - G.game.day)} 天后到达；不一定是已订货的商人。${waterAccess.legacy?'':'泊位已连通主河；本版按日期到访，尚无在途船只。'}`);
       const accepted = Object.keys(G.TRADE_VALUES).filter(type => G.merchantAccepts(b, type)).map(type => G.RES[type].name).join('、');
       set('[data-economy-live="merchant-payments"]', merchant ? `收购：${accepted}。${profile.acceptsFood ? '接受肉类、鸡蛋、蔬菜、主食、苹果、梨付款。' : '拒收食物：肉类、鸡蛋、蔬菜、主食、苹果、梨。'}` : '各商人有不同目录与收购物资；订货要等同一商人回访。');
       const inventory = b.tradeInventory || {}, targets = b.tradeTargets || {};
@@ -5012,7 +5014,7 @@ G.ui = {
     if(s.world!==G.world||s.game!==G.game){s.phase='edit';s.intent=null;phase(false);check.disabled=confirm.disabled=true;write('new-game-status','当前村已改变，此设置已过期；请取消后重新打开。');return;}
     const recorded=G.game.startConfig,known=recorded&&G.startConfigQuote(recorded),currentName=known?.ok?known.presetSummary.name:'旧档未记录开局配置（不根据现存资源猜测）';
     const currentClimate=G.game.climate && G.CLIMATES?.[G.game.climate.type];
-    write('new-game-current',`当前村：种子 ${G.world.seed} · ${G.world.N}×${G.world.N} · ${currentName} · ${G.world.mapVersion===2?'山地':'原地形'} · ${currentClimate ? currentClimate.name : '原季节规则（未启用温度气候）'}`);
+    write('new-game-current',`当前村：种子 ${G.world.seed} · ${G.world.N}×${G.world.N} · ${currentName} · ${G.world.mapVersion===4?'主河经典地形':G.world.mapVersion===2?'山地':'原地形'} · ${currentClimate ? currentClimate.name : '原季节规则（未启用温度气候）'}`);
     for(const preset of ['classic','hard'])document.getElementById('new-game-preset-'+preset).setAttribute('aria-pressed',String(s.preset===preset));
     for(const terrain of ['classic','mountain'])document.getElementById('new-game-terrain-'+terrain)?.setAttribute('aria-pressed',String(s.terrain===terrain));
     for(const climate of Object.keys(G.CLIMATES || {}))document.getElementById('new-game-climate-'+climate)?.setAttribute('aria-pressed',String(s.climate===climate));

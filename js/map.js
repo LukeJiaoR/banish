@@ -152,6 +152,85 @@ G.genWorld = function (seed, options) {
   return w;
 };
 
+/* Water-access version 1: new classic villages only. The five-cell channel,
+ * its bounded bends and cell navigation are this game's adaptation, not the
+ * original engine's unpublished depth/clearance formula. No simulation RNG.
+ * Start space and its 14-cell mineral reserve remain outside the river. */
+G.mainRiverLayout = function(w) {
+  const N=w.N,base=w.start.y<N/2?w.start.y+26:w.start.y-26;
+  const phase=G.h2(w.seed+7319,0,0)*32,path=[];
+  let y=base+Math.round(2*Math.sin(phase/16));
+  for(let x=0;x<N;x++){
+    path.push(y*N+x);
+    const next=base+Math.round(2*Math.sin((x+phase)/16));
+    while(y!==next){y+=Math.sign(next-y);path.push(y*N+x);}
+  }
+  return {v:1,entry:path[0],exit:path[path.length-1],mainRiver:path};
+};
+G.mainRiverCells = function(w,layout) {
+  const cells=new Set();
+  for(const i of layout.mainRiver){const x=i%w.N,y=Math.floor(i/w.N);
+    for(let dy=-2;dy<=2;dy++)for(let dx=-2;dx<=2;dx++){
+      const nx=x+dx,ny=y+dy;if(nx>=0&&ny>=0&&nx<w.N&&ny<w.N)cells.add(ny*w.N+nx);
+    }
+  }
+  return cells;
+};
+G.addMainRiver = function(w) {
+  if(w.mapVersion!==0||w.buildings.length||w.citizens.length||w.waterNavigation)throw new Error('主河只能在新经典村落位前生成');
+  const layout=G.mainRiverLayout(w);
+  for(const i of G.mainRiverCells(w,layout)){
+    G.removeTree(w,i%w.N,Math.floor(i/w.N));w.water[i]=1;w.rock[i]=0;
+  }
+  w.mapVersion=4;w.waterNavigation=layout;
+};
+
+/* Terrain is immutable after new-world construction / authoritative loading.
+ * Cache is per world and never serialized; bridges preserve the underlying
+ * water passage in all construction states. Land routing is not reused. */
+G.waterNetworkCache=new WeakMap();
+G.mainRiverNetwork = function(w) {
+  if(!w.waterNavigation)return null;
+  const cached=G.waterNetworkCache.get(w);
+  if(cached&&cached.water===w.water&&cached.layout===w.waterNavigation)return cached;
+  const N=w.N,parent=new Int32Array(N*N).fill(-1),queue=[],entry=w.waterNavigation.entry;
+  if(w.water[entry]===1){queue.push(entry);parent[entry]=entry;}
+  for(let head=0;head<queue.length;head++){
+    const i=queue[head],x=i%N,y=Math.floor(i/N);
+    for(const [dx,dy] of [[1,0],[0,1],[-1,0],[0,-1]]){
+      const nx=x+dx,ny=y+dy,j=ny*N+nx;
+      if(nx<0||ny<0||nx>=N||ny>=N||parent[j]!==-1||w.water[j]!==1)continue;
+      parent[j]=i;queue.push(j);
+    }
+  }
+  const result={water:w.water,layout:w.waterNavigation,parent};G.waterNetworkCache.set(w,result);return result;
+};
+G.tradeBerthCandidates = function(w,b) {
+  const cells=[];
+  for(let y=b.y-1;y<=b.y+b.h;y++)for(let x=b.x-1;x<=b.x+b.w;x++){
+    const side=(x>=b.x&&x<b.x+b.w&&(y===b.y-1||y===b.y+b.h))||
+      (y>=b.y&&y<b.y+b.h&&(x===b.x-1||x===b.x+b.w));
+    if(side&&x>=0&&y>=0&&x<w.N&&y<w.N&&w.water[y*w.N+x]===1)cells.push(y*w.N+x);
+  }
+  return cells;
+};
+G.chooseTradeBerth = function(w,b) {
+  const candidates=G.tradeBerthCandidates(w,b),network=G.mainRiverNetwork(w);
+  return candidates.find(i=>network&&network.parent[i]>=0)??candidates[0]??null;
+};
+G.tradeWaterAccess = function(w,b) {
+  if(!w.waterNavigation)return {ok:true,legacy:true};
+  if(!Number.isInteger(b.tradeBerth)||!G.tradeBerthCandidates(w,b).includes(b.tradeBerth))return {ok:false,reason:'贸易站缺少有效的岸边泊位'};
+  if(G.mainRiverNetwork(w).parent[b.tradeBerth]<0)return {ok:false,reason:'泊位未连通主河，商船不会到访；可将待售目标设为0取回备货'};
+  return {ok:true,legacy:false,berth:b.tradeBerth};
+};
+G.tradeWaterRoute = function(w,b) {
+  const access=G.tradeWaterAccess(w,b);if(!access.ok||access.legacy)return null;
+  const parent=G.mainRiverNetwork(w).parent,path=[];let i=b.tradeBerth;
+  while(true){path.push(i);if(parent[i]===i)break;i=parent[i];}
+  return path.reverse();
+};
+
 /* New classic starts only, after the real cart and citizens exist. Historical
  * generators 0/1 above remain byte-for-byte intact for legacy save reconstruction.
  * Use existing time-optimal routing; mineral tiles do not obstruct walking.
@@ -838,6 +917,7 @@ G.canPlace = function (w, type, ox, oy, fieldSize) {
         if (w.water[j * N + i] === 1) hasWater = true;
       }
     if (!hasWater) return { ok: false, reason: '码头/贸易站必须紧邻水面' };
+    if(type==='tradingpost'&&w.waterNavigation&&G.chooseTradeBerth(w,{x:ox,y:oy,w:def.w,h:def.h})===null)return {ok:false,reason:'贸易站须有侧边相邻水格作泊位，不能只接触水角'};
   }
   return { ok: true };
 };
