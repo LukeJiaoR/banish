@@ -7,7 +7,7 @@ G.goalRecommendationContext = function () {
   return {
     population:people.length,season:g.season,day:g.day,
     occupiedHomes:homes.length,
-    fullWinter:homes.reduce((n,b)=>n+G.BDEF[b.type].warmWoodPerYear,0),
+    fullWinter:G.townHeatingBudget().fullWinter,
     capacities:Object.fromEntries(G.RES_KEYS.map(k=>[k,G.isTool(k)?Infinity:G.storageCap(k)])),
     localLimits:w.buildings.filter(b=>b.state==='ok'&&['woodcutter','blacksmith'].includes(b.type)).map(b=>({
       type:b.type==='woodcutter'?'firewood':G.blacksmithOutput(b),
@@ -22,8 +22,8 @@ G.recommendProductionGoals = function (mode, context) {
   const c=context||G.goalRecommendationContext(),pop=Math.max(0,Math.floor(c.population||0));
   const season=Number.isInteger(c.season)?c.season:0;
   const dayInSeason=((c.day||0)%G.SEASON_DAYS+G.SEASON_DAYS)%G.SEASON_DAYS;
-  // Midnight has already charged today's heating. Food is a planning window,
-  // not a claim about the timing or reachability of each resident's next meal.
+  // The future heating window excludes today's calendar day, also after loading
+  // a pre-burn season autosave. Food does not promise next-meal reachability.
   const futureWinterDays=season===3?Math.max(0,G.SEASON_DAYS-1-dayInSeason):G.SEASON_DAYS;
   const foodDays=mode==='stockpile'?2*G.SEASON_DAYS:mode==='winter'?
     (season===2?G.SEASON_DAYS-dayInSeason+G.SEASON_DAYS+2:Math.max(G.SEASON_DAYS,futureWinterDays+2)):G.SEASON_DAYS;

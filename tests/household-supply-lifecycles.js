@@ -12,8 +12,8 @@ const near = (actual, expected, label = '') => assert(Math.abs(actual - expected
 function fresh({ legacy = false } = {}) {
   const G = loadGame(root); G.newGame(1);
   // Fixed-calendar historical cases intentionally use the pre-climate format.
-  // Other supply cases keep the real new-game Fair/v5 default.
-  if (legacy) { G.game.climate = null; delete G.game.startConfig.climate; assertLegacy(G); }
+  // Other supply cases keep the real new-game Fair/v6 default.
+  if (legacy) { G.game.climate = null; G.game.heatRules = null; delete G.game.startConfig.climate; assertLegacy(G); }
   const w = G.world;
   for (const k of ['water', 'rock', 'road']) w[k].fill(0);
   w.bgrid.fill(-1); w.treeIdx.fill(-1);
@@ -92,13 +92,14 @@ function deliver(G, c, initial = inventory(G)) {
 }
 const save = G => JSON.parse(JSON.stringify(G.serializeGame()));
 function assertLegacy(G) {
-  assert.equal(G.game.climate, null);
+  assert.equal(G.game.climate, null); assert.equal(G.game.heatRules, null);
   const snapshot = save(G); assert.equal(snapshot.v, 4);
   assert.equal(Object.hasOwn(snapshot.game, 'climate'), false);
+  assert.equal(Object.hasOwn(snapshot.game, 'heatRules'), false);
   assert.equal(Object.hasOwn(snapshot.game.startConfig, 'climate'), false);
 }
 function roundtrip(G, initial, times = 3) {
-  for (let i = 0; i < times; i++) { const legacy = !G.game.climate; G.applySaveData(save(G)); if (legacy) assertLegacy(G); else { assert.equal(save(G).v, 5); assert.equal(G.game.climate.type, 'fair'); } conserved(G, initial, `reload ${i + 1}`); }
+  for (let i = 0; i < times; i++) { const legacy = !G.game.climate; G.applySaveData(save(G)); if (legacy) assertLegacy(G); else { assert.equal(save(G).v, 6); assert.equal(G.game.climate.type, 'fair'); } conserved(G, initial, `reload ${i + 1}`); }
 }
 function ignite(G, b) {
   assert(G.setFireDisasters(true, G.fireToggleQuote(true).key)); assert(G.igniteHouse(b));
@@ -112,7 +113,7 @@ function test(name, fn) {
 test('automatic is the new-game default and does not create private stores', () => {
   const actual = loadGame(root); assert(actual.newGame(1).ok);
   assert.equal(actual.game.supplyMode, 'automatic'); assert.equal(actual.game.climate.type, 'fair');
-  assert.equal(actual.game.startConfig.climate, 'fair'); assert.equal(save(actual).v, 5);
+  assert.equal(actual.game.startConfig.climate, 'fair'); assert.equal(save(actual).v, 6);
   assert(actual.world.buildings.every(b => b.supplyStock === undefined));
   const G = fresh(), h = build(G, 'house', 15, 10), { c } = family(G, h);
   assert.equal(G.supplyEnabled(), false); assert.equal(G.tryHouseholdSupply(c), false);

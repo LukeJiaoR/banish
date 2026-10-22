@@ -2,7 +2,8 @@
 'use strict';
 const assert=require('node:assert/strict'),path=require('node:path');
 const {loadGame}=require('./helpers/playability');let passed=0;
-function fresh(){const G=loadGame(path.resolve(__dirname,'..'));G.newGame(1);const w=G.world;for(const k of ['water','rock','road'])w[k].fill(0);w.bgrid.fill(-1);w.treeIdx.fill(-1);w.trees=[];w.buildings=[];w.bmap={};w.citizens=[];w.cmap={};w.families=[];w.marked.clear();w.markedRocks.clear();G.bumpNavigation(w);G.game.h=12;G.rng=()=>.5;G.addBuilding('storage',2,2,{instant:true,free:true});Object.assign(G.game.res,{wood:200,stone:200,iron:100,tools:30,grain:500,food:500,firewood:100});const generate=G.genWorld;G.genWorld=(seed,opt)=>{const nw=generate(seed,opt);nw.water.set(w.water);nw.rock.set(w.rock);return nw;};return G;}
+// Historical upgrade economy keeps the fixed v4 30/20 fuel contract.
+function fresh(){const G=loadGame(path.resolve(__dirname,'..'));G.newGame(1);G.game.climate=null;G.game.heatRules=null;delete G.game.startConfig.climate;const w=G.world;for(const k of ['water','rock','road'])w[k].fill(0);w.bgrid.fill(-1);w.treeIdx.fill(-1);w.trees=[];w.buildings=[];w.bmap={};w.citizens=[];w.cmap={};w.families=[];w.marked.clear();w.markedRocks.clear();G.bumpNavigation(w);G.game.h=12;G.rng=()=>.5;G.addBuilding('storage',2,2,{instant:true,free:true});Object.assign(G.game.res,{wood:200,stone:200,iron:100,tools:30,grain:500,food:500,firewood:100});const generate=G.genWorld;G.genWorld=(seed,opt)=>{const nw=generate(seed,opt);nw.water.set(w.water);nw.rock.set(w.rock);return nw;};return G;}
 function person(G,x=9,y=11){return G.spawnCitizen({x,y,age:40,sex:'m'});}
 function house(G,free=false,x=10,y=10){return G.addBuilding('house',x,y,{instant:true,free}).b;}
 function household(G,b){const c=person(G),f={id:G.nextId(),members:[c.id],houseId:b.id,coupleIds:[]};c.familyId=f.id;b.family=f.id;G.world.families.push(f);return {c,f};}

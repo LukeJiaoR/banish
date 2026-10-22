@@ -6,7 +6,7 @@ const {loadGame}=require('./helpers/playability');
 let passed=0;
 const near=(a,b)=>assert(Math.abs(a-b)<1e-7,`${a} != ${b}`);
 function fresh(age=30){
- const G=loadGame(path.resolve(__dirname,'..'));G.newGame(1);G.game.climate=null;delete G.game.startConfig.climate; // Legacy calendar contract.
+ const G=loadGame(path.resolve(__dirname,'..'));G.newGame(1);G.game.climate=null;G.game.heatRules=null;delete G.game.startConfig.climate; // Legacy calendar contract.
 const w=G.world;
  for(const k of ['water','rock','road'])w[k].fill(0);w.bgrid.fill(-1);w.treeIdx.fill(-1);
  for(const k of ['trees','buildings','citizens','families'])w[k]=[];

@@ -56,7 +56,7 @@ G.supplyNeeds=function(b){
   const residents=G.world.buildings.filter(h=>G.supplyHome(h)&&Math.max(Math.abs(h.x-b.x),Math.abs(h.y-b.y))<=G.SUPPLY.marketRadius).reduce((n,h)=>n+G.supplyResidents(h).length,0);
   return {coats:G.clothingSupplyEnabled()?Math.max(0,Math.min(12,residents)-G.supplyCoats(all)):0,food:Math.max(0,Math.min(180,residents*G.LIFE.eatPerDay*3)-G.supplyFood(all)),firewood:Math.max(0,(G.game.season>=2?40:10)-all.firewood),coal:Math.max(0,(G.heatingPolicy().allowCoal?20:0)-all.coal),room:Math.max(0,G.SUPPLY.marketCap-G.supplySum(all))};
  }
- const residents=G.supplyResidents(b).length,heat=residents&&G.BDEF[b.type]?.warmWoodPerYear?G.BDEF[b.type].warmWoodPerYear/G.SEASON_DAYS*G.SUPPLY.fuelDays:0;
+ const residents=G.supplyResidents(b).length,heat=residents?G.homeSupplyHeat(b,G.SUPPLY.fuelDays):0;
  return {coats:Math.max(0,G.supplyCoatDemand(b)-G.supplyCoats(all)),food:Math.max(0,residents*G.LIFE.eatPerDay*G.SUPPLY.foodDays-G.supplyFood(all)),firewood:Math.max(0,(G.game.season>=2?heat:Math.min(heat,3))-all.firewood-(G.heatingPolicy().allowCoal?all.coal*G.COAL_HEAT:0)),coal:0,room:Math.max(0,G.SUPPLY.homeCap-G.supplySum(all))};
 };
 G.supplyBasket=function(stock,needs,cap,publicStock=false){
@@ -72,8 +72,8 @@ G.supplyBasket=function(stock,needs,cap,publicStock=false){
 };
 G.supplyRestockWanted=function(b){
  const n=G.supplyNeeds(b);if(b.type==='market')return n.room>0&&(n.food>=20||n.firewood>=5||n.coal>=5||n.coats>=1);
- const r=G.supplyResidents(b).length,s=b.supplyStock||G.emptySupplyStock(),heat=(G.BDEF[b.type]?.warmWoodPerYear||0)/G.SEASON_DAYS;
- return r>0&&(n.coats>=1||G.supplyFood(s)<r*G.LIFE.eatPerDay*2||(G.game.season>=2&&s.firewood+(G.heatingPolicy().allowCoal?s.coal*G.COAL_HEAT:0)<heat*2));
+ const r=G.supplyResidents(b).length,s=b.supplyStock||G.emptySupplyStock(),heat=G.homeSupplyHeat(b,2);
+ return r>0&&(n.coats>=1||G.supplyFood(s)<r*G.LIFE.eatPerDay*2||(G.game.season>=2&&s.firewood+(G.heatingPolicy().allowCoal?s.coal*G.COAL_HEAT:0)<heat));
 };
 G.supplyClaimed=b=>G.world.citizens.some(c=>G.supplyTaskOf(c)?.to===b||(G.supplyCargo(c)&&G.supplyDestination(c.carry.supplyBatch)===b));
 G.supplySourceStock=function(b,to,vendor){
@@ -204,7 +204,9 @@ G.useSupplyStock=function(stock,type,qty){stock[type]=Math.max(0,(stock[type]||0
 G.eatHousehold=function(c,qty,legacy=false){const mealDay=legacy?G.game.day-1:G.game.day;if(c.lastMealDay!=null&&c.lastMealDay>=mealDay)return [];const target=G.supplyFamilyTarget(G.familyOf(c),true);if(!target||(!(legacy&&G.mealTransitionActive(G.game,mealDay))&&(!G.atMealTarget(c,target)||!c.mealJourney||c.mealJourney.target!==target||c.mealJourney.familyId!==c.familyId||!(c.mealJourney.remaining<=0))))return [];const stock=G.supplyStock(target);if(G.supplyFood(stock)+1e-8<qty)return [];
  const basket=G.supplyBasket(stock,{food:qty,firewood:0,coal:0,room:qty},qty),eaten=[];for(const[k,n]of Object.entries(basket)){G.useSupplyStock(stock,k,n);eaten.push(k);}c.lastMealDay=mealDay;return G.foodGroupsOf(eaten);
 };
-G.heatSuppliedHome=function(b,need){const r=G.supplyStock(b),wood=Math.min(r.firewood,need),coal=G.heatingPolicy().allowCoal?Math.min(r.coal,Math.max(0,need-wood)/G.COAL_HEAT):0;
+G.heatSuppliedHome=function(b,need){
+ if(G.game.heatRules){if(!G.isOccupiedHome(G.world,b)||G.game.season!==3||b.lastHeating?.day===G.game.day)return;need=G.homeHeatingNeed(b);}
+ const r=G.supplyStock(b),wood=Math.min(r.firewood,need),coal=G.heatingPolicy().allowCoal?Math.min(r.coal,Math.max(0,need-wood)/G.COAL_HEAT):0;
  G.useSupplyStock(r,'firewood',wood);G.useSupplyStock(r,'coal',coal);b.lastHeating={day:G.game.day,wood,coal,need};b.unheated=wood+coal*G.COAL_HEAT+1e-8<need;
 };
 G.burnSupplyStock=function(b){if(!b.supplyStock)return;for(const[k,q]of Object.entries(b.supplyStock)){G.game.supplyLost[k]=(G.game.supplyLost[k]||0)+q;G.ledgerRecord('distributedLost',k,q);}delete b.supplyStock;};
@@ -233,7 +235,7 @@ G.supplyModeQuote=function(){
  for(const f of w.families){
   const people=w.citizens.filter(c=>!c.dead&&c.familyId===f.id);if(!people.length)continue;
   const b=w.bmap[f.houseId],home=G.supplyHome(b)?b:null,key=home?'building:'+home.id:'camp:'+f.id;
-  let row=byHome.get(key);if(!row){row={target:home?'building':'camp',id:home?home.id:f.id,name:home?G.BDEF[home.type].name:'无房家庭临时补给点',x:home?home.x:Math.round(people[0].x),y:home?home.y:Math.round(people[0].y),families:[],people:0,stock:G.emptySupplyStock(),fuelNeed:home&&g.season>=2?G.BDEF[home.type].warmWoodPerYear/G.SEASON_DAYS*2:0};rows.push(row);byHome.set(key,row);}
+  let row=byHome.get(key);if(!row){row={target:home?'building':'camp',id:home?home.id:f.id,name:home?G.BDEF[home.type].name:'无房家庭临时补给点',x:home?home.x:Math.round(people[0].x),y:home?home.y:Math.round(people[0].y),families:[],people:0,stock:G.emptySupplyStock(),fuelNeed:home&&g.season>=2?G.homeSupplyHeat(home,2):0};rows.push(row);byHome.set(key,row);}
   row.families.push(f.id);row.people+=people.length;
  }
  rows.sort((a,b)=>a.id-b.id);const pop=rows.reduce((n,r)=>n+r.people,0),foodNeed=pop*G.LIFE.eatPerDay*2,foodHave=G.supplyFood(g.res),ratio=foodHave?Math.min(1,foodNeed/foodHave):0;
@@ -260,10 +262,10 @@ G.enableHouseholdSupply=function(key,expectedGame=G.game){
 };
 G.householdSupplySummary=function(b){
  const stock={...G.emptySupplyStock(),...b.supplyStock},people=G.supplyResidents(b).length,incoming=G.supplyIncoming(b),buyers=G.world.citizens.filter(c=>G.supplyTaskOf(c)?.to===b||G.supplyCargo(c)&&G.supplyDestination(c.carry.supplyBatch)===b);
- const foodDays=people?G.supplyFood(stock)/(people*G.LIFE.eatPerDay):0,heat=(G.BDEF[b.type]?.warmWoodPerYear||0)/G.SEASON_DAYS;
+ const foodDays=people?G.supplyFood(stock)/(people*G.LIFE.eatPerDay):0;
  let reason=!G.supplyEnabled()?'自动供给：仍按旧规则从公共库存每日食用和取暖':b.houseFire?'火情封闭：屋内物资暂不可取，烧毁时才计损':!people?'空屋物资由空闲散工实际回收':buyers.length?'采购或返家途中，送到后才可食用':G.supplyFood(stock)<people*G.LIFE.eatPerDay?'家中口粮不足一日：需有空手健康成人、可达仓库/市场及道路':'家中有粮，低于两日储备时成人会在当前任务收尾后采购';
  if(G.clothingSupplyEnabled()&&!buyers.length&&!b.houseFire&&people&&G.supplyNeeds(b).coats>=1)reason+='；备换衣物不足，需实际采购送回（已穿衣未到期不更换）';
- return {mode:G.game.supplyMode,stock,incoming,people,foodDays,fuelDays:heat?(stock.firewood+(G.heatingPolicy().allowCoal?stock.coal*G.COAL_HEAT:0))/heat:0,buyers:buyers.map(c=>({id:c.id,name:c.name})),reason};
+ return {mode:G.game.supplyMode,stock,incoming,people,foodDays,climate:!!G.game.heatRules,fuelDays:G.homeFuelDays(b,stock.firewood+(G.heatingPolicy().allowCoal?stock.coal*G.COAL_HEAT:0)),buyers:buyers.map(c=>({id:c.id,name:c.name})),reason};
 };
 G.marketSupplySummary=function(b){
  const stock={...G.emptySupplyStock(),...b.supplyStock},incoming=G.supplyIncoming(b),workers=G.workforceWorkers(b),targets=G.supplyEnabled()?G.supplyNeeds(b):null;

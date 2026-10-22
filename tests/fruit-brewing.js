@@ -5,15 +5,15 @@ const assert=require('node:assert/strict'),path=require('node:path');
 const {loadGame}=require('./helpers/playability');let passed=0;
 const near=(a,b)=>assert(Math.abs(a-b)<1e-7,`${a} != ${b}`);
 function fresh({legacy=false}={}){const G=loadGame(path.resolve(__dirname,'..'));G.newGame(1);
-// Only fixed-calendar historical saves opt out of the real Fair/v5 default.
-if(legacy){G.game.climate=null;delete G.game.startConfig.climate;assertLegacy(G);}
+// Only fixed-calendar historical saves opt out of the real Fair/v6 default.
+if(legacy){G.game.climate=null;delete G.game.heatRules;delete G.game.startConfig.climate;assertLegacy(G);}
 const w=G.world;for(const k of ['water','rock','road'])w[k].fill(0);w.bgrid.fill(-1);w.treeIdx.fill(-1);w.trees=[];w.buildings=[];w.bmap={};w.citizens=[];w.cmap={};w.families=[];w.marked.clear();w.markedRocks.clear();G.bumpNavigation(w);G.game.h=12;G.rng=()=>.5;G.addBuilding('storage',2,2,{instant:true,free:true});for(const k of G.RES_KEYS)G.game.res[k]=0;G.game.res.tools=20;const generate=G.genWorld;G.genWorld=(seed,opt)=>{const nw=generate(seed,opt);nw.water.set(w.water);nw.rock.set(w.rock);return nw;};return G;}
 const build=(G,type,x=10,y=10)=>{const r=G.addBuilding(type,x,y,{instant:true,free:true});assert(r.ok);return r.b;};
 function worker(G,b){const c=G.spawnCitizen({x:b.x-2,y:b.y,age:30,sex:'f'});c.job=b.id;b.workers=[c.id];return c;}
 function until(G,c,condition,limit=4000){for(let i=0;i<limit&&!condition();i++)G.stepCitizen(c,.1);assert(condition(),'expected fruit/brewing progress missing');}
 const saved=G=>JSON.parse(JSON.stringify(G.serializeGame()));
 const clone=x=>JSON.parse(JSON.stringify(x));
-function assertLegacy(G){const d=saved(G);assert.equal(G.game.climate,null);assert.equal(d.v,4);assert.equal(Object.hasOwn(d.game,'climate'),false);assert.equal(Object.hasOwn(d.game.startConfig,'climate'),false);}
+function assertLegacy(G){const d=saved(G);assert.equal(G.game.climate,null);assert.equal(d.v,4);assert.equal(Object.hasOwn(d.game,'heatRules'),false);assert.equal(Object.hasOwn(d.game,'climate'),false);assert.equal(Object.hasOwn(d.game.startConfig,'climate'),false);}
 function clockAt(G,day){G.game.day=day;G.game.season=G.seasonOf(day);G.game.year=Math.floor(day/G.YEAR_DAYS)+1;G.game.townLedger=G.newTownLedger(G.game);}
 function food(G,type,qty){G.game.res[type]=qty;G.game.res.food=G.FOOD_KEYS.reduce((n,k)=>n+G.game.res[k],0);}
 function fruitTree(G,b,type='apple',i=0){G.game.unlocks[type==='legacy'?'orchard':type]=true;Object.assign(b.orchardTrees[i],{type,planted:true,age:G.ORCHARD.matureDays,fruit:20,season:G.game.year,tendedDay:G.game.day});G.syncOrchardTotals(b);return b.orchardTrees[i];}
@@ -49,11 +49,11 @@ test('invalid fruit fields, locked varieties, supply shape and cargo fail atomic
 test('seed purchase to four years of care to apples to a locked ten-ale batch is one continuous physical chain',()=>{const G=fresh(),tr=merchant(G),b=build(G,'orchard',20,10),c=worker(G,b);assert(G.executeTrade(tr,'appleSeed',1,'stone').ok);assert(G.setOrchardType(b,'apple'));G.requestTask(c);until(G,c,()=>b.orchardTrees.filter(t=>t.planted).length===1);assert(G.setOrchardReplant(b,false));until(G,c,()=>b.orchardTrees.filter(t=>t.planted).length===2);for(let day=1;day<=216;day++){clockAt(G,day);G.advanceTownEconomy();if(day<192){G.requestTask(c);until(G,c,()=>b.orchardTrees.filter(t=>t.planted).every(t=>t.tendedDay===day));}}assert.equal(b.orchardTrees.filter(t=>t.planted).length,2);assert.equal(b.orchardYield,2*G.ORCHARD.fruit);assert.equal(G.game.res.apples,0);G.requestTask(c);until(G,c,()=>G.game.res.apples===2*G.ORCHARD.fruit);assert.equal(G.game.res.vegetables,0);const tav=build(G,'tavern',30,10);G.releaseWorker(c);c.job=tav.id;tav.workers=[c.id];food(G,'grain',300);G.setTavernRecipe(tav,'apples');fetch(G,tav,c);assert.equal(G.game.res.apples,2*G.ORCHARD.fruit-30);until(G,c,()=>G.game.res.ale===10);assert.equal(G.game.res.apples,2*G.ORCHARD.fruit-30);assert.equal(G.game.res.grain,300);});
 test('overnight paused fruit batches resume their original recipe after a future-choice switch',()=>{const {G,b,c}=setupBrew('pears');fetch(G,b,c);until(G,c,()=>c.state==='work');const batch=c.task;G.game.h=23;G.stepCitizen(c,.1);assert.equal(c.pausedTask,batch);assert.equal(c.carry.type,'pears');G.setTavernRecipe(b,'apples');assert.equal(G.tavernSummary(b).batches[0].recipe,'pears');G.game.h=12;until(G,c,()=>G.game.res.ale===10);assert.equal(G.game.res.pears,90);assert.equal(G.game.res.apples,0);});
 test('old grain-carry reload still refunds the original thirty and keeps the chosen future recipe',()=>{const {G,b,c}=setupBrew('apples');G.setTavernRecipe(b,'grain');fetch(G,b,c);G.setTavernRecipe(b,'pears');until(G,c,()=>c.state==='work');G.applySaveData(saved(G));const cc=G.world.cmap[c.id];assert.equal(cc.carry.type,'grain');assert(cc.carry.brewIngredient);assert.equal(G.world.bmap[b.id].brewRecipe,'pears');until(G,cc,()=>!cc.carry);assert.equal(G.game.res.grain,300);assert.equal(G.game.res.ale,0);});
-test('Fair/v5 brewing reload keeps real fruit and rejects unsettled calendar jumps atomically',()=>{
+test('Fair/v6 brewing reload keeps real fruit and rejects unsettled calendar jumps atomically',()=>{
  const {G,b,c}=setupBrew('pears');fetch(G,b,c);until(G,c,()=>c.state==='work');
- const d=saved(G);assert.equal(d.v,5);assert.equal(d.game.climate.type,'fair');assert.equal(d.game.startConfig.climate,'fair');assert.equal(d.game.climate.lastDay,0);
+ const d=saved(G);assert.equal(d.v,6);assert.deepEqual(d.game.heatRules,{v:1,lastDay:0});assert.equal(d.game.climate.type,'fair');assert.equal(d.game.startConfig.climate,'fair');assert.equal(d.game.climate.lastDay,0);
  G.applySaveData(d);assert.equal(G.game.climate.type,'fair');assert.equal(G.game.res.pears,90);assert.equal(G.world.cmap[c.id].carry.type,'pears');assert.equal(G.world.cmap[c.id].carry.qty,30);assert.equal(G.world.bmap[b.id].brewRecipe,'pears');
- const good=saved(G),world=G.world,game=G.game,rng=G.rng,uid=G._peekUid();assert.equal(good.v,5);
+ const good=saved(G),world=G.world,game=G.game,rng=G.rng,uid=G._peekUid();assert.equal(good.v,6);assert.deepEqual(good.game.heatRules,d.game.heatRules);
  for(const day of [24,216]){const bad=clone(good);bad.game.day=day;bad.game.season=G.seasonOf(day);bad.game.year=Math.floor(day/G.YEAR_DAYS)+1;
   assert.throws(()=>G.applySaveData(bad),/气候结算日期/);
   assert.equal(G.world,world);assert.equal(G.game,game);assert.equal(G.rng,rng);assert.equal(G._peekUid(),uid);assert.deepEqual(saved(G),good);

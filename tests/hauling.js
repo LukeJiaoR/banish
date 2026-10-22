@@ -193,11 +193,12 @@ test('64 generated starts have one real storage and 15 reachable citizens', () =
 test('map version preserves starter minerals and legacy terrain on reload', () => {
   G.newGame(2);
   assert.equal(G.world.mapVersion,3);
-  const saved=JSON.parse(JSON.stringify(G.serializeGame()));assert.equal(saved.v,5);
+  const saved=JSON.parse(JSON.stringify(G.serializeGame()));assert.equal(saved.v,6);
+  assert.deepEqual(saved.game.heatRules,{v:1,lastDay:0});
   assert.equal(saved.game.climate.type,'fair');assert.equal(saved.game.startConfig.climate,'fair');
   const before=Array.from(G.world.rock);G.applySaveData(saved);assert.deepEqual(Array.from(G.world.rock),before);
-  assert.equal(G.serializeGame().v,5);assert.equal(G.game.climate.type,'fair');
-  // Build an actual legacy generator fixture separately; never relabel a v5
+  assert.equal(G.serializeGame().v,6);assert.equal(G.game.climate.type,'fair');assert.deepEqual(G.serializeGame().game.heatRules,{v:1,lastDay:0});
+  // Build an actual legacy generator fixture separately; never relabel a v6
   // authoritative terrain save as an old archive by deleting its version.
   G.world=G.genWorld(2,{starterResources:true});G.game=G.newGameState();
   const legacy=JSON.parse(JSON.stringify(G.serializeGame()));

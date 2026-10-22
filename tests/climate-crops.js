@@ -5,6 +5,8 @@ const {loadGame}=require('./helpers/playability');
 const ROOT=path.resolve(__dirname,'..'),copy=x=>JSON.parse(JSON.stringify(x));let passed=0;
 function fresh(type='fair',seed=1,options={},root=ROOT){
   const G=loadGame(root);assert(G.newGame(seed,{climate:type,...options}).ok);
+  // Crop-specific boundary fixtures retain v5 climate with fixed legacy heating.
+  G.game.heatRules=null;
   const w=G.world;for(const k of ['water','rock','road','mountain'])w[k].fill(0);w.bgrid.fill(-1);w.treeIdx.fill(-1);w.trees=[];w.buildings=[];w.bmap={};w.citizens=[];w.cmap={};w.families=[];w.marked.clear();w.markedRocks.clear();w.rockCleared=[];G.bumpNavigation(w);
   G.game.h=12;G.rng=()=>.5;G.addBuilding('storage',2,2,{instant:true,free:true});Object.assign(G.game.res,{wood:500,stone:500,iron:500,grain:100,food:100,tools:300,firewood:200});
   const c=G.spawnCitizen({x:8,y:10,age:30,sex:'m'}),h=G.addBuilding('house',4,10,{instant:true,free:true}).b,f={id:G.nextId(),members:[c.id],coupleIds:[],houseId:h.id};c.familyId=f.id;h.family=f.id;w.families=[f];
@@ -25,7 +27,7 @@ function coldDay(G,crop='wheat'){const line=G.CROP_TEMPERATURES[crop].frostBelow
 function step(G,c,done,max=10000){for(let i=0;i<max&&!done();i++)G.stepCitizen(c,.1);assert(done(),'real worker flow did not complete');}
 
 test('new game defaults Fair; all climates validate, quote and seed repeat without consuming live RNG',()=>{
- const {G}=fresh();assert(G.newGame(0).ok);assert.equal(G.game.climate.type,'fair');assert.equal(G.game.startConfig.climate,'fair');assert.equal(saved(G).v,5);
+ const {G}=fresh();assert(G.newGame(0).ok);assert.equal(G.game.climate.type,'fair');assert.equal(G.game.startConfig.climate,'fair');assert.equal(saved(G).v,6);assert.deepEqual({...G.game.heatRules},{v:1,lastDay:0});
  for(const type of Object.keys(G.CLIMATES)){const q=G.startConfigQuote({seed:0,climate:type});assert(q.ok);assert(q.key.includes(type));assert.equal(q.config.climate,type);assert(q.climateSummary.name.includes(type[0].toUpperCase()+type.slice(1)));}
  let calls=0;G.rng=()=>{calls++;return .2;};for(let d=0;d<1000;d++)for(const type of Object.keys(G.CLIMATES))assert.equal(G.temperatureFor(0,d,type),G.temperatureFor(0,d,type));assert.equal(calls,0);
  for(const climate of [null,'legacy','Fair','toString',1,{}])assert(!G.startConfigQuote({seed:1,climate}).ok);
@@ -120,7 +122,7 @@ test('winter cutoff cancels pending first/partial sow tasks without opening a ne
  const d=saved(G);G.applySaveData(d);restored(G,d);}
 });
 
-test('new v5 state rejects missing, foreign, contradictory or downgraded markers atomically',()=>{
+test('v5 climate state rejects missing, foreign, contradictory or downgraded markers atomically',()=>{
  const {G}=fresh('harsh'),b=field(G);planted(b);G.damageFrostTiles(b,[b.farm[0]]);const good=saved(G),world=G.world,game=G.game,rng=G.rng,uid=G._peekUid();
  const edits=[d=>delete d.game.climate,d=>d.game.climate=null,d=>d.game.climate.v=2,d=>d.game.climate.type='mild',d=>delete d.game.climate.lastDay,d=>d.game.climate.lastDay=-1,d=>d.game.climate.lastDay=1,d=>d.game.climate.extra=0,d=>d.v=4,d=>delete d.game.startConfig.climate,d=>d.game.startConfig.climate='toString',d=>d.mapVersion=1,d=>d.game.season=1,d=>d.game.year=2,d=>d.buildings.find(x=>x.id===b.id).sownAll='true',d=>d.buildings.find(x=>x.id===b.id).harvestDone=[],d=>d.buildings.find(x=>x.id===b.id).farm[0].pop(),d=>d.buildings.find(x=>x.id===b.id).farm[0][2]=1,d=>d.buildings.find(x=>x.id===b.id).farm[0][0]=0,d=>d.buildings.find(x=>x.id===b.id).sowingCommitted=false];
  for(const edit of edits){const d=copy(good);edit(d);assert.throws(()=>G.applySaveData(d));assert.equal(G.world,world);assert.equal(G.game,game);assert.equal(G.rng,rng);assert.equal(G._peekUid(),uid);assert.deepEqual(saved(G),good);}
@@ -128,7 +130,7 @@ test('new v5 state rejects missing, foreign, contradictory or downgraded markers
 
 test('legacy v1-v4 without climate stay legacy through loads and saves with no immediate crop/stock change',()=>{
  for(const fixture of ['mountain-v0.3.73.json']){const G=loadGame(ROOT),raw=JSON.parse(fs.readFileSync(path.join(ROOT,'tests/fixtures',fixture),'utf8')),d=raw.save||raw;const candidate=G.prepareSaveData(d);G.world=candidate.world;G.game=candidate.game;G.rng=candidate.rng;G.setUid(candidate.nextUid);assert.equal(G.game.climate,null);const before=saved(G);G.advanceCropClimate();assert.deepEqual(saved(G),before);assert.equal(G.climateWeather(),null);}
- for(const terrain of ['classic','mountain'])for(const mapSize of [128,192]){const G=loadGame(ROOT);assert(G.newGame(17,{terrain,mapSize,climate:'mild'}).ok);const d=saved(G);delete d.game.climate;delete d.game.startConfig.climate;d.v=d.mapVersion===3?4:d.N===192?3:2;G.applySaveData(d);assert.equal(G.game.climate,null);restored(G,d);}
+ for(const terrain of ['classic','mountain'])for(const mapSize of [128,192]){const G=loadGame(ROOT);assert(G.newGame(17,{terrain,mapSize,climate:'mild'}).ok);const d=saved(G);delete d.game.climate;delete d.game.heatRules;delete d.game.startConfig.climate;d.v=d.mapVersion===3?4:d.N===192?3:2;G.applySaveData(d);assert.equal(G.game.climate,null);restored(G,d);}
 });
 
 
