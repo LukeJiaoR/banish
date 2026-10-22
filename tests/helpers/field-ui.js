@@ -29,7 +29,10 @@ function fixture() {
       appendChild(child) { this.children.push(child); child.parentNode = this; return child; },
       descendants() { return this.children.flatMap(child => [child, ...child.descendants()]); },
       contains(child) { for (; child; child = child.parentNode) if (child === this) return true; return false; },
+      get options() { return this.tagName === 'SELECT' ? this.descendants().filter(child => child.tagName === 'OPTION') : undefined; },
       querySelectorAll(selector) {
+        const descendant = selector.match(/^(#[\w-]+)\s+([\w-]+)$/);
+        if (descendant) return this.querySelector(descendant[1])?.querySelectorAll(descendant[2]) || [];
         return this.descendants().filter(child => {
           if (selector[0] === '#') return child.id === selector.slice(1);
           if (selector === '.mini-tog') return child.classList.contains('mini-tog');
