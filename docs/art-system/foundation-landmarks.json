@@ -1,0 +1,89 @@
+{
+  "warning": "Manually selected visible plinth landmarks, not fitted geometry. Approximate +/-3 source pixels. Chapel left stepped footprint is not a clean rectangular edge.",
+  "rows": [
+    {
+      "name": "townhall",
+      "pts": [
+        [
+          35,
+          255
+        ],
+        [
+          224,
+          351
+        ],
+        [
+          417,
+          255
+        ]
+      ],
+      "note": "Control: near 2:1 on both selected base edges.",
+      "measurements": [
+        {
+          "slope": 0.5079365079365079,
+          "degrees": 26.927677851040503
+        },
+        {
+          "slope": 0.49740932642487046,
+          "degrees": 26.446180435778036
+        }
+      ]
+    },
+    {
+      "name": "tradingpost",
+      "pts": [
+        [
+          38,
+          263
+        ],
+        [
+          224,
+          353
+        ],
+        [
+          414,
+          263
+        ]
+      ],
+      "note": "Control: near 2:1; painted stone edge has several-pixel thickness.",
+      "measurements": [
+        {
+          "slope": 0.4838709677419355,
+          "degrees": 25.820991974189283
+        },
+        {
+          "slope": 0.47368421052631576,
+          "degrees": 25.346175941946694
+        }
+      ]
+    },
+    {
+      "name": "chapel",
+      "pts": [
+        [
+          30,
+          394
+        ],
+        [
+          224,
+          481
+        ],
+        [
+          440,
+          393
+        ]
+      ],
+      "note": "Review candidate: long right plinth appears flatter. Left footprint is stepped.",
+      "measurements": [
+        {
+          "slope": 0.4484536082474227,
+          "degrees": 24.15402143046676
+        },
+        {
+          "slope": 0.4074074074074074,
+          "degrees": 22.166345822082455
+        }
+      ]
+    }
+  ]
+}
