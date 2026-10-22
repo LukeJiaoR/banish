@@ -206,15 +206,15 @@ test('upgrade estimate rounds only displayed exact whole-winter wood and stone b
   assert.match(facts.data.fuel, /本年整冬.*省三分之一/);
 });
 
-test('new-game note and review disclose v9, retain legacy orchard boundaries, and create the selected heating rules', () => {
+test('new-game note and review disclose v10, retain legacy orchard boundaries, and create the selected heating rules', () => {
   const f = settings(), { G } = f;
-  assert.match(settingNode(f, 'climate-note').textContent, /冬季住房耗柴随气温变化.*秋霜损失树上未采果实.*提前采果.*v9.*旧程序无法读取.*v1–v6.*原果园规则.*v1–v5.*原固定取暖.*v1–v7.*不启用提前采果/);
+  assert.match(settingNode(f, 'climate-note').textContent, /冬季住房耗柴随气温变化.*秋霜损失树上未采果实.*提前采果.*v10.*旧程序无法读取.*v1–v6.*原果园规则.*v1–v5.*原固定取暖.*v1–v7.*不启用提前采果/);
   assert.equal(G.game.heatRules, null);
   seed(f, 17); press(f, 'climate-harsh'); press(f, 'review-button');
-  assert.match(settingNode(f, 'confirm-summary').textContent, /v9.*旧程序无法读取.*冬季住房耗柴随气温变化.*秋霜仅损失树上未采果实.*v1–v6.*不启用果园冷害.*v1–v7.*不启用提前采果/s);
+  assert.match(settingNode(f, 'confirm-summary').textContent, /v10.*旧程序无法读取.*冬季住房耗柴随气温变化.*秋霜仅损失树上未采果实.*v1–v6.*不启用果园冷害.*v1–v7.*不启用提前采果/s);
   assert.equal(G.game.heatRules, null);
   press(f, 'confirm'); assert.equal(G.game.climate.type, 'harsh'); assert.equal(G.game.heatRules.v, 1);
-  const save = G.serializeGame(); assert.equal(save.v, 9); assert.equal(G.prepareSaveData(save).game.heatRules.v, 1);
+  const save = G.serializeGame(); assert.equal(save.v, 10); assert.equal(G.prepareSaveData(save).game.heatRules.v, 1);
 });
 
 console.log(`Winter heating UI: ${passed} DOM/live-state suites passed (not browser/mobile acceptance).`);

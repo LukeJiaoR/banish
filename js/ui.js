@@ -4650,7 +4650,7 @@ G.ui = {
       const merchant = b.merchant && b.merchant.leaveDay > G.game.day;
       const profile = G.merchantProfile(b), order = G.merchantOrderSummary(b);
       const waterAccess=G.tradeWaterAccess(G.world,b);
-      set('[data-economy-live="merchant"]', !merchant&&!waterAccess.ok?waterAccess.reason:merchant ? `${profile.name}停靠中，将在 ${b.merchant.leaveDay - G.game.day} 天后离开。` : `下一艘商船约 ${Math.max(0, (b.nextMerchantDay || G.game.day) - G.game.day)} 天后到达；不一定是已订货的商人。${waterAccess.legacy?'':'泊位已连通主河；本版按日期到访，尚无在途船只。'}`);
+      set('[data-economy-live="merchant"]', !merchant&&!waterAccess.ok?waterAccess.reason:merchant ? `${profile.name}停靠中，将在 ${b.merchant.leaveDay - G.game.day} 天后离开。` : G.world.tradeVoyages?G.tradeVoyageSummary(b):`下一艘商船约 ${Math.max(0, (b.nextMerchantDay || G.game.day) - G.game.day)} 天后到达；不一定是已订货的商人。${waterAccess.legacy?'':'泊位已连通主河；本版按日期到访，尚无在途船只。'}`);
       const accepted = Object.keys(G.TRADE_VALUES).filter(type => G.merchantAccepts(b, type)).map(type => G.RES[type].name).join('、');
       set('[data-economy-live="merchant-payments"]', merchant ? `收购：${accepted}。${profile.acceptsFood ? '接受肉类、鸡蛋、蔬菜、主食、苹果、梨付款。' : '拒收食物：肉类、鸡蛋、蔬菜、主食、苹果、梨。'}` : '各商人有不同目录与收购物资；订货要等同一商人回访。');
       const inventory = b.tradeInventory || {}, targets = b.tradeTargets || {};
@@ -4671,7 +4671,7 @@ G.ui = {
       }
       for (const option of el.querySelector('#trade-payment').querySelectorAll('option')) option.disabled = !!merchant && !G.merchantAccepts(b, option.value);
       const pending = merchant && order.pending;
-      const returnText = merchant && Number.isFinite(order.returnDay) ? `同一商人预计约 ${Math.max(0, order.returnDay - G.game.day)} 天后回访（下一艘船可能不同）。` : '';
+      const returnText = merchant && Number.isFinite(order.returnDay) ? G.world.tradeVoyages?`同一商人最早目标约 ${Math.max(0, order.returnDay - G.game.day)} 天后回访，长航程会延后；下一艘船可能不同。`:`同一商人预计约 ${Math.max(0, order.returnDay - G.game.day)} 天后回访（下一艘船可能不同）。` : '';
       set('[data-economy-live="merchant-order"]', merchant ? (pending ? `待到货：${G.TRADE_GOODS[pending.good].name} × ${pending.qty}。` : '这位商人暂无待到货订单。') + returnText + (order.arrivedGood ? `本次已带到${G.TRADE_GOODS[order.arrivedGood].name}，订单已清除；${b.autoTrade?.enabled ? '自动购买结果见下方历史回执，剩余货物可手动确认购买。' : '购买仍需手动确认。'}` : '') : '商人未停靠，暂不能订货、替换或取消订单。');
       const otherOrders = (order.pendingOrders || []).filter(item => !merchant || item.merchantId !== order.merchantId);
       set('[data-economy-live="merchant-orders"]', otherOrders.length ? '等待其他商人回访：' + otherOrders.map(item => `${item.name} · ${G.TRADE_GOODS[item.good].name} × ${item.qty}（订货单价 ${item.unitPrice}）`).join('；') + '。须等该商人停靠后才能修改。' : '');
@@ -5024,7 +5024,7 @@ G.ui = {
     const q=G.startConfigQuote({seed:seed.value,preset:s.preset,terrain:s.terrain,mapSize:s.mapSize,climate:s.climate});
     seed.setAttribute('aria-invalid',String(!q.ok));
     const climateName=q.climateSummary ? ` · ${q.climateSummary.name}` : '';
-    const climateNote=q.climateSummary ? `${q.climateSummary.note} 气候新村使用 ${q.terrainSummary.mapVersion===4?'v9':'v8'} 存档，旧程序无法读取；冬季住房耗柴随气温变化，秋霜仅损失树上未采果实，既有 v1–v6 村不启用果园冷害，既有 v1–v7 村不启用提前采果。` : '';
+    const climateNote=q.climateSummary ? `${q.climateSummary.note} 气候新村使用 ${q.terrainSummary.mapVersion===4?'v10':'v8'} 存档，旧程序无法读取；冬季住房耗柴随气温变化，秋霜仅损失树上未采果实，既有 v1–v6 村不启用果园冷害，既有 v1–v7 村不启用提前采果。` : '';
     if(q.ok){const p=q.presetSummary;
       write('new-game-preview',`已选：${p.name} · ${terrainName} · ${q.mapSizeSummary.name}${climateName} · ${p.population}人`);
       write('new-game-summary',`新村预览：种子 ${q.config.seed} · ${p.name} · ${terrainName} · ${q.mapSizeSummary.name}${climateName}\n${climateNote}\n${q.mapSizeSummary.note}\n${p.families}家庭 / ${p.population}人（${p.adults}成人、${p.children}儿童）；仅有储物车，住房需自行建设\n${['wood','stone','iron','food','firewood','tools'].map(k=>`${G.RES[k].name} ${p.resources[k]}`).join(' · ')}\n${p.seedNote}\n${p.equipmentNote} ${p.adaptationNote}\n${terrainNote}`);
