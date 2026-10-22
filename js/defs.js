@@ -20,6 +20,9 @@ G.START_PRESETS = Object.freeze({
 G.CLIMATE_VERSION = 1;
 // Orchard frost v1: local 48-day adaptation, not original-game constants.
 // Same capped depth curve as crop frost; apple, pear and legacy fruit share it.
+// Original fruit resources: 4 months, 65 F centre, 20 F range. The triangular
+// temperature response and 48-day scaling below are our explicit adaptation.
+G.ORCHARD_HARVEST = Object.freeze({v:1,months:4,tempF:65,rangeF:20});
 G.ORCHARD_FROST = Object.freeze({v:1,frostBelow:0,perDegree:.04,minRate:.08,maxRate:.40});
 G.CLIMATES = Object.freeze({
   mild: Object.freeze({name:'温和 · Mild',offset:3,variation:1.2,snap:2,note:'温差较小，农田生长期较长；仍有霜害与冬季收割截止'}),

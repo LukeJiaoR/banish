@@ -162,12 +162,13 @@ G.serializeGame = function () {
   G.reconcileDeerHabitat(deerWorld,g);
   G.upgradeWildlife(deerWorld,g);
   return {
-    v: g.orchardRules?7:g.heatRules?6:g.climate?5:w.mapVersion===3?4:w.N===192?3:w.mapVersion===2?2:1, seed: w.seed, N: w.N, mapVersion: w.mapVersion || 0, // N：地图尺寸（旧档跨尺寸迁移裸索引用）
+    v: g.orchardHarvestRules?8:g.orchardRules?7:g.heatRules?6:g.climate?5:w.mapVersion===3?4:w.N===192?3:w.mapVersion===2?2:1, seed: w.seed, N: w.N, mapVersion: w.mapVersion || 0, // N：地图尺寸（旧档跨尺寸迁移裸索引用）
     ...(w.mapVersion===2||w.mapVersion===3||w.N===192?{terrain:{water:Array.from(w.water),rock:Array.from(w.rock),mountain:Array.from(w.mountain),start:{...w.start}}}:{}),
     game: {
       v: G.VERSION, startConfig:g.startConfig ? {...g.startConfig} : null,
       ...(g.climate?{climate:{...g.climate}}:{}),
       ...(g.heatRules?{heatRules:{...g.heatRules}}:{}),
+      ...(g.orchardHarvestRules?{orchardHarvestRules:{...g.orchardHarvestRules}}:{}),
       ...(g.orchardRules?{orchardRules:{...g.orchardRules}}:{}),
       h: g.h, day: g.day, season: g.season, year: g.year,
       res: g.res, stats: g.stats, prevFood: g.prevFood, foodNet: g.foodNet, foodUrgent: g.foodUrgent, warned: g.warned,
@@ -210,6 +211,7 @@ G.serializeGame = function () {
       supplyStock:b.supplyStock,lastHeating:b.lastHeating, unheated:b.unheated, graves:b.type==='cemetery'?(b.graves||[]).map(r=>G.graveRecord(b,r)):undefined,
       animalType:b.animalType, pastureInfestation:b.pastureInfestation, pastureProducts:b.pastureProducts, animals: b.animals, animalGrowth: b.animalGrowth, animalTarget: b.animalTarget, woolReady: b.woolReady, eggProgress:b.eggProgress, eggDay:b.eggDay,
       orchardAge: b.orchardAge, orchardYield: b.orchardYield, orchardSeason: b.orchardSeason, tendedDay: b.tendedDay,
+      ...(b.orchardHarvestYear!==undefined?{orchardHarvestYear:b.orchardHarvestYear}:{}),
       ...(b.orchardCut?{orchardCut:{...b.orchardCut}}:{}),
       orchardType:b.orchardType,orchardTrees:b.orchardTrees?b.orchardTrees.map(t=>({...t})):undefined,orchardDay:b.orchardDay,orchardReplant:b.orchardReplant,orchardWarnYear:b.orchardWarnYear,
       ...(g.orchardRules&&b.type==='orchard'?{orchardFrost:{...b.orchardFrost}}:{}),
@@ -336,8 +338,8 @@ G.prepareSaveData = function (d) {
     if(G.supplySum(stock)>limit+1e-6)bad(field+'容量');return stock;
   };
   record(d, '根对象');
-  if (d.v !== undefined && ![1,2,3,4,5,6,7].includes(d.v)) bad('版本不受支持');
-  const orchardFormat=d.v===7,heatFormat=d.v===6||orchardFormat,climateFormat=d.v===5||heatFormat,mineralStart=d.v===4||climateFormat&&d.mapVersion===3,expanded=d.v===3||(mineralStart||climateFormat)&&d.N===192,authoritative=d.v===2||expanded||mineralStart||climateFormat;
+  if (d.v !== undefined && ![1,2,3,4,5,6,7,8].includes(d.v)) bad('版本不受支持');
+  const harvestFormat=d.v===8,orchardFormat=d.v===7||harvestFormat,heatFormat=d.v===6||orchardFormat,climateFormat=d.v===5||heatFormat,mineralStart=d.v===4||climateFormat&&d.mapVersion===3,expanded=d.v===3||(mineralStart||climateFormat)&&d.N===192,authoritative=d.v===2||expanded||mineralStart||climateFormat;
   if(climateFormat&&![2,3].includes(d.mapVersion))bad('气候存档地图版本');
   if(mineralStart?d.mapVersion!==3:expanded?![1,2].includes(d.mapVersion):authoritative?d.mapVersion!==2:d.mapVersion!==undefined&&d.mapVersion!==0&&d.mapVersion!==1)bad('地图生成版本不受支持');
   if(!authoritative&&d.terrain!==undefined)bad('旧版本不能携带新地形');
@@ -379,6 +381,12 @@ G.prepareSaveData = function (d) {
     const r=record(gd.orchardRules,'果园冷害规则');
     if(Object.keys(r).length!==2||Object.keys(r).some(k=>!['v','lastDay'].includes(k))||r.v!==G.ORCHARD_FROST.v)bad('果园冷害规则版本');
     g.orchardRules={v:r.v,lastDay:integer(r.lastDay,'果园冷害结算日期',g.day,g.day)};
+  }
+  if(harvestFormat!==Object.hasOwn(gd,'orchardHarvestRules'))bad('果园提前采收版本标记缺失或不匹配');
+  if(harvestFormat){
+    const r=record(gd.orchardHarvestRules,'果实生长规则');
+    if(Object.keys(r).length!==1||r.v!==G.ORCHARD_HARVEST.v)bad('果实生长规则版本');
+    g.orchardHarvestRules={v:r.v};
   }
   const currentConstruction=gd.constructionVersion!==undefined;
   if(currentConstruction&&gd.constructionVersion!==1)bad('建材配送版本');
@@ -800,7 +808,7 @@ G.prepareSaveData = function (d) {
       }
     }
     if(bd.orchardFrost!==undefined&&(!orchardFormat||bd.type!=='orchard'))bad('旧档或非果园不能携带果园冷害记录');
-    if(['orchardCut','orchardType','orchardTrees','orchardDay','orchardReplant','orchardWarnYear'].some(k=>bd[k]!==undefined)&&bd.type!=='orchard')bad('果园树株字段');
+    if(['orchardHarvestYear','orchardCut','orchardType','orchardTrees','orchardDay','orchardReplant','orchardWarnYear'].some(k=>bd[k]!==undefined)&&bd.type!=='orchard')bad('果园树株字段');
     if(bd.type==='orchard'){
       if(orchardFormat){
         if(!Array.isArray(bd.orchardTrees))bad('新果园冷害存档缺少逐树记录');
@@ -823,6 +831,13 @@ G.prepareSaveData = function (d) {
         if(!Array.isArray(bd.orchardTrees)||bd.orchardTrees.length!==G.orchardTreeCount(b))bad('果园树株数量');
         b.orchardTrees=bd.orchardTrees.map((t,i)=>{record(t,'果园树株');if(typeof t.planted!=='boolean')bad('果树种植状态');
           const tree={type:t.type===undefined?'legacy':validVariety(t.type,'单株果树品种'),planted:t.planted,age:integer(t.age,'单株树龄',0,G.orchardLifetime(i)-1),fruit:number(t.fruit,'单株果实',0,G.ORCHARD.fruit),season:integer(t.season,'单株产季',0,g.year),tendedDay:integer(t.tendedDay,'单株照料日',-1,g.day),cycle:integer(t.cycle,'单株更新次数',0)};
+          if(harvestFormat){
+            const keys=['type','planted','age','fruit','season','tendedDay','cycle','fruitGrowth','harvested'];
+            if(Object.keys(t).length!==keys.length||Object.keys(t).some(k=>!keys.includes(k))||typeof t.harvested!=='boolean')bad('果实生长树株字段');
+            tree.fruitGrowth=number(t.fruitGrowth,'果实年生长进度',0,1);tree.harvested=t.harvested;
+            if(!Number.isInteger(tree.fruit)||tree.fruit>Math.floor(tree.fruitGrowth*G.ORCHARD.fruit)||tree.harvested&&tree.fruit||tree.age<G.ORCHARD.matureDays&&(tree.fruitGrowth||tree.harvested)||!tree.planted&&(tree.fruitGrowth||tree.harvested))bad('果实成长或本年采收状态');
+            if(g.season===3&&tree.fruit||tree.season!==g.year&&(tree.fruitGrowth||tree.harvested||tree.fruit)||tree.harvested&&Math.floor(tree.fruitGrowth*G.ORCHARD.fruit)<1)bad('果实年度或冬季状态');
+          }else if(t.fruitGrowth!==undefined||t.harvested!==undefined)bad('旧村不能携带新果实生长状态');
           if(b.orchardSize&&b.state==='site'&&(tree.planted||tree.age||tree.fruit||tree.cycle))bad('未建成果园已有果树');
           if(!tree.planted&&(tree.age||tree.fruit))bad('空果树位含生长或果实');return tree;});
         b.orchardDay=integer(bd.orchardDay,'果园推进日',0,g.day);
@@ -837,6 +852,10 @@ G.prepareSaveData = function (d) {
         if(b.state!=='ok'||!Array.isArray(bd.orchardTrees)||Object.keys(order).length!==2||Object.keys(order).some(k=>!['type','paused'].includes(k))||typeof order.paused!=='boolean'||!b.orchardTrees.some(t=>t.planted))bad('整园砍树指令状态');
         b.orchardCut={type:order.type==='none'?'none':validVariety(order.type,'砍树后补种品种'),paused:order.paused};
         if(order.type!=='none'&&!G.orchardUnlocked(order.type,g))bad('砍树后补种种子未解锁');
+      }
+      if(bd.orchardHarvestYear!==undefined){
+        if(!harvestFormat||b.state!=='ok'||b.orchardCut||g.season===3)bad('提前采果指令状态');
+        b.orchardHarvestYear=integer(bd.orchardHarvestYear,'提前采果年份',g.year,g.year);
       }
       if(bd.orchardWarnYear!==undefined)b.orchardWarnYear=integer(bd.orchardWarnYear,'果园预警年份',1,g.year);
     }

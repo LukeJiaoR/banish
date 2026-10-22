@@ -97,6 +97,7 @@ G.newGameState = function (startConfig = null) {
     startConfig: startConfig ? {...startConfig} : null,
     climate: startConfig?.climate ? {v:G.CLIMATE_VERSION,type:startConfig.climate,lastDay:0} : null,
     heatRules: startConfig?.climate ? {v:1,lastDay:0} : null,
+    orchardHarvestRules: startConfig?.climate ? {v:G.ORCHARD_HARVEST.v} : null,
     orchardRules: startConfig?.climate ? {v:G.ORCHARD_FROST.v,lastDay:0} : null,
     h: 6, day: 0, season: 0, year: 1,
     speed: 1, paused: false,
@@ -323,7 +324,7 @@ G.onSeasonChange = function (from, to) {
   }
   if (to === 3) G.expireWinterFarms();
   G.advanceCropClimate(); // Complete this day before the season autosave.
-  G.advanceOrchardClimate(); // v7 only: fruit formation/loss is saved atomically.
+  G.advanceOrchardClimate(); // v7+ daily fruit formation/loss is saved atomically.
   G.needGround = true;          // 换季调色板变化，整图重绘
   if (G.groundDirty) G.groundDirty.clear();
   if (G.autosave) G.autosave();
@@ -3337,6 +3338,7 @@ G.finishOrchardCut=function(b){
 G.startOrchardCut=function(b,type){
   if(!b||G.world.bmap[b.id]!==b||b.type!=='orchard'||b.state!=='ok'||b.orchardCut||(type!=='none'&&!G.orchardUnlocked(type)))return false;
   G.ensureOrchard(b);if(!b.orchardTrees.some(t=>t.planted))return false;
+  delete b.orchardHarvestYear;
   b.orchardCut={type,paused:false};G.invalidateOrchardTasks(b);return true;
 };
 G.controlOrchardCut=function(b,action){
@@ -3346,7 +3348,7 @@ G.controlOrchardCut=function(b,action){
   G.invalidateOrchardTasks(b);return true;
 };
 G.orchardLifetime=i=>(12+i%9)*G.YEAR_DAYS;
-G.newOrchardTree=(cycle=0)=>({type:'legacy',planted:false,age:0,fruit:0,season:0,tendedDay:-1,cycle});
+G.newOrchardTree=(cycle=0)=>({type:'legacy',planted:false,age:0,fruit:0,season:0,tendedDay:-1,cycle,...(G.game?.orchardHarvestRules?{fruitGrowth:0,harvested:false}:{})});
 G.newOrchardTrees=b=>Array.from({length:G.orchardTreeCount(b)},()=>G.newOrchardTree());
 G.ensureOrchard=function(b){
   if(!b.orchardTrees){
@@ -3369,11 +3371,35 @@ G.orchardPoint=function(b,i){
   const layout=G.orchardLayout(b),offset=layout.legacy?1:0;
   return {x:b.x+offset+(i%layout.columns)*2,y:b.y+offset+Math.floor(i/layout.columns)*(layout.legacy?2:3)};
 };
+/* v8 only: mature trees grow fruit before autumn. The button issues work;
+ * it never creates food, bypasses limits, or credits a storage inventory. */
+G.orchardCanHarvest=function(b,t){
+  if(!G.game.orchardHarvestRules)return G.game.season===2;
+  return G.game.season!==3&&t.season===G.game.year&&!t.harvested&&
+    (G.game.season===2||t.fruitGrowth>=1||b.orchardHarvestYear===G.game.year);
+};
+G.orchardEarlyReason=function(b){
+  if(!G.game.orchardHarvestRules)return '旧村保留原果园规则；提前采果仅新村启用';
+  if(!b||G.world.bmap[b.id]!==b||b.type!=='orchard'||b.state!=='ok')return '果园不可用';
+  if(b.orchardCut)return '整园砍树期间不能采果';
+  if(G.game.season===3)return '冬季没有可抢收的树上果实';
+  if(b.orchardHarvestYear===G.game.year)return '本年提前采果指令已下达';
+  if(!(b.orchardTrees||[]).some(t=>t.planted&&t.fruit>0&&!t.harvested&&t.season===G.game.year&&G.orchardUnlocked(G.orchardTreeType(t))))return '尚无长成的果实；幼树和空位不会凭空结果';
+  return '';
+};
+G.startOrchardHarvest=function(b){
+  if(G.orchardEarlyReason(b))return false;
+  b.orchardHarvestYear=G.game.year;G.invalidateOrchardTasks(b);return true;
+};
+G.orchardFruitTemperatureFactor=function(temperature){
+  const r=G.ORCHARD_HARVEST,f=temperature*9/5+32;
+  return G.clamp(1-Math.abs(f-r.tempF)/r.rangeF,0,1);
+};
 G.orchardAction=function(b,t){
   if(b.orchardCut)return !b.orchardCut.paused&&t.planted&&!G.goalPaused('wood')&&G.mineralStorageSpace('wood')>0?'cut':'';
   if(!t.planted)return b.orchardReplant!==false&&G.orchardUnlocked(G.orchardTypeOf(b))?'plant':'';
   if(!G.orchardUnlocked(G.orchardTreeType(t)))return '';
-  if(t.fruit>0&&G.game.season===2&&!G.goalPaused(G.orchardOutput(t)))return 'harvest';
+  if(t.fruit>0&&G.orchardCanHarvest(b,t)&&!G.goalPaused(G.orchardOutput(t)))return 'harvest';
   if(t.age<G.ORCHARD.matureDays&&t.tendedDay!==G.game.day)return 'tend';
   return '';
 };
@@ -3384,7 +3410,7 @@ G.orchardTaskCurrent=function(c,t){
   if(t.phase==='cut')return !!t.b.orchardCut&&!t.b.orchardCut.paused&&t.cutOrder===t.b.orchardCut&&!!tree&&tree===t.tree&&tree.cycle===t.cycle&&tree.planted;
   if(t.b.orchardCut)return false;
   if(!tree||tree.cycle!==t.cycle||tree!==t.tree||!G.orchardUnlocked(t.phase==='plant'?(t.orchardType||'legacy'):G.orchardTreeType(tree)))return false;
-  return t.phase==='plant'?!tree.planted:t.phase==='tend'?tree.planted&&tree.age<G.ORCHARD.matureDays:t.phase==='harvest'?tree.fruit>0&&G.game.season===2&&t.year===G.game.year:false;
+  return t.phase==='plant'?!tree.planted:t.phase==='tend'?tree.planted&&tree.age<G.ORCHARD.matureDays:t.phase==='harvest'?tree.fruit>0&&G.orchardCanHarvest(t.b,tree)&&t.year===G.game.year:false;
 };
 G.atOrchardTree=(c,t)=>G.orchardTaskCurrent(c,t)&&G.d2(c.x,c.y,t.tx,t.ty)<.04&&!G.tileBlocked(G.world,t.tx,t.ty);
 G.makeOrchardTask=function(b,c){
@@ -3411,17 +3437,28 @@ G.completeOrchardTask=function(c,t){
     G.finishOrchardCut(b);
   }else if(t.phase==='plant'){tree.type=t.orchardType||'legacy';tree.planted=true;tree.age=0;tree.tendedDay=G.game.day;}
   else if(t.phase==='tend')tree.tendedDay=G.game.day;
-  else {const qty=tree.fruit,type=G.orchardOutput(tree);tree.fruit=0;c.carry={type,qty,orchardId:b.id};G.recordProduction(b,type,qty);}
+  else {const qty=tree.fruit,type=G.orchardOutput(tree);tree.fruit=0;if(G.game.orchardHarvestRules)tree.harvested=true;c.carry={type,qty,orchardId:b.id};G.recordProduction(b,type,qty);}
   G.syncOrchardTotals(b);
 };
 G.advanceOrchard=function(b){
   G.ensureOrchard(b);const g=G.game;if(b.orchardDay>=g.day)return;b.orchardDay=g.day;
+  if(g.orchardHarvestRules&&(b.orchardHarvestYear!==g.year||g.season===3))delete b.orchardHarvestYear;
   let expired=0;
   for(let i=0;i<b.orchardTrees.length;i++){
     let t=b.orchardTrees[i];if(!t.planted||!G.orchardUnlocked(G.orchardTreeType(t)))continue;
     if(t.age>=G.ORCHARD.matureDays||t.tendedDay>=g.day-2)t.age++;
     if(t.age>=G.orchardLifetime(i)){b.orchardTrees[i]=G.newOrchardTree(t.cycle+1);expired++;continue;}
-    if(g.season===2&&t.age>=G.ORCHARD.matureDays&&t.season!==g.year){t.fruit=G.ORCHARD.fruit;t.season=g.year;}
+    if(g.orchardHarvestRules){
+      if(t.season!==g.year){t.season=g.year;t.fruit=0;t.fruitGrowth=0;t.harvested=false;}
+      if(g.season!==3&&t.age>=G.ORCHARD.matureDays&&!t.harvested){
+        const before=Math.floor(t.fruitGrowth*G.ORCHARD.fruit);
+        const days=G.YEAR_DAYS*G.ORCHARD_HARVEST.months/12;
+        t.fruitGrowth=Math.min(1,t.fruitGrowth+G.orchardFruitTemperatureFactor(G.climateWeather().temperature)/days);
+        // Only newly grown whole fruit is added. Frost losses consume the same
+        // annual budget and are never restored by recomputing the total.
+        t.fruit+=Math.floor(t.fruitGrowth*G.ORCHARD.fruit)-before;
+      }
+    }else if(g.season===2&&t.age>=G.ORCHARD.matureDays&&t.season!==g.year){t.fruit=G.ORCHARD.fruit;t.season=g.year;}
     if(g.season===3)t.fruit=0;
   }
   G.syncOrchardTotals(b);G.finishOrchardCut(b);
@@ -3429,7 +3466,7 @@ G.advanceOrchard=function(b){
   const soon=b.orchardTrees.some((t,i)=>t.planted&&G.orchardLifetime(i)-t.age<=G.YEAR_DAYS);
   if(soon&&b.orchardWarnYear!==g.year){b.orchardWarnYear=g.year;G.ui.toast('果园有老树将在一年内枯尽；查看空位与补种，保留其他食物来源','warn');}
 };
-/* Only v7 new villages opt in. No catch-up on load and no new weather draw.
+/* v7+ villages opt in. No catch-up on load and no new weather draw.
  * Advance trees before frost so autumn fruit cannot be regenerated after loss.
  * The same daily guard covers normal midnight and pre-autosave settlement. */
 G.advanceOrchardClimate=function(){
@@ -3474,7 +3511,7 @@ G.orchardSummary=function(b){
   const fruit=trees.reduce((n,t)=>n+t.fruit,0),remaining=trees.map((t,i)=>t.planted?G.orchardLifetime(i)-t.age:Infinity),soon=remaining.filter(n=>n<=G.YEAR_DAYS).length;
   const fruitByType={vegetables:0,apples:0,pears:0};for(const t of trees)fruitByType[G.orchardOutput(t)]+=t.fruit;
   const selected=G.orchardTypeOf(b),plantable=G.orchardUnlocked(selected),hasUnlockedTree=trees.some(t=>t.planted&&G.orchardUnlocked(G.orchardTreeType(t)));
-  return {...G.orchardLayout(b),dimensions:[b.w,b.h],area:b.w*b.h,empty,young,mature,fruit,fruitByType,selected,soon,nextDeath:Math.min(...remaining),status:b.orchardCut?(b.orchardCut.paused?'整园砍树已暂停':G.goalPaused('wood')?'原木目标已达，等待砍树':G.mineralStorageSpace('wood')<=0?'原木仓满，等待砍树':'农夫逐树砍伐；收果和补种暂停'):!plantable&&!hasUnlockedTree?'需从贸易站购买对应果树种子并选择补种品种':fruit&&G.game.season===2?(trees.some(t=>t.fruit>0&&!G.goalPaused(G.orchardOutput(t)))?'秋季逐树采果':'果实等待：对应果品或食物目标已达'):empty&&b.orchardReplant?(plantable?'空位待补种':'所选补种品种尚未解锁'):young?'幼树逐株养护，4年有效照料成熟':empty===G.orchardTreeCount(b)?'空园，补种已暂停':'成熟果树等待秋季'};
+  return {...G.orchardLayout(b),dimensions:[b.w,b.h],area:b.w*b.h,empty,young,mature,fruit,fruitByType,selected,soon,nextDeath:Math.min(...remaining),status:b.orchardCut?(b.orchardCut.paused?'整园砍树已暂停':G.goalPaused('wood')?'原木目标已达，等待砍树':G.mineralStorageSpace('wood')<=0?'原木仓满，等待砍树':'农夫逐树砍伐；收果和补种暂停'):!plantable&&!hasUnlockedTree?'需从贸易站购买对应果树种子并选择补种品种':fruit&&trees.some(t=>t.fruit>0&&G.orchardCanHarvest(b,t))?(trees.some(t=>t.fruit>0&&G.orchardCanHarvest(b,t)&&!G.goalPaused(G.orchardOutput(t)))?'农夫逐树采果':'果实等待：对应果品或食物目标已达'):empty&&b.orchardReplant?(plantable?'空位待补种':'所选补种品种尚未解锁'):young?'幼树逐株养护，4年有效照料成熟':empty===G.orchardTreeCount(b)?'空园，补种已暂停':G.game.orchardHarvestRules?'果实随气温生长；可提前采果，秋季或长满自动采收':'成熟果树等待秋季'};
 };
 
 /* Health is separate from happiness. Rates/capacity are small-town adaptations;
