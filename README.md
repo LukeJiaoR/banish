@@ -402,6 +402,15 @@ assets/         切出的精灵单件 PNG（地表纹理 / 树木岩石 / 建筑
 
 ## 本地回归检查
 
+本地 Node.js 测试与开发工具统一使用 **24.22.1 LTS**（版本固定在 `.nvmrc`），包含 [2026-10-21 官方安全补丁](https://nodejs.org/en/blog/release/v24.22.1)。已安装 nvm 的开发环境可在仓库根目录执行：
+
+```bash
+nvm install
+nvm use
+```
+
+这只指定本地工具所用的 Node 版本，不会自动升级已有机器的 Node。游戏仍在浏览器运行，部署服务器仍为 Python；没有新增 npm 依赖或构建步骤。本次版本配置更新未运行测试、模拟或浏览器验收；下列命令供之后按需使用，不代表已在新版本上通过。
+
 ```bash
 python3 -m py_compile server.py tests/server_smoke.py tests/server_security.py tests/server_deployment.py
 python3 tests/server_smoke.py
