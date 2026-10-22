@@ -58,7 +58,7 @@ G.startConfigQuote = function (input) {
   const config=mapSize===192?{v:3,preset,seed,terrain,mapSize}:terrain==='mountain'?{v:2,preset,seed,terrain}:{v:1,preset,seed},p=G.START_PRESETS[preset],families=p.kidPlan.length,children=p.kidPlan.reduce((n,k)=>n+k,0);
   if(climate!==undefined)config.climate=climate;
   const resources=Object.fromEntries(G.RES_KEYS.map(k=>[k,p.stocks[k]||0]));resources.food=G.FOOD_KEYS.reduce((n,k)=>n+resources[k],0);
-  return {ok:true,config,key:JSON.stringify(config),climateSummary:climate===undefined?null:{name:G.CLIMATES[climate].name,note:G.CLIMATES[climate].note+'；日气温与农田规则为48日历适配，冬季取暖随日气温变化，果园仍沿用季节规则；v6存档须使用新版'},mapSizeSummary:{size:mapSize,name:mapSize+'×'+mapSize,note:climate!==undefined?'新气候村使用v6存档，旧程序不能读取；128/192格地形保持原规则，192格手机性能尚未实测':mapSize===192?'面积为默认的2.25倍；同等开局库存与资源密度，远处资源须实际采运。采用权威地形存档（山地v3／新经典v4），旧版不能读取；手机性能尚未实测。':'默认尺寸与开局库存不变；新经典村使用v4地形存档，旧程序不能读取；已有村庄不补矿'},terrainSummary:{name:G.START_TERRAINS[terrain].name,mapVersion:terrain==='mountain'?2:3,
+  return {ok:true,config,key:JSON.stringify(config),climateSummary:climate===undefined?null:{name:G.CLIMATES[climate].name,note:G.CLIMATES[climate].note+'；日气温与农田规则为48日历适配，冬季取暖随日气温变化，秋霜损失未采果实但不冻死果树；v7存档须使用新版'},mapSizeSummary:{size:mapSize,name:mapSize+'×'+mapSize,note:climate!==undefined?'新气候村使用v7存档，旧程序不能读取；128/192格地形保持原规则，192格手机性能尚未实测':mapSize===192?'面积为默认的2.25倍；同等开局库存与资源密度，远处资源须实际采运。采用权威地形存档（山地v3／新经典v4），旧版不能读取；手机性能尚未实测。':'默认尺寸与开局库存不变；新经典村使用v4地形存档，旧程序不能读取；已有村庄不补矿'},terrainSummary:{name:G.START_TERRAINS[terrain].name,mapVersion:terrain==='mountain'?2:3,
     note:terrain==='mountain'?'41×37初始山谷为本作明确保底：有限木石铁与成熟食物林须劳动取得；山体阻路；可从陆地洞口规划隧道，实运建成后才通行':'沿用原地形与镇址；初始仓库落位后分别保证附近可达石头和铁矿，仍须实际采运'},presetSummary:{name:p.name,families,population:families*2+children,adults:families*2,children,resources,
     unlockedSeeds:p.wheat?['wheat']:[],seedNote:p.wheat?'已有小麦种子；其他作物与果树种子须贸易购买':'没有作物或果树种子，也没有牲畜；种子须贸易购买，永久解锁',
     equipmentNote:'衣物库存0、无预穿衣；工具默认共用池，寿命规则沿用现有系统',adaptationNote:'家庭数参考原版难度；人口组成与库存数量为本作适配'}};
@@ -162,12 +162,13 @@ G.serializeGame = function () {
   G.reconcileDeerHabitat(deerWorld,g);
   G.upgradeWildlife(deerWorld,g);
   return {
-    v: g.heatRules?6:g.climate?5:w.mapVersion===3?4:w.N===192?3:w.mapVersion===2?2:1, seed: w.seed, N: w.N, mapVersion: w.mapVersion || 0, // N：地图尺寸（旧档跨尺寸迁移裸索引用）
+    v: g.orchardRules?7:g.heatRules?6:g.climate?5:w.mapVersion===3?4:w.N===192?3:w.mapVersion===2?2:1, seed: w.seed, N: w.N, mapVersion: w.mapVersion || 0, // N：地图尺寸（旧档跨尺寸迁移裸索引用）
     ...(w.mapVersion===2||w.mapVersion===3||w.N===192?{terrain:{water:Array.from(w.water),rock:Array.from(w.rock),mountain:Array.from(w.mountain),start:{...w.start}}}:{}),
     game: {
       v: G.VERSION, startConfig:g.startConfig ? {...g.startConfig} : null,
       ...(g.climate?{climate:{...g.climate}}:{}),
       ...(g.heatRules?{heatRules:{...g.heatRules}}:{}),
+      ...(g.orchardRules?{orchardRules:{...g.orchardRules}}:{}),
       h: g.h, day: g.day, season: g.season, year: g.year,
       res: g.res, stats: g.stats, prevFood: g.prevFood, foodNet: g.foodNet, foodUrgent: g.foodUrgent, warned: g.warned,
       supplyMode:g.supplyMode,mealRuleVersion:g.mealRuleVersion,mealTransitionStart:g.mealTransitionStart,mealTransitionEnd:g.mealTransitionEnd,clothingSupply:g.clothingSupply,supplyStartedDay:g.supplyStartedDay,supplyUsed:g.supplyUsed,supplyLost:g.supplyLost,
@@ -210,6 +211,7 @@ G.serializeGame = function () {
       animalType:b.animalType, pastureInfestation:b.pastureInfestation, pastureProducts:b.pastureProducts, animals: b.animals, animalGrowth: b.animalGrowth, animalTarget: b.animalTarget, woolReady: b.woolReady, eggProgress:b.eggProgress, eggDay:b.eggDay,
       orchardAge: b.orchardAge, orchardYield: b.orchardYield, orchardSeason: b.orchardSeason, tendedDay: b.tendedDay,
       orchardType:b.orchardType,orchardTrees:b.orchardTrees?b.orchardTrees.map(t=>({...t})):undefined,orchardDay:b.orchardDay,orchardReplant:b.orchardReplant,orchardWarnYear:b.orchardWarnYear,
+      ...(g.orchardRules&&b.type==='orchard'?{orchardFrost:{...b.orchardFrost}}:{}),
     })),
     families: w.families.map(f => ({ id: f.id, members: f.members, houseId: f.houseId, coupleIds: f.coupleIds,supplyCamp:f.supplyCamp&&{x:f.supplyCamp.x,y:f.supplyCamp.y,supplyStock:f.supplyCamp.supplyStock} })),
     citizens: w.citizens.map(c => ({
@@ -333,8 +335,8 @@ G.prepareSaveData = function (d) {
     if(G.supplySum(stock)>limit+1e-6)bad(field+'容量');return stock;
   };
   record(d, '根对象');
-  if (d.v !== undefined && ![1,2,3,4,5,6].includes(d.v)) bad('版本不受支持');
-  const heatFormat=d.v===6,climateFormat=d.v===5||heatFormat,mineralStart=d.v===4||climateFormat&&d.mapVersion===3,expanded=d.v===3||(mineralStart||climateFormat)&&d.N===192,authoritative=d.v===2||expanded||mineralStart||climateFormat;
+  if (d.v !== undefined && ![1,2,3,4,5,6,7].includes(d.v)) bad('版本不受支持');
+  const orchardFormat=d.v===7,heatFormat=d.v===6||orchardFormat,climateFormat=d.v===5||heatFormat,mineralStart=d.v===4||climateFormat&&d.mapVersion===3,expanded=d.v===3||(mineralStart||climateFormat)&&d.N===192,authoritative=d.v===2||expanded||mineralStart||climateFormat;
   if(climateFormat&&![2,3].includes(d.mapVersion))bad('气候存档地图版本');
   if(mineralStart?d.mapVersion!==3:expanded?![1,2].includes(d.mapVersion):authoritative?d.mapVersion!==2:d.mapVersion!==undefined&&d.mapVersion!==0&&d.mapVersion!==1)bad('地图生成版本不受支持');
   if(!authoritative&&d.terrain!==undefined)bad('旧版本不能携带新地形');
@@ -370,6 +372,12 @@ G.prepareSaveData = function (d) {
     // preserves the unpaid boundary; it must never perform catch-up burning.
     const boundary=g.day>0&&g.day%G.SEASON_DAYS===0;
     g.heatRules={v:r.v,lastDay:integer(r.lastDay,'取暖结算日期',boundary?g.day-1:g.day,g.day)};
+  }
+  if(orchardFormat!==Object.hasOwn(gd,'orchardRules'))bad('果园冷害版本标记缺失或不匹配');
+  if(orchardFormat){
+    const r=record(gd.orchardRules,'果园冷害规则');
+    if(Object.keys(r).length!==2||Object.keys(r).some(k=>!['v','lastDay'].includes(k))||r.v!==G.ORCHARD_FROST.v)bad('果园冷害规则版本');
+    g.orchardRules={v:r.v,lastDay:integer(r.lastDay,'果园冷害结算日期',g.day,g.day)};
   }
   const currentConstruction=gd.constructionVersion!==undefined;
   if(currentConstruction&&gd.constructionVersion!==1)bad('建材配送版本');
@@ -790,8 +798,18 @@ G.prepareSaveData = function (d) {
         b.pastureInfestation={animalType:p.animalType,startedDay,lost:integer(p.lost,'牧场病死数量',0,Math.max(0,g.pasturePests.lastDay-startedDay-G.PASTURE_PESTS.warningDays+1)*G.PASTURE_PESTS.lossPerDay)};
       }
     }
+    if(bd.orchardFrost!==undefined&&(!orchardFormat||bd.type!=='orchard'))bad('旧档或非果园不能携带果园冷害记录');
     if(['orchardType','orchardTrees','orchardDay','orchardReplant','orchardWarnYear'].some(k=>bd[k]!==undefined)&&bd.type!=='orchard')bad('果园树株字段');
     if(bd.type==='orchard'){
+      if(orchardFormat){
+        if(!Array.isArray(bd.orchardTrees))bad('新果园冷害存档缺少逐树记录');
+        const f=record(bd.orchardFrost,'果园本季霜损');
+        if(Object.keys(f).length!==2||Object.keys(f).some(k=>!['year','lost'].includes(k)))bad('果园霜损字段');
+        b.orchardFrost={year:integer(f.year,'果园霜损年份',1,g.year),lost:number(f.lost,'果园霜损数量',0,G.orchardTreeCount(b)*G.ORCHARD.fruit)};
+        if(b.state==='site'&&f.lost!==0)bad('未建成果园已有霜损');
+        // A site completed mid-day may retain its placement day/year until
+        // the next midnight; loading must not age trees or catch up frost.
+      }
       const validVariety=(type,field)=>{if(typeof type!=='string'||!Object.hasOwn(G.ORCHARD_TYPES,type)||type!=='legacy'&&!G.orchardUnlocked(type,g))bad(field);return type;};
       b.orchardType=bd.orchardType===undefined?'legacy':validVariety(bd.orchardType,'果园补种品种');
       const age=bd.orchardAge===undefined?0:integer(bd.orchardAge,'果树养护年龄',0,G.ORCHARD.matureDays);
