@@ -4180,6 +4180,7 @@ G.ui = {
       <p data-economy-live="orchard-area"></p><p class="desc" data-economy-live="orchard-area-rule"></p><p data-economy-live="orchard-age"></p><p data-economy-live="orchard-harvest"></p><p data-economy-live="orchard-renewal"></p>
       <p data-economy-live="orchard-types"></p><p class="desc" data-economy-live="orchard-climate"></p><p data-economy-live="orchard-stock"></p><p data-economy-live="orchard-logistics"></p>
       <details class="building-task"><summary>以后种植品种</summary><form id="orchard-type-form" class="economy-form"><label for="orchard-type">以后空位种植品种</label><select id="orchard-type">${Object.entries(G.ORCHARD_TYPES).map(([type, def]) => `<option value="${type}"${G.orchardTypeOf(b) === type ? ' selected' : ''}${!G.game.unlocks?.[def.unlock] ? ' disabled' : ''}>${this.escHtml(def.name)} → ${G.RES[def.output].name}${!G.game.unlocks?.[def.unlock] ? '（尚未解锁）' : ''}</option>`).join('')}</select><div class="economy-actions"><button type="submit" id="orchard-type-apply">应用以后种植品种</button><button type="button" id="orchard-type-cancel">取消未应用选择</button></div><p data-economy-live="orchard-selection"></p></form></details>
+      <details class="building-task"><summary>整园砍树换种</summary><p class="desc">农夫逐株到树旁砍伐；树上未采果实随树损失，已经携带的果实保留。成熟树取原木，幼树只清除；原木实背送仓。砍树完成后才执行下面的补种选择。</p><p data-economy-live="orchard-cut-status"></p><form id="orchard-cut-form" class="economy-form"><label for="orchard-cut-type">清空后的安排（必须明确选择）</label><select id="orchard-cut-type"><option value="">请选择</option><option value="none">留空，不补种</option>${Object.entries(G.ORCHARD_TYPES).map(([type,def])=>`<option value="${type}"${!G.orchardUnlocked(type)?' disabled':''}>补种${def.name}${!G.orchardUnlocked(type)?'（未解锁）':''}</option>`).join('')}</select><label><input type="checkbox" id="orchard-cut-confirm">我知道已砍的树和树上果实不能恢复</label><button type="submit" id="orchard-cut-start">下达整园砍树</button></form><form id="orchard-cut-control" class="economy-form"><label for="orchard-cut-action">现有砍树指令</label><select id="orchard-cut-action"><option value="pause">暂停砍树</option><option value="resume">继续砍树</option><option value="cancel">取消剩余砍树，恢复原补种设置</option></select><button type="submit" id="orchard-cut-apply">应用指令</button><p class="desc">暂停/取消不追回已完成的木材，未完成的劳动重新开始；清园中不能另改补种品种。</p></form></details>
       <details class="building-task"><summary>补种设置</summary><form id="orchard-replant-form" class="economy-form"><label for="orchard-replant">空位补种</label><select id="orchard-replant"><option value="on"${b.orchardReplant!==false?' selected':''}>允许农夫补种</option><option value="off"${b.orchardReplant===false?' selected':''}>暂停新补种</option></select><button type="submit">应用补种设置</button></form></details>
       <details class="building-help"><summary>果树生长与品种规则</summary>      <p class="desc">苹果和梨种子各2500，分别购买一次永久解锁；购买后仍需在此明确应用，只改变以后新接的种植任务。旧通用果树种子仅解锁旧通用树，继续产蔬菜，不赠苹果、梨或新种子。已有树的品种、年龄、待采果实和已接任务/在途货不改换；买新果种不必先买通用种子。</p>
       <p class="desc">苹果与梨独立存量、贸易和生产目标；实际送仓后可食用或酿酒。营养都归蔬菜组，与肉类（含鸡蛋）、主食合为三组，不增加第四组。</p>
@@ -4256,6 +4257,13 @@ G.ui = {
       this.initAutoTradeInfo(b);
     }
     if(b.type==='orchard') {
+      onSubmit('orchard-cut-form',()=>{
+        const confirm=el.querySelector('#orchard-cut-confirm'),type=el.querySelector('#orchard-cut-type').value;
+        if(!confirm.checked){message('请先确认砍树会损失树上果实，已完成部分不能撤销。');return;}
+        const started=G.startOrchardCut(b,type);confirm.checked=false;
+        message(started?'已下达整园砍树；农夫逐树工作，已携果实保留。':'未下达：请选择已解锁的补种品种或留空，且果园须有树、无现有砍树指令。');
+      });
+      onSubmit('orchard-cut-control',()=>{message(G.controlOrchardCut(b,el.querySelector('#orchard-cut-action').value)?'砍树指令已更新；完成的部分和实际携货保留。':'没有可操作的砍树指令。');});
       onSubmit('orchard-replant-form',()=>{const value=el.querySelector('#orchard-replant').value;message(['on','off'].includes(value)&&G.setOrchardReplant(b,value==='on')?value==='on'?'允许新补种；需农夫到空树位劳动。':'已暂停新补种；现果、养护与已开始的工作继续。':'补种设置无效');});
       const form = el.querySelector('#orchard-type-form'), select = el.querySelector('#orchard-type');
       const cancel = el.querySelector('#orchard-type-cancel'), apply = el.querySelector('#orchard-type-apply');
@@ -4701,14 +4709,21 @@ G.ui = {
       set('[data-economy-live="orchard-age"]',`种子：${Object.values(types).map(type => `${type.name}${G.game.unlocks?.[type.unlock]?'已永久解锁':'尚未购买'}`).join(' · ')} · 空位 ${d.empty} / 幼树 ${d.young} / 成树 ${d.mature}（共${G.orchardTreeCount(b)}位）`);
       const composition=Object.entries(types).map(([type,def])=>{const planted=trees.filter(t=>t.planted&&G.orchardTreeType(t)===type);return `${def.name} ${planted.length}株 · 待采${G.RES[def.output].name} ${this.supplyNumber(planted.reduce((n,t)=>n+(t.fruit||0),0))}`;}).join('；');
       set('[data-economy-live="orchard-types"]',`现有果树：${composition}`);
+      const cut=b.orchardCut;
+      set('[data-economy-live="orchard-cut-status"]',cut?`${cut.paused?'已暂停':'砍树中'} · 待砍 ${d.young+d.mature} 株 · 可能损失树上果实 ${this.supplyNumber(d.fruit)} · 清空后${cut.type==='none'?'留空':`补种${types[cut.type].name}`}。${d.status}`:'没有整园砍树指令。');
+      el.querySelector('#orchard-cut-start').disabled=!!cut||d.young+d.mature===0;
+      el.querySelector('#orchard-cut-apply').disabled=!cut;
+      el.querySelector('#orchard-type-apply').disabled=!!cut;
+      el.querySelector('#orchard-replant-form button').disabled=!!cut;
+      for(const option of el.querySelector('#orchard-cut-type').options)if(types[option.value])option.disabled=!G.orchardUnlocked(option.value);
       set('[data-economy-live="orchard-selection"]',`已应用以后种植：${chosen.name} → ${G.RES[chosen.output].name}${G.game.unlocks?.[chosen.unlock]?'':'（尚未解锁，需买对应种子或选择已解锁品种）'}。仅作用于以后新接的空位种植任务。`);
       set('[data-economy-live="orchard-harvest"]',`本季未采果实合计 ${this.supplyNumber(d.fruit)}；品种明细见下方现有果树，实际采收/送仓才记产出/入库。${d.status}`);
       set('[data-economy-live="orchard-stock"]',`公共库存：${['vegetables','apples','pears'].map(type=>`${G.RES[type].name} ${this.supplyNumber(G.game.res[type])}`).join(' · ')}（不含树上待采与携果）；三种物品各有独立目标，并受总食物目标限制。`);
       const cargo=G.world.citizens.filter(c=>!c.dead&&c.carry?.orchardId===b.id).map(c=>`${c.name}：${G.RES[c.carry.type].name} ${this.supplyNumber(c.carry.qty)}，${G.cargoWaitReason(c)||'送仓途中'}`);
-      set('[data-economy-live="orchard-logistics"]',cargo.length?'已采在途：'+cargo.join('；')+'；尚未入库，满仓保留。':'暂无已采在途果实。');
+      set('[data-economy-live="orchard-logistics"]',cargo.length?'果园在途：'+cargo.join('；')+'；尚未入库，满仓保留。':'暂无果园在途果实或原木。');
       for(const option of el.querySelector('#orchard-type').querySelectorAll('option')){const def=types[option.value],unlocked=!!G.game.unlocks?.[def.unlock];option.disabled=!unlocked;const text=`${def.name} → ${G.RES[def.output].name}${unlocked?'':'（尚未解锁）'}`;if(option.textContent!==text)option.textContent=text;}
       set('[data-economy-live="orchard-renewal"]',`已应用补种：${b.orchardReplant?'允许':'暂停'} · 一年内将枯尽 ${d.soon} 株${Number.isFinite(d.nextDeath)?' · 最短还差 '+d.nextDeath+' 树龄日':''}；空位没有产量。`);
-      set('[data-economy-live="orchard-trees"]',trees.map((t,i)=>`第${i+1}株：${t.planted?`${types[G.orchardTreeType(t)].name} · 树龄 ${(t.age/G.YEAR_DAYS).toFixed(1)} 年 / 寿命 ${G.orchardLifetime(i)/G.YEAR_DAYS} 年 · ${t.age<G.ORCHARD.matureDays?'尚需 '+(G.ORCHARD.matureDays-t.age)+' 有效养护日':'成熟'} · 待采${G.RES[G.orchardOutput(t)].name} ${this.supplyNumber(t.fruit)}`:'空位，待种植'}`).join('\n'));
+      set('[data-economy-live="orchard-trees"]',trees.map((t,i)=>`第${i+1}株：${t.planted?`${cut?'待砍 · ':''}${types[G.orchardTreeType(t)].name} · 树龄 ${(t.age/G.YEAR_DAYS).toFixed(1)} 年 / 寿命 ${G.orchardLifetime(i)/G.YEAR_DAYS} 年 · ${t.age<G.ORCHARD.matureDays?'尚需 '+(G.ORCHARD.matureDays-t.age)+' 有效养护日':'成熟'} · 待采${G.RES[G.orchardOutput(t)].name} ${this.supplyNumber(t.fruit)}`:cut?'空位，等待整园清空':'空位，按补种设置处理'}`).join('\n'));
       const output=el.querySelector('[data-orchard-output]');if(output){const html='产出：'+G.productionOutputsOf(b).filter(k=>k!=='food').map(k=>`${this.resourceIcon(k)}${G.RES[k].name}`).join(' · ');if(output.innerHTML!==html)output.innerHTML=html;}
     }
     return true;
