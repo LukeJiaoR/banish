@@ -1510,6 +1510,64 @@ G.drawFoodForestBounds = function (ctx) {
 };
 
 /* ---------- 主绘制 ---------- */
+/* World vessels are read-only scenery. Positions use committed daily cells:
+ * no prediction/interpolation may show docking before its economic event. */
+G.tradeVesselPose=function(w,boat){
+  if(!w?.tradeVoyages||!boat||!['ingress','docked','egress'].includes(boat.phase)||!Array.isArray(boat.route)||!Number.isInteger(boat.step)||boat.step<0||boat.step>=boat.route.length)return null;
+  const cell=boat.route[boat.step];if(!Number.isInteger(cell)||cell<0||cell>=w.N*w.N)return null;
+  const x=cell%w.N,y=Math.floor(cell/w.N);let dx=1,dy=0;
+  // Prefer the onward edge, then the last edge at a berth/exit.
+  const next=boat.route[boat.step+1],prev=boat.route[boat.step-1];
+  if(next!==undefined){dx=next%w.N-x;dy=Math.floor(next/w.N)-y;}
+  else if(prev!==undefined){dx=x-prev%w.N;dy=y-Math.floor(prev/w.N);}
+  if(Math.abs(dx)+Math.abs(dy)!==1)return null;
+  return {x,y,dx,dy,phase:boat.phase};
+};
+G.drawTradeVessel=function(ctx,pose){
+  const {x,y,dx,dy,phase}=pose;
+  const project=(u,v,h=0)=>{const p=G.T2S(x+.5+dx*u-dy*v,y+.5+dy*u+dx*v);return [p[0],p[1]-h];};
+  const polygon=(points,fill,stroke)=>{ctx.beginPath();points.forEach((p,i)=>{const q=project(...p);i?ctx.lineTo(...q):ctx.moveTo(...q);});ctx.closePath();ctx.fillStyle=fill;ctx.fill();if(stroke){ctx.strokeStyle=stroke;ctx.stroke();}};
+  const line=(points,color,width=.45)=>{ctx.beginPath();points.forEach((p,i)=>i?ctx.lineTo(...project(...p)):ctx.moveTo(...project(...p)));ctx.strokeStyle=color;ctx.lineWidth=width;ctx.stroke();};
+  ctx.save();ctx.lineWidth=.6;ctx.lineJoin='round';
+  polygon([[-.57,-.23],[-.57,.23],[.35,.23],[.69,0],[.35,-.23]],'rgba(30,76,72,.20)');
+  if(phase!=='docked')for(const v of [-.23,.23])line([[-.58,v],[-.86,v*1.7]],'rgba(226,239,215,.52)',.65);
+  const outline=[[-.5,-.19],[-.5,.19],[.32,.19],[.61,0],[.32,-.19]];
+  // Tapered hull has real screen-space thickness; draw far sides before near sides.
+  const faces=outline.map((a,i)=>{const b=outline[(i+1)%outline.length];return {a,b,depth:(project(...a)[1]+project(...b)[1])/2};}).sort((a,b)=>a.depth-b.depth);
+  for(const {a,b} of faces){
+    const low=p=>[p[0]*.93,p[1]*.78,0],near=(a[0]+b[0])*(dx+dy)+(a[1]+b[1])*(dx-dy)>0;
+    polygon([low(a),low(b),[...b,5],[...a,5]],near?'#71523b':'#97734e','#574536');
+    for(const h of [1.7,3.3])line([[a[0]*(.93+.07*h/5),a[1]*(.78+.22*h/5),h],[b[0]*(.93+.07*h/5),b[1]*(.78+.22*h/5),h]],near?'#a58055':'#b79768',.35);
+  }
+  polygon(outline.map(p=>[...p,5]),'#b38b5c','#695039');
+  polygon([[-.43,-.13,5],[-.43,.13,5],[.29,.13,5],[.49,0,5],[.29,-.13,5]],'#c6a36f');
+  // Transverse boards plus longitudinal seams describe structure, not random noise.
+  for(let u=-.38;u<.37;u+=.105){const v=u>.29?.13*(.49-u)/.2:.13;line([[u,-v,5.1],[u,v,5.1]],'#947047',.42);}
+  for(const v of [-.065,.065])line([[-.41,v,5.1],[.32,v,5.1]],'rgba(236,208,155,.55)',.35);
+  for(const side of [-1,1])line([[-.48,.17*side,5.4],[.31,.17*side,5.4],[.56,0,5.4]],'#d0ac76',.7);
+  // Open timber supports hold a barrel-curved woven cover; no solid cabin box.
+  for(const u of [-.34,.04])for(const v of [-.145,.145])line([[u,v,5],[u,v,8.5]],'#70573e',1.05);
+  const ribs=[[-.17,8.5],[-.12,11.4],[0,13],[.12,11.4],[.17,8.5]];
+  const strips=ribs.slice(0,-1).map((a,i)=>({a,b:ribs[i+1],depth:project(-.15,(a[0]+ribs[i+1][0])/2)[1]})).sort((a,b)=>a.depth-b.depth);
+  for(const {a,b} of strips){const near=(a[0]+b[0])*(dx-dy)>0;
+    polygon([[-.36,...a],[.06,...a],[.06,...b],[-.36,...b]],near?'#8c9a7b':'#c0c4a2','#6d795f');
+    const v=(a[0]+b[0])/2,h=(a[1]+b[1])/2;line([[-.35,v,h+.1],[.05,v,h+.1]],'rgba(224,219,177,.55)',.35);
+  }
+  for(const u of [-.36,.06])line(ribs.map(([v,h])=>[u,v,h]),'#665d42',.7);
+  line(ribs.map(([v,h])=>[-.15,v,h+.12]),'rgba(80,97,72,.60)',.45);
+  // A bound cargo chest has a top and two shaded vertical faces.
+  polygon([[.16,-.085,5],[.32,-.085,5],[.32,-.085,8],[.16,-.085,8]],'#967044','#6b5034');
+  polygon([[.16,.085,5],[.32,.085,5],[.32,.085,8],[.16,.085,8]],'#795738','#6b5034');
+  polygon([[.16,-.085,8],[.16,.085,8],[.32,.085,8],[.32,-.085,8]],'#b08b58','#715538');
+  for(const u of [.19,.29])line([[u,-.085,5],[u,-.085,8],[u,.085,8],[u,.085,5]],'#d1b885',.65);
+  ctx.restore();
+};
+G.drawTradeVessels=function(ctx,w,bounds={}){
+  const {tx0=-Infinity,ty0=-Infinity,tx1=Infinity,ty1=Infinity}=bounds;
+  const visible=(w.tradeVoyages?.boats||[]).map(boat=>G.tradeVesselPose(w,boat)).filter(p=>p&&p.x>=tx0-1&&p.x<=tx1+1&&p.y>=ty0-1&&p.y<=ty1+1).sort((a,b)=>(a.x+a.y)-(b.x+b.y));
+  for(const pose of visible)G.drawTradeVessel(ctx,pose);
+};
+
 G.frame = function (dtReal) {
   const cv = G.cv, ctx = G.ctx;
   if(!G.game.paused)G.buildingEffectTime+=dtReal;
@@ -1543,6 +1601,7 @@ G.frame = function (dtReal) {
   for (const b of w.buildings) if (b.state === 'ok' && (b.type === 'pasture' || b.type === 'orchard' || b.type === 'cemetery'))
     G.drawEconomyFieldGround(ctx, b, { tx0, ty0, tx1, ty1 });
 
+  G.drawTradeVessels(ctx,w,{tx0,ty0,tx1,ty1}); // Water layer: below bridges and bankside objects.
   for(const b of w.buildings)if(b.type==='bridge')G.drawBridge(ctx,b);
   for(const b of w.buildings)if(b.type==='roadwork')G.drawRoadWorkGround(ctx,b,{tx0,ty0,tx1,ty1});
 

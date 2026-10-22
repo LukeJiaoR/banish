@@ -2990,7 +2990,7 @@ G.runArrivalAutoTrade=function(b,m){
   return result.ok;
 };
 /* Vessel v1: 16 water edges per daily settlement, an explicit adaptation.
- * This source slice has persistent vessel positions, but no boat artwork yet.
+ * Vessel rendering reads committed positions without advancing this lifecycle.
  * The 16-day arrival target and 12-day berth stay are unchanged. Departure
  * vessels remain independent; a long inbound trip can delay, never advance,
  * the next arrival. No manifest/order/RNG is consumed until actual docking. */
@@ -3049,7 +3049,7 @@ G.tradeVoyageSummary=function(b){
   const boat=v.boats.find(x=>x.postId===b.id&&x.phase==='ingress');
   if(boat){const days=Math.max(boat.targetDay-G.game.day,Math.ceil((boat.route.length-1-boat.step)/G.TRADE_VOYAGE.edgesPerDay),0);
     return `商船进港途中，预计至少${days}天后靠泊（按每日水路步进）；到港前没有货单或自动购买。`;}
-  return `下次目标到港日为第${b.nextMerchantDay??G.game.day}天；需完成真实水路，长航程可能延迟。本切片尚无船只画面。`;
+  return `下次目标到港日为第${b.nextMerchantDay??G.game.day}天；需完成真实水路，长航程可能延迟。本切片船只按日显示，浏览器视觉未验收。`;
 };
 
 G.arriveMerchant=function(b,boat){
