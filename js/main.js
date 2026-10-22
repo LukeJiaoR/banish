@@ -59,7 +59,7 @@ G.startConfigQuote = function (input) {
   if(climate!==undefined)config.climate=climate;
   const resources=Object.fromEntries(G.RES_KEYS.map(k=>[k,p.stocks[k]||0]));resources.food=G.FOOD_KEYS.reduce((n,k)=>n+resources[k],0);
   const river=terrain==='classic'&&climate!==undefined;
-  return {ok:true,config,key:JSON.stringify(config),climateSummary:climate===undefined?null:{name:G.CLIMATES[climate].name,note:G.CLIMATES[climate].note+'；日气温与农田规则为48日历适配，冬季取暖随日气温变化，秋霜损失未采果实但不冻死果树；'+(river?'v9':'v8')+'存档须使用新版'},mapSizeSummary:{size:mapSize,name:mapSize+'×'+mapSize,note:river?'新经典气候村使用v9：显式主河与贸易水路资格，旧程序不能读取；尚无在途商船，山地与旧村不启用；手机表现未验收':climate!==undefined?'新气候村使用v8存档，旧程序不能读取；128/192格地形保持原规则，192格手机性能尚未实测':mapSize===192?'面积为默认的2.25倍；同等开局库存与资源密度，远处资源须实际采运。采用权威地形存档（山地v3／新经典v4），旧版不能读取；手机性能尚未实测。':'默认尺寸与开局库存不变；新经典村使用v4地形存档，旧程序不能读取；已有村庄不补矿'},terrainSummary:{name:G.START_TERRAINS[terrain].name,mapVersion:river?4:terrain==='mountain'?2:3,
+  return {ok:true,config,key:JSON.stringify(config),climateSummary:climate===undefined?null:{name:G.CLIMATES[climate].name,note:G.CLIMATES[climate].note+'；日气温与农田规则为48日历适配，冬季取暖随日气温变化，秋霜损失未采果实但不冻死果树；'+(river?'v10':'v8')+'存档须使用新版'},mapSizeSummary:{size:mapSize,name:mapSize+'×'+mapSize,note:river?'新经典气候村使用v10：主河、进港/停靠/离港状态，旧程序不能读取；船实体按日推进，船只按日显示，浏览器视觉未验收；山地与旧村不启用；手机表现未验收':climate!==undefined?'新气候村使用v8存档，旧程序不能读取；128/192格地形保持原规则，192格手机性能尚未实测':mapSize===192?'面积为默认的2.25倍；同等开局库存与资源密度，远处资源须实际采运。采用权威地形存档（山地v3／新经典v4），旧版不能读取；手机性能尚未实测。':'默认尺寸与开局库存不变；新经典村使用v4地形存档，旧程序不能读取；已有村庄不补矿'},terrainSummary:{name:G.START_TERRAINS[terrain].name,mapVersion:river?4:terrain==='mountain'?2:3,
     note:river?'新图在起始镇址以外生成贯穿主河；连接主河的水体可接商船，孤立湖泊不来船。河宽、转弯及泊位为本作网格适配；仍须实际采运石铁':terrain==='mountain'?'41×37初始山谷为本作明确保底：有限木石铁与成熟食物林须劳动取得；山体阻路；可从陆地洞口规划隧道，实运建成后才通行':'沿用原地形与镇址；初始仓库落位后分别保证附近可达石头和铁矿，仍须实际采运'},presetSummary:{name:p.name,families,population:families*2+children,adults:families*2,children,resources,
     unlockedSeeds:p.wheat?['wheat']:[],seedNote:p.wheat?'已有小麦种子；其他作物与果树种子须贸易购买':'没有作物或果树种子，也没有牲畜；种子须贸易购买，永久解锁',
     equipmentNote:'衣物库存0、无预穿衣；工具默认共用池，寿命规则沿用现有系统',adaptationNote:'家庭数参考原版难度；人口组成与库存数量为本作适配'}};
@@ -80,7 +80,7 @@ G.prepareNewGame = function (config) {
     G.world=null;
     G.world=G.genWorld(quote.config.seed,{terrain:quote.config.terrain||'classic',mapVersion:quote.config.terrain==='mountain'?2:0,mapSize:quote.mapSizeSummary.size});
     const w=G.world,s=w.start,kidPlan=G.START_PRESETS[quote.config.preset].kidPlan;
-    if(quote.config.terrain!=='mountain'&&quote.config.climate!==undefined)G.addMainRiver(w);
+    if(quote.config.terrain!=='mountain'&&quote.config.climate!==undefined){G.addMainRiver(w);w.tradeVoyages={v:1,lastDay:G.game.day,nextId:1,boats:[]};}
     if(w.seed!==quote.config.seed||!s||!Number.isInteger(s.x)||!Number.isInteger(s.y))throw new Error('起始地图数据无效');
     const storage=G.addBuilding('storage',s.x-1,s.y-1,{instant:true,free:true});
     if(!storage.ok)throw new Error('起始储物车放置失败：'+storage.reason);
@@ -164,9 +164,10 @@ G.serializeGame = function () {
   G.reconcileDeerHabitat(deerWorld,g);
   G.upgradeWildlife(deerWorld,g);
   return {
-    v: w.waterNavigation?9:g.orchardHarvestRules?8:g.orchardRules?7:g.heatRules?6:g.climate?5:w.mapVersion===3?4:w.N===192?3:w.mapVersion===2?2:1, seed: w.seed, N: w.N, mapVersion: w.mapVersion || 0, // N：地图尺寸（旧档跨尺寸迁移裸索引用）
+    v: w.tradeVoyages?10:w.waterNavigation?9:g.orchardHarvestRules?8:g.orchardRules?7:g.heatRules?6:g.climate?5:w.mapVersion===3?4:w.N===192?3:w.mapVersion===2?2:1, seed: w.seed, N: w.N, mapVersion: w.mapVersion || 0, // N：地图尺寸（旧档跨尺寸迁移裸索引用）
     ...(w.mapVersion===2||w.mapVersion===3||w.mapVersion===4||w.N===192?{terrain:{water:Array.from(w.water),rock:Array.from(w.rock),mountain:Array.from(w.mountain),start:{...w.start}}}:{}),
     ...(w.waterNavigation?{waterNavigation:{...w.waterNavigation,mainRiver:[...w.waterNavigation.mainRiver]}}:{}),
+    ...(w.tradeVoyages?{tradeVoyages:{...w.tradeVoyages,boats:w.tradeVoyages.boats.map(boat=>({...boat,route:[...boat.route]}))}}:{}),
     game: {
       v: G.VERSION, startConfig:g.startConfig ? {...g.startConfig} : null,
       ...(g.climate?{climate:{...g.climate}}:{}),
@@ -342,12 +343,13 @@ G.prepareSaveData = function (d) {
     if(G.supplySum(stock)>limit+1e-6)bad(field+'容量');return stock;
   };
   record(d, '根对象');
-  if (d.v !== undefined && ![1,2,3,4,5,6,7,8,9].includes(d.v)) bad('版本不受支持');
-  const riverFormat=d.v===9,harvestFormat=d.v===8||riverFormat,orchardFormat=d.v===7||harvestFormat,heatFormat=d.v===6||orchardFormat,climateFormat=d.v===5||heatFormat,mineralStart=d.v===4||climateFormat&&[3,4].includes(d.mapVersion),expanded=d.v===3||(mineralStart||climateFormat)&&d.N===192,authoritative=d.v===2||expanded||mineralStart||climateFormat;
+  if (d.v !== undefined && ![1,2,3,4,5,6,7,8,9,10].includes(d.v)) bad('版本不受支持');
+  const voyageFormat=d.v===10,riverFormat=d.v===9||voyageFormat,harvestFormat=d.v===8||riverFormat,orchardFormat=d.v===7||harvestFormat,heatFormat=d.v===6||orchardFormat,climateFormat=d.v===5||heatFormat,mineralStart=d.v===4||climateFormat&&[3,4].includes(d.mapVersion),expanded=d.v===3||(mineralStart||climateFormat)&&d.N===192,authoritative=d.v===2||expanded||mineralStart||climateFormat;
   if(riverFormat?d.mapVersion!==4:climateFormat&&![2,3].includes(d.mapVersion))bad('气候存档地图版本');
   if(mineralStart?d.mapVersion!==(riverFormat?4:3):expanded?![1,2].includes(d.mapVersion):authoritative?d.mapVersion!==2:d.mapVersion!==undefined&&d.mapVersion!==0&&d.mapVersion!==1)bad('地图生成版本不受支持');
   if(!authoritative&&d.terrain!==undefined)bad('旧版本不能携带新地形');
   if(riverFormat!==Object.hasOwn(d,'waterNavigation'))bad('水路版本标记缺失或不匹配');
+  if(voyageFormat!==Object.hasOwn(d,'tradeVoyages'))bad('船生命周期版本标记缺失或不匹配');
   integer(d.seed, '地图种子', -0x80000000, 0xffffffff);
   const oldN = d.N === undefined ? G.MAP : integer(d.N, '地图尺寸', 1, 4096);
   if(authoritative&&d.N!==(expanded?192:128))bad('权威地形尺寸不匹配');
@@ -770,6 +772,8 @@ G.prepareSaveData = function (d) {
       if(bd.merchant!=null){record(bd.merchant,'商船');record(bd.merchant.stock,'商船货物');
         const id=bd.merchant.id===undefined?'general':bd.merchant.id;if(!Object.hasOwn(G.MERCHANTS,id))bad('商人身份');
         b.merchant={id,leaveDay:integer(bd.merchant.leaveDay,'商船离港',0),stock:{},autoTradeDone:true};
+        if(voyageFormat){b.merchant.boatId=integer(bd.merchant.boatId,'到港船ID',1);if(bd.merchant.autoTradeDone!==true||bd.merchant.arrivedDay===undefined)bad('到港事件尚未完整结算');}
+        else if(bd.merchant.boatId!==undefined)bad('旧村不能携带实体船ID');
         // A serialized docked boat has already crossed its one arrival event.
         if(bd.merchant.autoTradeDone!==undefined&&bd.merchant.autoTradeDone!==true)bad('自动购买到港标记');
         if(bd.merchant.arrivedDay!==undefined){b.merchant.arrivedDay=integer(bd.merchant.arrivedDay,'商船到港',0,g.day);if(b.merchant.leaveDay<=b.merchant.arrivedDay)bad('商船停靠日期');}
@@ -968,6 +972,44 @@ G.prepareSaveData = function (d) {
       b.supplyStock=supplyStock(bd.supplyStock,'建筑配送库存',b.type==='market'?G.SUPPLY.marketCap:G.SUPPLY.homeCap);
     }
     w.buildings.push(b); w.bmap[b.id] = b;
+  }
+  if(voyageFormat){
+    const raw=record(d.tradeVoyages,'船生命周期'),keys=['v','lastDay','nextId','boats'];
+    if(Object.keys(raw).length!==keys.length||Object.keys(raw).some(k=>!keys.includes(k))||raw.v!==G.TRADE_VOYAGE.v)bad('船生命周期字段');
+    const nextId=integer(raw.nextId,'下一船ID',1),rows=array(raw.boats,'实体船');
+    if(rows.length>w.N*w.N)bad('实体船数量');
+    const seen=new Set(),inbound=new Set(),docked=new Set();
+    const fields=['id','postId','berth','phase','route','step','launchDay','targetDay','dockedDay'];
+    // Reconstruct records only. In particular, never call arriveMerchant or
+    // runArrivalAutoTrade from loading, even for an inbound vessel at its berth.
+    w.tradeVoyages={v:raw.v,lastDay:integer(raw.lastDay,'船日结',g.day,g.day),nextId,boats:Array.from(rows,row=>{
+      record(row,'实体船');if(Object.keys(row).length!==fields.length||Object.keys(row).some(k=>!fields.includes(k))||!['ingress','docked','egress'].includes(row.phase))bad('实体船字段');
+      const boat={id:integer(row.id,'船ID',1,nextId-1),postId:integer(row.postId,'船目标站ID',1),berth:integer(row.berth,'船泊位',0,w.N*w.N-1),phase:row.phase,
+        route:[],step:0,launchDay:integer(row.launchDay,'发船日',0,g.day),targetDay:integer(row.targetDay,'目标到港日',0),dockedDay:row.dockedDay===null?null:integer(row.dockedDay,'实际到港日',0,g.day)};
+      if(seen.has(boat.id))bad('重复船ID');seen.add(boat.id);
+      const route=array(row.route,'船水路');if(!route.length||route.length>w.N*w.N)bad('船水路长度');
+      boat.route=Array.from(route,i=>integer(i,'船水路格',0,w.N*w.N-1));
+      boat.step=integer(row.step,'船水路进度',0,route.length-1);
+      const inboundRoute=G.waterPathFromEndpoint(w,boat.berth);
+      if(!inboundRoute)bad('船泊位不通主河');
+      const expected=boat.phase==='egress'?G.waterPathFromEndpoint(w,boat.route[0],'exit')?.reverse():inboundRoute;
+      if(!expected||expected.length!==boat.route.length||expected.some((i,j)=>boat.route[j]!==i))bad('船路线不是对应入口或出口的水路');
+      if(boat.phase==='egress'&&(boat.step===route.length-1||!inboundRoute.includes(boat.route[0])))bad('离港船已出图或起点非法');
+      if(boat.dockedDay!==null&&(boat.dockedDay<boat.launchDay||boat.dockedDay<boat.targetDay||inboundRoute.length-1>(boat.dockedDay-boat.launchDay)*G.TRADE_VOYAGE.edgesPerDay))bad('船到港时序');
+      const b=w.bmap[boat.postId];
+      if(boat.phase!=='egress'){
+        if(!b||b.type!=='tradingpost'||b.state!=='ok'||b.tradeBerth!==boat.berth||!G.tradeWaterAccess(w,b).ok)bad('在途或停靠船目标站无效');
+        const claimed=boat.phase==='ingress'?inbound:docked;if(claimed.has(b.id))bad('同站重复进港或停靠船');claimed.add(b.id);
+      }
+      if(boat.phase==='ingress'){
+        if(boat.dockedDay!==null||boat.targetDay!==b.nextMerchantDay||b.merchant?.boatId===boat.id)bad('进港船不能有到港结算');
+        if(boat.step>(g.day-boat.launchDay)*G.TRADE_VOYAGE.edgesPerDay||boat.step===route.length-1&&g.day>=boat.targetDay&&!b.merchant)bad('进港进度超时或到港事件未提交');
+      }else if(boat.phase==='docked'){
+        if(boat.step!==route.length-1||boat.dockedDay===null||!b.merchant||b.merchant.boatId!==boat.id||b.merchant.arrivedDay!==boat.dockedDay||b.merchant.leaveDay!==boat.dockedDay+G.SEASON_DAYS||b.merchant.leaveDay<=g.day||b.nextMerchantDay!==boat.dockedDay+G.MERCHANT_INTERVAL)bad('停靠船与唯一货单不匹配');
+      }else if(boat.dockedDay!==null&&boat.route[0]!==boat.berth)bad('已到港船离港起点');
+      return boat;
+    })};
+    for(const b of w.buildings)if(b.type==='tradingpost'&&b.merchant&&!docked.has(b.id))bad('到港货单缺少停靠实体');
   }
   // Road orders reserve construction ownership, never a walk-blocking tile.
   w.roadWorkIndex=new Int32Array(w.N*w.N).fill(-1);

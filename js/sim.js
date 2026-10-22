@@ -170,6 +170,7 @@ G.endDay = function () {
   const oldSeason = g.season;
   g.season = G.seasonOf(g.day);
   g.year = Math.floor(g.day / G.YEAR_DAYS) + 1;
+  G.advanceTradeVoyages(); // Arrival + automatic trade commit before any season autosave.
   if (g.season !== oldSeason) G.onSeasonChange(oldSeason, g.season);
   G.expireWinterFarms();
   G.advanceCropClimate();
@@ -2867,6 +2868,7 @@ G.removeBuilding = function (b, confirmationKey) {
   // Match ordinary supply reconciliation: an exhausted cache (including only
   // sub-epsilon arithmetic residue) must not remain inside restored solid rock.
   if(b.type==='tunnel')w.supplyCaches=(w.supplyCaches||[]).filter(p=>!(p.x>=b.x&&p.x<b.x+b.w&&p.y>=b.y&&p.y<b.y+b.h&&G.isMountain(w,p.x,p.y)&&G.supplySum(p.supplyStock)<=1e-8));
+  if(b.type==='tradingpost')G.detachTradeVoyages(b);
   w.buildings = w.buildings.filter(x => x !== b);
   delete w.bmap[b.id];
   const pit=leavesPit?{id:G.nextId(),type:'mineralpit',x:b.x,y:b.y,w:b.w,h:b.h,state:'ok',progress:1,workLeft:0,totalWork:1,
@@ -2933,7 +2935,7 @@ G.MERCHANTS={
 G.merchantProfile=b=>G.MERCHANTS[b?.merchant?.id]||G.MERCHANTS.general;
 G.merchantPrice=(b,good)=>Object.hasOwn(G.TRADE_GOODS,good)?(b?.merchant?.orderedGood===good?Math.floor(G.TRADE_GOODS[good].price*1.25):G.TRADE_GOODS[good].price):0;
 G.merchantAccepts=(b,payment)=>Object.hasOwn(G.TRADE_VALUES,payment)&&(G.merchantProfile(b).acceptsFood||!G.FOOD_KEYS.includes(payment));
-G.currentMerchant=(b,expected)=>!!(b&&G.world.bmap[b.id]===b&&b.type==='tradingpost'&&b.state==='ok'&&b.merchant&&b.merchant.leaveDay>G.game.day&&(expected===undefined||expected===b.merchant));
+G.currentMerchant=(b,expected)=>!!(b&&(!G.world.tradeVoyages||G.world.tradeVoyages.boats.some(v=>v.id===b.merchant?.boatId&&v.postId===b.id&&v.phase==='docked'))&&G.world.bmap[b.id]===b&&b.type==='tradingpost'&&b.state==='ok'&&b.merchant&&b.merchant.leaveDay>G.game.day&&(expected===undefined||expected===b.merchant));
 G.merchantOrderSummary=function(b){
   const p=G.merchantProfile(b),m=b?.merchant;
   return {merchantId:p.id,name:p.name,pending:b?.merchantOrders?.[p.id]||null,
@@ -2987,17 +2989,84 @@ G.runArrivalAutoTrade=function(b,m){
     paid:result.ok?result.paid:0,ok:result.ok,reason:result.ok?'已按到港规则用本站库存完成整批购买':result.reason};
   return result.ok;
 };
-G.arriveMerchant=function(b){
+/* Vessel v1: 16 water edges per daily settlement, an explicit adaptation.
+ * Vessel rendering reads committed positions without advancing this lifecycle.
+ * The 16-day arrival target and 12-day berth stay are unchanged. Departure
+ * vessels remain independent; a long inbound trip can delay, never advance,
+ * the next arrival. No manifest/order/RNG is consumed until actual docking. */
+G.TRADE_VOYAGE=Object.freeze({v:1,edgesPerDay:16});
+G.departTradeVessel=function(boat){
+  const route=G.waterPathFromEndpoint(G.world,boat.route[boat.step],'exit');
+  if(!route)return false;
+  boat.phase='egress';boat.route=route.reverse();boat.step=0;return true;
+};
+G.detachTradeVoyages=function(b){
+  const voyages=G.world.tradeVoyages;if(!voyages)return;
+  for(const boat of voyages.boats)if(boat.postId===b.id&&boat.phase!=='egress')G.departTradeVessel(boat);
+  voyages.boats=voyages.boats.filter(boat=>boat.phase!=='egress'||boat.step<boat.route.length-1);
+  b.merchant=null; // Visitor stock leaves with its vessel, never enters town stock.
+};
+G.advanceTradeVoyages=function(){
+  const w=G.world,g=G.game,v=w.tradeVoyages;if(!v||v.lastDay>=g.day)return;
+  v.lastDay=g.day;
+  // Depart occupied berths first, so input order cannot decide who docks.
+  for(const boat of v.boats){
+    const b=w.bmap[boat.postId];
+    if(boat.phase==='egress')continue;
+    if(!b||b.type!=='tradingpost'||b.state!=='ok'||b.tradeBerth!==boat.berth||!G.tradeWaterAccess(w,b).ok){
+      if(b?.merchant?.boatId===boat.id)b.merchant=null;
+      G.departTradeVessel(boat);continue;
+    }
+    if(boat.phase==='docked'&&g.day>=boat.dockedDay+G.SEASON_DAYS){
+      if(b.merchant?.boatId===boat.id)b.merchant=null;
+      G.departTradeVessel(boat);
+    }
+  }
+  for(const boat of v.boats){
+    if(boat.phase==='docked')continue;
+    boat.step=Math.min(boat.route.length-1,boat.step+G.TRADE_VOYAGE.edgesPerDay);
+    if(boat.phase==='ingress'&&boat.step===boat.route.length-1&&g.day>=boat.targetDay){
+      const b=w.bmap[boat.postId];if(b&&!b.merchant)G.arriveMerchant(b,boat);
+    }
+  }
+  v.boats=v.boats.filter(boat=>boat.phase!=='egress'||boat.step<boat.route.length-1);
+  for(const b of w.buildings){
+    if(b.type!=='tradingpost'||b.state!=='ok'||!G.tradeWaterAccess(w,b).ok)continue;
+    G.ensureEconomyBuilding(b);
+    if(v.boats.some(boat=>boat.postId===b.id&&boat.phase==='ingress'))continue;
+    const route=G.tradeWaterRoute(w,b);if(!route)continue;
+    const travelDays=Math.ceil((route.length-1)/G.TRADE_VOYAGE.edgesPerDay);
+    if(g.day<b.nextMerchantDay-travelDays)continue;
+    // One upcoming trip may coexist with today's docked/egressing vessel.
+    // Its target was set once by the previous arrival, not by each frame.
+    const boat={id:v.nextId++,postId:b.id,berth:b.tradeBerth,phase:'ingress',route,step:0,launchDay:g.day,targetDay:b.nextMerchantDay,dockedDay:null};
+    v.boats.push(boat);
+    if(route.length===1&&g.day>=boat.targetDay&&!b.merchant)G.arriveMerchant(b,boat);
+  }
+};
+G.tradeVoyageSummary=function(b){
+  const v=G.world.tradeVoyages;if(!v)return '';
+  const boat=v.boats.find(x=>x.postId===b.id&&x.phase==='ingress');
+  if(boat){const days=Math.max(boat.targetDay-G.game.day,Math.ceil((boat.route.length-1-boat.step)/G.TRADE_VOYAGE.edgesPerDay),0);
+    return `商船进港途中，预计至少${days}天后靠泊（按每日水路步进）；到港前没有货单或自动购买。`;}
+  return `下次目标到港日为第${b.nextMerchantDay??G.game.day}天；需完成真实水路，长航程可能延迟。本切片船只按日显示，浏览器视觉未验收。`;
+};
+
+G.arriveMerchant=function(b,boat){
   if(!b||G.world.bmap[b.id]!==b||b.type!=='tradingpost'||b.state!=='ok'||G.currentMerchant(b))return false;
   if(!G.tradeWaterAccess(G.world,b).ok)return false; // Before RNG, order consumption or automatic purchase.
+  const voyages=G.world.tradeVoyages;
+  if(voyages&&(!boat||!voyages.boats.includes(boat)||boat.postId!==b.id||boat.phase!=='ingress'||boat.step!==boat.route.length-1||boat.berth!==b.tradeBerth||G.game.day<boat.targetDay||b.merchant))return false;
   const visit=b.merchantVisits||0,id=G.MERCHANT_CYCLE[visit%G.MERCHANT_CYCLE.length],p=G.MERCHANTS[id];
   const goods=visit===0?p.goods:p.goods.map(good=>({good,r:G.rng()})).sort((a,b)=>a.r-b.r).slice(0,p.assortment).map(v=>v.good);
   const m={id,arrivedDay:G.game.day,leaveDay:G.game.day+G.SEASON_DAYS,autoTradeDone:false,stock:Object.fromEntries(goods.map(k=>[k,G.TRADE_GOODS[k].stock]))};
   const order=b.merchantOrders?.[id];
   if(order){m.stock[order.good]=order.qty;m.orderedGood=order.good;delete b.merchantOrders[id];}
+  if(voyages){boat.phase='docked';boat.dockedDay=G.game.day;m.boatId=boat.id;b.nextMerchantDay=G.game.day+G.MERCHANT_INTERVAL;}
   b.merchant=m;b.merchantVisits=visit+1;
   const autoBought=G.runArrivalAutoTrade(b,m);
   G.ui.toast(`⛵ ${p.name}到访贸易站${autoBought?'，已按规则自动购买':order?'，上次订货已带到，请查看交易':''}`,'good');
+  return true;
 };
 G.tradeQuote=function(b,good,qty,payment){
   const q={ok:false,good,qty,payment,merchant:b?.merchant,cost:0,unitPrice:G.merchantPrice(b,good)};
@@ -3259,7 +3328,7 @@ G.advanceChickenEggs=function(b){
 G.advanceTownEconomy = function(){
   const g=G.game;g.unlocks=g.unlocks||{orchard:false};g.livestock=g.livestock||{sheep:0,cattle:0,chicken:0};
   for(const b of G.world.buildings){if(b.state!=='ok')continue;G.ensureEconomyBuilding(b);
-    if(b.type==='tradingpost'){
+    if(b.type==='tradingpost'&&!G.world.tradeVoyages){
       if(b.merchant&&g.day>=b.merchant.leaveDay){b.merchant=null;b.merchantVisits=Math.max(1,b.merchantVisits);b.nextMerchantDay=g.day+G.MERCHANT_INTERVAL-G.SEASON_DAYS;}
       if(!b.merchant&&g.day>=b.nextMerchantDay)G.arriveMerchant(b);
     }

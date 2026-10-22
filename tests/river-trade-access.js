@@ -7,9 +7,9 @@ let passed=0;function test(name,fn){fn();passed++;console.log('ok '+name);}
 function village(options={}){const G=loadGame(ROOT);assert(G.newGame(17,{climate:'fair',...options}).ok);return G;}
 for(const terrain of ['classic','mountain'])for(const mapSize of [128,192])test(`${terrain}/${mapSize} selects the correct save and preserves orchard/heating rules`,()=>{
  const G=village({terrain,mapSize});G.applySaveData(copy(G.serializeGame()));const d=copy(G.serializeGame()),river=terrain==='classic';
- assert.equal(d.v,river?9:8);assert.equal(d.mapVersion,river?4:2);
+ assert.equal(d.v,river?10:8);assert.equal(d.mapVersion,river?4:2);
  assert.equal(!!d.waterNavigation,river);assert.equal(d.game.orchardHarvestRules.v,1);assert.equal(d.game.orchardRules.v,1);assert.equal(d.game.heatRules.v,1);
- const q=G.startConfigQuote({seed:17,climate:'fair',terrain,mapSize});assert(q.climateSummary.note.includes(river?'v9':'v8'));
+ const q=G.startConfigQuote({seed:17,climate:'fair',terrain,mapSize});assert(q.climateSummary.note.includes(river?'v10':'v8'));
  G.applySaveData(d);assert.deepEqual(copy(G.serializeGame()),d);
  if(river){const nav=G.world.waterNavigation,net=G.mainRiverNetwork(G.world);assert(net.parent[nav.exit]>=0);for(const i of G.mainRiverCells(G.world,nav))assert.equal(G.world.water[i],1);}
 });
@@ -31,8 +31,9 @@ test('isolated lake and invalid berth reject arrival before RNG, orders, stock o
  assert.equal(JSON.stringify({b,res:G.game.res}),before);assert.equal(rng,0);assert.equal(auto,0);
  b.tradeBerth=-1;assert.equal(G.arriveMerchant(b),false);assert.equal(rng,0);assert.equal(auto,0);
 });
-test('connected berth has an entry route and commits just one arrival',()=>{
+test('legacy v9 connected berth has an entry route and commits just one arrival',()=>{
  const G=village(),w=G.world,cell=w.waterNavigation.mainRiver[Math.floor(w.waterNavigation.mainRiver.length/2)],x=cell%w.N,y=Math.floor(cell/w.N);
+ delete w.tradeVoyages; // Explicit old v9 arrival contract.
  const b=post(G,x,y+3);b.tradeBerth=G.chooseTradeBerth(w,b);assert(G.tradeWaterAccess(w,b).ok);
  const route=G.tradeWaterRoute(w,b);assert.equal(route[0],w.waterNavigation.entry);assert.equal(route.at(-1),b.tradeBerth);
  for(let i=1;i<route.length;i++){assert.equal(w.water[route[i]],1);const a=route[i-1],z=route[i];assert.equal(Math.abs(a%w.N-z%w.N)+Math.abs(Math.floor(a/w.N)-Math.floor(z/w.N)),1);}

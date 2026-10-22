@@ -189,11 +189,11 @@ G.addMainRiver = function(w) {
  * Cache is per world and never serialized; bridges preserve the underlying
  * water passage in all construction states. Land routing is not reused. */
 G.waterNetworkCache=new WeakMap();
-G.mainRiverNetwork = function(w) {
-  if(!w.waterNavigation)return null;
-  const cached=G.waterNetworkCache.get(w);
+G.mainRiverNetwork = function(w, endpoint = 'entry') {
+  if(!w.waterNavigation||!['entry','exit'].includes(endpoint))return null;
+  const caches=G.waterNetworkCache.get(w)||{},cached=caches[endpoint];
   if(cached&&cached.water===w.water&&cached.layout===w.waterNavigation)return cached;
-  const N=w.N,parent=new Int32Array(N*N).fill(-1),queue=[],entry=w.waterNavigation.entry;
+  const N=w.N,parent=new Int32Array(N*N).fill(-1),queue=[],entry=w.waterNavigation[endpoint];
   if(w.water[entry]===1){queue.push(entry);parent[entry]=entry;}
   for(let head=0;head<queue.length;head++){
     const i=queue[head],x=i%N,y=Math.floor(i/N);
@@ -203,7 +203,7 @@ G.mainRiverNetwork = function(w) {
       parent[j]=i;queue.push(j);
     }
   }
-  const result={water:w.water,layout:w.waterNavigation,parent};G.waterNetworkCache.set(w,result);return result;
+  const result={water:w.water,layout:w.waterNavigation,parent};caches[endpoint]=result;G.waterNetworkCache.set(w,caches);return result;
 };
 G.tradeBerthCandidates = function(w,b) {
   const cells=[];
@@ -223,6 +223,15 @@ G.tradeWaterAccess = function(w,b) {
   if(!Number.isInteger(b.tradeBerth)||!G.tradeBerthCandidates(w,b).includes(b.tradeBerth))return {ok:false,reason:'贸易站缺少有效的岸边泊位'};
   if(G.mainRiverNetwork(w).parent[b.tradeBerth]<0)return {ok:false,reason:'泊位未连通主河，商船不会到访；可将待售目标设为0取回备货'};
   return {ok:true,legacy:false,berth:b.tradeBerth};
+};
+// Canonical water-only paths; a departure goes to the explicit exit, not
+// backwards to the entry. Path arrays belong to the vessel, not to a building.
+G.waterPathFromEndpoint = function(w,cell,endpoint='entry') {
+  const network=G.mainRiverNetwork(w,endpoint);
+  if(!network||!Number.isInteger(cell)||cell<0||cell>=w.N*w.N||network.parent[cell]<0)return null;
+  const path=[];let i=cell;
+  while(true){path.push(i);if(network.parent[i]===i)break;i=network.parent[i];}
+  return path.reverse();
 };
 G.tradeWaterRoute = function(w,b) {
   const access=G.tradeWaterAccess(w,b);if(!access.ok||access.legacy)return null;
