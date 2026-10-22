@@ -58,8 +58,9 @@ G.startConfigQuote = function (input) {
   const config=mapSize===192?{v:3,preset,seed,terrain,mapSize}:terrain==='mountain'?{v:2,preset,seed,terrain}:{v:1,preset,seed},p=G.START_PRESETS[preset],families=p.kidPlan.length,children=p.kidPlan.reduce((n,k)=>n+k,0);
   if(climate!==undefined)config.climate=climate;
   const resources=Object.fromEntries(G.RES_KEYS.map(k=>[k,p.stocks[k]||0]));resources.food=G.FOOD_KEYS.reduce((n,k)=>n+resources[k],0);
-  return {ok:true,config,key:JSON.stringify(config),climateSummary:climate===undefined?null:{name:G.CLIMATES[climate].name,note:G.CLIMATES[climate].note+'；日气温与农田规则为48日历适配，冬季取暖随日气温变化，秋霜损失未采果实但不冻死果树；v8存档须使用新版'},mapSizeSummary:{size:mapSize,name:mapSize+'×'+mapSize,note:climate!==undefined?'新气候村使用v8存档，旧程序不能读取；128/192格地形保持原规则，192格手机性能尚未实测':mapSize===192?'面积为默认的2.25倍；同等开局库存与资源密度，远处资源须实际采运。采用权威地形存档（山地v3／新经典v4），旧版不能读取；手机性能尚未实测。':'默认尺寸与开局库存不变；新经典村使用v4地形存档，旧程序不能读取；已有村庄不补矿'},terrainSummary:{name:G.START_TERRAINS[terrain].name,mapVersion:terrain==='mountain'?2:3,
-    note:terrain==='mountain'?'41×37初始山谷为本作明确保底：有限木石铁与成熟食物林须劳动取得；山体阻路；可从陆地洞口规划隧道，实运建成后才通行':'沿用原地形与镇址；初始仓库落位后分别保证附近可达石头和铁矿，仍须实际采运'},presetSummary:{name:p.name,families,population:families*2+children,adults:families*2,children,resources,
+  const river=terrain==='classic'&&climate!==undefined;
+  return {ok:true,config,key:JSON.stringify(config),climateSummary:climate===undefined?null:{name:G.CLIMATES[climate].name,note:G.CLIMATES[climate].note+'；日气温与农田规则为48日历适配，冬季取暖随日气温变化，秋霜损失未采果实但不冻死果树；'+(river?'v9':'v8')+'存档须使用新版'},mapSizeSummary:{size:mapSize,name:mapSize+'×'+mapSize,note:river?'新经典气候村使用v9：显式主河与贸易水路资格，旧程序不能读取；尚无在途商船，山地与旧村不启用；手机表现未验收':climate!==undefined?'新气候村使用v8存档，旧程序不能读取；128/192格地形保持原规则，192格手机性能尚未实测':mapSize===192?'面积为默认的2.25倍；同等开局库存与资源密度，远处资源须实际采运。采用权威地形存档（山地v3／新经典v4），旧版不能读取；手机性能尚未实测。':'默认尺寸与开局库存不变；新经典村使用v4地形存档，旧程序不能读取；已有村庄不补矿'},terrainSummary:{name:G.START_TERRAINS[terrain].name,mapVersion:river?4:terrain==='mountain'?2:3,
+    note:river?'新图在起始镇址以外生成贯穿主河；连接主河的水体可接商船，孤立湖泊不来船。河宽、转弯及泊位为本作网格适配；仍须实际采运石铁':terrain==='mountain'?'41×37初始山谷为本作明确保底：有限木石铁与成熟食物林须劳动取得；山体阻路；可从陆地洞口规划隧道，实运建成后才通行':'沿用原地形与镇址；初始仓库落位后分别保证附近可达石头和铁矿，仍须实际采运'},presetSummary:{name:p.name,families,population:families*2+children,adults:families*2,children,resources,
     unlockedSeeds:p.wheat?['wheat']:[],seedNote:p.wheat?'已有小麦种子；其他作物与果树种子须贸易购买':'没有作物或果树种子，也没有牲畜；种子须贸易购买，永久解锁',
     equipmentNote:'衣物库存0、无预穿衣；工具默认共用池，寿命规则沿用现有系统',adaptationNote:'家庭数参考原版难度；人口组成与库存数量为本作适配'}};
 };
@@ -79,6 +80,7 @@ G.prepareNewGame = function (config) {
     G.world=null;
     G.world=G.genWorld(quote.config.seed,{terrain:quote.config.terrain||'classic',mapVersion:quote.config.terrain==='mountain'?2:0,mapSize:quote.mapSizeSummary.size});
     const w=G.world,s=w.start,kidPlan=G.START_PRESETS[quote.config.preset].kidPlan;
+    if(quote.config.terrain!=='mountain'&&quote.config.climate!==undefined)G.addMainRiver(w);
     if(w.seed!==quote.config.seed||!s||!Number.isInteger(s.x)||!Number.isInteger(s.y))throw new Error('起始地图数据无效');
     const storage=G.addBuilding('storage',s.x-1,s.y-1,{instant:true,free:true});
     if(!storage.ok)throw new Error('起始储物车放置失败：'+storage.reason);
@@ -96,7 +98,7 @@ G.prepareNewGame = function (config) {
     if(quote.config.terrain!=='mountain'){
       const report=G.ensureClassicStarterMinerals(w);
       if(!report.ok)throw new Error(report.reason);
-      w.mapVersion=3;w.startReport=report;
+      if(!w.waterNavigation)w.mapVersion=3;w.startReport=report;
     }
     if(w.mapVersion===2){
       const report=G.mountainStartReport(w,quote.config.preset);
@@ -162,8 +164,9 @@ G.serializeGame = function () {
   G.reconcileDeerHabitat(deerWorld,g);
   G.upgradeWildlife(deerWorld,g);
   return {
-    v: g.orchardHarvestRules?8:g.orchardRules?7:g.heatRules?6:g.climate?5:w.mapVersion===3?4:w.N===192?3:w.mapVersion===2?2:1, seed: w.seed, N: w.N, mapVersion: w.mapVersion || 0, // N：地图尺寸（旧档跨尺寸迁移裸索引用）
-    ...(w.mapVersion===2||w.mapVersion===3||w.N===192?{terrain:{water:Array.from(w.water),rock:Array.from(w.rock),mountain:Array.from(w.mountain),start:{...w.start}}}:{}),
+    v: w.waterNavigation?9:g.orchardHarvestRules?8:g.orchardRules?7:g.heatRules?6:g.climate?5:w.mapVersion===3?4:w.N===192?3:w.mapVersion===2?2:1, seed: w.seed, N: w.N, mapVersion: w.mapVersion || 0, // N：地图尺寸（旧档跨尺寸迁移裸索引用）
+    ...(w.mapVersion===2||w.mapVersion===3||w.mapVersion===4||w.N===192?{terrain:{water:Array.from(w.water),rock:Array.from(w.rock),mountain:Array.from(w.mountain),start:{...w.start}}}:{}),
+    ...(w.waterNavigation?{waterNavigation:{...w.waterNavigation,mainRiver:[...w.waterNavigation.mainRiver]}}:{}),
     game: {
       v: G.VERSION, startConfig:g.startConfig ? {...g.startConfig} : null,
       ...(g.climate?{climate:{...g.climate}}:{}),
@@ -207,6 +210,7 @@ G.serializeGame = function () {
       farm: b.farm ? b.farm.map(f => [f.sown ? 1 : 0, f.harvested ? 1 : 0, f.pestLost ? 1 : 0, ...(g.climate?[f.frostLost ? 1 : 0]:[])]) : undefined,
       sownAll: b.sownAll, growth: b.growth, harvestDone: b.harvestDone, cropType:b.cropType, cropChoice:b.cropChoice,
       sowingCommitted: b.sowingCommitted, pestInfestation:b.pestInfestation, lastPestCrop:b.lastPestCrop, earlyHarvestYield:b.earlyHarvestYield, productionPaused: b.productionPaused,
+      ...(w.waterNavigation&&b.type==='tradingpost'?{tradeBerth:b.tradeBerth}:{}),
       tradeInventory: b.tradeInventory, tradeTargets: b.tradeTargets, merchant: b.merchant, nextMerchantDay: b.nextMerchantDay, merchantVisits:b.merchantVisits, merchantOrders:b.merchantOrders, autoTrade:b.autoTrade, autoTradeLast:b.autoTradeLast,
       supplyStock:b.supplyStock,lastHeating:b.lastHeating, unheated:b.unheated, graves:b.type==='cemetery'?(b.graves||[]).map(r=>G.graveRecord(b,r)):undefined,
       animalType:b.animalType, pastureInfestation:b.pastureInfestation, pastureProducts:b.pastureProducts, animals: b.animals, animalGrowth: b.animalGrowth, animalTarget: b.animalTarget, woolReady: b.woolReady, eggProgress:b.eggProgress, eggDay:b.eggDay,
@@ -338,11 +342,12 @@ G.prepareSaveData = function (d) {
     if(G.supplySum(stock)>limit+1e-6)bad(field+'容量');return stock;
   };
   record(d, '根对象');
-  if (d.v !== undefined && ![1,2,3,4,5,6,7,8].includes(d.v)) bad('版本不受支持');
-  const harvestFormat=d.v===8,orchardFormat=d.v===7||harvestFormat,heatFormat=d.v===6||orchardFormat,climateFormat=d.v===5||heatFormat,mineralStart=d.v===4||climateFormat&&d.mapVersion===3,expanded=d.v===3||(mineralStart||climateFormat)&&d.N===192,authoritative=d.v===2||expanded||mineralStart||climateFormat;
-  if(climateFormat&&![2,3].includes(d.mapVersion))bad('气候存档地图版本');
-  if(mineralStart?d.mapVersion!==3:expanded?![1,2].includes(d.mapVersion):authoritative?d.mapVersion!==2:d.mapVersion!==undefined&&d.mapVersion!==0&&d.mapVersion!==1)bad('地图生成版本不受支持');
+  if (d.v !== undefined && ![1,2,3,4,5,6,7,8,9].includes(d.v)) bad('版本不受支持');
+  const riverFormat=d.v===9,harvestFormat=d.v===8||riverFormat,orchardFormat=d.v===7||harvestFormat,heatFormat=d.v===6||orchardFormat,climateFormat=d.v===5||heatFormat,mineralStart=d.v===4||climateFormat&&[3,4].includes(d.mapVersion),expanded=d.v===3||(mineralStart||climateFormat)&&d.N===192,authoritative=d.v===2||expanded||mineralStart||climateFormat;
+  if(riverFormat?d.mapVersion!==4:climateFormat&&![2,3].includes(d.mapVersion))bad('气候存档地图版本');
+  if(mineralStart?d.mapVersion!==(riverFormat?4:3):expanded?![1,2].includes(d.mapVersion):authoritative?d.mapVersion!==2:d.mapVersion!==undefined&&d.mapVersion!==0&&d.mapVersion!==1)bad('地图生成版本不受支持');
   if(!authoritative&&d.terrain!==undefined)bad('旧版本不能携带新地形');
+  if(riverFormat!==Object.hasOwn(d,'waterNavigation'))bad('水路版本标记缺失或不匹配');
   integer(d.seed, '地图种子', -0x80000000, 0xffffffff);
   const oldN = d.N === undefined ? G.MAP : integer(d.N, '地图尺寸', 1, 4096);
   if(authoritative&&d.N!==(expanded?192:128))bad('权威地形尺寸不匹配');
@@ -562,6 +567,14 @@ G.prepareSaveData = function (d) {
     w.start={x:integer(start.x,'起点 x',0,w.N-1),y:integer(start.y,'起点 y',0,w.N-1)};
     const i=w.start.y*w.N+w.start.x;if(w.water[i]||w.rock[i]||w.mountain[i])bad('起始位置地形');
   }
+  if(riverFormat){
+    const nav=record(d.waterNavigation,'主河水路'),keys=['v','entry','exit','mainRiver'];
+    if(Object.keys(nav).length!==keys.length||Object.keys(nav).some(k=>!keys.includes(k)))bad('主河水路字段');
+    const expected=G.mainRiverLayout(w),path=array(nav.mainRiver,'主河中心线');
+    if(nav.v!==1||nav.entry!==expected.entry||nav.exit!==expected.exit||path.length!==expected.mainRiver.length||expected.mainRiver.some((i,j)=>path[j]!==i))bad('主河身份或入口不匹配');
+    for(const i of G.mainRiverCells(w,expected))if(w.water[i]!==1)bad('主河航道不是水面');
+    w.waterNavigation=expected;
+  }
   const gridIndex = (i, field) => {
     integer(i, field, 0, oldN * oldN - 1);
     const x = i % oldN, y = Math.floor(i / oldN);
@@ -724,7 +737,10 @@ G.prepareSaveData = function (d) {
       if (!['iron', 'steel'].includes(b.toolRecipe)) bad('工具配方');
     }
     if(bd.type==='tailor'){b.coatRecipe=bd.coatRecipe===undefined?'basic':bd.coatRecipe;if(!['basic','warm'].includes(b.coatRecipe))bad('衣物配方');b.coatMaterial=bd.coatMaterial===undefined?'auto':bd.coatMaterial;if(!['auto','leather','wool'].includes(b.coatMaterial))bad('普通衣原料选择');}
+    if(bd.tradeBerth!==undefined&&(!riverFormat||bd.type!=='tradingpost'))bad('旧村或非贸易站不能携带泊位');
     if (bd.type === 'tradingpost') {
+      if(riverFormat){b.tradeBerth=integer(bd.tradeBerth,'贸易泊位',0,w.N*w.N-1);if(!G.tradeBerthCandidates(w,b).includes(b.tradeBerth))bad('贸易泊位须侧邻建筑水面');}
+
       for(const field of ['tradeInventory','tradeTargets']){
         b[field]={};if(bd[field]!==undefined){record(bd[field],field);for(const key of Object.keys(bd[field])){
           if(!Object.hasOwn(G.TRADE_VALUES,key))bad('贸易资源');b[field][key]=number(bd[field][key],field,0,field==='tradeTargets'?2000:1000000);
@@ -750,6 +766,7 @@ G.prepareSaveData = function (d) {
         if(typeof order.good!=='string'||!G.MERCHANTS[id].goods.includes(order.good))bad('商人订货目录');
         b.merchantOrders[id]={good:order.good,qty:integer(order.qty,'订货数量',1,G.TRADE_GOODS[order.good].stock)};
       }}
+      if(bd.merchant!=null&&riverFormat&&!G.tradeWaterAccess(w,b).ok)bad('孤立泊位不能有到港商船');
       if(bd.merchant!=null){record(bd.merchant,'商船');record(bd.merchant.stock,'商船货物');
         const id=bd.merchant.id===undefined?'general':bd.merchant.id;if(!Object.hasOwn(G.MERCHANTS,id))bad('商人身份');
         b.merchant={id,leaveDay:integer(bd.merchant.leaveDay,'商船离港',0),stock:{},autoTradeDone:true};

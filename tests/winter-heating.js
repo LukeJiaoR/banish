@@ -9,6 +9,8 @@ const save=G=>copy(G.serializeGame());
 function test(name,fn){fn();passed++;console.log('ok '+name);}
 function fresh(type='fair',seed=1,root=ROOT){
  const G=loadGame(root);assert(G.newGame(seed,{climate:type}).ok);const w=G.world;
+ // Synthetic heating-only village retains v8; new-village v9 is tested separately.
+ if(w.waterNavigation){delete w.waterNavigation;w.mapVersion=3;}
  for(const k of ['water','rock','road','mountain'])w[k].fill(0);w.bgrid.fill(-1);w.treeIdx.fill(-1);w.trees=[];w.buildings=[];w.bmap={};w.citizens=[];w.cmap={};w.families=[];w.marked.clear();w.markedRocks.clear();w.rockCleared=[];G.bumpNavigation(w);
  G.game.h=12;G.rng=()=>.5;G.addBuilding('storage',2,2,{instant:true,free:true});Object.assign(G.game.res,{wood:500,stone:500,iron:500,grain:1000,food:1000,tools:300,firewood:200,coal:100});
  G.game.townLedger=G.newTownLedger(G.game);G.game.industryLedger=G.newIndustryLedger(G.game);return G;
@@ -21,15 +23,15 @@ function winter(G){day(G,35);G.game.h=23.9;G.advanceSim(.2);assert.equal(G.game.
 function stable(G){const before=save(G),w=G.world,g=G.game,rng=G.rng,uid=G._peekUid();return bad=>{assert.throws(()=>G.applySaveData(bad));assert.equal(G.world,w);assert.equal(G.game,g);assert.equal(G.rng,rng);assert.equal(G._peekUid(),uid);assert.deepEqual(save(G),before);};}
 function inventories(G){const out={wood:G.game.res.firewood,coal:G.game.res.coal};for(const b of G.world.buildings){out.wood+=b.supplyStock?.firewood||0;out.coal+=b.supplyStock?.coal||0;}return out;}
 
-test('genuine new villages use v8 and independent heat-v1; crop/weather version stays v1',()=>{
- const G=loadGame(ROOT);assert(G.newGame(0).ok);assert.equal(G.game.climate.type,'fair');assert.deepEqual(copy(G.game.heatRules),{v:1,lastDay:0});assert.equal(save(G).v,8);assert.equal(G.game.climate.v,1);G.applySaveData(save(G));assert.equal(save(G).v,8);
- for(const type of ['mild','fair','harsh']){assert(G.newGame(17,{climate:type}).ok);assert.equal(save(G).v,8);assert.equal(G.game.heatRules.v,1);}
+test('genuine new villages use v9 and independent heat-v1; crop/weather version stays v1',()=>{
+ const G=loadGame(ROOT);assert(G.newGame(0).ok);assert.equal(G.game.climate.type,'fair');assert.deepEqual(copy(G.game.heatRules),{v:1,lastDay:0});assert.equal(save(G).v,9);assert.equal(G.game.climate.v,1);G.applySaveData(save(G));assert.equal(save(G).v,9);
+ for(const type of ['mild','fair','harsh']){assert(G.newGame(17,{climate:type}).ok);assert.equal(save(G).v,9);assert.equal(G.game.heatRules.v,1);}
 });
 
 test('synthetic v6 and v7 empty-village saves preserve their orchard rule boundaries',()=>{
  for(const version of [6,7]){
   const G=loadGame(ROOT);assert(G.newGame(17,{climate:'fair'}).ok);
-  const legacy=save(G);legacy.v=version;delete legacy.game.orchardHarvestRules;
+  const legacy=save(G);delete legacy.waterNavigation;legacy.mapVersion=3;legacy.v=version;delete legacy.game.orchardHarvestRules;
   if(version===6)delete legacy.game.orchardRules;
   G.applySaveData(legacy);assert.equal(save(G).v,version);
   assert.equal(G.game.orchardHarvestRules,null);assert.equal(!!G.game.orchardRules,version===7);

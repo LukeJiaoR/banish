@@ -2701,6 +2701,7 @@ G.addBuilding = function (type, x, y, opt) {
         b.farm.push({ x: i, y: j, sown: false, harvested: false });
     b.sownAll = false; b.growth = 0; b.harvestDone = false;
   }
+  if(type==='tradingpost'&&w.waterNavigation)b.tradeBerth=G.chooseTradeBerth(w,b);
   if(type==='hunting')b.huntingReadyDay=0;
   if (type === 'forester') { b.doCut = true; b.doPlant = true; } // 原版 Forester 的 Cut / Plant 开关
   if(G.MINERAL_RULES[type])b.mineralUnits=G.MINERAL_RULES[type].capacity;
@@ -2988,6 +2989,7 @@ G.runArrivalAutoTrade=function(b,m){
 };
 G.arriveMerchant=function(b){
   if(!b||G.world.bmap[b.id]!==b||b.type!=='tradingpost'||b.state!=='ok'||G.currentMerchant(b))return false;
+  if(!G.tradeWaterAccess(G.world,b).ok)return false; // Before RNG, order consumption or automatic purchase.
   const visit=b.merchantVisits||0,id=G.MERCHANT_CYCLE[visit%G.MERCHANT_CYCLE.length],p=G.MERCHANTS[id];
   const goods=visit===0?p.goods:p.goods.map(good=>({good,r:G.rng()})).sort((a,b)=>a.r-b.r).slice(0,p.assortment).map(v=>v.good);
   const m={id,arrivedDay:G.game.day,leaveDay:G.game.day+G.SEASON_DAYS,autoTradeDone:false,stock:Object.fromEntries(goods.map(k=>[k,G.TRADE_GOODS[k].stock]))};

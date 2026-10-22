@@ -7,8 +7,11 @@ function fresh(type='fair',seed=1,options={},root=ROOT){
   const G=loadGame(root);assert(G.newGame(seed,{climate:type,...options}).ok);
   // Crop-specific boundary fixtures retain v5 climate with fixed legacy heating.
   G.game.heatRules=null;G.game.orchardRules=null;G.game.orchardHarvestRules=null;
-  if(root===ROOT)assert.equal(G.serializeGame().v,5); // Explicit synthetic v5 scope, not a historical-engine migration test.
-  const w=G.world;for(const k of ['water','rock','road','mountain'])w[k].fill(0);w.bgrid.fill(-1);w.treeIdx.fill(-1);w.trees=[];w.buildings=[];w.bmap={};w.citizens=[];w.cmap={};w.families=[];w.marked.clear();w.markedRocks.clear();w.rockCleared=[];G.bumpNavigation(w);
+   // Explicit synthetic v5 scope, not a historical-engine migration test.
+  const w=G.world;
+  // Controlled crop-only fixture removes new river metadata before flattening.
+  if(w.waterNavigation){delete w.waterNavigation;w.mapVersion=3;}
+  for(const k of ['water','rock','road','mountain'])w[k].fill(0);w.bgrid.fill(-1);w.treeIdx.fill(-1);w.trees=[];w.buildings=[];w.bmap={};w.citizens=[];w.cmap={};w.families=[];w.marked.clear();w.markedRocks.clear();w.rockCleared=[];G.bumpNavigation(w);if(root===ROOT)assert.equal(G.serializeGame().v,5);
   G.game.h=12;G.rng=()=>.5;G.addBuilding('storage',2,2,{instant:true,free:true});Object.assign(G.game.res,{wood:500,stone:500,iron:500,grain:100,food:100,tools:300,firewood:200});
   const c=G.spawnCitizen({x:8,y:10,age:30,sex:'m'}),h=G.addBuilding('house',4,10,{instant:true,free:true}).b,f={id:G.nextId(),members:[c.id],coupleIds:[],houseId:h.id};c.familyId=f.id;h.family=f.id;w.families=[f];
   G.game.townLedger=G.newTownLedger(G.game);G.game.industryLedger=G.newIndustryLedger(G.game);
@@ -28,7 +31,7 @@ function coldDay(G,crop='wheat'){const line=G.CROP_TEMPERATURES[crop].frostBelow
 function step(G,c,done,max=10000){for(let i=0;i<max&&!done();i++)G.stepCitizen(c,.1);assert(done(),'real worker flow did not complete');}
 
 test('new game defaults Fair; all climates validate, quote and seed repeat without consuming live RNG',()=>{
- const {G}=fresh();assert(G.newGame(0).ok);assert.equal(G.game.climate.type,'fair');assert.equal(G.game.startConfig.climate,'fair');assert.equal(saved(G).v,8);assert.deepEqual({...G.game.heatRules},{v:1,lastDay:0});
+ const {G}=fresh();assert(G.newGame(0).ok);assert.equal(G.game.climate.type,'fair');assert.equal(G.game.startConfig.climate,'fair');assert.equal(saved(G).v,9);assert.deepEqual({...G.game.heatRules},{v:1,lastDay:0});
  for(const type of Object.keys(G.CLIMATES)){const q=G.startConfigQuote({seed:0,climate:type});assert(q.ok);assert(q.key.includes(type));assert.equal(q.config.climate,type);assert(q.climateSummary.name.includes(type[0].toUpperCase()+type.slice(1)));}
  let calls=0;G.rng=()=>{calls++;return .2;};for(let d=0;d<1000;d++)for(const type of Object.keys(G.CLIMATES))assert.equal(G.temperatureFor(0,d,type),G.temperatureFor(0,d,type));assert.equal(calls,0);
  for(const climate of [null,'legacy','Fair','toString',1,{}])assert(!G.startConfigQuote({seed:1,climate}).ok);
@@ -131,7 +134,7 @@ test('v5 climate state rejects missing, foreign, contradictory or downgraded mar
 
 test('historical mountain fixture and synthetic v2-v4 without climate stay legacy through loads and saves with no immediate crop/stock change',()=>{
  for(const fixture of ['mountain-v0.3.73.json']){const G=loadGame(ROOT),raw=JSON.parse(fs.readFileSync(path.join(ROOT,'tests/fixtures',fixture),'utf8')),d=raw.save||raw;const candidate=G.prepareSaveData(d);G.world=candidate.world;G.game=candidate.game;G.rng=candidate.rng;G.setUid(candidate.nextUid);assert.equal(G.game.climate,null);const before=saved(G);G.advanceCropClimate();assert.deepEqual(saved(G),before);assert.equal(G.climateWeather(),null);}
- for(const terrain of ['classic','mountain'])for(const mapSize of [128,192]){const G=loadGame(ROOT);assert(G.newGame(17,{terrain,mapSize,climate:'mild'}).ok);const d=saved(G);delete d.game.climate;delete d.game.heatRules;delete d.game.orchardRules;delete d.game.orchardHarvestRules;delete d.game.startConfig.climate;d.v=d.mapVersion===3?4:d.N===192?3:2;G.applySaveData(d);assert.equal(G.game.climate,null);restored(G,d);}
+ for(const terrain of ['classic','mountain'])for(const mapSize of [128,192]){const G=loadGame(ROOT);assert(G.newGame(17,{terrain,mapSize,climate:'mild'}).ok);const d=saved(G);if(d.waterNavigation){delete d.waterNavigation;d.mapVersion=3;}delete d.game.climate;delete d.game.heatRules;delete d.game.orchardRules;delete d.game.orchardHarvestRules;delete d.game.startConfig.climate;d.v=d.mapVersion===3?4:d.N===192?3:2;G.applySaveData(d);assert.equal(G.game.climate,null);restored(G,d);}
 });
 
 
