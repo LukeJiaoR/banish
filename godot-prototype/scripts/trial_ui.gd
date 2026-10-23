@@ -108,13 +108,18 @@ static func build(main: Node2D) -> void:
 	brand.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	brand.add_theme_constant_override("separation", 0)
 	top.add_child(brand)
-	brand.add_child(label("归园  ·  山水小景", 23))
-	brand.add_child(label("Godot 视觉试验  /  原版保留", 12, MUTED))
+	var brand_title := label("归园  ·  山水小景", 23)
+	brand.add_child(brand_title)
+	var brand_note := label("Godot 视觉试验  /  原版保留", 12, MUTED)
+	brand.add_child(brand_note)
+	main.set_meta("trial_brand_title", brand_title)
+	main.set_meta("trial_brand_note", brand_note)
 	main.pause_button = button("暂停动画  Space", func(): main.set_paused(not main.paused))
 	top.add_child(main.pause_button)
-	top.add_child(button("网格  G", func():
+	var grid_button := button("网格  G", func():
 		main.terrain.show_grid = not main.terrain.show_grid
-		main.terrain.queue_redraw()))
+		main.terrain.queue_redraw())
+	top.add_child(grid_button)
 	var reference := button("对照 A 图  R", func():
 		if main.has_method("toggle_reference"):
 			main.call("toggle_reference"))
@@ -122,7 +127,10 @@ static func build(main: Node2D) -> void:
 	reference.visible = main.has_method("toggle_reference")
 	top.add_child(reference)
 	main.set_meta("trial_reference_button", reference)
-	top.add_child(button("纯画面  H", func(): main.toggle_presentation()))
+	var presentation_button := button("纯画面  H", func():
+		main.toggle_presentation()
+		layout(main))
+	top.add_child(presentation_button)
 
 	# Right-side complete art / purpose / confirm. The map keeps most of the view.
 	var side := PanelContainer.new()
@@ -192,6 +200,8 @@ static func build(main: Node2D) -> void:
 		card_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		card_content.add_child(card_title)
 		main.tool_buttons[kind] = card
+		card.set_meta("trial_card_art", card_content.get_child(0))
+		card.set_meta("trial_card_title", card_title)
 
 	# Keep confirmation reachable even on the 960x640 minimum window.
 	var actions := HBoxContainer.new()
@@ -232,6 +242,146 @@ static func build(main: Node2D) -> void:
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	notes.add_child(hint)
 
+	# This sibling survives main.ui.hide(), so an iOS player is never trapped
+	# in presentation mode without a physical keyboard. Reference overlay is
+	# above this canvas and has its own close button in main.gd.
+	var recovery := HBoxContainer.new()
+	recovery.name = "TouchRecovery"
+	recovery.theme = theme
+	recovery.add_theme_constant_override("separation", 7)
+	canvas.add_child(recovery)
+	var build_toggle := button("试摆", func(): toggle_build(main))
+	build_toggle.custom_minimum_size = Vector2(66, 44)
+	recovery.add_child(build_toggle)
+	var restore := button("界面", func():
+		main.toggle_presentation()
+		layout(main))
+	restore.custom_minimum_size = Vector2(66, 44)
+	recovery.add_child(restore)
+	var reference_touch := button("A 图", func():
+		if main.has_method("toggle_reference"):
+			main.toggle_reference()
+		layout(main))
+	reference_touch.custom_minimum_size = Vector2(62, 44)
+	recovery.add_child(reference_touch)
+	main.set_meta("trial_mobile_build_open", false)
+	main.set_meta("trial_layout_nodes", {
+		"header": header, "top": top, "side": side, "bottom": bottom,
+		"content": content, "detail": detail, "scroll": scroll,
+		"caption": caption, "divider": divider, "choices": choices,
+		"undo": undo, "cancel": cancel, "scope": scope, "hint": hint,
+		"grid": grid_button, "presentation": presentation_button,
+		"recovery": recovery, "build_toggle": build_toggle,
+		"restore": restore, "reference_touch": reference_touch
+	})
+	layout(main)
+
+static func compact(main: Node2D) -> bool:
+	# main supplies CSS-pixel detection on Web; logical UI layout is separate
+	# from the display's devicePixelRatio and WebGL framebuffer resolution.
+	return bool(main.get("compact_ui"))
+
+static func toggle_build(main: Node2D) -> void:
+	if main.presentation:
+		main.toggle_presentation()
+	var opening := not bool(main.get_meta("trial_mobile_build_open", false))
+	main.set_meta("trial_mobile_build_open", opening)
+	if not opening:
+		main.select_tool("")
+	layout(main)
+
+static func set_rect(node: Control, rect: Rect2) -> void:
+	node.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	node.position = rect.position
+	node.size = rect.size
+
+static func layout(main: Node2D) -> void:
+	## Call after viewport/content_scale_size changes, and after pause / H / R.
+	if not main.has_meta("trial_layout_nodes"):
+		return
+	var nodes: Dictionary = main.get_meta("trial_layout_nodes")
+	var mobile := compact(main)
+	var view: Vector2 = main.ui.get_viewport_rect().size
+	if view.x <= 0 or view.y <= 0:
+		return
+	var showing: bool = not main.presentation
+	var opening := bool(main.get_meta("trial_mobile_build_open", false))
+	if main.presentation:
+		opening = false
+		main.set_meta("trial_mobile_build_open", false)
+	elif mobile and not main.tool.is_empty():
+		opening = true
+		main.set_meta("trial_mobile_build_open", true)
+	var title: Label = main.get_meta("trial_brand_title")
+	var note: Label = main.get_meta("trial_brand_note")
+	var art: TextureRect = main.get_meta("trial_detail_art")
+	var detail_title: Label = main.get_meta("trial_detail_title")
+	var purpose: Label = main.get_meta("trial_detail_copy")
+	var reference: Button = main.get_meta("trial_reference_button")
+	nodes.grid.visible = not mobile
+	nodes.presentation.visible = not mobile
+	reference.visible = not mobile and main.has_method("toggle_reference")
+	nodes.recovery.visible = (mobile or main.presentation) and not main.reference_visible
+	nodes.build_toggle.visible = mobile and showing
+	nodes.reference_touch.visible = main.has_method("toggle_reference")
+	nodes.restore.text = "隐藏" if showing else "显示界面"
+	nodes.build_toggle.text = "收起试摆" if opening else "试摆"
+	nodes.top.add_theme_constant_override("separation", 7 if mobile else 10)
+	title.text = "归园 · 视觉试验" if mobile else "归园  ·  山水小景"
+	title.add_theme_font_size_override("font_size", 18 if mobile else 23)
+	note.text = "原版保留 · 不保存" if mobile else "Godot 视觉试验  /  原版保留"
+	note.add_theme_font_size_override("font_size", 11 if mobile else 12)
+	main.pause_button.text = ("继续" if main.paused else "暂停") if mobile else ("继续动画  Space" if main.paused else "暂停动画  Space")
+	main.pause_button.custom_minimum_size = Vector2(58 if mobile else 0, 44 if mobile else 40)
+	for item in [nodes.caption, art, detail_title, nodes.divider, purpose, main.summary, nodes.scope]:
+		item.visible = not mobile
+	nodes.hint.visible = not mobile or not opening
+	nodes.hint.text = "单指移图 · 双指缩放 · 试摆后点确认" if mobile else "中键 / WASD 移图 · 滚轮缩放 · Home 回中 · H 收起 / 显示界面"
+	nodes.content.add_theme_constant_override("separation", 7 if mobile else 10)
+	nodes.detail.add_theme_constant_override("separation", 0 if mobile else 8)
+	nodes.side.add_theme_stylebox_override("panel", style(PAPER, Color("cad2ac"), 18 if mobile else 22, 9 if mobile else 14))
+	main.status.add_theme_font_size_override("font_size", 13 if mobile else 15)
+	main.status.max_lines_visible = 2 if mobile else -1
+	main.status.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS if mobile else TextServer.OVERRUN_NO_TRIMMING
+	nodes.hint.max_lines_visible = 1 if mobile else -1
+	nodes.hint.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS if mobile else TextServer.OVERRUN_NO_TRIMMING
+	nodes.undo.text = "撤销本次试摆" if mobile else "撤销本次试摆  Z"
+	nodes.undo.custom_minimum_size.y = 44 if mobile else 34
+	main.confirm_button.custom_minimum_size.y = 44 if mobile else 40
+	nodes.cancel.custom_minimum_size.y = 44 if mobile else 40
+	for key in main.tool_buttons:
+		var card: Button = main.tool_buttons[key]
+		card.custom_minimum_size = Vector2(68, 69 if mobile else 91)
+		var icon: TextureRect = card.get_meta("trial_card_art")
+		icon.custom_minimum_size.y = 34 if mobile else 53
+		var card_title: Label = card.get_meta("trial_card_title")
+		card_title.text = NAMES[key] if mobile else NAMES[key] + (" 1" if key == "house" else (" 2" if key == "tree" else " 3"))
+	if mobile:
+		set_rect(nodes.header, Rect2(10, 10, maxf(1, view.x - 20), 64))
+		var panel_height := 197.0
+		var panel_y := view.y - 72.0 - panel_height
+		nodes.side.visible = opening
+		set_rect(nodes.side, Rect2(10, maxf(80, panel_y), maxf(1, view.x - 20), panel_height))
+		var status_y := panel_y - 76.0 if opening else view.y - 142.0
+		nodes.bottom.visible = not opening or view.y >= 520
+		set_rect(nodes.bottom, Rect2(10, maxf(80, status_y), maxf(1, view.x - 20), 68))
+		nodes.recovery.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+		nodes.recovery.offset_right = -10
+		nodes.recovery.offset_left = -10 - (234 if showing else 166)
+		nodes.recovery.offset_top = -62
+		nodes.recovery.offset_bottom = -18
+	else:
+		set_rect(nodes.header, Rect2(18, 16, maxf(1, view.x - 36), 62))
+		nodes.side.visible = true
+		set_rect(nodes.side, Rect2(view.x - 276, 96, 258, maxf(1, view.y - 114)))
+		nodes.bottom.visible = true
+		set_rect(nodes.bottom, Rect2(18, view.y - 88, maxf(1, view.x - 312), 70))
+		nodes.recovery.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
+		nodes.recovery.offset_left = 18
+		nodes.recovery.offset_right = 190
+		nodes.recovery.offset_top = -62
+		nodes.recovery.offset_bottom = -18
+
 static func refresh(main: Node2D) -> void:
 	## Call LAST in main._refresh_ui(), after its existing text/counter update.
 	if not main.has_meta("trial_detail_art"):
@@ -248,3 +398,4 @@ static func refresh(main: Node2D) -> void:
 		card.text = ""
 		card.set_pressed_no_signal(key == kind)
 	main.confirm_button.text = "确认试摆"
+	layout(main)

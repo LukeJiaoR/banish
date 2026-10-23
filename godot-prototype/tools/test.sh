@@ -14,6 +14,7 @@ python3 "$ROOT/tools/verify_assets.py"
 cat "$RUNTIME/import.log"
 if grep -Eq '(^| )(ERROR:|SCRIPT ERROR:)' "$RUNTIME/import.log"; then exit 1; fi
 "$GODOT_BIN" --headless --path "$ROOT" --script tests/smoke.gd
+"$GODOT_BIN" --headless --path "$ROOT" --script tests/mobile_ui.gd
 "$GODOT_BIN" --headless --path "$ROOT" --quit-after 180 > "$RUNTIME/run.log" 2>&1
 cat "$RUNTIME/run.log"
 if grep -Eq '(^| )(ERROR:|SCRIPT ERROR:)' "$RUNTIME/run.log"; then exit 1; fi

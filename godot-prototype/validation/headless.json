@@ -1,5 +1,5 @@
 {
-  "checks": 5165,
+  "checks": 5182,
   "engine": "4.6.3-stable (official)",
   "failures": [],
   "scope": "Headless Godot engine integration; not GPU screenshot, browser or physical device validation"

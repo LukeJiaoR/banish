@@ -9,9 +9,10 @@ concept, with portrait and landscape compositions. It was actually opened and
 visually inspected for this trial. It is not a Godot frame or a pixel-match
 acceptance result; its example stock figures are not reproduced as fake state.
 
-Press **R** in the running trial to inspect this reference. The overlay says
+Tap **A图** or press **R** in the running trial to inspect this reference. The overlay says
 it is a reference, pauses the diorama, and restores the previous pause state
-when R/Escape closes it. **H** hides/shows the runtime interface for comparison.
+when the return button or R/Escape closes it. The on-screen hide/show control or **H**
+hides/shows the runtime interface for comparison; mobile recovery remains reachable.
 
 ## What was structurally changed after looking at A
 

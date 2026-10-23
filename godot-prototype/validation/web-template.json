@@ -1,0 +1,36 @@
+{
+  "official_source": "https://github.com/godotengine/godot-builds/releases/download/4.6.3-stable/Godot_v4.6.3-stable_export_templates.tpz",
+  "engine": "4.6.3.stable",
+  "archive_bytes": 1255918323,
+  "selected_entry": {
+    "name": "templates/web_nothreads_release.zip",
+    "compression": 8,
+    "crc32": 340484631,
+    "compressed_bytes": 9548031,
+    "bytes": 9574223,
+    "offset": 1037103554
+  },
+  "downloaded_bytes": 9613618,
+  "range_requests": [
+    {
+      "range": "1255852766-1255918322",
+      "http": 206,
+      "content_range": "bytes 1255852766-1255918322/1255918323",
+      "bytes": 65557
+    },
+    {
+      "range": "1037103554-1037103583",
+      "http": 206,
+      "content_range": "bytes 1037103554-1037103583/1255918323",
+      "bytes": 30
+    },
+    {
+      "range": "1037103647-1046651677",
+      "http": 206,
+      "content_range": "bytes 1037103647-1046651677/1255918323",
+      "bytes": 9548031
+    }
+  ],
+  "sha256": "1446f79dc12f60ce5d244c39fb6628ec298337ca5c4f91a16491feea72aa1bc9",
+  "nested_zip_crc": "pass"
+}

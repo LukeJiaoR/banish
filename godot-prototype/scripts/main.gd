@@ -17,6 +17,12 @@ var reference_visible := false
 var reference_previous_pause := false
 var presentation := false
 var presentation_previous_grid := false
+var compact_ui := false
+var touch_points: Dictionary = {}
+var touch_travel := 0.0
+var touch_multiple := false
+var touch_tool := ""
+var last_touch_time := -1000
 var camera: Camera2D
 var animals: Array[Node2D] = []
 var placed: Array[Dictionary] = []
@@ -52,6 +58,8 @@ func _ready() -> void:
 	add_child(camera)
 	_make_ui()
 	reset_scene()
+	get_viewport().size_changed.connect(_sync_layout)
+	_sync_layout()
 
 func reset_scene() -> void:
 	for container in [entities, shadows]:
@@ -283,6 +291,7 @@ func set_paused(value: bool) -> void:
 		animal.active = not value
 	if pause_button:
 		pause_button.text = "继续动画  Space" if paused else "暂停动画  Space"
+		Interface.layout(self)
 
 func zoom_by(factor: float) -> void:
 	var before := get_global_mouse_position()
@@ -305,11 +314,92 @@ func _process(delta: float) -> void:
 	hover_cell = Iso.cell_at(get_global_mouse_position())
 	queue_redraw()
 
+func _screen_to_world(point: Vector2) -> Vector2:
+	return get_viewport().get_canvas_transform().affine_inverse() * point
+
+func _clear_touches() -> void:
+	touch_points.clear()
+	touch_travel = 0.0
+	touch_multiple = false
+	touch_tool = ""
+
+func _handle_touch(event: InputEvent) -> bool:
+	if event is InputEventScreenTouch and not event.pressed and touch_points.has(event.index):
+		last_touch_time = Time.get_ticks_msec()
+		touch_points.erase(event.index)
+		if touch_points.is_empty():
+			if not reference_visible and not presentation and not touch_multiple and touch_travel < 9.0 and not tool.is_empty() and tool == touch_tool:
+				stage_placement(Iso.cell_at(_screen_to_world(event.position)))
+			_clear_touches()
+		return true
+	if event is InputEventScreenDrag and touch_points.has(event.index):
+		last_touch_time = Time.get_ticks_msec()
+		if reference_visible:
+			_clear_touches()
+			return true
+		touch_travel += event.relative.length()
+		if touch_points.size() >= 2:
+			var ids := touch_points.keys()
+			var old_a: Vector2 = touch_points[ids[0]]
+			var old_b: Vector2 = touch_points[ids[1]]
+			var old_center := (old_a + old_b) * 0.5
+			var world_before := _screen_to_world(old_center)
+			touch_points[event.index] = event.position
+			var a: Vector2 = touch_points[ids[0]]
+			var b: Vector2 = touch_points[ids[1]]
+			var factor := a.distance_to(b) / maxf(12.0, old_a.distance_to(old_b))
+			camera.zoom = Vector2.ONE * clampf(camera.zoom.x * factor, 0.65, 2.4)
+			camera.force_update_scroll()
+			camera.position += world_before - _screen_to_world((a + b) * 0.5)
+		else:
+			touch_points[event.index] = event.position
+			if touch_travel >= 9.0:
+				camera.position -= event.relative / camera.zoom
+		_clamp_camera()
+		camera.force_update_scroll()
+		return true
+	return false
+
+func _begin_touch(event: InputEventScreenTouch) -> void:
+	last_touch_time = Time.get_ticks_msec()
+	touch_points[event.index] = event.position
+	if touch_points.size() == 1:
+		touch_travel = 0.0
+		touch_multiple = false
+		touch_tool = tool
+	else:
+		touch_multiple = true
+		pending = Vector2i(-99, -99)
+		_refresh_ui()
+
+func _sync_layout() -> void:
+	var physical_size := Vector2(get_window().size)
+	if OS.has_feature("web"):
+		physical_size = Vector2(float(JavaScriptBridge.eval("window.innerWidth")), float(JavaScriptBridge.eval("window.innerHeight")))
+	var was_compact := compact_ui
+	compact_ui = physical_size.x < 760.0 or physical_size.y < 540.0
+	if compact_ui and not was_compact:
+		camera.zoom = Vector2.ONE * 0.78
+		camera.position = HOME_POSITION
+	if compact_ui:
+		# CSS-sized UI on a high-DPI mobile canvas; no tiny desktop controls.
+		var desired := Vector2i(maxf(320.0, physical_size.x), maxf(320.0, physical_size.y))
+		if get_window().content_scale_size != desired:
+			get_window().content_scale_size = desired
+	else:
+		if get_window().content_scale_size != Vector2i(1280, 800):
+			get_window().content_scale_size = Vector2i(1280, 800)
+	Interface.layout(self)
+
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_APPLICATION_FOCUS_OUT:
 		dragging = false
+		_clear_touches()
 
 func _input(event: InputEvent) -> void:
+	if _handle_touch(event):
+		get_viewport().set_input_as_handled()
+		return
 	# Finish an existing drag even when its release lands on UI.
 	if event is InputEventMouseButton and not event.pressed and event.button_index == MOUSE_BUTTON_MIDDLE:
 		dragging = false
@@ -325,7 +415,13 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if presentation and event is InputEventKey and event.physical_keycode in [KEY_1, KEY_2, KEY_3, KEY_ENTER, KEY_Z, KEY_G]:
 		return
+	if event is InputEventScreenTouch and event.pressed:
+		_begin_touch(event)
+		get_viewport().set_input_as_handled()
+		return
 	if event is InputEventMouseButton:
+		if Time.get_ticks_msec() - last_touch_time < 500:
+			return
 		if event.button_index == MOUSE_BUTTON_MIDDLE:
 			dragging = event.pressed
 		elif event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_UP:
@@ -368,6 +464,7 @@ func toggle_presentation() -> void:
 	terrain.queue_redraw()
 	presentation = not presentation
 	ui.visible = not presentation
+	Interface.layout(self)
 
 func toggle_reference() -> void:
 	if not reference_layer:
@@ -395,6 +492,19 @@ func toggle_reference() -> void:
 		title.add_theme_font_size_override("font_size", 21)
 		title.position = Vector2(24, 12)
 		backdrop.add_child(title)
+		title.text = "A 设计参考图（非运行画面）"
+		title.add_theme_font_size_override("font_size", 16)
+		var close := Button.new()
+		close.text = "返回场景"
+		close.add_theme_font_override("font", load("res://assets/fonts/jade-song.ttf"))
+		close.custom_minimum_size = Vector2(110, 44)
+		backdrop.add_child(close)
+		close.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+		close.offset_left = -130
+		close.offset_right = -20
+		close.offset_top = -64
+		close.offset_bottom = -20
+		close.pressed.connect(toggle_reference)
 	if not reference_visible:
 		reference_previous_pause = paused
 		set_paused(true)
@@ -403,6 +513,8 @@ func toggle_reference() -> void:
 	reference_visible = not reference_visible
 	reference_layer.visible = reference_visible
 	dragging = false
+	_clear_touches()
+	Interface.layout(self)
 
 func _draw() -> void:
 	if tool.is_empty():

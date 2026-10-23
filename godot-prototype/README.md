@@ -19,14 +19,9 @@
    ```
 
 若拿到的是独立源码 ZIP，解压后同样打开里面的 `project.godot`。
-另提供的 `.pck` **不是独立可执行程序**；需要同版 Godot：
-
-```sh
-godot --main-pack banish-godot-trial.pck
-```
-
-实测引擎为 4.6.3；更新版本未实测。桌面鼠标键盘是本切片支持的操作目标，
-未实现触屏双指手势，也没有做手机兼容承诺。
+实测引擎为 4.6.3；更新版本未实测。支持桌面鼠标键盘，以及手机基础触控：
+单指平移、双指缩放、屏幕按钮查看 A 参考和恢复界面。手机横竖屏会切换紧凑布局，
+试摆面板默认收起。**这些不是完整移动版；iOS Safari 真机性能与兼容性尚未验收。**
 
 ## 当前包含
 
@@ -47,18 +42,18 @@ godot --main-pack banish-godot-trial.pck
 
 | 操作 | 输入 |
 |---|---|
-| 平移镜头 | 中键拖动，或 WASD / 方向键 |
-| 缩放 | 滚轮，范围 0.65–2.4 |
+| 平移镜头 | 单指拖动；桌面中键拖动，或 WASD / 方向键 |
+| 缩放 | 双指捏合 / 滚轮，范围 0.65–2.4 |
 | 回到初始镜头 | Home |
-| 选木屋 / 树木 / 土路 | 右侧按钮，或 1 / 2 / 3 |
-| 预览放置 | 左键点地块；绿色合法，红色阻挡 |
+| 选木屋 / 树木 / 土路 | 手机先点「试摆」，再选物件；桌面右侧按钮，或 1 / 2 / 3 |
+| 预览放置 | 选物件后轻点地块 / 左键；绿色合法，红色阻挡，拖动与双指操作不会建造 |
 | 实际放置 | 确认按钮 / Enter；单击地图本身不建造 |
 | 取消预览与工具 | Esc / 右键 / 取消按钮 |
 | 撤销本次最后一次试摆 | Z / 撤销按钮；不能删预置场景 |
 | 暂停所有动物与水面动画 | Space / 暂停按钮 |
 | 网格 | G / 网格按钮 |
-| 对照 A 图 | R / 对照按钮；R 或 Esc 返回，恢复此前暂停状态 |
-| 纯画面 | H；清除试摆工具并隐藏网格，H 恢复 UI |
+| 对照 A 图 | 「A图」/ 对照按钮 / R；点「返回场景」或 R / Esc 返回，恢复此前暂停状态 |
+| 纯画面 | 「隐藏界面」/ H；清除试摆工具和网格；手机始终有「显示界面」可恢复 |
 
 UI 点击不透传地图；中键在面板上松开或窗口失焦也结束拖动。
 本版没有存档/读档、网络、反馈上报或生产服务器连接。
@@ -71,8 +66,8 @@ UI 点击不透传地图；中键在面板上松开或窗口失焦也结束拖�
 
 ## 验证与边界
 
-参见 [VALIDATION.md](VALIDATION.md)。已有引擎导入、主场景启动、5165 次断言的
-headless 功能/状态检查；**没有完成真实 GPU 画面、人工操作、浏览器或真机视觉验收**。
+参见 [VALIDATION.md](VALIDATION.md)。已有引擎导入、主场景启动、5182 次断言的
+headless 功能/状态检查及 46 次移动 UI 布局/恢复检查；**没有完成真实 GPU 画面、人工操作、浏览器或真机视觉验收**。
 当前 VM 的临时图形显示启动受运行环境限制，未使用其他机器绕过，也未伪造截图。
 
 开发验证（Godot 4.6.3 + Python 3，仅标准库）：
@@ -91,13 +86,18 @@ python3 godot-prototype/tools/package_source.py
 本项目选 **GDScript + Compatibility**。Godot 4 的 Web 导出要求 WebAssembly / WebGL 2.0；
 Forward+ / Mobile 渲染器不能直接用于 Web。单线程 Web 导出可避免线程版的
 SharedArrayBuffer 跨源隔离部署要求。本项目 `Web Trial` preset 已禁用线程与扩展，
-但本 VM **没有对应导出模板，没有生成或验证 Web 包**；未下载全平台模板大包。
+已用官方 4.6.3 单线程 Web 模板成功导出，导出日志无脚本错误。仅通过 HTTP Range
+读取官方归档里的 Web 条目（约 19.2 MB 总传输），没有下载 1.26 GB 全平台包。
+模板来源与校验见 `validation/web-template.json`。导出的 `index.wasm` 为
+37,700,666 字节，超出某些静态平台的 25 MiB 单文件上限；部署端必须正确处理，
+不能仅把 `.wasm` 改名为 `.gz` 或把压缩字节直接交给 WebAssembly。
 详见 [Godot 官方 Web 导出文档](https://docs.godotengine.org/en/stable/tutorials/export/exporting_for_web.html)。
 
 安装与引擎完全匹配的官方 Web 模板后才可在独立目录导出：
 
 ```sh
 mkdir -p godot-prototype/build/web
+touch godot-prototype/build/.gdignore
 godot --headless --path godot-prototype --export-release "Web Trial" build/web/index.html
 ```
 

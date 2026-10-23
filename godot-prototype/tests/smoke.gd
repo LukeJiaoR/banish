@@ -173,5 +173,66 @@ func run() -> void:
 	check(scene.terrain.show_grid, "presentation restores previous grid preference")
 	check(scene.shadows.get_child_count() > 40, "A-study has a separate ground-shadow layer")
 	check(scene.terrain.courtyards.size() == 9, "A-study has nine coordinated village aprons")
+	# Touch-state integration (physical iOS Safari remains a separate check).
+	scene.set_paused(false)
+	scene.select_tool("house")
+	var tap_position: Vector2 = root.get_canvas_transform() * Iso.project(Vector2(10.5, 13.5))
+	var touch := InputEventScreenTouch.new()
+	touch.index = 0
+	touch.pressed = true
+	touch.position = tap_position
+	scene._unhandled_input(touch)
+	touch.pressed = false
+	scene._input(touch)
+	check(scene.pending == Vector2i(10, 13) and scene.placed.is_empty(), "touch tap stages one preview without constructing")
+	scene.select_tool("")
+	touch.pressed = true
+	touch.position = Vector2(300, 300)
+	scene._unhandled_input(touch)
+	var cam_before: Vector2 = scene.camera.position
+	var drag := InputEventScreenDrag.new()
+	drag.index = 0
+	drag.position = Vector2(340, 320)
+	drag.relative = Vector2(40, 20)
+	scene._input(drag)
+	check(scene.camera.position.distance_to(cam_before) > 10, "single finger pans the scene")
+	var second := InputEventScreenTouch.new()
+	second.index = 1
+	second.pressed = true
+	second.position = Vector2(500, 320)
+	scene._unhandled_input(second)
+	var zoom_before: float = scene.camera.zoom.x
+	drag.index = 1
+	drag.position = Vector2(580, 320)
+	drag.relative = Vector2(80, 0)
+	scene._input(drag)
+	check(scene.camera.zoom.x > zoom_before, "two fingers pinch to zoom")
+	second.pressed = false
+	scene._input(second)
+	touch.pressed = false
+	scene._input(touch)
+	check(scene.touch_points.is_empty() and scene.placed.is_empty(), "pinch release never accidentally builds and clears tracking")
+	touch.pressed = true
+	scene._unhandled_input(touch)
+	scene._notification(Node.NOTIFICATION_APPLICATION_FOCUS_OUT)
+	check(scene.touch_points.is_empty(), "focus loss clears active touches")
+	for mobile_size in [Vector2i(390, 844), Vector2i(844, 390)]:
+		root.size = mobile_size
+		scene._sync_layout()
+		await process_frame
+		await process_frame
+		check(scene.compact_ui, "compact layout enabled for phone portrait/landscape")
+		var nodes: Dictionary = scene.get_meta("trial_layout_nodes")
+		check(nodes.recovery.visible and not nodes.side.visible, "mobile recovery controls visible with build panel collapsed")
+		scene.toggle_presentation()
+		check(nodes.recovery.visible and not scene.ui.visible, "pure view retains touch HUD restore button")
+		scene.toggle_presentation()
+		nodes.build_toggle.pressed.emit()
+		await process_frame
+		check(nodes.side.visible and scene.confirm_button.is_visible_in_tree(), "phone build confirmation reachable without keyboard")
+		nodes.build_toggle.pressed.emit()
+		for panel in [nodes.header, nodes.recovery]:
+			var rect: Rect2 = panel.get_global_rect()
+			check(rect.position.x >= -1 and rect.position.y >= -1 and rect.end.x <= root.get_visible_rect().size.x + 1 and rect.end.y <= root.get_visible_rect().size.y + 1, "mobile primary controls fit logical viewport")
 	print(JSON.stringify({"checks": checks, "failures": failures, "engine": Engine.get_version_info().string, "scope": "Headless Godot engine integration; not GPU screenshot, browser or physical device validation"}))
 	quit(0 if failures.is_empty() else 1)
