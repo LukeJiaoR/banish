@@ -1,0 +1,30 @@
+; Independent visual/interaction prototype. The original web game is untouched.
+config_version=5
+
+[application]
+config/name="Banish · Godot Garden Trial"
+run/main_scene="res://scenes/main.tscn"
+config/features=PackedStringArray("4.6", "GL Compatibility")
+config/use_custom_user_dir=true
+config/custom_user_dir_name="banish-godot-prototype"
+
+[display]
+window/size/viewport_width=1280
+window/size/viewport_height=800
+window/size/window_width_override=1280
+window/size/window_height_override=800
+window/size/min_width=320
+window/size/min_height=320
+window/stretch/mode="canvas_items"
+
+[rendering]
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+textures/default_filters/use_nearest_mipmap_filter=false
+environment/defaults/default_clear_color=Color(0.1098, 0.1725, 0.1569, 1)
+
+[audio]
+driver/enable_input=false
+
+[debug]
+file_logging/enable_file_logging=false
