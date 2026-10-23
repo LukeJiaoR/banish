@@ -1,0 +1,65 @@
+{
+  "source_sha256": "fd7807e7009e9b47c6894a46d3f46aba19f7121bcb626962b79066ed9004f676",
+  "method": "Manual endpoints on alpha-composited PNG; interrupted wall-plane bed joint excludes protruding pilaster seams. Approximate endpoints, not fitted or architectural truth. Guide is comparison, not mandated correction.",
+  "rows": [
+    {
+      "id": "outer plinth silhouette",
+      "points": [
+        [
+          224,
+          481
+        ],
+        [
+          440,
+          393
+        ]
+      ],
+      "uncertainty_each_axis": 3,
+      "slope": 0.4074074074074074,
+      "angle_degrees": 22.16634582208246,
+      "slope_range": [
+        0.36936936936936937,
+        0.44761904761904764
+      ],
+      "native_endpoint_delta_vs_2to1": 9.257142857142858
+    },
+    {
+      "id": "wall bed joint, interrupted by pilasters",
+      "points": [
+        [
+          243,
+          431
+        ],
+        [
+          413,
+          362
+        ]
+      ],
+      "uncertainty_each_axis": 4,
+      "slope": 0.40588235294117647,
+      "angle_degrees": 22.091365409362936,
+      "slope_range": [
+        0.34269662921348315,
+        0.47530864197530864
+      ],
+      "native_endpoint_delta_vs_2to1": 7.405714285714287
+    }
+  ],
+  "anchors": {
+    "chapel": {
+      "canvas_bottom": 496,
+      "front_tip": 483,
+      "scale": 0.4628571428571429,
+      "required_offset": 6.017142857142858,
+      "actual_offset": 6
+    },
+    "market": {
+      "canvas_bottom": 320,
+      "front_tip": 317,
+      "scale": 0.5,
+      "required_offset": 1.5,
+      "actual_offset": 1.5
+    }
+  },
+  "status": "Measurement only. No runtime or asset edits. Original native visual assessment required before any correction."
+}
