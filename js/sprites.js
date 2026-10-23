@@ -47,7 +47,7 @@ G.SPRITE_SIZES = {
 (function () {
   if (typeof Image === 'undefined') return; // node 测试环境：无渲染，保持回退路径
   const SHEET = {
-    'a-style': ['storage-a-v2','tree-a-v2-broadleaf-sapling','tree-a-v2-broadleaf-sapling-winter','tree-a-v2-broadleaf-young','tree-a-v2-broadleaf-young-winter','tree-a-v2-willow-sapling','tree-a-v2-willow-sapling-winter','tree-a-v2-willow-young','tree-a-v2-willow-young-winter','woodcutter-a-idle','woodcutter-a-processing-v2','house-a-v2-square-empty','house-a-v2-square-occupied','tree-a-v1-broadleaf','tree-a-v1-willow','tree-a-v1-broadleaf-winter','tree-a-v1-willow-winter'],
+    'a-style': ['bank-sedge-a-v1','storage-a-v2','tree-a-v2-broadleaf-sapling','tree-a-v2-broadleaf-sapling-winter','tree-a-v2-broadleaf-young','tree-a-v2-broadleaf-young-winter','tree-a-v2-willow-sapling','tree-a-v2-willow-sapling-winter','tree-a-v2-willow-young','tree-a-v2-willow-young-winter','woodcutter-a-idle','woodcutter-a-processing-v2','house-a-v2-square-empty','house-a-v2-square-occupied','tree-a-v1-broadleaf','tree-a-v1-willow','tree-a-v1-broadleaf-winter','tree-a-v1-willow-winter'],
     'terrain-v2': ['meadow_spring', 'meadow_summer', 'meadow_autumn', 'meadow_winter', 'water_open'],
     tiles: ['grass_spring', 'grass_summer', 'grass_autumn', 'grass_winter',
       'sand_spring', 'sand_summer', 'sand_autumn', 'sand_winter',
@@ -94,7 +94,7 @@ G.SPRITE_SIZES = {
         // Resource and carried-goods art share the same tiny PNG, without duplicate requests.
         if (['res_meat', 'res_eggs', 'res_apples', 'res_pears', 'res_vegetables', 'res_grain', 'res_leather', 'res_wool', 'res_clothes', 'res_warmCoats', 'res_herbs', 'res_ale', 'res_coal', 'res_steelTools'].includes(n))
           G.SPR.map.set('carry_' + n.slice(4), im);
-        if (dir === 'tiles' || dir === 'terrain-v2' || n === 'res_iron') G.needGround = true; // 地表纹理到位后重建地面缓存
+        if (dir === 'tiles' || dir === 'terrain-v2' || n === 'res_iron' || n === 'bank-sedge-a-v1') G.needGround = true; // 地表纹理到位后重建地面缓存
         if (--pending === 0) G.SPR.ready = true;
       };
       im.onerror = () => {

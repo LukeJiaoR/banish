@@ -35,6 +35,7 @@ async function nativePixels(){
  const {createCanvas,loadImage}=require('@napi-rs/canvas');
  G.SPR={images:new Map(),get(n){return this.images.get(n);}};
  for(const season of G.TEX_SEASON)for(const [prefix,dir]of [['meadow_','terrain-v2'],['sand_','tiles']])G.SPR.images.set(prefix+season,await loadImage(__dirname+'/../assets/'+dir+'/'+prefix+season+'.png'));
+ G.SPR.images.set('bank-sedge-a-v1',await loadImage(__dirname+'/../assets/a-style/bank-sedge-a-v1.png'));
  G.SPR.images.set('water_open',await loadImage(__dirname+'/../assets/terrain-v2/water_open.png'));
  G.SPR.images.set('water_winter',await loadImage(__dirname+'/../assets/tiles/water_winter.png'));
  c.document={createElement:()=>createCanvas(1,1)};
