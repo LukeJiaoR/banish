@@ -694,7 +694,8 @@ G.alternateTaskEndpoint = function (c, t) {
   if (t.kind === 'clearSite' && (!t.tree || G.world.trees[G.world.treeIdx[t.tree.i]] !== t.tree)) return null;
   if (['care', 'clinic', 'arrival', 'leisure', 'host', 'worship', 'cleric', 'study', 'teach'].includes(t.kind)) return G.workSpot(G.world, t.b, c.x, c.y, true);
   if (t.kind === 'clearSite') return G.siteClearSpot(c, t.b, t.tree);
-  if(['smith','fuel'].includes(t.kind)&&t.phase==='fetch'&&!G.hasStorageBuilding())return G.workSpot(G.world,t.b,c.x,c.y,true);
+  if(t.kind==='fuel'&&(t.phase==='process'||t.phase==='fetch'&&!G.hasStorageBuilding()))return G.fuelWorkSpot(G.world,t.b,c.x,c.y);
+  if(t.kind==='smith'&&t.phase==='fetch'&&!G.hasStorageBuilding())return G.workSpot(G.world,t.b,c.x,c.y,true);
   if (['firewood', 'trade', 'brew', 'smith', 'fuel', 'tailor'].includes(t.kind) && t.phase === 'fetch') return G.storageRoute(c.x,c.y,G.fetchStorageTypes(t))?.spot || null;
   if (t.kind === 'build' || t.kind === 'firewood' || t.kind === 'trade' || t.kind === 'brew' || t.kind === 'smith' || t.kind === 'fuel' || t.kind === 'tailor' ||
       (t.kind === 'work' && ['dock', 'mine', 'stonequarry', 'blacksmith', 'pasture', 'orchard'].includes(t.b.type)))
@@ -1171,28 +1172,56 @@ G.completeSmithTask=function(c,t){
 
 /* Fuel inputs are a distinct bounded batch. Tailor batches below separately
  * track leather/wool; neither charges public stock twice. */
+// The open woodcutter's work apron faces the camera. Prefer a reachable
+// front perimeter tile; never move rendered citizens away from their real tile.
+// Rear-only access remains valid for crowded/legacy villages.
+G.fuelWorkSpot=function(w,b,fx,fy){
+ if(b?.type!=='woodcutter')return G.workSpot(w,b,fx,fy);
+ const bay={x:b.x+1,y:b.y+1,building:b,state:b.state};
+ if(G.woodcutterBayAt(w,bay.x,bay.y)===b && G.surfaceAccess(w,b.x+1,b.y+2)){
+  const route=G.routeSpot(G.findPathToAny(w,fx,fy,[bay]));if(route)return route;
+ }
+ const apron={x:b.x+b.w,y:b.y+b.h,building:b,state:b.state};
+ if(apron.x<w.N&&apron.y<w.N&&G.surfaceAccess(w,apron.x,apron.y)){
+  const primary=G.routeSpot(G.findPathToAny(w,fx,fy,[apron]));if(primary)return primary;
+ }
+ const front=[];
+ for(let y=b.y;y<=b.y+b.h;y++)for(let x=b.x;x<=b.x+b.w;x++){
+  if(x!==b.x+b.w&&y!==b.y+b.h)continue;
+  if(x+y<b.x+b.y+b.w+b.h-2)continue;
+  if(x<0||y<0||x>=w.N||y>=w.N||!G.surfaceAccess(w,x,y))continue;
+  front.push({x,y,building:b,state:b.state});
+ }
+ return G.routeSpot(G.findPathToAny(w,fx,fy,front))||G.workSpot(w,b,fx,fy);
+};
 G.makeFuelTask=function(b,c){
   const p=G.PROD.woodcutter;
   if(G.fuelLimited(b)){b.noWork=true;b.warnText='柴火已达上限';return null;}
   if(G.game.res.wood<p.logsIn){b.noWork=true;b.warnText='缺木材';return null;}
   const stored=G.hasStorageBuilding(),route=stored?G.storageRoute(c.x,c.y,'wood'):null;
-  const spot=stored?route?.spot:G.workSpot(G.world,b,c.x,c.y);
+  const spot=stored?route?.spot:G.fuelWorkSpot(G.world,b,c.x,c.y);
   if(!spot){b.noWork=true;b.warnText=stored?'取木堆料场或仓库不可达':'伐木屋入口不可达';return null;}
   b.noWork=false;b.warnText='';
   return G.withTaskRoute({kind:'fuel',phase:'fetch',b,tx:spot.x,ty:spot.y,work:.1,workLeft:.1,craftWork:p.workH,
     consume:{type:'wood',qty:p.logsIn},yield:{type:'firewood',qty:G.taskYield(c.educated?p.logsIn*p.eduFirewoodPerLog:p.firewoodOut)}},spot.route);
 };
 G.fuelTaskCurrent=(c,t)=>!!t&&!t.completed&&t.kind==='fuel'&&G.world.cmap[c.id]===c&&!c.dead&&t.b?.type==='woodcutter'&&G.world.bmap[t.b.id]===t.b&&t.b.state==='ok'&&c.job===t.b.id;
+G.fuelAtWorksite=function(c,b){
+ if(G.atMedicalDoor(c,b))return true; // old exterior tasks remain valid
+ const w=G.world;
+ return G.woodcutterBayAt(w,Math.round(c.x),Math.round(c.y))===b &&
+  G.d2(c.x,c.y,b.x+1,b.y+1)<.04 && G.surfaceAccess(w,b.x+1,b.y+2);
+};
 G.fuelAtTask=function(c,t){
   if(!G.fuelTaskCurrent(c,t)||G.tileBlocked(G.world,Math.round(c.x),Math.round(c.y))||G.d2(c.x,c.y,t.tx,t.ty)>.04)return false;
-  return t.phase==='fetch'&&G.hasStorageBuilding()?G.atStorageDoor(c,'wood'):G.atMedicalDoor(c,t.b);
+  return t.phase==='fetch'&&G.hasStorageBuilding()?G.atStorageDoor(c,'wood'):G.fuelAtWorksite(c,t.b);
 };
 G.completeFuelTask=function(c,t){
   if(t?.completed||G.world.cmap[c.id]!==c)return;
   if(!G.fuelAtTask(c,t)){G.returnSmithBatch(c);return;}
   if(t.phase==='fetch'){
     if(c.carry||G.game.res.wood<t.consume.qty){G.returnSmithBatch(c);return;}
-    const spot=G.workSpot(G.world,t.b,c.x,c.y);if(!spot){t.b.warnText='伐木屋入口不可达';G.returnSmithBatch(c);return;}
+    const spot=G.fuelWorkSpot(G.world,t.b,c.x,c.y);if(!spot){t.b.warnText='伐木屋入口不可达';G.returnSmithBatch(c);return;}
     G.withdrawResource('wood',t.consume.qty);c.carry={type:'wood',qty:t.consume.qty,fuelInput:true,staffingReturn:true};
     t.inputCargo=c.carry;t.phase='process';t.tx=spot.x;t.ty=spot.y;t.work=t.workLeft=t.craftWork;c.task=t;
     if(!G.sendTo(c,t.tx,t.ty,spot.route))G.returnSmithBatch(c);return;

@@ -7,6 +7,40 @@ G.ui = {
   el: {},
   infoT: 0,
 
+  // Family 02 currently has adult faces only; missing life stages use family 01.
+  // Keep this registry stable within an asset release; never hash jobs or RNG.
+  portraitFamilies: [
+    { id: '01', stages: ['child', 'adult', 'elder'] },
+    { id: '02', stages: ['adult'] }
+  ],
+  citizenPortraitKey: function (c) {
+    if (!c || !['m', 'f'].includes(c.sex) || !Number.isFinite(c.age) || c.age < 0 ||
+        !(Number.isSafeInteger(c.id) && c.id >= 0)) return null;
+    // 60 is a visual-only elder threshold; work eligibility still uses ADULT_AGE.
+    const stage = c.age < G.ADULT_AGE ? 'child' : c.age >= 60 ? 'elder' : 'adult';
+    const sex = stage === 'child' ? (c.sex === 'm' ? 'boy' : 'girl') : (c.sex === 'm' ? 'man' : 'woman');
+    let hash = 2166136261;
+    for (const char of String(c.id)) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619) >>> 0;
+    const family = this.portraitFamilies[hash % this.portraitFamilies.length];
+    const available = family?.stages.includes(stage) ? family : this.portraitFamilies.find(f => f.stages.includes(stage));
+    return available ? `${stage}-${sex}-${available.id}` : null;
+  },
+  citizenPortraitMarkup: function (c, compact = false) {
+    const key = this.citizenPortraitKey(c);
+    // Transparent pixels reveal only the frame, never a second face underneath.
+    return `<span class="citizen-portrait${compact ? ' is-compact' : ''}" data-portrait-key="${key || ''}" aria-hidden="true">${key ? `<img src="assets/portraits/${key}.png" alt="" width="64" height="64" loading="${compact ? 'lazy' : 'eager'}" decoding="async" onerror="this.remove()">` : ''}<span class="portrait-fallback">?</span></span>`;
+  },
+  citizenRoleText: function (c) {
+    const sex = c.sex === 'm' ? '男' : c.sex === 'f' ? '女' : '性别未知';
+    const age = Number.isFinite(c.age) && c.age >= 0 ? `${Math.floor(c.age)} 岁` : '年龄未知';
+    const role = c.student ? '学生' : c.adult === true ? '成人' : c.adult === false ? '儿童' : '身份未知';
+    return `${sex} · ${age} · ${role}`;
+  },
+  refreshCitizenPortrait: function (c) {
+    const holder = this.el.info.querySelector?.('[data-citizen-portrait]');
+    if (holder && holder.querySelector('[data-portrait-key]')?.dataset.portraitKey !== (this.citizenPortraitKey(c) || '')) holder.innerHTML = this.citizenPortraitMarkup(c);
+  },
+
   // Restore the original pre-#110 PNG/emoji set; keep the newer UI contracts.
   iconMarkup: function (symbol, imagePath) {
     // A failed image removes itself, exposing the same registry emoji. The two
@@ -2679,9 +2713,9 @@ G.ui = {
   refreshSchoolStudents:function(b){
     const el=this.el.info,list=el.querySelector&&el.querySelector('[data-school-student-list]');if(!list)return;
     const w=G.world,g=G.game,teachers=G.schoolTeachers(b),students=[...teachers,...w.citizens.filter(c=>!c.dead&&c.student&&(c.school===b.id||c.school==null))];
-    const key=JSON.stringify(students.map(c=>[c.id,c.name,c.school,c.job,c.student]));if(list._studentKey===key)return;
+    const key=JSON.stringify(students.map(c=>[c.id,c.name,c.school,c.job,c.student,this.citizenPortraitKey(c)]));if(list._studentKey===key)return;
     const focused=list.contains&&list.contains(document.activeElement),focusedId=focused?document.activeElement.dataset.studentId:null;
-    list.innerHTML=students.map(c=>`<button type="button" class="medical-patient" data-student-id="${c.id}">查看${teachers.includes(c)?'教师 ':''}${this.escHtml(c.name)}${c.student&&c.school==null?'（待转校）':''}</button>`).join('');list._studentKey=key;
+    list.innerHTML=students.map(c=>`<button type="button" class="medical-patient" data-student-id="${c.id}">${this.citizenPortraitMarkup(c, true)}查看${teachers.includes(c)?'教师 ':''}${this.escHtml(c.name)}${c.student&&c.school==null?'（待转校）':''}</button>`).join('');list._studentKey=key;
     for(const button of list.querySelectorAll('[data-student-id]'))button.addEventListener('click',()=>{
       if(G.world!==w||G.game!==g||this.el.info!==el||el.classList.contains('hidden')||G.sel?.kind!=='b'||G.sel.id!==b.id||w.bmap[b.id]!==b||el.querySelector('[data-school-student-list]')!==list||(G.hasOpenModal&&G.hasOpenModal()))return;
       const c=w.cmap[Number(button.dataset.studentId)];if(!c||c.dead||!(G.schoolTeachers(b).includes(c)||(c.student&&(c.school===b.id||c.school==null))))return;G.sel={kind:'c',id:c.id};this.showInfo();
@@ -2711,7 +2745,7 @@ G.ui = {
     if(start){start.disabled=!canLeave;start.classList.toggle('hidden',!canLeave);}
     if(!canLeave||(G.hasOpenModal&&G.hasOpenModal())){panel._leavePending=false;if(confirm)confirm.classList.add('hidden');}
     const status=el.querySelector('[data-citizen-status]');if(status)status.textContent=this.citizenStatus(c);
-    const role=el.querySelector('[data-citizen-role]');if(role)role.textContent=`${c.sex==='m'?'男':'女'} · ${Math.floor(c.age)} 岁 · ${c.student?'学生':c.adult?'成人':'儿童'}`;
+    const role=el.querySelector('[data-citizen-role]');if(role)role.textContent=this.citizenRoleText(c);
     const job=el.querySelector('[data-citizen-job]'),b=G.world.bmap[c.job];if(job)job.textContent=b?G.BDEF[b.type].name:c.student?'学堂学生':c.adult?'无业':'儿童';
   },
   initStudentInfo:function(c){
@@ -3494,11 +3528,11 @@ G.ui = {
     const el = this.el.info, list = el.querySelector && el.querySelector('[data-medical-patient-list]');
     if (!list) return;
     const patients = G.medicalPatients(b), w = G.world;
-    const key = JSON.stringify(patients.map(c => [c.id, c.name]));
+    const key = JSON.stringify(patients.map(c => [c.id, c.name, this.citizenPortraitKey(c)]));
     if (list._patientKey !== key) {
       const focused = document.activeElement && list.contains && list.contains(document.activeElement);
       const focusedId = focused ? document.activeElement.dataset.patientId : null;
-      list.innerHTML = patients.map(c => `<button type="button" class="medical-patient" data-patient-id="${Number(c.id)}"><span>${this.escHtml(c.name)}</span><small></small></button>`).join('');
+      list.innerHTML = patients.map(c => `<button type="button" class="medical-patient" data-patient-id="${Number(c.id)}">${this.citizenPortraitMarkup(c, true)}<span>${this.escHtml(c.name)}</span><small></small></button>`).join('');
       list._patientKey = key;
       list.querySelectorAll('[data-patient-id]').forEach(btn => btn.addEventListener('click', () => {
         if (G.world !== w || !G.sel || G.sel.kind !== 'b' || G.sel.id !== b.id || w.bmap[b.id] !== b) return;
@@ -3801,7 +3835,7 @@ G.ui = {
     if (sameSelection && selected.type === 'woodcutter' && this._fuelInfoState === selected.state && this.refreshFuelInfo(selected)) return;
     if (hadFocus && !force && sameSelection && selected.type !== 'woodcutter' &&
         !(selected.type === 'farm' && selected.state === 'ok' && G.farmSummary) && (G.sel.kind === 'c' || (this._infoBuildState === selected.state && this._infoBuildType === selected.type))) {
-      if (G.sel.kind === 'c') { this.refreshCitizenSupplyInfo(selected); this.refreshCitizenHealth(selected); this.refreshCitizenLeisure(selected); this.refreshCitizenClothing(selected); this.refreshStudentInfo(selected); }
+      if (G.sel.kind === 'c') { this.refreshCitizenPortrait(selected); this.refreshCitizenSupplyInfo(selected); this.refreshCitizenHealth(selected); this.refreshCitizenLeisure(selected); this.refreshCitizenClothing(selected); this.refreshStudentInfo(selected); }
       // Patch changing site facts in place without stealing keyboard focus.
       if (G.sel.kind === 'b' && selected.state === 'site') {
         const data = this.siteInfoData(selected);
@@ -4026,10 +4060,10 @@ G.ui = {
       const jobName = jobB ? G.BDEF[jobB.type].name : (c.student ? '学堂学生' : (c.adult ? '无业' : '儿童'));
       const fam = G.familyOf(c), supplyHome = G.supplyFamilyTarget && G.supplyFamilyTarget(fam, false);
       el.innerHTML = `
-        <div class="info-head"><span class="detail-title">${this.icon ? this.icon('citizen') : ''}<span>${this.escHtml(c.name)}</span></span><button type="button" id="info-close" aria-label="关闭居民详情">${this.icon ? this.icon('close') : '×'}</button></div>
+        <div class="info-head"><span class="detail-title"><span data-citizen-portrait>${this.citizenPortraitMarkup(c)}</span><span>${this.escHtml(c.name)}</span></span><button type="button" id="info-close" aria-label="关闭居民详情">${this.icon ? this.icon('close') : '×'}</button></div>
         <div class="detail-scroll" data-detail-scroll>
         ${this.citizenSurvivalMarkup(c)}
-        <div class="row" data-citizen-role>${c.sex === 'm' ? '男' : '女'} · ${Math.floor(c.age)} 岁 · ${c.student ? '学生' : c.adult ? '成人' : '儿童'}</div>
+        <div class="row" data-citizen-role>${this.citizenRoleText(c)}</div>
         <div class="row">职业：<span data-citizen-job>${jobName}</span> · <span data-citizen-status>${this.escHtml(status)}</span></div>
         ${c.carry ? `<div class="row">随身：${this.cargoText(c.carry)}（${Number.isInteger(c.carry.constructionId)?'建材已出库、尚未投入施工':c.carry.smithInput?'铁匠原料已出库、尚未消耗':'未入库'}）</div>` : ''}
         <div class="row">家庭：${fam ? (fam.houseId != null ? '有房' : '无房') : '单身'}</div>

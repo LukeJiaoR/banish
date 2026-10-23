@@ -227,6 +227,8 @@ G.drawMountainHover = function(ctx,w,x,y) {
 // Original A-style source pixels stay intact. Calibrated source-space anchors,
 // not canvas edges, land on the existing world footpoints. No save/RNG changes.
 G.A_ART = Object.freeze({
+ 'woodcutter-a-idle': {source:[1056,704], anchor:[543.125,657.9375], span:754.1875},
+ 'woodcutter-a-processing-v2': {source:[1056,704], anchor:[543.125,662.75], span:772.0625, contact:[515.625,462.6875]},
  'house-a-v2-square-empty': {source:[1536,1024], anchor:[768,975], span:1056},
  'house-a-v2-square-occupied': {source:[1536,1024], anchor:[768,975], span:1056},
  'tree-a-v1-broadleaf': {source:[1536,1024], anchor:[820,984], height:960, displayHeight:88},
@@ -244,6 +246,12 @@ G.drawCalibratedArt=function(ctx,name,x,y,size){
 G.houseArtName=function(b){
  if(b?.type!=='house'||b.state!=='ok'||b.houseFire)return null;
  return G.renderBuildingActivity(b)?.atHome>0?'house-a-v2-square-occupied':'house-a-v2-square-empty';
+};
+// Keep state selection live: a cached working badge must not keep stale work props.
+G.woodcutterArtName=function(b){
+ if(b?.type!=='woodcutter'||b.state!=='ok'||b.houseFire||G.world?.bmap?.[b.id]!==b)return null;
+ const processing=(b.workers||[]).some(id=>G.buildingProcessingWorker(b,G.world.cmap[id]));
+ return processing?'woodcutter-a-processing-v2':'woodcutter-a-idle';
 };
 G.sprDraw = function (ctx, name, cx, by, opts) {
   const im = G.SPR && G.SPR.get(name);
@@ -363,7 +371,7 @@ G.buildingActivityContext=function(){
 };
 G.buildingProcessingWorker=function(b,c,context){
  const t=c?.task,w=G.world,k=({blacksmith:'smith',woodcutter:'fuel',tailor:'tailor',tavern:'brew'})[b.type];
- if(!k||!c||c.dead||c.job!==b.id||w.cmap[c.id]!==c||c.state!=='work'||!t||t.kind!==k||t.b!==b||t.phase!=='process'||t.completed||!(t.workLeft>0)||G.d2(c.x,c.y,t.tx,t.ty)>.04||G.tileBlocked(w,Math.round(c.x),Math.round(c.y))||!G.atMedicalDoor(c,b))return false;
+ if(!k||!c||c.dead||c.job!==b.id||w.cmap[c.id]!==c||c.state!=='work'||!t||t.kind!==k||t.b!==b||t.phase!=='process'||t.completed||!(t.workLeft>0)||G.d2(c.x,c.y,t.tx,t.ty)>.04||G.tileBlocked(w,Math.round(c.x),Math.round(c.y))||!(k==='fuel'?G.fuelAtWorksite(c,b):G.atMedicalDoor(c,b)))return false;
  const cargo=c.carry;
  if(k==='smith')return G.smithTaskCurrent(c,t)&&G.smithCargoMatches(c,t);
  if(k==='fuel')return G.fuelTaskCurrent(c,t)&&cargo===t.inputCargo&&cargo?.fuelInput===true&&cargo.staffingReturn===true&&cargo.type==='wood'&&cargo.qty===t.consume?.qty&&!cargo.extra;
@@ -936,16 +944,16 @@ G.drawBuilding = function (ctx, b, time) {
   const sprW = (b.w + b.h) * 32 * (G.BUILD_SPR_W[b.type] || 1.08);
   // 贸易站按原图50%显示；补偿底角下方3px透明余量，让石基脚点贴合占地底角。
   const sprFootY = B[1] + ((b.type === 'tradingpost'||b.type==='market') ? 1.5 : b.type === 'mineralpit' ? 2 : b.type==='burntruins'?2.5:b.type==='well'?1:b.type==='chapel'?6:0);
-  const houseArt=G.houseArtName(b);
+  const houseArt=G.houseArtName(b)||G.woodcutterArtName(b);
   const calibrated=houseArt&&G.drawCalibratedArt(ctx,houseArt,B[0],sprFootY,(b.w+b.h)*32);
   const spr = calibrated||G.sprDraw(ctx, b.type, B[0], sprFootY, { w: sprW, omitSmokeAir:true });
   if (spr) {
     if(calibrated){
-      // New roof has no chimney. Keep factual state markers, never reuse old
-      // image-relative window/smoke anchors or imply consumed heating fuel.
+      // Calibrated source art has no chimney. Keep factual state markers,
+      // without legacy image-relative smoke/window/work-effect anchors.
       delete b._chimney;
       const activity=G.renderBuildingActivity(b);
-      if(activity)G.drawBuildingStateMarker(ctx,activity,B[0]+7,sprFootY+5,false);
+      if(activity)G.drawBuildingStateMarker(ctx,activity,B[0]+(b.type==='woodcutter'?20:7),sprFootY+5,b.type==='woodcutter'&&G.woodcutterArtName(b)==='woodcutter-a-processing-v2'&&!G.game.paused);
     }else G.drawBuildingActivity(ctx,b,spr,B[0],sprFootY);
     if(b.houseFire)G.drawHouseFire(ctx,b,time,spr);
     return;
@@ -1382,7 +1390,7 @@ G.citizenWorkTarget = function (c) {
   const t = c.state === 'work' && c.task;
   if (!t) return null;
   if (t.tree) return t.tree;
-  if (t.b && (t.kind === 'build' || t.kind === 'firewood' || ['dock', 'mine', 'stonequarry', 'blacksmith'].includes(t.b.type)))
+  if (t.b && (t.kind === 'build' || t.kind === 'firewood' || t.kind === 'fuel' && t.phase === 'process' || ['dock', 'mine', 'stonequarry', 'blacksmith'].includes(t.b.type)))
     return { x: t.b.x + (t.b.w - 1) / 2, y: t.b.y + (t.b.h - 1) / 2 };
   return { x: t.tx, y: t.ty };
 };
@@ -1398,6 +1406,33 @@ G.citizenFacing = function (c, workTarget) {
   else if (dx < -0.03) c._fx = -1;
   c._psx = sx;
   return c._fx === -1 ? -1 : 1; // 现有 PNG 朝右；真正的八向帧尚未提供。
+};
+
+// Native arm/tool articulation on the original idle body; all points derive from real position.
+G.woodcutterToolPose=function(c){
+ const b=c.task?.b;
+ if(!b || G.woodcutterBayAt(G.world,Math.round(c.x),Math.round(c.y))!==b ||
+  !G.buildingProcessingWorker(b,c))return null;
+ const image=G.SPR?.get('woodcutter-a-processing-v2');
+ const spec=G.A_ART['woodcutter-a-processing-v2'];
+ if(!image || image.width!==spec.source[0] || image.height!==spec.source[1])return null;
+ const [x,y0]=G.T2S(c.x,c.y),y=y0+16;
+ const B=G.T2S(b.x+b.w,b.y+b.h),k=128/spec.span;
+ const contact=[B[0]+(spec.contact[0]-spec.anchor[0])*k,B[1]+(spec.contact[1]-spec.anchor[1])*k];
+ const strike=(1-Math.cos(c.animT||0))/2;
+ const grip=[x,y-10],length=Math.hypot(contact[0]-grip[0],contact[1]-grip[1]);
+ const impactAngle=Math.atan2(contact[1]-grip[1],contact[0]-grip[0]);
+ const angle=-.7+(impactAngle+.7)*strike;
+ return {foot:[x,y],shoulder:[x-1,y-11],grip,
+  blade:[grip[0]+Math.cos(angle)*length,grip[1]+Math.sin(angle)*length],contact,strike,handleLength:length};
+};
+G.drawWoodcutterTool=function(ctx,p){
+ ctx.save();ctx.lineCap='round';
+ ctx.strokeStyle='#6a4931';ctx.lineWidth=2.2;ctx.beginPath();ctx.moveTo(...p.shoulder);ctx.lineTo(...p.grip);ctx.stroke();
+ ctx.strokeStyle='#c99d73';ctx.lineWidth=1.3;ctx.beginPath();ctx.moveTo(...p.shoulder);ctx.lineTo(...p.grip);ctx.stroke();
+ ctx.strokeStyle='#52351e';ctx.lineWidth=1.1;ctx.beginPath();ctx.moveTo(...p.grip);ctx.lineTo(...p.blade);ctx.stroke();
+ ctx.translate(...p.blade);ctx.rotate(Math.atan2(p.blade[1]-p.grip[1],p.blade[0]-p.grip[0]));
+ ctx.fillStyle='#4b575a';ctx.fillRect(-2.2,-1.6,2.2,3.2);ctx.fillStyle='#b8c7c8';ctx.fillRect(-.55,-1.6,.55,3.2);ctx.restore();
 };
 
 G.drawCitizen = function (ctx, c, time, homes) {
@@ -1437,7 +1472,9 @@ G.drawCitizen = function (ctx, c, time, homes) {
     frame = walking ? 'adult_carry_walk_' + (f % 4) : 'adult_carry_idle';
     fallback = walking ? 'adult_walk_' + (f % 4) : 'adult_idle';
   } else frame = walking ? 'adult_walk_' + (f % 4) : 'adult_idle';
-  const bodyY = sy - (working ? bob : 0);
+  const toolPose=G.woodcutterToolPose(c);
+  if(toolPose)frame='adult_idle';
+  const bodyY = sy - (working && !toolPose ? bob : 0);
   if (!G.sprDrawRim(ctx, frame, sx, bodyY, { flip }) &&
       !(fallback && G.sprDrawRim(ctx, fallback, sx, bodyY, { flip }))) {
     ctx.fillStyle = child ? '#a3703f' : '#6e4a33';
@@ -1447,8 +1484,11 @@ G.drawCitizen = function (ctx, c, time, homes) {
     ctx.arc(sx, sy - 8.6 * s - bob, 1.8 * s, 0, Math.PI * 2);
     ctx.fill();
   }
+  if(toolPose)G.drawWoodcutterTool(ctx,toolPose);
   // 携带物跟随抱持侧镜像；专用帧缺失时仍保持正常小人和资源回退。
-  if (c.carry) {
+  const fuelProcessing=c.task?.kind==='fuel'&&G.buildingProcessingWorker(c.task.b,c);
+  // Accepted raw logs are on the stump while cutting, not covering the tool.
+  if (c.carry&&!fuelProcessing) {
     const cx = sx + facing * 3.2 * s;
     if (!G.sprDraw(ctx, 'carry_' + c.carry.type, cx, bodyY - 4 * s, { w: 10 * s, flip })) {
       ctx.fillStyle = G.RES[c.carry.type].color;
