@@ -1,0 +1,18 @@
+{
+  "generator": "built-in image_gen",
+  "mode": "stylized-concept original transparent farmer hat",
+  "records": [
+    {
+      "path": "docs/art-assets/profession-accessories/farmer-hat-source.png",
+      "bytes": 1120741,
+      "sha256": "96980a598164ff566c891f7aca47ac2b59e983786969c5e6e4e4e019d4c9b528"
+    },
+    {
+      "path": "assets/a-style/farmer-hat-a.png",
+      "bytes": 11682,
+      "sha256": "efc6a12634e530ef78a4857ce7466c8d552175d0014288c2c8612d3ffe96b4be"
+    }
+  ],
+  "export": "alpha>0 bounds crop and aspect-preserving Canvas resize to width128; source alpha not manually edited",
+  "reuse": "Actual existing adult_work_1 is a pickaxe pose; reuse unchanged for miners rather than overlaying a second generated tool. Unused pick candidate not shipped."
+}

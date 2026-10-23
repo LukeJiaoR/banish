@@ -1496,6 +1496,35 @@ G.drawWoodcutterTool=function(ctx,p){
  ctx.fillStyle='#4b575a';ctx.fillRect(-2.2,-1.6,2.2,3.2);ctx.fillStyle='#b8c7c8';ctx.fillRect(-.55,-1.6,.55,3.2);ctx.restore();
 };
 
+// Two bounded occupational poses; preserve original bodies/tools and stable identity.
+G.PROFESSION_ART=Object.freeze({
+ 'farmer-hat-a':{source:[128,65],width:9,anchor:[.5,.85],headOffset:[2.4,-15.5]}
+});
+G.citizenProfessionRole=function(c){
+ const w=G.world,t=c?.task,b=t?.b;
+ if(!c||w?.cmap?.[c.id]!==c||c.dead||!c.adult||!Number.isFinite(c.age)||c.age<G.ADULT_AGE||c.student||c.state!=='work'||
+  !t||t.completed||!(t.workLeft>0)||!b||w.bmap[b.id]!==b||b.state!=='ok'||b.houseFire||c.job!==b.id||
+  !(b.workers||[]).includes(c.id)||G.fireTaskOf?.(c)||G.supplyTaskOf?.(c))return null;
+ if(t.mineral&&!c.carry&&G.atMineralTask(c,t))return 'miner';
+ if(['sow','harvest'].includes(t.kind)&&G.farmTaskCurrent(t)){
+  const cell=b.farm[t.ti];
+  if(c.carry&&(t.kind==='sow'||c.carry.type!==G.farmOutput(b)||c.carry.brewIngredient))return null;
+  if(cell.x===t.tx&&cell.y===t.ty&&G.d2(c.x,c.y,t.tx,t.ty)<.04&&
+   !G.tileBlocked(w,Math.round(c.x),Math.round(c.y))&&
+   (t.kind!=='harvest'||cell.sown))return 'farmer';
+ }
+ return null;
+};
+G.drawCitizenProfession=function(ctx,name,image,x,bodyY,facing,animT){
+ const spec=G.PROFESSION_ART[name];if(!spec||!image||image.width!==spec.source[0]||image.height!==spec.source[1])return false;
+ const width=spec.width,height=width*image.height/image.width;
+ ctx.save();
+ ctx.translate(x+facing*spec.headOffset[0],bodyY+spec.headOffset[1]);
+ ctx.scale(facing,1);
+ ctx.drawImage(image,-spec.anchor[0]*width,-spec.anchor[1]*height,width,height);
+ ctx.restore();return true;
+};
+
 G.drawCitizen = function (ctx, c, time, homes) {
   if(G.tunnelInteriorAt(G.world,Math.round(c.x),Math.round(c.y)))return;
   if (G.citizenIndoorHome(c, homes) || (G.inMedicalCare && G.inMedicalCare(c)) || (G.inSchool && G.inSchool(c)) || (G.inChapel && G.inChapel(c))) return;
@@ -1534,7 +1563,13 @@ G.drawCitizen = function (ctx, c, time, homes) {
     fallback = walking ? 'adult_walk_' + (f % 4) : 'adult_idle';
   } else frame = walking ? 'adult_walk_' + (f % 4) : 'adult_idle';
   const toolPose=G.woodcutterToolPose(c);
+  const profession=working&&!toolPose?G.citizenProfessionRole(c):null;
+  const professionImage=profession==='farmer'&&G.SPR?.get('farmer-hat-a');
+  const professionSpec=G.PROFESSION_ART['farmer-hat-a'];
+  const hasProfession=professionImage&&professionImage.width===professionSpec.source[0]&&professionImage.height===professionSpec.source[1]&&G.SPR?.get('adult_work_0');
   if(toolPose)frame='adult_idle';
+  else if(profession==='miner')frame='adult_work_1'; // Original raised pick, not a new tool over a face.
+  else if(hasProfession)frame='adult_work_0'; // Original bent farm-work body; hat follows its actual head.
   const bodyY = sy - (working && !toolPose ? bob : 0);
   if (!G.sprDrawRim(ctx, frame, sx, bodyY, { flip }) &&
       !(fallback && G.sprDrawRim(ctx, fallback, sx, bodyY, { flip }))) {
@@ -1546,6 +1581,7 @@ G.drawCitizen = function (ctx, c, time, homes) {
     ctx.fill();
   }
   if(toolPose)G.drawWoodcutterTool(ctx,toolPose);
+  if(hasProfession)G.drawCitizenProfession(ctx,'farmer-hat-a',professionImage,sx,bodyY,facing,c.animT);
   // 携带物跟随抱持侧镜像；专用帧缺失时仍保持正常小人和资源回退。
   const fuelProcessing=c.task?.kind==='fuel'&&G.buildingProcessingWorker(c.task.b,c);
   // Accepted raw logs are on the stump while cutting, not covering the tool.

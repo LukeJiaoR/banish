@@ -1,0 +1,20 @@
+[
+  {
+    "name": "farmer-hat",
+    "file": "assets/a-style/farmer-hat-a.png",
+    "source": [
+      1774,
+      887
+    ],
+    "crop": [
+      82,
+      43,
+      1591,
+      812
+    ],
+    "output": [
+      128,
+      65
+    ]
+  }
+]
