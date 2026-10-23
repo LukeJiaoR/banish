@@ -1,0 +1,478 @@
+[
+  {
+    "file": "assets/props/deer_walk_0.png",
+    "sourceScale": 0.3778501628664495,
+    "sourceAnchor": [
+      211.5,
+      285
+    ],
+    "canvas": [
+      128,
+      128
+    ],
+    "footAnchor": [
+      64,
+      126
+    ],
+    "sha256": "6b385fb0f18a4382ae0beef37bcce562f2b44725cb207d2cc77c43dc3cc1cdc8"
+  },
+  {
+    "file": "assets/props/deer_walk_1.png",
+    "sourceScale": 0.3778501628664495,
+    "sourceAnchor": [
+      175.5,
+      285
+    ],
+    "canvas": [
+      128,
+      128
+    ],
+    "footAnchor": [
+      64,
+      126
+    ],
+    "sha256": "216b723e40cffd3237d1b3907d0138aa7160d5e19c24a4c9d142af6de2f92e52"
+  },
+  {
+    "file": "assets/props/deer_walk_2.png",
+    "sourceScale": 0.3778501628664495,
+    "sourceAnchor": [
+      181.0,
+      285
+    ],
+    "canvas": [
+      128,
+      128
+    ],
+    "footAnchor": [
+      64,
+      126
+    ],
+    "sha256": "a23a376f199c2201cdd3df823758bf05ea1d4cae194638fe448dfda46c84cbd1"
+  },
+  {
+    "file": "assets/props/deer_walk_3.png",
+    "sourceScale": 0.3778501628664495,
+    "sourceAnchor": [
+      171.0,
+      285
+    ],
+    "canvas": [
+      128,
+      128
+    ],
+    "footAnchor": [
+      64,
+      126
+    ],
+    "sha256": "17ef6e9243b5384fbb1133c4c2e6b8f31cccba02e9cb9599e8041b03ea52651e"
+  },
+  {
+    "file": "assets/props/deer_idle.png",
+    "sourceScale": 0.285,
+    "sourceAnchor": [
+      266,
+      393
+    ],
+    "canvas": [
+      128,
+      128
+    ],
+    "footAnchor": [
+      64,
+      126
+    ],
+    "sha256": "b7ffc5801cec10573881e84cb7b9d81b6a97f54c24c5434039fd47abed689a98"
+  },
+  {
+    "file": "assets/props/deer_graze.png",
+    "sourceScale": 0.285,
+    "sourceAnchor": [
+      266,
+      393
+    ],
+    "canvas": [
+      128,
+      128
+    ],
+    "footAnchor": [
+      64,
+      126
+    ],
+    "sha256": "ec96930c2fbade3621134c5eb381dccc16f2e9e8e8005fa32f332575122244d1"
+  },
+  {
+    "file": "assets/props/deer_turn.png",
+    "sourceScale": 0.19193857965451055,
+    "sourceAnchor": [
+      396.5,
+      536
+    ],
+    "canvas": [
+      128,
+      128
+    ],
+    "footAnchor": [
+      64,
+      126
+    ],
+    "sha256": "562eccd035d21a1bc243e53937a0938979f1d5eec59daeb13eea9d8f4c73e49a"
+  },
+  {
+    "file": "assets/props/sheep_walk_0.png",
+    "sourceScale": 0.38926174496644295,
+    "sourceAnchor": [
+      186.5,
+      234
+    ],
+    "canvas": [
+      128,
+      128
+    ],
+    "footAnchor": [
+      64,
+      126
+    ],
+    "sha256": "54265ac1d9b6fdb8773afc674bfd7951598b99de05359dd415d2990f29c4cf74"
+  },
+  {
+    "file": "assets/props/sheep_walk_1.png",
+    "sourceScale": 0.38926174496644295,
+    "sourceAnchor": [
+      159.5,
+      234
+    ],
+    "canvas": [
+      128,
+      128
+    ],
+    "footAnchor": [
+      64,
+      126
+    ],
+    "sha256": "27372237b00f506b5c0c29349ad16edd6629fa1a7aea9f7d18b846ef53222e97"
+  },
+  {
+    "file": "assets/props/sheep_walk_2.png",
+    "sourceScale": 0.38926174496644295,
+    "sourceAnchor": [
+      153.0,
+      234
+    ],
+    "canvas": [
+      128,
+      128
+    ],
+    "footAnchor": [
+      64,
+      126
+    ],
+    "sha256": "6e69cdf4d88ac7b5c2d5aed3019afc4d103db6f7559711a005a5452965d65b27"
+  },
+  {
+    "file": "assets/props/sheep_walk_3.png",
+    "sourceScale": 0.38926174496644295,
+    "sourceAnchor": [
+      152.0,
+      234
+    ],
+    "canvas": [
+      128,
+      128
+    ],
+    "footAnchor": [
+      64,
+      126
+    ],
+    "sha256": "db6990034ab694e3fc7aec1e559b6c8c7122092a1254023a86741acd9a259216"
+  },
+  {
+    "file": "assets/props/sheep_idle.png",
+    "sourceScale": 0.276,
+    "sourceAnchor": [
+      262,
+      335
+    ],
+    "canvas": [
+      128,
+      128
+    ],
+    "footAnchor": [
+      64,
+      126
+    ],
+    "sha256": "cc2080b72f8206d7ec1f9f10b3647d0ecb05eba642eee168bd8158ee0925b29b"
+  },
+  {
+    "file": "assets/props/sheep_graze.png",
+    "sourceScale": 0.276,
+    "sourceAnchor": [
+      254,
+      335
+    ],
+    "canvas": [
+      128,
+      128
+    ],
+    "footAnchor": [
+      64,
+      126
+    ],
+    "sha256": "e21447bd32e7a145b2b45a81de6802f796a1131c124060c0cca992a30791eca1"
+  },
+  {
+    "file": "assets/props/sheep_turn.png",
+    "sourceScale": 0.1958997722095672,
+    "sourceAnchor": [
+      318.0,
+      536
+    ],
+    "canvas": [
+      128,
+      128
+    ],
+    "footAnchor": [
+      64,
+      126
+    ],
+    "sha256": "998ad67c53500bcb9f4aed552b2f08b1d7b975bd9556e3dc205c5506b02baff5"
+  },
+  {
+    "file": "assets/props/cattle_walk_0.png",
+    "sourceScale": 0.3504531722054381,
+    "sourceAnchor": [
+      193.5,
+      254
+    ],
+    "canvas": [
+      128,
+      128
+    ],
+    "footAnchor": [
+      64,
+      126
+    ],
+    "sha256": "ef2d276a84734f86c6aca87c16719b1bf0306cceeae49877df74c1febaa96f94"
+  },
+  {
+    "file": "assets/props/cattle_walk_1.png",
+    "sourceScale": 0.3504531722054381,
+    "sourceAnchor": [
+      174.0,
+      254
+    ],
+    "canvas": [
+      128,
+      128
+    ],
+    "footAnchor": [
+      64,
+      126
+    ],
+    "sha256": "4827efdd0e02b6717db1fa107ab187436ce1eb71e926aca49d97face489d6382"
+  },
+  {
+    "file": "assets/props/cattle_walk_2.png",
+    "sourceScale": 0.3504531722054381,
+    "sourceAnchor": [
+      173.5,
+      254
+    ],
+    "canvas": [
+      128,
+      128
+    ],
+    "footAnchor": [
+      64,
+      126
+    ],
+    "sha256": "eadc2abb488a212925a7cf2726a55217fbd116dad8fb54693641e917304936e7"
+  },
+  {
+    "file": "assets/props/cattle_walk_3.png",
+    "sourceScale": 0.3504531722054381,
+    "sourceAnchor": [
+      171.0,
+      254
+    ],
+    "canvas": [
+      128,
+      128
+    ],
+    "footAnchor": [
+      64,
+      126
+    ],
+    "sha256": "e49b10475eba02bfca83b2cca63bbcf60e165dcbf36766b1ff71111e55b2a31f"
+  },
+  {
+    "file": "assets/props/cattle_idle.png",
+    "sourceScale": 0.245,
+    "sourceAnchor": [
+      278,
+      365
+    ],
+    "canvas": [
+      128,
+      128
+    ],
+    "footAnchor": [
+      64,
+      126
+    ],
+    "sha256": "c389751e4d908558e0f609224240ffe354e4e76de9f45acc1481898af8f0376b"
+  },
+  {
+    "file": "assets/props/cattle_graze.png",
+    "sourceScale": 0.245,
+    "sourceAnchor": [
+      266,
+      365
+    ],
+    "canvas": [
+      128,
+      128
+    ],
+    "footAnchor": [
+      64,
+      126
+    ],
+    "sha256": "c5e7144c27db3a938376db993aff7d65ba1ba3195f44dcc25292d2ab99fd6ea8"
+  },
+  {
+    "file": "assets/props/cattle_turn.png",
+    "sourceScale": 0.16569200779727095,
+    "sourceAnchor": [
+      426.0,
+      515
+    ],
+    "canvas": [
+      128,
+      128
+    ],
+    "footAnchor": [
+      64,
+      126
+    ],
+    "sha256": "44aece1a39be7ed5cae7abbce09f4db5b77ca8e307d6624ffe7cbe89cc0fa712"
+  },
+  {
+    "file": "assets/props/chicken_walk_0.png",
+    "sourceScale": 0.5201793721973094,
+    "sourceAnchor": [
+      184.0,
+      245
+    ],
+    "canvas": [
+      128,
+      128
+    ],
+    "footAnchor": [
+      64,
+      126
+    ],
+    "sha256": "88732b50d92d7a4306f98d77c9687e21e358a14fd2cf48652ec106c76437bbf3"
+  },
+  {
+    "file": "assets/props/chicken_walk_1.png",
+    "sourceScale": 0.5201793721973094,
+    "sourceAnchor": [
+      156.5,
+      245
+    ],
+    "canvas": [
+      128,
+      128
+    ],
+    "footAnchor": [
+      64,
+      126
+    ],
+    "sha256": "6dc531f4ec96eb443b7dcebfef30ee501e91f7098c6fa4e86a33fb7de57e6c00"
+  },
+  {
+    "file": "assets/props/chicken_walk_2.png",
+    "sourceScale": 0.5201793721973094,
+    "sourceAnchor": [
+      157.5,
+      245
+    ],
+    "canvas": [
+      128,
+      128
+    ],
+    "footAnchor": [
+      64,
+      126
+    ],
+    "sha256": "7fa15f17837b0eb41260ef7780396fbc7b336611d65e0db0da32f9a9480f2501"
+  },
+  {
+    "file": "assets/props/chicken_walk_3.png",
+    "sourceScale": 0.5201793721973094,
+    "sourceAnchor": [
+      153.0,
+      245
+    ],
+    "canvas": [
+      128,
+      128
+    ],
+    "footAnchor": [
+      64,
+      126
+    ],
+    "sha256": "15dc2cc9de68238eb359fea1498c1c32cfc6480d7ed620b038f6a5a046ac6878"
+  },
+  {
+    "file": "assets/props/chicken_idle.png",
+    "sourceScale": 0.38,
+    "sourceAnchor": [
+      290,
+      326
+    ],
+    "canvas": [
+      128,
+      128
+    ],
+    "footAnchor": [
+      64,
+      126
+    ],
+    "sha256": "aff517180241486e513a5fdcf1409dd7fabc005f05c535a2092e2e6b85d6ea2e"
+  },
+  {
+    "file": "assets/props/chicken_graze.png",
+    "sourceScale": 0.38,
+    "sourceAnchor": [
+      245,
+      326
+    ],
+    "canvas": [
+      128,
+      128
+    ],
+    "footAnchor": [
+      64,
+      126
+    ],
+    "sha256": "d3768d6822ecae57ac45cd94d6d48211ba8874071ceaeef6a31ccb692455ed64"
+  },
+  {
+    "file": "assets/props/chicken_turn.png",
+    "sourceScale": 0.26280623608017817,
+    "sourceAnchor": [
+      348.5,
+      524
+    ],
+    "canvas": [
+      128,
+      128
+    ],
+    "footAnchor": [
+      64,
+      126
+    ],
+    "sha256": "c8e3a17afe1236c803fba932551aa8a544e7558fe77ca55a03458a2c96c22b67"
+  }
+]

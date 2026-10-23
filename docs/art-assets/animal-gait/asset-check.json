@@ -1,0 +1,94 @@
+{
+  "deer": {
+    "frames": 4,
+    "unique_rgba": 4,
+    "alpha_extrema": [
+      [
+        0,
+        255
+      ],
+      [
+        0,
+        255
+      ],
+      [
+        0,
+        255
+      ],
+      [
+        0,
+        255
+      ]
+    ],
+    "leg_region_unique": 4
+  },
+  "sheep": {
+    "frames": 4,
+    "unique_rgba": 4,
+    "alpha_extrema": [
+      [
+        0,
+        255
+      ],
+      [
+        0,
+        255
+      ],
+      [
+        0,
+        255
+      ],
+      [
+        0,
+        255
+      ]
+    ],
+    "leg_region_unique": 4
+  },
+  "cattle": {
+    "frames": 4,
+    "unique_rgba": 4,
+    "alpha_extrema": [
+      [
+        0,
+        255
+      ],
+      [
+        0,
+        255
+      ],
+      [
+        0,
+        255
+      ],
+      [
+        0,
+        255
+      ]
+    ],
+    "leg_region_unique": 4
+  },
+  "chicken": {
+    "frames": 4,
+    "unique_rgba": 4,
+    "alpha_extrema": [
+      [
+        0,
+        255
+      ],
+      [
+        0,
+        255
+      ],
+      [
+        0,
+        255
+      ],
+      [
+        0,
+        255
+      ]
+    ],
+    "leg_region_unique": 4
+  }
+}

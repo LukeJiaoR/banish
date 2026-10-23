@@ -1243,28 +1243,36 @@ G.pastureAnimalSpots=function(b){
     return spots.slice(0,count);
   }
   if(!count)return [];
-  const cols=Math.ceil(Math.sqrt((count+10)*b.w/b.h)),rows=Math.ceil((count+10)/cols),spots=[];
+  const capacity=G.pastureCapacity(b),cols=Math.ceil(Math.sqrt((capacity+10)*b.w/b.h)),rows=Math.ceil((capacity+10)/cols),spots=[];
   for(let row=0;row<rows;row++)for(let col=0;col<cols;col++){
     const x=.8+(b.w-1.6)*(col+.5)/cols+Math.sin(col*2.1+row*3.7)*.13,
       y=.8+(b.h-1.6)*(row+.5)/rows+Math.cos(row*2.3+col*3.1)*.13;
     if(x<3.4&&y<3.4)continue; // Keep feet out of the original shelter footprint.
     spots.push([x,y]);
   }
-  return Array.from({length:Math.min(count,spots.length)},(_,i)=>spots[Math.floor((i+.5)*spots.length/count)]);
+  return Array.from({length:Math.min(count,capacity,spots.length)},(_,i)=>spots[Math.floor((i+.5)*spots.length/capacity)]);
 };
 
-// Cosmetic motion is a pure function of the saved simulation clock. It neither
-// consumes RNG nor changes animal counts, hunting targets or production. A paused
-// game holds its pose; speed and reload naturally follow the same clock.
-G.animalPose=function(id){
-  if(G.buildingReducedMotion())return {dx:0,dy:0,bob:0,flip:id%3===1};
-  const time=((G.game.day||0)*G.DAY_H+(G.game.h||0))/G.HOURS_PER_SEC,
-    phase=time*.65+id*2.399,walk=Math.cos(phase),stride=Math.max(0,Math.abs(walk)-.3)/.7;
-  return {dx:Math.sin(phase)*.32,dy:Math.sin(phase*.71+id)*.22,
-    bob:Math.abs(Math.sin(time*7+id))*stride*.8,flip:walk<0};
+// Presentation only: stable pen slots, real rest intervals and distance-based gait.
+// No settlement RNG, population, hunting, inventory or save fields are changed.
+G.animalClock=()=>((G.game.day||0)*G.DAY_H+(G.game.h||0))/G.HOURS_PER_SEC;
+G.animalPose=function(id,species='sheep'){
+  if(G.buildingReducedMotion())return {dx:0,dy:0,bob:0,flip:id%3===1,moving:false,frame:0,turnScale:1};
+  const time=G.animalClock(),period=species==='chicken'?8:12,
+    t=((time+id*2.399)%period+period)%period,leg=period/3,rest=period/6,
+    returning=t>=leg+rest,u=returning?(t-leg-rest)/leg:t/leg,
+    moving=u>=0&&u<1,progress=G.clamp(u,0,1),ease=(1-Math.cos(progress*Math.PI))/2,
+    along=returning?1-ease:ease,dx=(along*2-1)*.32,
+    dy=(along*2-1)*.22*(id%2?1:-1),distance=(returning?2-along:along)*.64,
+    frame=moving?Math.floor(distance/(species==='chicken'?.055:.09))%4:0,
+    // Original animal assets face left. A pen animal turns only during its rest,
+    // rather than flipping independently of its projected movement each frame.
+    flip=returning?false:true;
+  const turning=t<.18||t>=period-.18||Math.abs(t-leg-rest)<.18;
+  return {dx,dy,bob:0,flip,moving,frame,turnScale:1,turning,idleFrame:Math.floor(time*.8+id)%2};
 };
 G.pastureAnimalPoint=function(b,spot,i){
-  const pose=G.animalPose(b.id*31+i),[x,y]=spot;
+  const pose=G.animalPose(b.id*31+i,G.pastureTypeOf(b)),[x,y]=spot;
   // Keep area-pen feet outside the shelter and every herd inside its fence.
   let dx=pose.dx,dy=pose.dy;
   if(b.pastureSize){
@@ -1273,14 +1281,41 @@ G.pastureAnimalPoint=function(b,spot,i){
   }
   return {x:b.x+G.clamp(x+dx,.55,b.w-.55),y:b.y+G.clamp(y+dy,.55,b.h-.55),pose};
 };
+// Weak presentation history retains facing at a stop; it is not serialized and
+// never smooths/offsets the authoritative footpoint. Offscreen animals remain at
+// their exact route location, so camera re-entry cannot replay stale movement.
+G._deerPresentation=new WeakMap();
 G.deerDisplayPoint=function(deer){
-  const pose=G.animalPose(deer.id),at=G.deerPosition?G.deerPosition(deer):deer;
-  // Stay inside the actual habitat tile; never move prey across a shoreline,
-  // building or hunting-range boundary for the sake of an animation.
-  const reduced=G.buildingReducedMotion();
-  if(reduced)pose.flip=deer.id%2===0;
-  if(deer.route?.length){const target=deer.route[0];pose.flip=target.x+target.y<deer.x+deer.y;return {x:at.x,y:at.y,pose};}
-  return {x:at.x+(reduced?0:(pose.dx+.32)*.6),y:at.y+(reduced?0:(pose.dy+.22)*.6),pose};
+  const at=G.deerPosition?G.deerPosition(deer):deer,time=G.animalClock();
+  let state=G._deerPresentation.get(deer);
+  if(!state||time<state.time||state.generation!==deer.generation){
+    const target=deer.route?.[0],vx=target?target.x-deer.x:0,vy=target?target.y-deer.y:0;
+    state={time,generation:deer.generation,x:at.x,y:at.y,distance:0,flip:target?vx-vy>0:deer.id%2===0,moving:false,frame:0};
+    G._deerPresentation.set(deer,state);
+  }else if(time>state.time){
+    const dx=at.x-state.x,dy=at.y-state.y,distance=Math.hypot(dx,dy);
+    state.moving=distance>1e-8;
+    if(state.moving){
+      if(Math.abs(dx-dy)>1e-8){const flip=dx-dy>0;if(flip!==state.flip)state.turnUntil=time+.18;state.flip=flip;}
+      state.distance+=distance;
+    }
+    state.frame=state.moving?Math.floor(state.distance/.18)%4:0;
+    state.time=time;state.x=at.x;state.y=at.y;
+  }
+  const reduced=G.buildingReducedMotion(),pose={dx:0,dy:0,bob:0,flip:state.flip,
+    moving:!reduced&&state.moving,frame:reduced?0:state.frame,turnScale:1,turning:!reduced&&time<(state.turnUntil||0),
+    idleFrame:reduced?0:Math.floor(time*.6+deer.id)%2};
+  return {x:at.x,y:at.y,pose};
+};
+
+// A missing animation frame falls back per animal to the original image.
+G.drawAnimatedAnimal=function(ctx,species,x,y,pose,width){
+  // Use a complete family together: late/failed individual downloads cannot
+  // alternate old/new body proportions while the gait advances.
+  const ready=['_idle','_graze','_turn','_walk_0','_walk_1','_walk_2','_walk_3'].every(s=>G.SPR?.get(species+s)?.width);
+  const suffix=pose?.turning?'_turn':pose?.moving?'_walk_'+pose.frame:pose?.idleFrame?'_graze':'_idle';
+  // Shared exported foot anchor is y=126 on the 128px canvas.
+  return G.sprDraw(ctx,ready?species+suffix:species,x,y+(ready?width*2/128:0),{w:width,flip:!!pose?.flip});
 };
 
 // Work uses integer tiles; new tree feet sit at those tiles' visual centers.
@@ -1325,7 +1360,7 @@ G.drawDeer = function(ctx, deer) {
   if(deer.returnDay!==null)return;
   const point=G.deerDisplayPoint(deer),[x,footY]=G.T2S(point.x,point.y),y=footY-point.pose.bob;
   ctx.fillStyle='rgba(26,32,19,.16)';ctx.beginPath();ctx.ellipse(x,footY-1,8,2.6,0,0,Math.PI*2);ctx.fill();
-  if(G.sprDraw(ctx,'deer',x,y,{w:26,flip:point.pose.flip}))return;
+  if(G.drawAnimatedAnimal(ctx,'deer',x,y,point.pose,26))return;
   // Missing-image fallback, consistent with other entity fallbacks.
   ctx.save();ctx.translate(x,y);if(point.pose.flip)ctx.scale(-1,1);
   ctx.strokeStyle='#705039';ctx.lineWidth=1.5;ctx.beginPath();
@@ -1360,11 +1395,11 @@ G.drawEconomyFieldPart = function (ctx, p) {
   if (p.kind === 'sheepShelter') {
     G.sprDraw(ctx, 'pasture', sx, sy, { w: 112 }); return;
   }
-  const animalY=sy-(p.pose?.bob||0),animalFlip=p.pose?.flip??(p.n%3===1);
-  if(p.kind==='chicken'){G.sprDraw(ctx,'chicken',sx,animalY,{w:16,flip:animalFlip});return;}
-  if(p.kind==='cattle'){G.sprDraw(ctx,'cattle',sx,animalY,{w:32,flip:animalFlip});return;}
+  const animalY=sy-(p.pose?.bob||0);
+  if(p.kind==='chicken'){G.drawAnimatedAnimal(ctx,'chicken',sx,animalY,p.pose,16);return;}
+  if(p.kind==='cattle'){G.drawAnimatedAnimal(ctx,'cattle',sx,animalY,p.pose,32);return;}
   if (p.kind === 'sheep') {
-    G.sprDraw(ctx, 'sheep', sx, animalY, { w: 24, flip: animalFlip }); return;
+    G.drawAnimatedAnimal(ctx,'sheep',sx,animalY,p.pose,24); return;
   }
   if (p.kind === 'fruitTree') {
     const tree=p.b.orchardTrees?.[p.ti];
@@ -1738,6 +1773,8 @@ G.drawTradeVessels=function(ctx,w,bounds={}){
 
 G.frame = function (dtReal) {
   const cv = G.cv, ctx = G.ctx;
+  // Advance presentation for every live deer, not only those inside the camera.
+  for(const deer of G.world?.deer||[])if(deer.returnDay===null)G.deerDisplayPoint(deer);
   if(!G.game.paused)G.buildingEffectTime+=dtReal;
   if (G.needGround || G.groundDirty.size || G._groundWorld !== G.world || G._groundScale !== G.groundScale) G.buildGround();
 
