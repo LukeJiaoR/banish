@@ -1,0 +1,27 @@
+{
+  "base": "65e02091748141c1ea4dd0d388592b67a279257d",
+  "generator": "built-in image_gen",
+  "mode": "precise-object-edit",
+  "source": {
+    "path": "docs/art-assets/blacksmith-state/idle-source.png",
+    "sha256": "90d34f05b7805fa4a720a84c2f0c622f14c81eee6a29eecbdc4d4b9a4f0715b2",
+    "size": [
+      1310,
+      1200
+    ]
+  },
+  "runtime": {
+    "path": "assets/a-style/blacksmith-a-idle.png",
+    "sha256": "285008115680d9efb0d1fd02e7f9f52294d11ce61fceeda9317458ff5c9a1919",
+    "size": [
+      512,
+      469
+    ]
+  },
+  "preservedProcessing": {
+    "path": "assets/buildings/blacksmith.png",
+    "sha256": "53e3bb1b5107b91d947ac678cf21cac43e83b308b1516efb5b86ca405d33b3fe"
+  },
+  "export": "@napi-rs/canvas resize only; original alpha preserved by normal Canvas scaling; no manual recoloring",
+  "boundary": "Edited idle image geometry/layout retained visually, not pixel-identical outside hearth. No new production, inventory, identity, save, deployment."
+}

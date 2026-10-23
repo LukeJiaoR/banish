@@ -227,6 +227,8 @@ G.drawMountainHover = function(ctx,w,x,y) {
 // Original A-style source pixels stay intact. Calibrated source-space anchors,
 // not canvas edges, land on the existing world footpoints. No save/RNG changes.
 G.A_ART = Object.freeze({
+ 'blacksmith-a-idle': {source:[512,469], anchor:[256,469], span:512/1.06},
+ 'blacksmith': {source:[512,469], anchor:[256,469], span:512/1.06},
  'storage-a-v2': {source:[768,768], anchor:[654*768/1254,1154*768/1254], span:1232*768/1254},
  'woodcutter-a-idle': {source:[1056,704], anchor:[543.125,657.9375], span:754.1875},
  'woodcutter-a-processing-v2': {source:[1056,704], anchor:[543.125,662.75], span:772.0625, contact:[515.625,462.6875]},
@@ -261,6 +263,11 @@ G.woodcutterArtName=function(b){
  if(b?.type!=='woodcutter'||b.state!=='ok'||b.houseFire||G.world?.bmap?.[b.id]!==b)return null;
  const processing=(b.workers||[]).some(id=>G.buildingProcessingWorker(b,G.world.cmap[id]));
  return processing?'woodcutter-a-processing-v2':'woodcutter-a-idle';
+};
+// Preserve the original lit forge only for an actual material-bearing smith batch.
+G.blacksmithArtName=function(b){
+ if(b?.type!=='blacksmith'||b.state!=='ok'||b.houseFire||G.world?.bmap?.[b.id]!==b)return null;
+ return (b.workers||[]).some(id=>G.buildingProcessingWorker(b,G.world.cmap[id]))?'blacksmith':'blacksmith-a-idle';
 };
 G.sprDraw = function (ctx, name, cx, by, opts) {
   // Completed storage and its pending preview share this exact footpoint path.
@@ -980,11 +987,11 @@ G.drawBuilding = function (ctx, b, time) {
   const sprW = (b.w + b.h) * 32 * (G.BUILD_SPR_W[b.type] || 1.08);
   // 贸易站按原图50%显示；补偿底角下方3px透明余量，让石基脚点贴合占地底角。
   const sprFootY = B[1] + ((b.type === 'tradingpost'||b.type==='market') ? 1.5 : b.type === 'mineralpit' ? 2 : b.type==='burntruins'?2.5:b.type==='well'?1:b.type==='chapel'?6:0);
-  const houseArt=G.houseArtName(b)||G.woodcutterArtName(b);
+  const houseArt=G.houseArtName(b)||G.woodcutterArtName(b)||G.blacksmithArtName(b);
   const calibrated=houseArt&&G.drawCalibratedArt(ctx,houseArt,B[0],sprFootY,(b.w+b.h)*32);
   const spr = calibrated||G.sprDraw(ctx, b.type, B[0], sprFootY, { w: sprW, omitSmokeAir:true });
   if (spr) {
-    if(calibrated){
+    if(calibrated&&b.type!=='blacksmith'){
       // Calibrated source art has no chimney. Keep factual state markers,
       // without legacy image-relative smoke/window/work-effect anchors.
       delete b._chimney;
