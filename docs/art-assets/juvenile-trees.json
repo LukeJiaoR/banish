@@ -1,0 +1,166 @@
+{
+  "generator": "OpenAI built-in imagegen",
+  "baseCommit": "1b60fd180edfcb7d26923c9a8c0554fbce1c5af0",
+  "assets": [
+    {
+      "name": "tree-a-v2-broadleaf-sapling",
+      "prompt": "Use case: stylized-concept. Production game sprite for an ancient Chinese village strategy game, painted detailed realistic miniature matching the warm yellow-green / jade botanical style of the reference village. ONE small broadleaf SEEDLING in summer, truly juvenile structure: short slender smooth twig trunk, only three short side twigs, a handful of soft fresh oval lobed leaf clusters, visible negative spaces, no bulky mature trunk or dense adult crown. 2:1 dimetric orthographic game camera, ground diamond corresponds to 64x32, viewed from elevated 30 degree angle, light upper left, shadow right. Entire plant with tiny root collar visible, centered root contact near bottom at x50% y90%, ample padding, portrait square 1024x1024. Genuine transparent RGBA background, isolated plant only, no ground tile, no pot, no labels, no grid, no borders, no atmospheric glow, no background vignette. Original artwork. Crisp textured edges and clean silhouette, consistent miniature rendering; warm woody browns and fresh golden-green leaves. This is a separate seedling design, never a scaled-down mature tree.",
+      "anchor": [
+        676,
+        1156
+      ],
+      "height": 1061,
+      "displayHeight": 22,
+      "sourceSha256": "4f3e6df5895e27994339efe719d2f9f138e2f02f4c843d351205d051d9fab1a4",
+      "sourceDimensions": [
+        1254,
+        1254
+      ],
+      "runtimeDimensions": [
+        384,
+        384
+      ],
+      "runtimeSha256": "e08309a74af175210f19c4957a4cc2b4752137f127df811d550d6e46cd167709"
+    },
+    {
+      "name": "tree-a-v2-broadleaf-sapling-winter",
+      "prompt": "Use case: lighting-weather. Edit target: attached original juvenile broadleaf-sapling game tree. Create its WINTER dormant seasonal counterpart. Preserve exact canvas, trunk position, trunk and branch geometry, juvenile age and thinness, root contact coordinates, dimetric 2:1 camera and upper-left lighting. Remove the green leaves completely, reveal fine bare twigs along the existing branch structure; add delicate white snow sitting on upward branch surfaces and tiny root collar. Do not thicken trunk or turn it into a mature tree. No new ground or mound. Keep genuine transparent RGBA background, entire silhouette and roots, no backdrop, no glow, no text, no borders. Detailed painterly miniature style consistent with source. This is the very same small plant in winter.",
+      "anchor": [
+        680,
+        1159
+      ],
+      "height": 1076,
+      "displayHeight": 22,
+      "sourceSha256": "b05e2d9d9b361a26bc374fba515e3b89d1ed6ddbaaea93d50ad3f6e571e168e5",
+      "sourceDimensions": [
+        1254,
+        1254
+      ],
+      "runtimeDimensions": [
+        384,
+        384
+      ],
+      "runtimeSha256": "c116de869e25786c496bdf7ce9e88b05490ec70158213a0f2fb4d48f86ef60b1"
+    },
+    {
+      "name": "tree-a-v2-broadleaf-young",
+      "prompt": "Use case: stylized-concept. Production game sprite for an ancient Chinese village strategy game, painted detailed realistic miniature matching the warm yellow-green / jade botanical style of the reference village. ONE young broadleaf TREE in summer, truly juvenile structure: slender smooth teenage trunk branching into five light upward stems, a small airy crown of 7 distinct rounded clusters of small oak-like leaves, trunk visible through crown, visible negative spaces, no bulky mature trunk or dense adult crown. 2:1 dimetric orthographic game camera, ground diamond corresponds to 64x32, viewed from elevated 30 degree angle, light upper left, shadow right. Entire plant with tiny root collar visible, centered root contact near bottom at x50% y90%, ample padding, portrait square 1024x1024. Genuine transparent RGBA background, isolated plant only, no ground tile, no pot, no labels, no grid, no borders, no atmospheric glow, no background vignette. Original artwork. Crisp textured edges and clean silhouette, consistent miniature rendering; warm woody browns and fresh golden-green leaves. This is a separate young tree design, never a scaled-down mature tree.",
+      "anchor": [
+        650,
+        1210
+      ],
+      "height": 1186,
+      "displayHeight": 46,
+      "sourceSha256": "c9d91f8e82f87257a7ea510789c501da184a0889b931305fcaee3f01eb4c328b",
+      "sourceDimensions": [
+        1254,
+        1254
+      ],
+      "runtimeDimensions": [
+        384,
+        384
+      ],
+      "runtimeSha256": "0e1d8942f9a4a3fd82a28d15b0009c271cbf8729c70108fd336c64d92a0b51b7"
+    },
+    {
+      "name": "tree-a-v2-broadleaf-young-winter",
+      "prompt": "Use case: stylized-concept. Original isolated juvenile oak-like broadleaf tree in deep WINTER, fully leafless, a game sprite. ONLY a slim upright brown trunk with five elegant main branches with sparse fine forked bare twigs. A little white snow lies on the branches. Empty completely transparent spaces between all the branches. Small young tree, no thick or gnarled adult trunk. No leaves of any kind, no brown leaves, no webs, no films, no canopy, no haze. Warm upper left sunlight, subtly hand-painted realistic Chinese village miniature style. Elevated 2:1 dimetric orthographic camera for 64x32 tile game. 1248x1248 square composition: root collar at pixel 640,1170, tree tip near 630,45, plant width about 880 pixels. Root collar fully visible, no soil mound, no ground tile, no shadow, no labels, no text. Genuine transparent background.",
+      "anchor": [
+        648,
+        1237
+      ],
+      "height": 1218,
+      "displayHeight": 46,
+      "sourceSha256": "d3b6a60e3fd3d9411050ee0c495e662ee83ae651fc680a972f04072556135e26",
+      "sourceDimensions": [
+        1254,
+        1254
+      ],
+      "runtimeDimensions": [
+        384,
+        384
+      ],
+      "runtimeSha256": "d13f290c37ca39052fb0dab3cd73d81c10b5af2a29da0f55aeff187ce08824ae"
+    },
+    {
+      "name": "tree-a-v2-willow-sapling",
+      "prompt": "Use case: stylized-concept. Production game sprite for an ancient Chinese village strategy game, painted detailed realistic miniature matching the warm yellow-green / jade botanical style of the reference village. ONE small willow SEEDLING in summer, truly juvenile structure: short slender smooth twig trunk, only three short side twigs, a handful of narrow lance-shaped willow leaf clusters, with two wispy slightly drooping shoots, visible negative spaces, no bulky mature trunk or dense adult crown. 2:1 dimetric orthographic game camera, ground diamond corresponds to 64x32, viewed from elevated 30 degree angle, light upper left, shadow right. Entire plant with tiny root collar visible, centered root contact near bottom at x50% y90%, ample padding, portrait square 1024x1024. Genuine transparent RGBA background, isolated plant only, no ground tile, no pot, no labels, no grid, no borders, no atmospheric glow, no background vignette. Original artwork. Crisp textured edges and clean silhouette, consistent miniature rendering; warm woody browns and fresh golden-green leaves. This is a separate seedling design, never a scaled-down mature tree.",
+      "anchor": [
+        622,
+        1162
+      ],
+      "height": 1077,
+      "displayHeight": 22,
+      "sourceSha256": "cee1b792b363008edb15039a20e1101184c26e563fa7b73febefbc2ee212113a",
+      "sourceDimensions": [
+        1254,
+        1254
+      ],
+      "runtimeDimensions": [
+        384,
+        384
+      ],
+      "runtimeSha256": "ac89d2527411cdd94cf50f251abdac22e61c0ddf953bbdd079f787bce8e9941b"
+    },
+    {
+      "name": "tree-a-v2-willow-sapling-winter",
+      "prompt": "Use case: lighting-weather. Edit target: attached original juvenile willow-sapling game tree. Create its WINTER dormant seasonal counterpart. Preserve exact canvas, trunk position, trunk and branch geometry, juvenile age and thinness, root contact coordinates, dimetric 2:1 camera and upper-left lighting. Remove the green leaves completely, reveal fine bare twigs along the existing branch structure; add delicate white snow sitting on upward branch surfaces and tiny root collar. Do not thicken trunk or turn it into a mature tree. No new ground or mound. Keep genuine transparent RGBA background, entire silhouette and roots, no backdrop, no glow, no text, no borders. Detailed painterly miniature style consistent with source. This is the very same small plant in winter.",
+      "anchor": [
+        623,
+        1170
+      ],
+      "height": 1092,
+      "displayHeight": 22,
+      "sourceSha256": "eefa1102e75467a3b68d9030f12ad9754d96e8d207a7b822b53d7b1e6ef42177",
+      "sourceDimensions": [
+        1254,
+        1254
+      ],
+      "runtimeDimensions": [
+        384,
+        384
+      ],
+      "runtimeSha256": "e589c9f9b1a55c1ce51846fa979907c949be2464fba7433537561e2df7e6fe37"
+    },
+    {
+      "name": "tree-a-v2-willow-young",
+      "prompt": "Use case: stylized-concept. Production game sprite for an ancient Chinese village strategy game, painted detailed realistic miniature matching the warm yellow-green / jade botanical style of the reference village. ONE young willow TREE in summer, truly juvenile structure: slender upright teenage trunk with three light arching branches, an airy crown of delicate lime green lance shaped leaves and distinct fine drooping wisps, trunk visible through crown, visible negative spaces, no bulky mature trunk or dense adult crown. 2:1 dimetric orthographic game camera, ground diamond corresponds to 64x32, viewed from elevated 30 degree angle, light upper left, shadow right. Entire plant with tiny root collar visible, centered root contact near bottom at x50% y90%, ample padding, portrait square 1024x1024. Genuine transparent RGBA background, isolated plant only, no ground tile, no pot, no labels, no grid, no borders, no atmospheric glow, no background vignette. Original artwork. Crisp textured edges and clean silhouette, consistent miniature rendering; warm woody browns and fresh golden-green leaves. This is a separate young tree design, never a scaled-down mature tree.",
+      "anchor": [
+        650,
+        1200
+      ],
+      "height": 1167,
+      "displayHeight": 46,
+      "sourceSha256": "34aa21eab6ead6ab5225a70568cbfef9a08154fbfa90efb5d201ec8ae717b496",
+      "sourceDimensions": [
+        1254,
+        1254
+      ],
+      "runtimeDimensions": [
+        384,
+        384
+      ],
+      "runtimeSha256": "de9a4b19530d89b68341563e344173ccf15e35dfb2ebf1c33d726dd7d3c03e23"
+    },
+    {
+      "name": "tree-a-v2-willow-young-winter",
+      "prompt": "Use case: stylized-concept. Original isolated juvenile willow tree in deep WINTER, fully leafless, a game sprite. ONLY a slim upright brown trunk with five elegant main branches with sparse long fine drooping bare twigs. A little white snow lies on the branches. Empty completely transparent spaces between all the branches. Small young tree, no thick or gnarled adult trunk. No leaves of any kind, no brown leaves, no webs, no films, no canopy, no haze. Warm upper left sunlight, subtly hand-painted realistic Chinese village miniature style. Elevated 2:1 dimetric orthographic camera for 64x32 tile game. 1248x1248 square composition: root collar at pixel 640,1170, tree tip near 630,45, plant width about 880 pixels. Root collar fully visible, no soil mound, no ground tile, no shadow, no labels, no text. Genuine transparent background.",
+      "anchor": [
+        640,
+        1225
+      ],
+      "height": 1200,
+      "displayHeight": 46,
+      "sourceSha256": "e75e9db193dc95fba0a3e1b6ba115d4402534d49f229132f2042e9d5f2fe25d6",
+      "sourceDimensions": [
+        1254,
+        1254
+      ],
+      "runtimeDimensions": [
+        384,
+        384
+      ],
+      "runtimeSha256": "63a6240f2e82f880d277f14f305e52d57d7af58636da417f5f9411d71eca8dc7"
+    }
+  ]
+}

@@ -231,6 +231,14 @@ G.A_ART = Object.freeze({
  'woodcutter-a-processing-v2': {source:[1056,704], anchor:[543.125,662.75], span:772.0625, contact:[515.625,462.6875]},
  'house-a-v2-square-empty': {source:[1536,1024], anchor:[768,975], span:1056},
  'house-a-v2-square-occupied': {source:[1536,1024], anchor:[768,975], span:1056},
+ 'tree-a-v2-broadleaf-sapling': {"source":[384,384],"anchor":[207.00478468899522,353.99043062200957],"height":324.89952153110045,"displayHeight":22},
+ 'tree-a-v2-broadleaf-sapling-winter': {"source":[384,384],"anchor":[208.2296650717703,354.9090909090909],"height":329.49282296650716,"displayHeight":22},
+ 'tree-a-v2-broadleaf-young': {"source":[384,384],"anchor":[199.04306220095694,370.52631578947364],"height":363.17703349282294,"displayHeight":46},
+ 'tree-a-v2-broadleaf-young-winter': {"source":[384,384],"anchor":[198.43062200956936,378.7942583732057],"height":372.9760765550239,"displayHeight":46},
+ 'tree-a-v2-willow-sapling': {"source":[384,384],"anchor":[190.46889952153109,355.82775119617224],"height":329.79904306220095,"displayHeight":22},
+ 'tree-a-v2-willow-sapling-winter': {"source":[384,384],"anchor":[190.77511961722487,358.2775119617225],"height":334.39234449760767,"displayHeight":22},
+ 'tree-a-v2-willow-young': {"source":[384,384],"anchor":[199.04306220095694,367.46411483253587],"height":357.35885167464113,"displayHeight":46},
+ 'tree-a-v2-willow-young-winter': {"source":[384,384],"anchor":[195.98086124401914,375.11961722488036],"height":367.46411483253587,"displayHeight":46},
  'tree-a-v1-broadleaf': {source:[1536,1024], anchor:[820,984], height:960, displayHeight:88},
  'tree-a-v1-willow': {source:[1536,1024], anchor:[770,990], height:980, displayHeight:92},
  'tree-a-v1-broadleaf-winter': {source:[1536,1024], anchor:[820,984], height:960, displayHeight:88},
@@ -819,8 +827,9 @@ G.drawTree = function (ctx, t, variation) {
   const by = sy + 16;
   const stage = G.treeStage(t);
   const winter = G.isWinter();
-  const matureArt=(v.variant?'tree-a-v1-willow':'tree-a-v1-broadleaf')+(winter?'-winter':'');
-  if(stage===2&&G.drawCalibratedArt(ctx,matureArt,sx,by,G.A_ART[matureArt].displayHeight*v.scale))return;
+  const family=v.variant?'willow':'broadleaf';
+  const art=(stage===2?'tree-a-v1-'+family:'tree-a-v2-'+family+'-'+['sapling','young'][stage])+(winter?'-winter':'');
+  if(G.drawCalibratedArt(ctx,art,sx,by,G.A_ART[art].displayHeight*v.scale))return;
   const sprName = 'tree_' + ['sapling', 'young', 'mature'][stage] + (winter ? '_snow' : '');
   const baseH = (G.SPRITE_SIZES[sprName] || {}).h;
   if (G.sprDraw(ctx, sprName, sx, by, baseH ? { h: baseH * v.scale } : undefined)) return;
