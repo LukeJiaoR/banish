@@ -227,6 +227,8 @@ G.drawMountainHover = function(ctx,w,x,y) {
 // Original A-style source pixels stay intact. Calibrated source-space anchors,
 // not canvas edges, land on the existing world footpoints. No save/RNG changes.
 G.A_ART = Object.freeze({
+ 'tavern-a-processing': {source:[448,320], anchor:[223.5,316], span:(448/(7/6))*425/418},
+ 'tavern': {source:[448,320], anchor:[224,320], span:448/(7/6)},
  'tailor-a-idle': {source:[512,540], anchor:[256,540], span:512/1.04},
  'tailor': {source:[512,540], anchor:[256,540], span:512/1.04},
  'blacksmith-a-idle': {source:[512,469], anchor:[256,469], span:512/1.06},
@@ -275,6 +277,11 @@ G.blacksmithArtName=function(b){
 G.tailorArtName=function(b){
  if(b?.type!=='tailor'||b.state!=='ok'||b.houseFire||G.world?.bmap?.[b.id]!==b)return null;
  return (b.workers||[]).some(id=>G.buildingProcessingWorker(b,G.world.cmap[id]))?'tailor':'tailor-a-idle';
+};
+// Hosting is not brewing: only an actual ingredient-bearing process opens the vat.
+G.tavernArtName=function(b){
+ if(b?.type!=='tavern'||b.state!=='ok'||b.houseFire||G.world?.bmap?.[b.id]!==b)return null;
+ return (b.workers||[]).some(id=>G.buildingProcessingWorker(b,G.world.cmap[id]))?'tavern-a-processing':'tavern';
 };
 G.sprDraw = function (ctx, name, cx, by, opts) {
   // Completed storage and its pending preview share this exact footpoint path.
@@ -994,17 +1001,21 @@ G.drawBuilding = function (ctx, b, time) {
   const sprW = (b.w + b.h) * 32 * (G.BUILD_SPR_W[b.type] || 1.08);
   // 贸易站按原图50%显示；补偿底角下方3px透明余量，让石基脚点贴合占地底角。
   const sprFootY = B[1] + ((b.type === 'tradingpost'||b.type==='market') ? 1.5 : b.type === 'mineralpit' ? 2 : b.type==='burntruins'?2.5:b.type==='well'?1:b.type==='chapel'?6:0);
-  const houseArt=G.houseArtName(b)||G.woodcutterArtName(b)||G.blacksmithArtName(b)||G.tailorArtName(b);
+  const houseArt=G.houseArtName(b)||G.woodcutterArtName(b)||G.blacksmithArtName(b)||G.tailorArtName(b)||G.tavernArtName(b);
   const calibrated=houseArt&&G.drawCalibratedArt(ctx,houseArt,B[0],sprFootY,(b.w+b.h)*32);
   const spr = calibrated||G.sprDraw(ctx, b.type, B[0], sprFootY, { w: sprW, omitSmokeAir:true });
   if (spr) {
-    if(calibrated&&!['blacksmith','tailor'].includes(b.type)){
+    if(calibrated&&!['blacksmith','tailor','tavern'].includes(b.type)){
       // Calibrated source art has no chimney. Keep factual state markers,
       // without legacy image-relative smoke/window/work-effect anchors.
       delete b._chimney;
       const activity=G.renderBuildingActivity(b);
       if(activity)G.drawBuildingStateMarker(ctx,activity,B[0]+(b.type==='woodcutter'?20:7),sprFootY+5,b.type==='woodcutter'&&G.woodcutterArtName(b)==='woodcutter-a-processing-v2'&&!G.game.paused);
-    }else G.drawBuildingActivity(ctx,b,spr,B[0],sprFootY);
+    }else {
+      // Brewing edit uses its own source anchor; keep legacy work effects at their original world point.
+      const effectSprite=b.type==='tavern'&&calibrated?[sprW,sprW*320/448]:spr;
+      G.drawBuildingActivity(ctx,b,effectSprite,B[0],sprFootY);
+    }
     if(b.houseFire)G.drawHouseFire(ctx,b,time,spr);
     return;
   }

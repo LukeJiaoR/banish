@@ -47,7 +47,7 @@ G.SPRITE_SIZES = {
 (function () {
   if (typeof Image === 'undefined') return; // node 测试环境：无渲染，保持回退路径
   const SHEET = {
-    'a-style': ['tailor-a-idle','blacksmith-a-idle','bank-sedge-a-v1','storage-a-v2','tree-a-v2-broadleaf-sapling','tree-a-v2-broadleaf-sapling-winter','tree-a-v2-broadleaf-young','tree-a-v2-broadleaf-young-winter','tree-a-v2-willow-sapling','tree-a-v2-willow-sapling-winter','tree-a-v2-willow-young','tree-a-v2-willow-young-winter','woodcutter-a-idle','woodcutter-a-processing-v2','house-a-v2-square-empty','house-a-v2-square-occupied','tree-a-v1-broadleaf','tree-a-v1-willow','tree-a-v1-broadleaf-winter','tree-a-v1-willow-winter'],
+    'a-style': ['tavern-a-processing','tailor-a-idle','blacksmith-a-idle','bank-sedge-a-v1','storage-a-v2','tree-a-v2-broadleaf-sapling','tree-a-v2-broadleaf-sapling-winter','tree-a-v2-broadleaf-young','tree-a-v2-broadleaf-young-winter','tree-a-v2-willow-sapling','tree-a-v2-willow-sapling-winter','tree-a-v2-willow-young','tree-a-v2-willow-young-winter','woodcutter-a-idle','woodcutter-a-processing-v2','house-a-v2-square-empty','house-a-v2-square-occupied','tree-a-v1-broadleaf','tree-a-v1-willow','tree-a-v1-broadleaf-winter','tree-a-v1-willow-winter'],
     'terrain-v2': ['meadow_spring', 'meadow_summer', 'meadow_autumn', 'meadow_winter', 'water_open'],
     tiles: ['grass_spring', 'grass_summer', 'grass_autumn', 'grass_winter',
       'sand_spring', 'sand_summer', 'sand_autumn', 'sand_winter',
