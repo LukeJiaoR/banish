@@ -585,6 +585,13 @@ G.areaLand = function (w, x, y, ww, hh) {
 
 /* ---------- 通行 ---------- */
 G.wildlifeInFootprint=(w,b)=>(w.deer||[]).some(d=>{if(d.returnDay!==null)return false;const cells=[{x:d.x,y:d.y}],p=d.progress>0&&d.route?.[0];if(p){cells.push(p);if(p.x!==d.x&&p.y!==d.y)cells.push({x:p.x,y:d.y},{x:d.x,y:p.y});}return cells.some(p=>p.x>=b.x&&p.x<b.x+b.w&&p.y>=b.y&&p.y<b.y+b.h);});
+// A single open work bay, not general building passability. Footprint ownership stays intact.
+G.woodcutterBayAt = function (w, x, y) {
+  if (!Number.isInteger(x) || !Number.isInteger(y) || x < 0 || y < 0 || x >= w.N || y >= w.N) return null;
+  const b = w.bmap[w.bgrid[y*w.N+x]];
+  return b?.type === 'woodcutter' && b.state === 'ok' && b.w === 2 && b.h === 2 &&
+    x === b.x+1 && y === b.y+1 && b.y+2 < w.N ? b : null;
+};
 G.tileBlocked = function (w, x, y) {
   if (x < 0 || y < 0 || x >= w.N || y >= w.N) return true;
   const i = y * w.N + x;
@@ -595,7 +602,7 @@ G.tileBlocked = function (w, x, y) {
   const bid = w.bgrid[i];
   if (bid >= 0) {
     const b = w.bmap[bid];
-    if (b && !G.BDEF[b.type].passable) return true;
+    if (b && !G.BDEF[b.type].passable && !G.woodcutterBayAt(w,x,y)) return true;
   }
   return false;
 };
@@ -787,6 +794,10 @@ G.findPath = function (w, sx, sy, tx, ty, destinations = null) {
   // Reach its center physically before entering the axis; never relax a wall.
   const first=path[0],entry=first&&G.tunnelInteriorAt(w,first.x,first.y);
   if(entry&&!G.isMountain(w,sx,sy)&&G.tunnelAt(w,sx,sy)===entry&&(entry.tunnelAxis==='x'?Math.abs(fromY-entry.y)>1e-8:Math.abs(fromX-entry.x)>1e-8))path.unshift({x:sx,y:sy});
+  const bay=first&&G.woodcutterBayAt(w,first.x,first.y);
+  // A paused diagonal can round to the doorway without physically reaching it.
+  // Walk to its center first, exactly like a tunnel mouth; never widen the wall rule.
+  if(bay && sx===bay.x+1 && sy===bay.y+2 && (fromX!==sx || fromY!==sy))path.unshift({x:sx,y:sy});
   return path;
 };
 G.nearestWalkable = function (w, x, y, r) {
@@ -1089,6 +1100,11 @@ G.tunnelInteriorAt=(w,x,y)=>G.isMountain(w,x,y)&&G.tunnelAt(w,x,y)?.state==='ok'
 G.walkEdgeAllowed=function(w,sx,sy,tx,ty){
  const dx=tx-sx,dy=ty-sy;if(Math.abs(dx)>1||Math.abs(dy)>1||G.tileBlocked(w,tx,ty))return false;
  if(!dx&&!dy)return true;
+ // The open bay has one front doorway. No side entry, diagonal corner cutting or shortcut.
+ for (const [x,y,ox,oy] of [[sx,sy,tx,ty],[tx,ty,sx,sy]]) {
+  const b=G.woodcutterBayAt(w,x,y);
+  if(b && (ox!==b.x+1 || oy!==b.y+2))return false;
+ }
  for(const [x,y,ox,oy] of [[sx,sy,tx,ty],[tx,ty,sx,sy]])if(G.isMountain(w,x,y)){
   const b=G.tunnelAt(w,x,y);if(!b||b.state!=='ok'||(b.tunnelAxis==='x'?dy!==0:dx!==0)||G.tunnelAt(w,ox,oy)!==b)return false;
  }
@@ -1096,6 +1112,11 @@ G.walkEdgeAllowed=function(w,sx,sy,tx,ty){
  return true;
 };
 G.tunnelSegmentAllowed=function(w,x,y,tx,ty){
+ // An interrupted/sub-cell path must remain on the bay doorway axis as well.
+ for(const [px,py] of [[Math.round(x),Math.round(y)],[tx,ty]]){
+  const b=G.woodcutterBayAt(w,px,py);
+  if(b && (Math.abs(x-(b.x+1))>1e-8 || tx!==b.x+1 || y<b.y+1-1e-8 || y>b.y+2+1e-8 || ty<b.y+1 || ty>b.y+2))return false;
+ }
  for(const [px,py]of [[Math.round(x),Math.round(y)],[tx,ty]]){const b=G.tunnelInteriorAt(w,px,py);if(b&&(b.tunnelAxis==='x'?Math.abs(y-b.y)>1e-8||ty!==b.y:Math.abs(x-b.x)>1e-8||tx!==b.x))return false;}
  return G.walkEdgeAllowed(w,Math.round(x),Math.round(y),tx,ty);
 };

@@ -8,7 +8,16 @@
 G.SPR = {
   map: new Map(),
   failed: [],
-  get: function (n) { return this.map.get(n) || null; },
+  // Only optional large workshop art is demand-loaded; legacy sprite timing stays intact.
+  lazy: new Map(),
+  lazyPending: new Set(),
+  get: function (n) {
+    const image = this.map.get(n);
+    if (image) return image;
+    const load = this.lazy.get(n);
+    if (load) { this.lazy.delete(n); load(); } // one attempt, including repeated failed draws
+    return null;
+  },
 };
 
 /* 渲染尺寸（游戏像素）。h = 显示高、w = 显示宽，另一边按原图比例；
@@ -38,7 +47,7 @@ G.SPRITE_SIZES = {
 (function () {
   if (typeof Image === 'undefined') return; // node 测试环境：无渲染，保持回退路径
   const SHEET = {
-    'a-style': ['house-a-v2-square-empty','house-a-v2-square-occupied','tree-a-v1-broadleaf','tree-a-v1-willow','tree-a-v1-broadleaf-winter','tree-a-v1-willow-winter'],
+    'a-style': ['woodcutter-a-idle','woodcutter-a-processing-v2','house-a-v2-square-empty','house-a-v2-square-occupied','tree-a-v1-broadleaf','tree-a-v1-willow','tree-a-v1-broadleaf-winter','tree-a-v1-willow-winter'],
     'terrain-v2': ['meadow_spring', 'meadow_summer', 'meadow_autumn', 'meadow_winter', 'water_open'],
     tiles: ['grass_spring', 'grass_summer', 'grass_autumn', 'grass_winter',
       'sand_spring', 'sand_summer', 'sand_autumn', 'sand_winter',
@@ -67,6 +76,17 @@ G.SPRITE_SIZES = {
   let pending = 0;
   for (const dir of Object.keys(SHEET))
     for (const n of SHEET[dir]) {
+      if (dir === 'a-style' && ['woodcutter-a-idle', 'woodcutter-a-processing-v2'].includes(n)) {
+        G.SPR.lazy.set(n, () => {
+          const im = new Image();
+          G.SPR.lazyPending.add(n);
+          im.decoding = 'async';
+          im.onload = () => { G.SPR.map.set(n, im); G.SPR.lazyPending.delete(n); };
+          im.onerror = () => { G.SPR.failed.push(n); G.SPR.lazyPending.delete(n); };
+          im.src = 'assets/' + dir + '/' + n + '.png';
+        });
+        continue;
+      }
       pending++;
       const im = new Image();
       im.onload = () => {
