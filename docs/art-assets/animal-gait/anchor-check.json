@@ -1,0 +1,202 @@
+{
+  "deer": {
+    "sameUniformScaleEveryWalkFrame": true,
+    "rows": [
+      {
+        "frame": 0,
+        "visibleBBox": [
+          6,
+          27,
+          122,
+          126
+        ],
+        "bodyBandCentroidX": 64.529,
+        "footBottomNative": 25.594
+      },
+      {
+        "frame": 1,
+        "visibleBBox": [
+          8,
+          26,
+          121,
+          126
+        ],
+        "bodyBandCentroidX": 66.467,
+        "footBottomNative": 25.594
+      },
+      {
+        "frame": 2,
+        "visibleBBox": [
+          6,
+          26,
+          122,
+          124
+        ],
+        "bodyBandCentroidX": 64.76,
+        "footBottomNative": 25.188
+      },
+      {
+        "frame": 3,
+        "visibleBBox": [
+          7,
+          26,
+          120,
+          126
+        ],
+        "bodyBandCentroidX": 64.737,
+        "footBottomNative": 25.594
+      }
+    ],
+    "bodyBandCentroidMaxDeltaNative": 0.394
+  },
+  "sheep": {
+    "sameUniformScaleEveryWalkFrame": true,
+    "rows": [
+      {
+        "frame": 0,
+        "visibleBBox": [
+          6,
+          39,
+          121,
+          126
+        ],
+        "bodyBandCentroidX": 65.322,
+        "footBottomNative": 23.625
+      },
+      {
+        "frame": 1,
+        "visibleBBox": [
+          6,
+          40,
+          121,
+          126
+        ],
+        "bodyBandCentroidX": 64.751,
+        "footBottomNative": 23.625
+      },
+      {
+        "frame": 2,
+        "visibleBBox": [
+          6,
+          39,
+          120,
+          126
+        ],
+        "bodyBandCentroidX": 65.071,
+        "footBottomNative": 23.625
+      },
+      {
+        "frame": 3,
+        "visibleBBox": [
+          6,
+          39,
+          122,
+          126
+        ],
+        "bodyBandCentroidX": 65.349,
+        "footBottomNative": 23.625
+      }
+    ],
+    "bodyBandCentroidMaxDeltaNative": 0.112
+  },
+  "cattle": {
+    "sameUniformScaleEveryWalkFrame": true,
+    "rows": [
+      {
+        "frame": 0,
+        "visibleBBox": [
+          8,
+          42,
+          120,
+          127
+        ],
+        "bodyBandCentroidX": 64.448,
+        "footBottomNative": 31.75
+      },
+      {
+        "frame": 1,
+        "visibleBBox": [
+          7,
+          42,
+          121,
+          127
+        ],
+        "bodyBandCentroidX": 65.389,
+        "footBottomNative": 31.75
+      },
+      {
+        "frame": 2,
+        "visibleBBox": [
+          6,
+          42,
+          122,
+          125
+        ],
+        "bodyBandCentroidX": 63.909,
+        "footBottomNative": 31.25
+      },
+      {
+        "frame": 3,
+        "visibleBBox": [
+          7,
+          42,
+          121,
+          127
+        ],
+        "bodyBandCentroidX": 64.55,
+        "footBottomNative": 31.75
+      }
+    ],
+    "bodyBandCentroidMaxDeltaNative": 0.37
+  },
+  "chicken": {
+    "sameUniformScaleEveryWalkFrame": true,
+    "rows": [
+      {
+        "frame": 0,
+        "visibleBBox": [
+          7,
+          6,
+          121,
+          125
+        ],
+        "bodyBandCentroidX": 66.504,
+        "footBottomNative": 15.625
+      },
+      {
+        "frame": 1,
+        "visibleBBox": [
+          7,
+          5,
+          123,
+          127
+        ],
+        "bodyBandCentroidX": 67.403,
+        "footBottomNative": 15.875
+      },
+      {
+        "frame": 2,
+        "visibleBBox": [
+          7,
+          6,
+          120,
+          126
+        ],
+        "bodyBandCentroidX": 67.252,
+        "footBottomNative": 15.75
+      },
+      {
+        "frame": 3,
+        "visibleBBox": [
+          7,
+          5,
+          121,
+          126
+        ],
+        "bodyBandCentroidX": 66.238,
+        "footBottomNative": 15.75
+      }
+    ],
+    "bodyBandCentroidMaxDeltaNative": 0.146
+  }
+}

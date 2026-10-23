@@ -53,7 +53,7 @@ G.SPRITE_SIZES = {
       'sand_spring', 'sand_summer', 'sand_autumn', 'sand_winter',
       'water_spring', 'water_summer', 'water_summer_b', 'water_autumn', 'water_winter',
       'road_spring', 'road_summer', 'road_autumn', 'road_winter', 'farm_soil', 'farm_soil_snow', 'mountain_rock', 'mountain_rock_snow'],
-    props: ['tree_sapling', 'tree_young', 'tree_mature',
+    props: [...['deer','sheep','cattle','chicken'].flatMap(s=>['_idle','_graze','_turn','_walk_0','_walk_1','_walk_2','_walk_3'].map(p=>s+p)), 'tree_sapling', 'tree_young', 'tree_mature',
       'tree_sapling_snow', 'tree_young_snow', 'tree_mature_snow',
       'rock_a', 'rock_b', 'rock_a_snow', 'rock_b_snow',
       'crop_stage0', 'crop_stage1', 'crop_stage2', 'crop_ripe', 'crop_dead', 'cabbage_stage0', 'cabbage_stage1', 'cabbage_stage2', 'cabbage_ripe', 'bean_stage0', 'bean_stage1', 'bean_stage2', 'bean_ripe', 'squash_stage0', 'squash_stage1', 'squash_stage2', 'squash_ripe', 'sheep', 'chicken', 'cattle', 'deer', 'orchard_leafy', 'orchard_pear', 'orchard_pear_leafy', 'grave'],
