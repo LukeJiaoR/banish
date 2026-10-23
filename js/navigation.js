@@ -1,6 +1,6 @@
 'use strict';
 // Presentation-only modes. Tools, construction rules and saves remain owned by the game.
-window.addEventListener('DOMContentLoaded', () => {
+window.addEventListener(window.BANISH_PIXI ? 'banish-ready' : 'DOMContentLoaded', () => {
   const ui = G.ui, hud = document.getElementById('hud');
   const toolbar = document.getElementById('toolbar');
   const dock = document.getElementById('town-dock');

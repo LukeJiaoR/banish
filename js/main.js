@@ -1728,7 +1728,7 @@ G.commitHarvestSelection = function () {
 /* ---------- 初始化 ---------- */
 G.init = function () {
   G.cv = document.getElementById('game');
-  G.ctx = G.cv.getContext('2d');
+  G.ctx = G.pixi ? G.pixi.context : G.cv.getContext('2d');
   G.dpr = Math.min(2, window.devicePixelRatio || 1);
 
   const resize = () => {
@@ -1736,8 +1736,11 @@ G.init = function () {
     // 瞬间变成 dpr 倍宽，把 innerWidth 撑大后又被写回 CSS，形成 2 倍画布且无法自愈。
     G.cv.style.width = window.innerWidth + 'px';
     G.cv.style.height = window.innerHeight + 'px';
-    G.cv.width = Math.floor(window.innerWidth * G.dpr);
-    G.cv.height = Math.floor(window.innerHeight * G.dpr);
+    if (G.pixi) G.pixi.resize(window.innerWidth, window.innerHeight);
+    else {
+      G.cv.width = Math.floor(window.innerWidth * G.dpr);
+      G.cv.height = Math.floor(window.innerHeight * G.dpr);
+    }
   };
   window.addEventListener('resize', resize);
   resize();
@@ -1752,8 +1755,12 @@ G.init = function () {
       G.newGame(undefined, { preserveSaves: true });
     }
     if (raw) { if (!G.loadGame(G.AUTOSAVE_KEY)) G.recoverBrokenAutosave(raw); }
-    else if (!G.world) G.newGame();
+    else if (!G.world) {
+      if (G.initialSave) G.applySaveData(G.initialSave);
+      else G.newGame();
+    }
   }
+  delete G.initialSave;
   G.probeServerSaves(); // 探测服务器存档接口（server.py 托管时可用）
 
   // 自动存档：换季（sim.js onSeasonChange）、定时、页面隐藏、刷新/关闭时写入
@@ -2246,4 +2253,4 @@ G.selectAt = function (tx, ty, p) {
   } else {G.sel=null;G.ui.hideInfo();if(mountain)G.ui.toast('山体不可直接步行或建造；可从两个陆地洞口规划直线隧道，完工后沿轴通行','info');}
 };
 
-window.addEventListener('DOMContentLoaded', G.init);
+if (!window.BANISH_PIXI) window.addEventListener('DOMContentLoaded', G.init);

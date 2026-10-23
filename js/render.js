@@ -1771,22 +1771,70 @@ G.drawTradeVessels=function(ctx,w,bounds={}){
   for(const pose of visible)G.drawTradeVessel(ctx,pose);
 };
 
+G.drawSceneItem = function (ctx, it, now, citizenHomes) {
+    if (it.k === 0) {
+      G.drawTree(ctx, it.t, it.v);
+      if (it.marked) { // 待砍标记（原版 Harvest Trees 的选中态）
+        const [msx, msy] = G.T2S(it.x, it.y);
+        G.drawResourceDesignation(ctx,msx,msy);
+      }
+    }
+    else if (it.k === 3) { // 待清除岩石标记
+      const [msx, msy] = G.T2S(it.x, it.y);
+      G.drawResourceDesignation(ctx,msx,msy);
+    }
+    else if (it.k === 4) G.drawFarmCrop(ctx, it.b, it.f);
+    else if (it.k === 5) G.drawEconomyFieldPart(ctx, it);
+    else if (it.k === 6) G.drawSupplyPile(ctx,it.pile);
+    else if (it.k === 7) G.drawDeer(ctx,it.deer);
+    else if (it.k === 8) G.drawMountain(ctx,G.world,it.x,it.y);
+    else if(it.k===9)G.drawTunnelPortal(ctx,it.b,it.p,it.first);
+    else if(it.k===10)G.drawPendingBuildingPreview(ctx,it.pending);
+    else if (it.k === 1) {
+      if(it.b.type==='farm')G.drawFarmPestBadge(ctx,it.b);
+      if(it.b.type==='pasture')G.drawPasturePestBadge(ctx,it.b);
+      // Farm ground/crops were split above; keep its building-level badges.
+      if (it.b.type !== 'farm' && !(it.b.state === 'ok' && (it.b.type === 'pasture' || it.b.type === 'orchard' || it.b.type === 'cemetery')))
+        G.drawBuilding(ctx, it.b, now);
+      if(G.game.supplyMode==='physical'&&G.supplyHome(it.b)&&G.supplyResidents(it.b).length&&G.supplyFood(it.b.supplyStock)<G.supplyResidents(it.b).length*G.LIFE.eatPerDay){const p=G.T2S(it.b.x+it.b.w/2,it.b.y);G.drawNeedBadge(ctx,p[0]-3,p[1]-25,'food');}
+      // Cold homes get a distinct snowflake; no-work warning remains separate.
+      if (G.isWinter() && it.b.unheated && it.b.state === 'ok') {
+        const T = G.T2S(it.b.x + it.b.w / 2, it.b.y);
+        G.drawNeedBadge(ctx, T[0] + 13, T[1] - 25, 'cold');
+      }
+      // 警告标记
+      if (it.b.noWork && it.b.state === 'ok') {
+        const T = G.T2S(it.b.x + it.b.w / 2, it.b.y);
+        if (!G.sprDraw(ctx, 'alert', T[0], T[1] - 16, {})) {
+          ctx.font = '13px system-ui';
+          ctx.textAlign = 'center';
+          ctx.fillStyle = '#ffcf4d';
+          ctx.fillText('⚠', T[0], T[1] - 30);
+        }
+      }
+    } else G.drawCitizen(ctx, it.c, now, citizenHomes);
+};
+
 G.frame = function (dtReal) {
   const cv = G.cv, ctx = G.ctx;
   // Advance presentation for every live deer, not only those inside the camera.
   for(const deer of G.world?.deer||[])if(deer.returnDay===null)G.deerDisplayPoint(deer);
   if(!G.game.paused)G.buildingEffectTime+=dtReal;
-  if (G.needGround || G.groundDirty.size || G._groundWorld !== G.world || G._groundScale !== G.groundScale) G.buildGround();
+  G.pixi?.prepareArt();
+  const groundChanged = G.needGround || G.groundDirty.size || G._groundWorld !== G.world || G._groundScale !== G.groundScale;
+  if (G.pixi) G.pixi.beginFrame(groundChanged);
+  if (groundChanged) G.buildGround();
 
   ctx.setTransform(G.dpr, 0, 0, G.dpr, 0, 0);
   ctx.fillStyle = '#14181d';
-  ctx.fillRect(0, 0, cv.clientWidth, cv.clientHeight);
+  if (!G.pixi) ctx.fillRect(0, 0, cv.clientWidth, cv.clientHeight);
 
   const z = G.cam.z;
   ctx.setTransform(G.dpr * z, 0, 0, G.dpr * z, G.dpr * G.cam.x, G.dpr * G.cam.y);
 
   // 地面
-  ctx.drawImage(G._gcv, -G.groundOX, -G.groundOY,
+  if (G.pixi) G.pixi.drawGround();
+  else ctx.drawImage(G._gcv, -G.groundOX, -G.groundOY,
     G._gcv.width / G.groundScale, G._gcv.height / G.groundScale);
 
   const w = G.world;
@@ -1943,52 +1991,15 @@ G.frame = function (dtReal) {
   }
   for(const pile of [...(w.supplyCaches||[]),...(w.families||[]).map(f=>f.supplyCamp).filter(Boolean)])if(!G.tunnelInteriorAt(w,pile.x,pile.y)&&G.supplySum(pile.supplyStock)>1e-8&&pile.x>=tx0-3&&pile.x<=tx1+3&&pile.y>=ty0-3&&pile.y<=ty1+3)items.push({d:pile.x+pile.y+.005,k:6,pile});
   G.addDeerDrawItems(items,w,{tx0,ty0,tx1,ty1});
+  G.pixi?.addDecorations(items, { tx0, ty0, tx1, ty1 });
   items.sort((a, b) => a.d - b.d);
   const now = performance.now() / 1000;
   G._visibleActivityBuildings=items.filter(it=>it.k===1&&it.b.state==='ok'&&!it.b.houseFire&&G.BUILD_ACTIVITY_TYPES.includes(it.b.type)).map(it=>it.b);
   G.prepareBuildingActivities(G._visibleActivityBuildings,now);
+  if (G.pixi) G.pixi.beginItems();
   for (const it of items) {
-    if (it.k === 0) {
-      G.drawTree(ctx, it.t, it.v);
-      if (it.marked) { // 待砍标记（原版 Harvest Trees 的选中态）
-        const [msx, msy] = G.T2S(it.x, it.y);
-        G.drawResourceDesignation(ctx,msx,msy);
-      }
-    }
-    else if (it.k === 3) { // 待清除岩石标记
-      const [msx, msy] = G.T2S(it.x, it.y);
-      G.drawResourceDesignation(ctx,msx,msy);
-    }
-    else if (it.k === 4) G.drawFarmCrop(ctx, it.b, it.f);
-    else if (it.k === 5) G.drawEconomyFieldPart(ctx, it);
-    else if (it.k === 6) G.drawSupplyPile(ctx,it.pile);
-    else if (it.k === 7) G.drawDeer(ctx,it.deer);
-    else if (it.k === 8) G.drawMountain(ctx,w,it.x,it.y);
-    else if(it.k===9)G.drawTunnelPortal(ctx,it.b,it.p,it.first);
-    else if(it.k===10)G.drawPendingBuildingPreview(ctx,it.pending);
-    else if (it.k === 1) {
-      if(it.b.type==='farm')G.drawFarmPestBadge(ctx,it.b);
-      if(it.b.type==='pasture')G.drawPasturePestBadge(ctx,it.b);
-      // Farm ground/crops were split above; keep its building-level badges.
-      if (it.b.type !== 'farm' && !(it.b.state === 'ok' && (it.b.type === 'pasture' || it.b.type === 'orchard' || it.b.type === 'cemetery')))
-        G.drawBuilding(ctx, it.b, now);
-      if(G.game.supplyMode==='physical'&&G.supplyHome(it.b)&&G.supplyResidents(it.b).length&&G.supplyFood(it.b.supplyStock)<G.supplyResidents(it.b).length*G.LIFE.eatPerDay){const p=G.T2S(it.b.x+it.b.w/2,it.b.y);G.drawNeedBadge(ctx,p[0]-3,p[1]-25,'food');}
-      // Cold homes get a distinct snowflake; no-work warning remains separate.
-      if (G.isWinter() && it.b.unheated && it.b.state === 'ok') {
-        const T = G.T2S(it.b.x + it.b.w / 2, it.b.y);
-        G.drawNeedBadge(ctx, T[0] + 13, T[1] - 25, 'cold');
-      }
-      // 警告标记
-      if (it.b.noWork && it.b.state === 'ok') {
-        const T = G.T2S(it.b.x + it.b.w / 2, it.b.y);
-        if (!G.sprDraw(ctx, 'alert', T[0], T[1] - 16, {})) {
-          ctx.font = '13px system-ui';
-          ctx.textAlign = 'center';
-          ctx.fillStyle = '#ffcf4d';
-          ctx.fillText('⚠', T[0], T[1] - 30);
-        }
-      }
-    } else G.drawCitizen(ctx, it.c, now, citizenHomes);
+    if (G.pixi) G.pixi.drawItem(it, now, citizenHomes);
+    else G.drawSceneItem(ctx, it, now, citizenHomes);
   }
 
   if(G.tool?.kind==='road'&&G.roadPlan?.surface==='tunnel'&&G.roadPlan.world===w&&G.roadPlan.start&&G.roadPlan.end)G.drawTunnelGuide(ctx,G.roadPlan.start,G.roadPlan.end,G.roadPlan.result.ok);
@@ -2060,6 +2071,7 @@ G.frame = function (dtReal) {
     clearTimeout(G._gsTimer);
     G._gsTimer = null;
   }
+  if (G.pixi) G.pixi.finish();
 };
 
 G.drawBridge = function(ctx,b) {

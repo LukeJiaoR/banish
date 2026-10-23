@@ -14,7 +14,7 @@ window.addEventListener('keydown', e => {
   } else return;
   e.preventDefault();e.stopImmediatePropagation();
 }, true);
-window.addEventListener('DOMContentLoaded', () => {
+window.addEventListener(window.BANISH_PIXI ? 'banish-ready' : 'DOMContentLoaded', () => {
   const ui=G.ui, $=id=>document.getElementById(id), hud=$('hud'), toolbar=$('toolbar');
   // Keep the real resource chips and their focus/handlers across breakpoints.
   const compact=window.matchMedia?.('(max-width: 760px)');
@@ -63,7 +63,7 @@ window.addEventListener('DOMContentLoaded', () => {
   for(const key of ['food','wood','stone']){const icon=$('res-'+key)?.querySelector('.res-icon');if(icon)icon.innerHTML=ui.icon(key);}
   const originals={refreshToolbarNavigation:ui.refreshToolbarNavigation,refreshHUD:ui.refreshHUD,refreshPlacement:ui.refreshPlacement};
   const buildings=new Set(['house','stonehouse','boarding','storage','stockpile','market','well','gatherer','hunting','dock','forester','woodcutter','stonequarry','mine','blacksmith','tailor','tavern','school','herbalist','hospital','chapel','tradingpost','townhall','pasture','orchard']);
-  const paths=type=>buildings.has(type)?`assets/buildings/${type}.png`:null;
+  const paths=type=>G.pixiArt?.paths[type]||(buildings.has(type)?`assets/buildings/${type}.png`:null);
   const crops={stockpile:[29,68,260,126,320,224],market:[9,30,416,288,448,320],well:[70,60,180,194,320,256],stonequarry:[32,63,384,257,448,320],herbalist:[26,65,268,191,320,256],hospital:[24,35,401,285,448,320],tavern:[15,21,418,299,448,320],tradingpost:[25,33,402,324,448,360],townhall:[14,17,421,335,448,352]};
   function artwork(type) {
     if(crops[type]){const [x,y,w,h,iw,ih]=crops[type];return `<svg class="jade-thumbnail" viewBox="${x} ${y} ${w} ${h}" preserveAspectRatio="xMidYMid meet" aria-hidden="true"><image href="${paths(type)}" width="${iw}" height="${ih}"/></svg>`;}

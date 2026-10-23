@@ -8,10 +8,12 @@ const {loadGame}=require('./helpers/playability');
 function fixture(){
  const G=loadGame(root);G.newGame(65);const w=G.world;
  w.water.fill(0);w.rock.fill(0);w.treeIdx.fill(-1);w.trees=[];w.citizens=[];w.cmap={};w.families=[];w.buildings=[];w.bmap={};w.bgrid.fill(-1);
- for(const[type,x,y]of[['house',40,40],['house',42,40],['house',44,40],['farm',40,32]]){const r=G.addBuilding(type,x,y);assert(r.ok,r.reason);G.finishBuilding(r.b)}
+ for(const[type,x,y]of[['house',40,40],['house',42,40],['house',44,40],['farm',40,32]]){const r=G.addBuilding(type,x,y,{instant:true,free:true});assert(r.ok,r.reason)}
  const context={G,performance,document:{},setTimeout(){},clearTimeout(){}};vm.createContext(context);vm.runInContext(fs.readFileSync(root+'/js/render.js','utf8'),context);
  G.cv={clientWidth:800,clientHeight:600};G.ctx=new Proxy({}, {get:()=>()=>{},set:()=>true});G.dpr=1;G.cam={z:1.5,x:256,y:-1654};G.hover={tx:-1,ty:-1};G.needGround=false;G.groundDirty=new Set();G._gcv={width:1,height:1};G.groundScale=1;G._groundWorld=G.world;G._groundScale=G.groundScale;G.updateParticles=()=>{};G.ui.refreshPlacement=()=>{};G.game.h=12;G.game.season=1;
  const calls=[];G.fillTexDiamond=(ctx,name)=>{calls.push(name);return true};G.sprDraw=(ctx,name)=>{calls.push(name);return[100,100]};
+ // A-style houses use calibrated source pivots instead of the legacy sprite path.
+ G.drawCalibratedArt=(ctx,name)=>{if(name.startsWith('house-'))calls.push('house');return[100,100]};
  return{G,w,calls,farm:w.buildings.find(b=>b.type==='farm')};
 }
 let passed=0;function test(name,fn){fn();passed++;console.log('ok '+name)}
