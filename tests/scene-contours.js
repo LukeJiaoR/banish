@@ -20,6 +20,7 @@ async function pixels(){
  const {createCanvas,loadImage}=require('@napi-rs/canvas'),path=require('node:path'),crypto=require('node:crypto');
  global.document={createElement:()=>createCanvas(1,1)};
  for(const season of G.TEX_SEASON)for(const [prefix,folder]of [['meadow_','terrain-v2'],['sand_','tiles'],['road_','tiles'],['water_','tiles']]){const name=prefix+season;G.SPR.map.set(name,await loadImage(path.join(__dirname,'../assets',folder,name+'.png')));}
+ G.SPR.map.set('bank-sedge-a-v1',await loadImage(__dirname+'/../assets/a-style/bank-sedge-a-v1.png'));
  G.SPR.map.set('water_open',await loadImage(path.join(__dirname,'../assets/terrain-v2/water_open.png')));
  const patterns={coast:(x,y)=>x>=6+Math.round(Math.sin(y*.8)),island:(x,y)=>!(x>=4&&x<=7&&y>=4&&y<=7),checker:(x,y)=>(x+y)%2===0,channel:(x,y)=>x===5||y===5,pond:(x,y)=>x===5&&y===5};
  function fixture(fn){const N=12,w={N,seed:7,water:new Uint8Array(N*N),road:new Uint8Array(N*N),rock:new Uint8Array(N*N),bgrid:new Int32Array(N*N).fill(-1)};for(let y=0;y<N;y++)for(let x=0;x<N;x++)if(fn(x,y))w.water[y*N+x]=1;for(let y=0;y<N;y++)for(let x=0;x<N;x++)if(!w.water[y*N+x]&&[[1,0],[-1,0],[0,1],[0,-1]].some(([dx,dy])=>x+dx>=0&&y+dy>=0&&x+dx<N&&y+dy<N&&w.water[(y+dy)*N+x+dx]===1))w.water[y*N+x]=2;return w;}

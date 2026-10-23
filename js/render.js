@@ -682,6 +682,25 @@ G.coastPresentation = (()=>{
     }
   }
 
+  // Small, deterministic bank dressing is painted into the existing ground cache.
+  // Decorative pebbles are not mineable rock; no world state or RNG is changed.
+  function bankDetails(c,w,bounds){
+    const im=G.SPR?.get('bank-sedge-a-v1');
+    if(G.game.season===3||!im?.width)return; // Snow covers this low vegetation.
+    const N=w.N;
+    for(let y=Math.max(0,bounds.y0-1);y<=Math.min(N-1,bounds.y1+1);y++)for(let x=Math.max(0,bounds.x0-1);x<=Math.min(N-1,bounds.x1+1);x++){
+      const i=y*N+x;if(w.water[i]!==2||w.road[i]||w.rock[i])continue;
+      const h=G.h2(w.seed+457,x,y);if(h>.43)continue;
+      const dirs=[[1,0],[0,1],[-1,0],[0,-1]],wet=dirs.filter(([dx,dy])=>x+dx>=0&&y+dy>=0&&x+dx<N&&y+dy<N&&w.water[(y+dy)*N+x+dx]===1);
+      if(!wet.length)continue;
+      const [dx,dy]=wet[Math.floor(G.h2(w.seed+461,x,y)*wet.length)],j=G.h2(w.seed+463,x,y)-.5;
+      const [sx,sy]=G.T2S(x+.5+dx*.22-dy*j*.5,y+.5+dy*.22+dx*j*.5);
+      // 36 px visible silhouette, 23 px tall; source foot contact is (710,936).
+      const scale=36/(1099*256/1394);
+      c.drawImage(im,sx-710*256/1394*scale,sy-936*256/1394*scale,im.width*scale,im.height*scale);
+    }
+  }
+
   function outline(c,w){[[0,0],[w.N,0],[w.N,w.N],[0,w.N]].forEach((p,i)=>i?c.lineTo(...G.T2S(...p)):c.moveTo(...G.T2S(...p)));c.closePath();}
   function material(c,name){const im=G.SPR?.get(name);if(!im?.width||!c.createPattern)return null;
     let entries=G.terrainPatterns.get(c);if(!entries){entries=new Map();G.terrainPatterns.set(c,entries);}let p=entries.get(name);
@@ -748,11 +767,11 @@ G.coastPresentation = (()=>{
     bankPath(c,routes,w.N,1);c.fillStyle=snowy?'rgba(186,200,205,.40)':'rgba(164,143,97,.40)';c.fill();
     const sand=material(c,'sand_'+G.TEX_SEASON[G.game.season]);
     if(sand){c.save();c.globalAlpha=.78;bankPath(c,routes,w.N,.7);c.fillStyle=sand;c.fill();c.restore();}
-    c.restore();
+    bankDetails(c,w,bounds);c.restore();
     c.save();c.beginPath();for(const r of p.water)curve(c,r,w.N);c.clip('evenodd');surface(c,waterMaterial(),bounds);stroke(snowy?'rgba(167,196,214,.45)':'rgba(115,159,148,.55)',14);stroke(snowy?'rgba(219,233,240,.45)':'rgba(165,185,157,.35)',5);c.restore();
     if(snowy)stroke('rgba(231,242,247,.35)',.6);c.restore();
   }
-  return {draw,active,topology,curve,smoothRoute,boundaryPaths,fillWinterWater,bankSamples,bankPath};
+  return {draw,active,topology,curve,smoothRoute,boundaryPaths,fillWinterWater,bankSamples,bankPath,bankDetails};
 })();
 
 G.buildGround = function () {
