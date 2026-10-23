@@ -1769,7 +1769,8 @@ G.init = function () {
   let dragging = false, dragBtn = -1, dragMoved = 0, lastX = 0, lastY = 0, pressX = 0, pressY = 0;
   let fixedFieldTouch = null, fixedFieldMouse = null;
   let buildingTouch = null, buildingMouse = null;
-  let panTouch = null;
+  let panTouch = null, cameraTouch = null;
+  const minZoom = 0.55, maxZoom = 2.6;
   const fixedField = () => G.tool?.kind === 'build' && ['farm', 'pasture', 'orchard'].includes(G.tool.type);
   let roadTouch = null, harvestTouch = null, harvestMouse = null, roadMouse = null, farmTouch=null, farmMouse=null, pastureTouch=null, pastureMouse=null, orchardTouch=null, orchardMouse=null, cemeteryTouch=null, cemeteryMouse=null;
   function resetInput() {
@@ -1777,7 +1778,7 @@ G.init = function () {
     if (G.harvestPlan && !G.harvestPlan.frozen) G.cancelHarvestPlan();
     fixedFieldTouch = null; fixedFieldMouse = null;
     buildingTouch = null; buildingMouse = null;
-    panTouch = null;
+    panTouch = null; cameraTouch = null;
     G.keys = {};
     dragging = false; dragBtn = -1; dragMoved = 0;
     roadTouch = null; harvestTouch = null; harvestMouse = null; roadMouse = null; G.roadDrag = null;farmTouch=null;farmMouse=null;G.farmDrag=null;pastureTouch=null;pastureMouse=null;G.pastureDrag=null;orchardTouch=null;orchardMouse=null;G.orchardDrag=null;cemeteryTouch=null;cemeteryMouse=null;G.cemeteryDrag=null;
@@ -1944,6 +1945,38 @@ G.init = function () {
     }
   });
 
+  // 双指始终控制相机。先截住同次手势的工具输入，并沿用触摸取消规则
+  // 丢弃未确认预览；松开一指后也不重新触发单指选址，直到两指全部抬起。
+  function touchCamera(e) {
+    const touches = e.targetTouches || e.touches || [];
+    if (!cameraTouch && (e.type !== 'touchstart' || touches.length < 2)) return;
+    if (!cameraTouch) {
+      resetInput();
+      G.cancelBuildingPlacement(); G.cancelRoadPlan(); G.cancelHarvestPlan();
+      G.cancelFarmPlan(); G.cancelPasturePlan(); G.cancelOrchardPlan(); G.cancelCemeteryPlan();
+      cameraTouch = { world:G.world, game:G.game, point:null, blocked:G.hasOpenModal() };
+    }
+    e.preventDefault();
+    e.stopImmediatePropagation?.();
+    if (e.type === 'touchcancel' || !touches.length) { resetInput(); return; }
+    if (G.hasOpenModal() || cameraTouch.world !== G.world || cameraTouch.game !== G.game) cameraTouch.blocked = true;
+    if (cameraTouch.blocked || touches.length !== 2) { cameraTouch.point = null; return; }
+    const a = toLocal(touches[0]), b = toLocal(touches[1]);
+    const p = { x:(a.x+b.x)/2, y:(a.y+b.y)/2, distance:Math.hypot(a.x-b.x,a.y-b.y) };
+    if (!Number.isFinite(p.distance) || p.distance < 1) { cameraTouch.point = null; return; }
+    const previous = cameraTouch.point;
+    cameraTouch.point = p;
+    if (!previous || e.type !== 'touchmove') return;
+    const oldZ = G.cam.z, nz = G.clamp(oldZ * p.distance / previous.distance, minZoom, maxZoom);
+    // 缩放围绕双指中点，移动中点同时平移，手指下的地图位置保持稳定。
+    G.cam.x = p.x - (previous.x-G.cam.x) * (nz/oldZ);
+    G.cam.y = p.y - (previous.y-G.cam.y) * (nz/oldZ);
+    G.cam.z = nz;
+    G.clampCam();
+  }
+  for (const type of ['touchstart','touchmove','touchend','touchcancel'])
+    G.cv.addEventListener(type, touchCamera, {capture:true,passive:false});
+
   // 单指平移：与鼠标左键拖动同一门槛——无工具、无规划、无弹窗时才平移。
   // 位移 ≤6px 视为点按，不拦截默认行为，选址/选中仍走兼容鼠标事件；
   // 超过门槛后 preventDefault，既止住页面手势，也抑制这次点按的选中。
@@ -1955,6 +1988,7 @@ G.init = function () {
     panTouch = { x: p.x, y: p.y, moved: 0 };
   }, { passive: true });
   G.cv.addEventListener('touchmove', e => {
+    if (G.hasOpenModal()) { resetInput(); return; }
     if (!panTouch || e.touches.length !== 1) return;
     const p = toLocal(e.touches[0]);
     const dx = p.x - panTouch.x, dy = p.y - panTouch.y;
@@ -2085,7 +2119,7 @@ G.init = function () {
     e.preventDefault();
     const p = toLocal(e);
     const oldZ = G.cam.z;
-    const nz = G.clamp(oldZ * (e.deltaY < 0 ? 1.12 : 1 / 1.12), 0.55, 2.6);
+    const nz = G.clamp(oldZ * (e.deltaY < 0 ? 1.12 : 1 / 1.12), minZoom, maxZoom);
     // 以指针为中心缩放
     G.cam.x = p.x - (p.x - G.cam.x) * (nz / oldZ);
     G.cam.y = p.y - (p.y - G.cam.y) * (nz / oldZ);

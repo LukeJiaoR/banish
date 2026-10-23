@@ -25,6 +25,8 @@ function fixture() {
     }
   }
   const window = new Target(), document = new Target();
+  const compactMedia = new Target(); compactMedia.matches = false;
+  window.matchMedia = query => query === '(max-width: 760px)' ? compactMedia : {matches: false};
   document.activeElement = null;
   document.visibilityState = 'visible';
   Object.defineProperty(document,'hidden',{get:()=>document.visibilityState==='hidden'});
@@ -107,6 +109,7 @@ function fixture() {
         node.remove(); node.parentNode = this; this.children.unshift(node);
       }
     }
+    replaceChildren(...nodes) { this.textContent = ''; this.append(...nodes); }
     descendants() { return this.children.flatMap(child => [child, ...child.descendants()]); }
     contains(node) {
       for (; node; node = node.parentNode) if (node === this) return true;
@@ -192,8 +195,9 @@ function fixture() {
   mount('guide-count', guide, 'span').hidden = true;
   mount('dynamic-coach', guide).hidden = true; mount('coach-text', guide);
   let modal = false, hudReads = 0, saves = 0;
-  const G = {game: {paused: false, res: {wood: 80, stone: 48}}, tool: null, sel: null,
-    world: {buildings:[]}, pendingBuildingPlacement:null, buildingPlacementGestureVersion:0,
+  const G = {game: {paused: false, season:0, day:0, res: {food:100, wood: 80, stone: 48}}, tool: null, sel: null,
+    world: {buildings:[],citizens:[],families:[]}, pendingBuildingPlacement:null, buildingPlacementGestureVersion:0,
+    LIFE:{eatPerDay:2}, SEASON_NAMES:['春','夏','秋','冬'], SEASON_DAYS:12, YEAR_DAYS:48,
     RES: {wood: {name: '木材', icon: '🪵'}, stone: {name: '石材', icon: '🪨'}},
     BDEF: Object.fromEntries(['house', 'stonehouse', 'gatherer', 'storage'].map(type =>
       [type, {name: type, icon: '🏠', w:2, h:2, cost: {wood: 16, stone: 8}, jobs: 0, desc: '测试建筑'}])),
@@ -255,6 +259,7 @@ function fixture() {
     event: (target,type,props={}) => dispatch(target,type,props),
     windowEvent: (type,props={}) => dispatch(window,type,props),
     documentEvent: (type,props={}) => dispatch(document,type,props),
+    compact: value => { compactMedia.matches = value; dispatch(compactMedia, 'change'); },
     key: (key, props = {}) => dispatch(document.activeElement || body, 'keydown', {key, ...props}),
     modal: value => { modal = value; }, hudReads: () => hudReads, saves: () => saves};
 }
@@ -275,13 +280,59 @@ test('existing nodes are moved once, retaining identity and bound system handler
   }
   assert(!f.get('town-dock').contains(f.originals.close));
   assert(!f.get('toolbar').querySelector('.toolbar-heading').contains(f.originals.cancel));
-  assert.deepEqual(Array.from(f.ui.hudVisibleResources()), ['food', 'wood', 'stone']);
+  assert.deepEqual(Array.from(f.ui.hudVisibleResources()), ['food', 'wood', 'stone', 'tools', 'firewood']);
   for (const key of ['iron', 'tools', 'firewood']) {
-    assert.equal(f.get('res-' + key).parentNode, f.get('secondary-resources'));
+    assert.equal(f.get('res-' + key).parentNode, f.get(key === 'iron' ? 'secondary-resources' : 'core-resources'));
     assert.equal(f.document.querySelectorAll('#res-' + key).length, 1);
   }
   f.get('open-town').click(); assert.equal(f.get('town-controls').hidden, false);
   f.originals.sysButton.click(); assert.equal(f.saves(), 1);
+});
+
+test('compact resources stay accessible in More and return as the same chips on desktop', f => {
+  const tools=f.get('res-tools'),fuel=f.get('res-firewood');
+  f.compact(true);
+  assert.deepEqual(Array.from(f.ui.hudVisibleResources()), ['food','wood','stone']);
+  assert.equal(tools.parentNode,f.get('secondary-resources'));
+  assert.equal(fuel.parentNode,f.get('secondary-resources'));
+  f.ui.setResourceExpanded(true);assert.equal(f.get('secondary-resources').hidden,false);
+  f.compact(false);
+  assert.equal(f.get('res-tools'),tools);assert.equal(f.get('res-firewood'),fuel);
+  assert.equal(tools.parentNode,f.get('core-resources'));
+  assert.equal(fuel.parentNode,f.get('core-resources'));
+  assert.equal(f.document.querySelectorAll('#res-tools').length,1);
+});
+
+test('food coverage uses living population and labels physical supply as public inventory', f => {
+  f.G.world.citizens=[{adult:true},{adult:true},{dead:true}];
+  f.G.game.season=3;f.G.game.day=37;f.G.climateWeather=()=>({temperature:-8});
+  f.ui.refreshHUD();
+  assert.equal(f.get('jade-food-days').textContent,'约 25.0 天');
+  assert.match(f.get('jade-food-days').title,/不计新产出/);
+  assert.equal(f.get('jade-mobile-date').textContent,'冬 2日 · -8°C');
+  f.G.supplyEnabled=()=>true;f.ui.refreshHUD();
+  assert.equal(f.get('jade-food-days').textContent,'公共库存');
+  assert.match(f.get('jade-food-days').title,/本地储备与配送/);
+  f.G.supplyEnabled=()=>false;f.G.world.citizens=[];f.ui.refreshHUD();
+  assert.equal(f.get('jade-food-days').textContent,'暂无居民');
+});
+
+test('compact risks name heating, tools and housing with current mode semantics and clear after recovery', f => {
+  const heat=f.mount('',f.get('guide-list'),'li');heat.dataset.guideKind='heating';heat.dataset.level='urgent';heat.title='本冬取暖燃料不足';
+  f.mount('',heat,'span','guide-text').textContent='取暖燃料不足 · 0 / 150';
+  f.G.world.citizens=[{adult:true},{adult:true,student:true},{adult:true,equipped:true}];
+  f.G.world.families=[{houseId:null,members:[1]},{houseId:1,members:[2]}];
+  f.G.toolDaysLeft=()=>48;f.ui.refreshHUD();
+  assert.equal(f.get('jade-mobile-alert').textContent,'取暖燃料不足 · 工具不足 · 1家无房');
+  f.G.toolDaysLeft=()=>100;f.ui.refreshHUD();assert(!f.get('jade-mobile-alert').textContent.includes('工具不足'));
+  f.G.personalToolsEnabled=()=>true;
+  f.G.toolWorker=c=>c.adult&&!c.student;f.G.toolEquipped=c=>!!c.equipped;
+  f.G.toolDaysLeft=()=>{throw new Error('personal tools must use actual equipment');};
+  f.ui.refreshHUD();assert.match(f.get('jade-mobile-alert').textContent,/1人缺工具/);
+  assert.match(f.get('jade-mobile-alert').title,/公共库存不等于已装备/);
+  heat.remove();f.G.world.citizens[0].equipped=true;f.G.world.families[0].houseId=2;f.ui.refreshHUD();
+  assert.equal(f.get('jade-mobile-alert').textContent,'');
+  assert(!f.get('res-tools').classList.contains('resource-warning'));
 });
 
 test('build, real category/tool handlers, pause, cancel and close work after reparenting', f => {
@@ -438,6 +489,42 @@ test('material shortage keeps a legal plan confirmable without inventing or spen
   confirm.click();assert.equal(f.G.world.buildings.length,1);
   assert.equal(f.G.world.buildings[0].state,'site');
   assert.deepEqual({...f.G.game.res},before);
+});
+
+test('ordinary placement shows location feedback before confirmation and the full preview in details',f=>{
+  f.get('open-build').click();f.ui.openToolCategory('food');f.G.setTool('gatherer');
+  f.G.RES_KEYS=['wood','stone'];f.G.game.h=12;f.G.game.day=1;
+  let reads=0;
+  f.G.placementInfo=()=>{reads++;return {ok:true,warning:true,
+    summary:'附近成熟林偏少，采集产量较低。',text:'成熟 17 棵\n林量偏低\n当前地形可达仓：约 3 步'};};
+  const stocks={...f.G.game.res};stage(f);
+  f.ui.refreshPlacement('gatherer',10,10);
+  const feedback=f.get('jade-placement-feedback'),details=f.get('placement-info').querySelector('details');
+  assert.equal(feedback.hidden,false);assert.equal(feedback.parentNode.id,'jade-build-copy');
+  assert.equal(feedback.textContent,'附近成熟林偏少，采集产量较低。');
+  assert.equal(feedback.dataset.state,'warning');assert.doesNotMatch(feedback.textContent,/17|3/);
+  assert(!f.get('jade-build-header').classList.contains('jade-details-open'));
+  f.get('jade-build-title').click();assert.equal(details.open,true);
+  assert.match(details.querySelector('.placement-full').textContent,/成熟 17 棵[\s\S]*约 3 步/);
+  f.ui.refreshPlacement('gatherer',10,10);assert.equal(reads,1);
+  assert.equal(f.G.world.buildings.length,0);assert.deepEqual({...f.G.game.res},stocks);
+  f.get('jade-build-confirm').click();assert.equal(f.G.world.buildings.length,1);
+});
+
+test('placement feedback follows the pending position and clears on tool and planning changes',f=>{
+  selectHouse(f);f.G.RES_KEYS=['wood','stone'];f.G.game.h=12;f.G.game.day=1;
+  f.G.placementInfo=(type,x)=>({ok:x>=0,warning:x>=0,summary:x<0?'不能建：位置被占用':'当前没有可达仓库，请先打通通路。',text:type+'完整预览'});
+  const feedback=f.get('jade-placement-feedback');
+  f.ui.refreshPlacement('house',9,9);assert.equal(feedback.hidden,false);
+  stage(f,10,10);assert.equal(feedback.hidden,true);
+  f.ui.refreshPlacement('house',10,10);assert.equal(feedback.hidden,false);
+  stage(f,-1,10);assert.equal(feedback.hidden,true);
+  f.ui.refreshPlacement('house',-1,10);
+  assert.equal(feedback.dataset.state,'blocked');assert.match(feedback.textContent,/不能建/);
+  f.G.setTool('stonehouse');assert.equal(feedback.hidden,true);
+  f.ui.refreshPlacement('stonehouse',10,10);assert.equal(feedback.hidden,false);
+  f.G.setTool('cemetery');assert.equal(feedback.hidden,true);
+  f.G.setTool(null);f.ui.refreshPlacement(null);assert.equal(feedback.hidden,true);
 });
 
 test('details Escape closes only the details and Back restores categories with correct aria',f=>{

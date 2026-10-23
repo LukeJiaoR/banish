@@ -53,7 +53,7 @@ test('responsive categories and management retain scrollable access without forc
   assert.match(css, /@media\s*\(max-width:\s*760px\)/);
   assert.match(css, /@media\s*\(min-width:\s*761px\)\s*and\s*\(max-height:\s*600px\)/);
   assert(rule('#hud #toolbar #toolbar-categories', 'display', 'grid'));
-  assert(rule('#hud #toolbar', 'max-height', 'calc\\(100dvh - 120px\\)'));
+  assert(rule('#hud #toolbar', 'max-height', 'calc\\(100dvh - var\\(--hud-height\\) - 72px\\)'));
   assert(rule('#hud #toolbar', 'overflow-y', 'auto'));
   assert(rule('#hud #town-controls', 'overflow-y', 'auto'));
   assert(!clean.includes('!important'));

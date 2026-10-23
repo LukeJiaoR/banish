@@ -5379,6 +5379,7 @@ G.placementInfo = function (type, x, y) {
   const check = G.canPlace(w, type, x, y, type==='farm'?[8,8]:undefined);
   const affordable = Object.keys(def.cost).every(k => G.game.res[k] >= def.cost[k]);
   const result = { ok: check.ok, affordable, radius: type === 'market' ? G.SUPPLY.marketRadius : p.radius || p.waterR || 0, warning: !affordable };
+  const feedback = [];
   result.bounds = [Math.max(0,x-result.radius), Math.max(0,y-result.radius), Math.min(w.N,x+result.radius+1), Math.min(w.N,y+result.radius+1)];
   const lines = [`${def.name} · ${!check.ok ? '不能建：' + check.reason : !affordable ? '可规划，等待材料' : '可建造'}`];
   lines.push('材料（现有/需要）：' + (Object.keys(def.cost).map(k => `${G.RES[k].name} ${Math.floor(G.game.res[k])}/${def.cost[k]}`).join(' · ') || '无需建材，仍需施工'));
@@ -5389,8 +5390,15 @@ G.placementInfo = function (type, x, y) {
     lines.push(`工作范围 ±${p.radius} 格（方形，建筑原点） · 占地清场后 ${result.trees} 棵树 / 成熟 ${result.mature}`);
     if (['gatherer', 'herbalist'].includes(type)) {
       const n = type !== 'gatherer' ? result.mature : result.trees;
-      if (n < p.needTrees) { result.warning = true; lines.push(`⚠ 可建但当前无法生产：至少需 ${p.needTrees} 棵${type !== 'gatherer' ? '成熟' : ''}树`); }
-      else if (result.mature < p.fullForest) { result.warning = true; lines.push(`△ 林量偏低：产量随成熟林增加，充足参考 ${p.fullForest} 棵`); }
+      if (n < p.needTrees) {
+        result.warning = true;
+        feedback.push(type === 'gatherer' ? '附近森林不足，当前无法采集食物。' : '附近成熟林不足，当前无法采药。');
+        lines.push(`⚠ 可建但当前无法生产：至少需 ${p.needTrees} 棵${type !== 'gatherer' ? '成熟' : ''}树`);
+      } else if (result.mature < p.fullForest) {
+        result.warning = true;
+        feedback.push(type === 'gatherer' ? '附近成熟林偏少，采集产量较低。' : '附近成熟林偏少，采药产量较低。');
+        lines.push(`△ 林量偏低：产量随成熟林增加，充足参考 ${p.fullForest} 棵`);
+      }
     }
     if (type === 'forester') lines.push('砍伐会降低重叠食物林产量；可在建筑面板关闭砍伐育林。');
   }
@@ -5399,7 +5407,7 @@ G.placementInfo = function (type, x, y) {
     lines.push(`鹿群：圈内 ${h.count} 只 · 未被追踪 ${h.free} 只 · 当前门外可达 ${h.reachable} 只（排除拟建占地）`);
     lines.push(`最多2名猎人共用每 ${G.HUNTING.cooldownDays} 天一次猎杀；实际追踪、劳动和肉皮送仓后才有库存。`);
     lines.push('林木是栖地参考，不按树数直接发肉。鹿会补入，不啃食作物；数量会随活动和猎杀变化。');
-    if(!h.reachable){result.warning=true;lines.push('⚠ 当前没有可达且未被追踪的鹿；建成后须等待鹿群或改善通路。');}
+    if(!h.reachable){result.warning=true;feedback.push('当前无可追猎的鹿，需等待鹿群或改善通路。');lines.push('⚠ 当前没有可达且未被追踪的鹿；建成后须等待鹿群或改善通路。');}
   }
   if (type === 'dock') {
     const fish = G.fishingPlacementSummary(x, y); result.fishing = fish; result.water = fish.raw;
@@ -5410,7 +5418,11 @@ G.placementInfo = function (type, x, y) {
     else lines.push('当前没有受此处新增在岗渔屋影响的邻屋。');
     lines.push(fish.rule === 'shared' ? '桥梁工地即占水；0人/0上限/工地不竞争，休息和搬运仍计。只影响之后新接批次，当前任务与携货不变。' : '当前经典规则仍按原始水域计产，新建不会自动切换；可在渔屋或市政厅详情查看全镇一次性启用确认。');
     lines.push('这是单批估计，不是年度或入库保证；教育影响工时，真实行走、劳动、送仓仍须完成。');
-    if ((fish.rule === 'shared' ? fish.effective : fish.raw) < p.fullWater) { result.warning = true; lines.push(fish.catch === 0 ? '⚠ 无可捕鱼水域，无法接新捕鱼批次' : '△ 有效水域不足满产参考，单次渔获较低'); }
+    if ((fish.rule === 'shared' ? fish.effective : fish.raw) < p.fullWater) {
+      result.warning = true;
+      feedback.push(fish.catch === 0 ? '缺少可捕鱼水域，当前无法捕鱼。' : '有效水域不足，单次渔获较低。');
+      lines.push(fish.catch === 0 ? '⚠ 无可捕鱼水域，无法接新捕鱼批次' : '△ 有效水域不足满产参考，单次渔获较低');
+    }
   }
   if(type==='market')lines.push(`占地 3×3 · 服务范围 ±${G.SUPPLY.marketRadius} 格（方形，建筑原点） · 最多 1 名货商；货商搬 ${G.SUPPLY.vendorCarry}，家庭成人搬 ${G.SUPPLY.homeCarry}。近仓直接采购可能更快；市场只转运，不生产粮柴，自动供给模式下需先确认整村切换。`);
   if(type==='stockpile')lines.push('完工后：仅木/石/铁/煤/柴各增加250公共仓容，零常驻工人；不是独立地方库存。');
@@ -5420,13 +5432,20 @@ G.placementInfo = function (type, x, y) {
   } else if (check.ok) {
     const outputs=G.productionOutputsOf({type});
     const route = G.storageRoute(x,y,outputs.length?outputs:null);
-    if (route) lines.push(`当前地形可达仓：约 ${route.path.length} 步；道路更快，完工后须保留出入口。`);
-    else { result.warning = true; lines.push(type === 'market' ? '⚠ 当前找不到可达仓库，货商无法从公共库存补货' : '⚠ 当前找不到可达仓库，产物无法正常入库'); }
+    if (route) {
+      if (!feedback.length) feedback.push('当前选址可达仓库。');
+      lines.push(`当前地形可达仓：约 ${route.path.length} 步；道路更快，完工后须保留出入口。`);
+    } else {
+      result.warning = true;
+      feedback.push(type === 'market' ? '当前没有可达仓库，货商无法补货。' : '当前没有可达仓库，请先打通通路。');
+      lines.push(type === 'market' ? '⚠ 当前找不到可达仓库，货商无法从公共库存补货' : '⚠ 当前找不到可达仓库，产物无法正常入库');
+    }
   } else lines.push('物流：地块合法后显示可达仓；近仓且通路畅通，搬运更快。');
   let clearing = 0;
   for (let yy = Math.max(0,y); yy < Math.min(w.N,y+def.h); yy++) for (let xx = Math.max(0,x); xx < Math.min(w.N,x+def.w); xx++) if (w.treeIdx[yy*w.N+xx] >= 0) clearing++;
   if (clearing) lines.push(`清场 ${clearing} 棵树：工人逐棵砍伐并搬运，完成后才施工；取消保留未砍树。`);
   lines.push('工人自动分配：食品优先；工地过多会争用散工。');
+  result.summary = !check.ok ? '不能建：' + check.reason : feedback.slice(0, 2).join('');
   result.text = lines.join('\n');
   return result;
 };

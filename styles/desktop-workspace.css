@@ -16,7 +16,8 @@
   #hud #toolbar #jade-build-header {display:contents;position:static;padding:0;border:0;background:none;box-shadow:none;overflow:visible}
   #hud #toolbar #jade-build-header::after {display:none}
   #hud #toolbar #jade-build-art {grid-column:1;grid-row:2;width:104px;height:118px;margin:0;align-self:center}
-  #hud #toolbar #jade-build-copy {grid-column:2;grid-row:2;display:flex;flex-direction:column;align-items:stretch;justify-content:center;gap:10px;min-height:118px;max-height:270px;overflow-y:auto;scrollbar-width:thin}
+  #hud #toolbar #jade-build-copy {grid-column:2;grid-row:2;display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;gap:10px;min-height:118px;max-height:270px;overflow-y:auto;scrollbar-width:thin}
+  #hud #toolbar #jade-build-name {flex:0 0 auto}
   #hud #toolbar #jade-build-name,#hud #toolbar #jade-build-title {text-align:left}
   #hud #toolbar #jade-build-title {font-size:23px;line-height:1.35;min-height:44px}
   #hud #toolbar #jade-build-benefit {font-size:13px;line-height:1.6;max-height:none;margin-top:5px;color:#52665d}
@@ -64,23 +65,31 @@
   #hud #info.detail-inspector {width:340px;right:12px;top:64px;bottom:12px;max-height:none}
 }
 @media (min-width:761px) and (max-height:600px) {
-  #hud #toolbar,#hud[data-mode=build] #toolbar {top:60px;bottom:8px;padding:9px;gap:6px;grid-template-rows:36px auto minmax(60px,1fr) auto 40px}
+  #hud #toolbar,#hud[data-mode=build] #toolbar {top:60px;bottom:8px;padding:9px;gap:6px;grid-template-rows:36px auto minmax(64px,1fr) auto 40px}
   #hud #toolbar .toolbar-heading {padding-bottom:4px}
   #hud #toolbar #jade-build-art {height:70px}
-  #hud #toolbar #jade-build-copy {min-height:70px;max-height:110px;gap:4px}
+  #hud #toolbar #jade-build-copy {min-height:70px;max-height:120px;gap:4px}
   #hud #toolbar #jade-build-title {font-size:18px;min-height:30px}
   #hud #toolbar #jade-build-benefit {font-size:12px;margin-top:2px}
+  #hud #toolbar #jade-build-header[data-ordinary=true] #jade-build-benefit {display:none}
   #hud #toolbar #jade-build-costs {padding-top:3px;gap:4px}
   #hud #toolbar .jade-cost {min-height:27px;padding:1px 5px}
   #hud #toolbar .jade-cost b {font-size:14px}
+  #hud #toolbar #jade-placement-feedback {padding-top:4px;padding-bottom:4px}
   #hud #toolbar #jade-build-header[data-planning=true] #jade-build-copy {max-height:120px}
   #hud #toolbar .toolbar-items,#hud #toolbar .tool-group {padding-top:6px;gap:6px}
+  #hud #toolbar .tb,#hud #toolbar .tb-category,#hud #toolbar #toolbar-categories .tb-category,
+  #hud #toolbar .tb:not(.tb-category),#hud.is-placing #toolbar .tool-group .tb.active {flex-direction:row;height:52px;min-height:52px;max-height:52px;padding:4px 3px;gap:3px}
+  #hud #toolbar .tb .ic,#hud #toolbar .tb-category .ic {width:34px;height:40px;max-height:40px;flex-basis:34px;line-height:40px}
+  #hud #toolbar .tb .ic>.ui-icon {width:30px;height:30px}
+  #hud #toolbar .tb:not(.tb-category) .lb,#hud #toolbar .category-label {min-width:0;font-size:12px;line-height:18px}
+  #hud #toolbar #jade-build-header.jade-details-open #placement-panel {max-height:60px}
   #hud #toolbar #toolbar-state {max-height:22px;padding-top:0;font-size:11px}
   #hud #toolbar #jade-build-actions button {height:40px;min-height:40px;font-size:14px}
 }
 /* Small screens retain the bottom tray, with readable names and honest overflow. */
 @media (max-width:760px) {
-  #hud #toolbar {max-height:calc(100dvh - 120px);overflow-y:auto;overscroll-behavior:contain}
+  #hud #toolbar {max-height:calc(100dvh - var(--hud-height) - 72px);overflow-y:auto;overscroll-behavior:contain}
   #hud #toolbar .toolbar-heading {display:flex;gap:6px;align-items:center;order:-1}
   #hud #toolbar #toolbar-path {font-size:12px;line-height:1.3}
   #hud #toolbar #toolbar-back {min-height:36px;padding:4px 8px;font-size:12px}
@@ -114,7 +123,7 @@
 }
 @media (min-width:761px) and (max-height:600px) {
   #hud:not(.jade-has-tool) #toolbar,#hud:not(.jade-has-tool)[data-mode=build] #toolbar {grid-template-rows:36px 0 auto auto 40px;max-height:calc(100dvh - 68px)}
-  #hud.jade-has-tool #toolbar,#hud.jade-has-tool[data-mode=build] #toolbar {grid-template-columns:104px minmax(0,1fr);grid-template-rows:36px auto minmax(60px,1fr) auto 40px;top:60px;max-height:none}
+  #hud.jade-has-tool #toolbar,#hud.jade-has-tool[data-mode=build] #toolbar {grid-template-columns:104px minmax(0,1fr);grid-template-rows:36px auto minmax(64px,1fr) auto 40px;top:60px;max-height:none}
   #hud.jade-has-tool #toolbar #jade-build-art {width:104px;height:70px}
   #hud.jade-has-tool #toolbar #jade-build-copy {min-height:70px}
   #hud.jade-has-tool #toolbar .tool-group {max-height:none}
@@ -135,7 +144,7 @@
 }
 @media (min-width:761px) and (max-height:600px) {
   #hud.jade-has-tool #toolbar:has(#jade-build-header[data-planning=true]),
-  #hud.jade-has-tool[data-mode=build] #toolbar:has(#jade-build-header[data-planning=true]) {top:60px;grid-template-rows:36px auto minmax(40px,1fr) auto 40px}
+  #hud.jade-has-tool[data-mode=build] #toolbar:has(#jade-build-header[data-planning=true]) {top:60px;grid-template-rows:36px auto minmax(64px,1fr) auto 40px}
   #hud #toolbar #jade-build-header[data-planning=true] #jade-build-copy {max-height:135px}
   #hud #toolbar #road-plan-status,#hud #toolbar #cemetery-plan-status,#hud #toolbar #harvest-range-status {max-height:35px}
   #hud:not(.jade-has-tool) #toolbar,#hud:not(.jade-has-tool)[data-mode=build] #toolbar {grid-template-rows:36px auto auto 40px}

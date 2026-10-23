@@ -20,6 +20,34 @@ const poor=G.placementInfo('gatherer',x,y);
 assert.equal(poor.affordable,false);assert.match(poor.text,/木材.*0\/30/);
 assert.match(poor.text,/工作范围/);assert.match(poor.text,/仓/);
 const dock=G.placementInfo('dock',x,y);assert.equal(dock.water,G.countWaterInRadius(G.world,x,y,G.PROD.dock.waterR));
+// The compact copy must describe the same placement facts as the full preview,
+// without requiring players to interpret resource counts or path lengths.
+const originalPlacementAPIs={canPlace:G.canPlace,treesInRadius:G.treesInRadius,treeStage:G.treeStage,
+  storageRoute:G.storageRoute,fishingPlacementSummary:G.fishingPlacementSummary};
+try {
+  let trees=[],reachable=true,legal=true,fish={rule:'shared',raw:4,blocked:0,free:4,sharedTiles:0,effective:4,catch:1,baseCatch:1,affected:[]};
+  G.canPlace=()=>({ok:legal,reason:'地块被占用'});
+  G.treesInRadius=()=>trees;G.treeStage=t=>t.stage;
+  G.storageRoute=()=>reachable?{path:[{x:1,y:1}]}:null;
+  G.fishingPlacementSummary=()=>fish;
+  let info=G.placementInfo('gatherer',x,y);
+  assert.equal(info.summary,'附近森林不足，当前无法采集食物。');assert.equal(info.warning,true);
+  trees=Array.from({length:G.PROD.gatherer.needTrees},()=>({x:x-1,y,stage:0}));
+  info=G.placementInfo('gatherer',x,y);
+  assert.equal(info.summary,'附近成熟林偏少，采集产量较低。');
+  trees=Array.from({length:G.PROD.gatherer.fullForest},()=>({x:x-1,y,stage:2}));
+  info=G.placementInfo('gatherer',x,y);assert.equal(info.summary,'当前选址可达仓库。');
+  reachable=false;info=G.placementInfo('gatherer',x,y);
+  assert.equal(info.summary,'当前没有可达仓库，请先打通通路。');assert.equal(info.warning,true);
+  trees=[];info=G.placementInfo('gatherer',x,y);
+  assert.equal(info.summary,'附近森林不足，当前无法采集食物。当前没有可达仓库，请先打通通路。');
+  legal=false;assert.equal(G.placementInfo('gatherer',x,y).summary,'不能建：地块被占用');
+  legal=true;reachable=true;
+  assert.equal(G.placementInfo('dock',x,y).summary,'有效水域不足，单次渔获较低。');
+  fish={...fish,raw:0,free:0,effective:0,catch:0};
+  assert.equal(G.placementInfo('dock',x,y).summary,'缺少可捕鱼水域，当前无法捕鱼。');
+  assert.doesNotMatch(info.summary,/\d|棵|步/);
+} finally { Object.assign(G,originalPlacementAPIs); }
 let hidden=true;G.ui.el.help={classList:{contains:()=>hidden,toggle(k,v){hidden=v;}}};
 G.game.paused=false;G.ui.toggleHelp(true);assert.equal(G.game.paused,true);G.ui.toggleHelp(true);G.ui.toggleHelp(false);assert.equal(G.game.paused,false);
 G.game.paused=true;G.ui.toggleHelp(true);G.ui.toggleHelp(false);assert.equal(G.game.paused,true);

@@ -16,12 +16,23 @@ window.addEventListener('keydown', e => {
 }, true);
 window.addEventListener('DOMContentLoaded', () => {
   const ui=G.ui, $=id=>document.getElementById(id), hud=$('hud'), toolbar=$('toolbar');
-  // Primary stocks stay in the strip; all other real nodes remain in More.
-  ui.hudVisibleResources=()=>['food','wood','stone'];
-  for(const key of ['iron','tools','firewood'])$('secondary-resources').prepend($('res-'+key));
+  // Keep the real resource chips and their focus/handlers across breakpoints.
+  const compact=window.matchMedia?.('(max-width: 760px)');
+  ui.hudVisibleResources=()=>compact?.matches?['food','wood','stone']:['food','wood','stone','tools','firewood'];
+  $('secondary-resources').prepend($('res-iron'));
+  const syncResources=()=>{
+    if(compact?.matches)$('secondary-resources').prepend($('res-tools'),$('res-firewood'));
+    else $('core-resources').append($('res-tools'),$('res-firewood'));
+  };
+  syncResources();
+  compact?.addEventListener('change',()=>{syncResources();ui.refreshHUD();});
+  const foodDays=document.createElement('small');foodDays.id='jade-food-days';$('res-food').append(foodDays);
   const populationDetail=document.createElement('p');populationDetail.id='jade-population-detail';populationDetail.setAttribute('aria-label','人口与健康明细');$('secondary-resources').append(populationDetail);
   const status=document.createElement('div'); status.id='jade-status';
   status.append($('date'),$('pop')); $('topbar').append(status,$('resource-more'));
+  const mobileDate=document.createElement('span');mobileDate.id='jade-mobile-date';
+  const mobileAlert=document.createElement('span');mobileAlert.id='jade-mobile-alert';
+  $('topbar').append(mobileDate,mobileAlert);
   const head=document.createElement('div'); head.id='jade-build-header';
   const art=document.createElement('button'); art.type='button';art.id='jade-build-art';art.title='返回建筑分类';art.setAttribute('aria-label','返回建筑分类');art.addEventListener('click',()=>{if(!G.hasOpenModal?.())ui.backToCategories();});
   const copy=document.createElement('div'); copy.id='jade-build-copy';
@@ -34,6 +45,7 @@ window.addEventListener('DOMContentLoaded', () => {
   const back=document.createElement('button');back.type='button';back.id='jade-back-categories';back.textContent='返回建筑分类';back.addEventListener('click',()=>{if(!G.hasOpenModal?.()){head.classList.remove('jade-details-open');title.setAttribute('aria-expanded','false');ui.backToCategories();}});$('placement-panel').append(back);
   const benefit=document.createElement('small');benefit.id='jade-build-benefit';title.append(benefit);
   const costs=document.createElement('div');costs.id='jade-build-costs';copy.append(costs);
+  const feedback=document.createElement('p');feedback.id='jade-placement-feedback';feedback.hidden=true;copy.append(feedback);
   const confirm=document.createElement('button');confirm.id='jade-build-confirm';confirm.type='button';confirm.textContent='选择位置';actions.append(confirm);
   // Keep keyboard traversal in the same order as the visible workspace.
   toolbar.prepend(toolbar.querySelector('.toolbar-heading'));toolbar.append(actions);
@@ -49,7 +61,7 @@ window.addEventListener('DOMContentLoaded', () => {
   const originalIcon=ui.icon;
   ui.icon=function(name){return ['food','wood','stone','people'].includes(name)?`<span class="ui-icon" aria-hidden="true"><img src="assets/icons/jade/${name}.svg" alt=""></span>`:originalIcon.call(this,name);};
   for(const key of ['food','wood','stone']){const icon=$('res-'+key)?.querySelector('.res-icon');if(icon)icon.innerHTML=ui.icon(key);}
-  const originals={refreshToolbarNavigation:ui.refreshToolbarNavigation,refreshHUD:ui.refreshHUD};
+  const originals={refreshToolbarNavigation:ui.refreshToolbarNavigation,refreshHUD:ui.refreshHUD,refreshPlacement:ui.refreshPlacement};
   const buildings=new Set(['house','stonehouse','boarding','storage','stockpile','market','well','gatherer','hunting','dock','forester','woodcutter','stonequarry','mine','blacksmith','tailor','tavern','school','herbalist','hospital','chapel','tradingpost','townhall','pasture','orchard']);
   const paths=type=>buildings.has(type)?`assets/buildings/${type}.png`:null;
   const crops={stockpile:[29,68,260,126,320,224],market:[9,30,416,288,448,320],well:[70,60,180,194,320,256],stonequarry:[32,63,384,257,448,320],herbalist:[26,65,268,191,320,256],hospital:[24,35,401,285,448,320],tavern:[15,21,418,299,448,320],tradingpost:[25,33,402,324,448,360],townhall:[14,17,421,335,448,352]};
@@ -69,7 +81,19 @@ window.addEventListener('DOMContentLoaded', () => {
   for(const button of toolbar.querySelectorAll('[data-category]')) {
     const type=categoryArt[button.dataset.category]; if(type)button.querySelector('.ic').innerHTML=artwork(type);
   }
-  let previousArt='',previousTool=null;
+  let previousArt='',previousTool=null,placementPreview=null;
+  function syncPlacementFeedback(){
+    const p=placementPreview,pending=G.currentBuildingPlacement?.();
+    const current=G.isBuildingPlacementPlanning?.()&&p&&p.tool===G.tool&&p.world===G.world&&p.game===G.game&&p.type===G.tool.type&&(!pending||p.x===pending.ox&&p.y===pending.oy);
+    const text=current?p.info.summary||'':'';
+    if(feedback.textContent!==text)feedback.textContent=text;
+    feedback.hidden=!text;
+    if(current){
+      feedback.dataset.state=!p.info.ok?'blocked':p.info.warning?'warning':'ready';
+      // The building title is the disclosure; keep its full preview open inside.
+      const details=$('placement-info').querySelector('details');if(details)details.open=true;
+    }
+  }
   function syncSelection(){
     const type=G.tool?.kind==='build'?G.tool.type:null,def=G.BDEF[type];
     const ordinary=!!G.isBuildingPlacementPlanning?.();
@@ -84,8 +108,13 @@ window.addEventListener('DOMContentLoaded', () => {
     if(status?.pending&&!status.ok){benefit.textContent=status.reason;benefit.classList.add('is-blocked');}else benefit.classList.remove('is-blocked');
     costs.innerHTML=def&&type!=='cemetery'?Object.entries(def.cost||{}).map(([key,qty])=>`<span class="jade-cost ${(G.game?.res[key]||0)<qty?'is-short':''}" aria-label="${G.RES[key].name} ${qty}${(G.game?.res[key]||0)<qty?'，库存不足':''}">${ui.resourceIcon(key)}<b>${qty}</b></span>`).join(''):'';
     costs.title=def&&type!=='cemetery'?'建造消耗，红色表示库存不足':'';
-    if(ordinary)$('toolbar-state').textContent=status?.pending?(status.ok?'位置已选定，确认后建造':status.reason):'点击地图选择位置，再确认建造';
+    if(ordinary){
+      const touchHint=window.matchMedia?.('(pointer: coarse)').matches?' · 单指选址，双指移图 / 缩放':'';
+      $('toolbar-state').textContent=(status?.pending?(status.ok?'位置已选定，确认后建造':status.reason):'点击地图选择位置，再确认建造')+touchHint;
+    }
+    syncPlacementFeedback();
   }
+  ui.refreshPlacement=function(type,x,y){const result=originals.refreshPlacement.call(this,type,x,y);placementPreview=result?{type,x,y,info:result,tool:G.tool,world:G.world,game:G.game}:null;syncPlacementFeedback();return result;};
   if(G.stageBuildingPlacement){const stage=G.stageBuildingPlacement;G.stageBuildingPlacement=function(...args){const result=stage.apply(this,args);syncSelection();return result;};}
   function syncTray(){
     if(previousTool!==G.tool){head.classList.remove('jade-details-open');title.setAttribute('aria-expanded','false');disarm();previousTool=G.tool;}
@@ -115,6 +144,26 @@ window.addEventListener('DOMContentLoaded', () => {
     chip.innerHTML='<img src="assets/icons/jade/book.svg" alt=""><span></span><b>›</b>';chip.querySelector('span').textContent=text; chip.title=text+'；展开全部提醒与引导';chip.classList.toggle('is-urgent',!!urgent);
     const count=$('guide-count');if(count&&!count.hidden)chip.setAttribute('aria-label',text+'，'+count.textContent+'，展开全部提醒');else chip.setAttribute('aria-label',text+'，展开生存清单');
   }
-  ui.refreshHUD=function(...args){const result=originals.refreshHUD.apply(this,args);syncGuide();syncSelection();populationDetail.textContent=$('date').textContent+' · 人口与健康 · '+$('pop').textContent;return result;};
-  syncTray();syncGuide();syncSelection();populationDetail.textContent=$('date').textContent+' · 人口与健康 · '+$('pop').textContent;
+  function syncHUD(){
+    const g=G.game,w=G.world,alive=w.citizens.filter(c=>!c.dead),adults=alive.filter(c=>c.adult).length;
+    foodDays.textContent=G.supplyEnabled?.()?'公共库存':alive.length?`约 ${(g.res.food/(alive.length*G.LIFE.eatPerDay)).toFixed(1)} 天`:'暂无居民';
+    foodDays.title=G.supplyEnabled?.()?'这里只计公共食物；各家能否食用取决于本地储备与配送。':'按当前库存和人口估算，不计新产出。';
+    const temperature=G.climateWeather?.()?.temperature;
+    mobileDate.textContent=`${G.SEASON_NAMES[g.season]} ${(g.day%G.SEASON_DAYS)+1}日`+(temperature===undefined?'':` · ${temperature}°C`);
+    mobileDate.title=$('date').textContent;
+    const alerts=[],details=[],heat=$('guide-list').querySelector('[data-guide-kind="heating"]');
+    if(heat&&['urgent','recommend'].includes(heat.dataset.level)){
+      alerts.push(heat.querySelector('.guide-text').textContent.split(' · ')[0]);details.push(heat.title);
+    }
+    const personal=G.personalToolsEnabled?.(),missing=personal?alive.filter(c=>G.toolWorker(c)&&!G.toolEquipped(c)).length:0;
+    const toolWarning=personal?(missing?`${missing}人缺工具`:''):(adults&&G.toolDaysLeft?.(adults)<=G.YEAR_DAYS?'工具不足':'');
+    if(toolWarning){alerts.push(toolWarning);details.push(personal?`${missing}名劳动者尚无个人工具，公共库存不等于已装备。`:'工具余量约一年或更短，不计新产出；可查看工具库存说明。');}
+    $('res-tools').classList.toggle('resource-warning',!!toolWarning);
+    const homeless=w.families.filter(f=>f.houseId==null&&f.members.length).length;
+    if(homeless){alerts.push(`${homeless}家无房`);details.push(`${homeless}个家庭尚无住房，入冬前逐步安置并备柴。`);}
+    mobileAlert.textContent=alerts.join(' · ');mobileAlert.title=details.join('；');
+    populationDetail.textContent=$('date').textContent+' · 人口与健康 · '+$('pop').textContent;
+  }
+  ui.refreshHUD=function(...args){const result=originals.refreshHUD.apply(this,args);syncGuide();syncSelection();syncHUD();return result;};
+  syncTray();syncGuide();syncSelection();syncHUD();
 });
