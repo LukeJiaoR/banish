@@ -1,0 +1,26 @@
+{
+  "preceding_slice": "tailor window-state art following PR162",
+  "generator": "built-in image_gen precise-object-edit",
+  "source": {
+    "path": "docs/art-assets/tavern-state/processing-source.png",
+    "sha256": "92db56fb3a72c17306773711d9beaa49bb3984a14540a76814b19b8c2475fe21",
+    "size": [
+      1484,
+      1060
+    ]
+  },
+  "runtime": {
+    "path": "assets/a-style/tavern-a-processing.png",
+    "sha256": "a5c1776a79659df0a06b142c9f45cf747cf1b6410e0d3a1bec4764e02dc88fb2",
+    "size": [
+      448,
+      320
+    ]
+  },
+  "preservedIdleHosting": {
+    "path": "assets/buildings/tavern.png",
+    "sha256": "ea7deed22c8e92a685e834e21faeb5050e43187427a4eaa8e417e4d61af80b02"
+  },
+  "export": "@napi-rs/canvas scaling only",
+  "boundary": "Layout preserved visually, not a pixel-locked local edit; barrels are state illustration not inventory. No production/save/path changes."
+}
