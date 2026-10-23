@@ -66,7 +66,7 @@ window.addEventListener(window.BANISH_PIXI ? 'banish-ready' : 'DOMContentLoaded'
   const paths=type=>G.pixiArt?.paths[type]||(buildings.has(type)?`assets/buildings/${type}.png`:null);
   const crops={stockpile:[29,68,260,126,320,224],market:[9,30,416,288,448,320],well:[70,60,180,194,320,256],stonequarry:[32,63,384,257,448,320],herbalist:[26,65,268,191,320,256],hospital:[24,35,401,285,448,320],tavern:[15,21,418,299,448,320],tradingpost:[25,33,402,324,448,360],townhall:[14,17,421,335,448,352]};
   function artwork(type) {
-    if(crops[type]){const [x,y,w,h,iw,ih]=crops[type];return `<svg class="jade-thumbnail" viewBox="${x} ${y} ${w} ${h}" preserveAspectRatio="xMidYMid meet" aria-hidden="true"><image href="${paths(type)}" width="${iw}" height="${ih}"/></svg>`;}
+    if(crops[type]&&!G.pixiArt?.paths[type]){const [x,y,w,h,iw,ih]=crops[type];return `<svg class="jade-thumbnail" viewBox="${x} ${y} ${w} ${h}" preserveAspectRatio="xMidYMid meet" aria-hidden="true"><image href="${paths(type)}" width="${iw}" height="${ih}"/></svg>`;}
     if(type==='farm')return `<span class="jade-field-art" aria-hidden="true">${[0,1,2,3].map(i=>`<img src="assets/props/crop_ripe.png" alt="" class="crop-${i}">`).join('')}</span>`;
     if(type==='bridge')return '<img src="assets/bridges/bridge_x.png" alt="">';
     return paths(type)?`<img src="${paths(type)}" alt="" onerror="this.remove()">`:ui.icon(type);

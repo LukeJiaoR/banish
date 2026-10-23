@@ -4,51 +4,61 @@
 G.A_ART = Object.freeze({ ...G.A_ART,
   'pixi-courtyard': { source: [1536, 1024], anchor: [800, 978], span: 1280 },
   'pixi-river-garden': { source: [1536, 1024], anchor: [780, 923], span: 1350 },
+  'pixi-granary': { source: [1536, 1024], anchor: [788, 990], span: 1240 },
+  'pixi-well': { source: [1536, 1024], anchor: [777, 938], span: 768 },
+  'pixi-smithy': { source: [1536, 1024], anchor: [775, 945], span: 1360 },
 });
-const originalHouseArtName = G.houseArtName;
-G.houseArtName = function (b) {
-  const original = originalHouseArtName(b);
-  return original && G.SPR.get('pixi-courtyard') ? 'pixi-courtyard' : original;
+// Painted roofs may overhang their logical plots; all four assets share a
+// doorway/eave scale instead of making every sprite fill its entire canvas.
+const villageArt = {
+  house: { key: 'pixi-courtyard', file: 'courtyard-house-v1.png', width: 144 },
+  storage: { key: 'pixi-granary', file: 'granary-v2.png', width: 152 },
+  well: { key: 'pixi-well', file: 'well-v2.png', width: 64 },
+  blacksmith: { key: 'pixi-smithy', file: 'smithy-v2.png', width: 168 },
+};
+function plotArt(type, x, y, building) {
+  // Reuse the existing small hip-roof dwelling for two of the starter plots.
+  // The home/away variant still follows the actual household's presence.
+  if (type === 'house' && (x + y) % 3 === 1) {
+    const key = building ? G.houseArtName(building) : 'house-a-v2-square-empty';
+    if (key && G.SPR.get(key)) return { key, width: 112 };
+  }
+  return villageArt[type];
+}
+const originalBuilding = G.drawBuilding;
+G.drawBuilding = function (ctx, b, time) {
+  const art = plotArt(b.type, b.x, b.y, b);
+  if (art && b.state === 'ok' && !b.houseFire) {
+    const [x, y] = G.T2S(b.x + b.w, b.y + b.h);
+    if (G.drawCalibratedArt(ctx, art.key, x, y, art.width)) {
+      delete b._chimney;
+      const state = G.renderBuildingActivity(b);
+      const processing = (b.workers || []).some(id => G.buildingProcessingWorker(b, G.world.cmap[id]));
+      if (state) G.drawBuildingStateMarker(ctx, state, x + 7, y + 5, processing && !G.game.paused);
+      return;
+    }
+  }
+  return originalBuilding(ctx, b, time);
 };
 const originalPreview = G.drawPendingBuildingPreview;
 G.drawPendingBuildingPreview = function (ctx, pending) {
-  const name = G.pixiArt.previewNames[pending.type], def = G.BDEF[pending.type];
-  if (!name || !G.SPR.get(name)) return originalPreview(ctx, pending);
+  const art = plotArt(pending.type, pending.ox, pending.oy), def = G.BDEF[pending.type];
+  if (!art || !G.SPR.get(art.key)) return originalPreview(ctx, pending);
   const [x, y] = G.T2S(pending.ox + def.w, pending.oy + def.h);
   ctx.save(); ctx.globalAlpha = .65;
-  G.drawCalibratedArt(ctx, name, x, y, (def.w + def.h) * 32); ctx.restore();
+  G.drawCalibratedArt(ctx, art.key, x, y, art.width); ctx.restore();
 };
-const drawCoast = G.coastPresentation.draw;
-G.coastPresentation.draw = function (c, w, bounds) {
-  drawCoast(c, w, bounds);
-  if (G.game.season === 3) return;
-  // Bake continuous ground decals once, inside the cache's existing repair
-  // clip. Individual tile clips would leave antialiased seams between washes.
-  c.save(); c.beginPath();
-  const [left, top] = G.T2S(0, 0);
-  c.rect(left - w.N * 32 - 40, top - 40, w.N * 64 + 80, w.N * 32 + 80);
-  for (let y = bounds.y0; y <= bounds.y1; y++) for (let x = bounds.x0; x <= bounds.x1; x++) {
-    const i = y * w.N + x;
-    if (w.water[i] !== 1 && !w.road[i] && !w.rock[i] && !w.mountain[i]) continue;
-    const [sx, sy] = G.T2S(x, y);
-    c.moveTo(sx, sy); c.lineTo(sx + 32, sy + 16); c.lineTo(sx, sy + 32); c.lineTo(sx - 32, sy + 16); c.closePath();
-  }
-  c.clip('evenodd');
-  for (const b of w.buildings) {
-    if (['farm', 'dock', 'bridge', 'tunnel', 'roadwork'].includes(b.type)) continue;
-    const [cx, cy] = G.T2S(b.x + b.w / 2, b.y + b.h / 2), r = (b.w + b.h) * 20 + 48;
-    c.save(); c.translate(cx, cy); c.scale(1, .5);
-    const wash = c.createRadialGradient(0, 0, r * .35, 0, 0, r);
-    wash.addColorStop(0, 'rgba(212,184,126,.65)'); wash.addColorStop(1, 'rgba(212,184,126,0)');
-    c.fillStyle = wash; c.fillRect(-r, -r, r * 2, r * 2); c.restore();
-  }
-  c.restore();
+const originalCitizen = G.drawCitizen;
+G.drawCitizen = function (ctx, citizen, time, homes) {
+  const [x, sy] = G.T2S(citizen.x, citizen.y);
+  const y = sy + 16 - (G.bridgeAt(G.world, Math.round(citizen.x), Math.round(citizen.y))?.state === 'ok' ? 8 : 0);
+  ctx.save(); ctx.translate(x, y); ctx.scale(1.2, 1.2); ctx.translate(-x, -y);
+  originalCitizen(ctx, citizen, time, homes); ctx.restore();
 };
 
 G.pixiArt = {
-  paths: { house: 'assets/pixi/courtyard-house-v1.png', storage: 'assets/a-style/storage-a-v2.png', woodcutter: 'assets/a-style/woodcutter-a-idle.png', blacksmith: 'assets/a-style/blacksmith-a-idle.png', tailor: 'assets/a-style/tailor-a-idle.png' },
-  previewNames: { house: 'pixi-courtyard', woodcutter: 'woodcutter-a-idle', blacksmith: 'blacksmith-a-idle', tailor: 'tailor-a-idle', tavern: 'tavern' },
-  ready: Promise.all([['pixi-courtyard', 'courtyard-house-v1.png'], ['pixi-river-garden', 'river-garden-v1.png']].map(([key, file]) => new Promise(resolve => {
+  paths: { ...Object.fromEntries(Object.entries(villageArt).map(([type, art]) => [type, 'assets/pixi/' + art.file])), woodcutter: 'assets/a-style/woodcutter-a-idle.png', tailor: 'assets/a-style/tailor-a-idle.png' },
+  ready: Promise.all([...Object.values(villageArt).map(art => [art.key, art.file]), ['pixi-river-garden', 'river-garden-v1.png']].map(([key, file]) => new Promise(resolve => {
     const image = new Image(); image.decoding = 'async';
     image.onload = () => { G.SPR.map.set(key, image); resolve(); };
     image.onerror = () => { G.SPR.failed.push(key); resolve(); };
@@ -68,14 +78,22 @@ G.pixiArt = {
       this.world = w; this.banks = [];
       for (let y = 1; y < w.N - 1; y++) for (let x = 1; x < w.N - 1; x++) {
         const i = y * w.N + x, h = G.h2(w.seed + 701, x, y);
-        if (w.water[i] === 1 || h > .85) continue;
+        if (w.water[i] === 1 || h > .67) continue;
         const wet = [[1, 0], [0, 1], [-1, 0], [0, -1]].find(([dx, dy]) => w.water[(y + dy) * w.N + x + dx] === 1);
-        if (wet) this.banks.push({ id: 'bank-' + i, x: x + .5 + wet[0] * .22, y: y + .5 + wet[1] * .22, cell: i, size: 56 + h * 24 });
+        if (wet) this.banks.push({ id: 'bank-' + i, x: x + .5 + wet[0] * .22, y: y + .5 + wet[1] * .22, cell: i,
+          art: h < .42 ? 'pixi-river-garden' : 'bank-sedge-a-v1', size: h < .42 ? 30 + h * 34 : 19 + h * 22 });
       }
     }
     const props = this.banks.slice();
     for (const b of w.buildings) if (b.state === 'ok' && b.type === 'house') {
-      props.push({ id: 'garden-' + b.id, x: b.x + b.w + .45, y: b.y + b.h - .25, size: 46 });
+      for (const [n, dx, dy] of [[0, .05, -.45], [1, b.w + .4, b.h - .6], [2, -.5, b.h + .3]])
+        props.push({ id: 'garden-' + b.id + '-' + n, x: b.x + dx, y: b.y + dy,
+          size: 23 + G.h2(w.seed + 881 + n, b.x, b.y) * 11, art: 'pixi-river-garden' });
+      // Short rear fences sit within the occupied plot, so residents never
+      // walk through a decorative barrier on an otherwise passable tile.
+      const ax = b.x + .12, ay = b.y + .12, bx = b.x + b.w - .12;
+      if (b.x >= bounds.tx0 && b.y >= bounds.ty0 && b.x <= bounds.tx1 && b.y <= bounds.ty1)
+        items.push({ id: 'fence-' + b.id, k: 11, fence: true, x: (ax + bx) / 2, y: ay, ax, ay, bx, by: ay, d: (ax + bx) / 2 + ay });
     }
     for (const p of props) {
       if (p.x < bounds.tx0 || p.y < bounds.ty0 || p.x > bounds.tx1 || p.y > bounds.ty1) continue;
@@ -85,7 +103,9 @@ G.pixiArt = {
     }
   },
   draw(ctx, p) {
+    if (p.fence) return G.drawEconomyFieldPart(ctx, { ...p, kind: 'fence' });
     const [x, y] = G.T2S(p.x, p.y);
-    G.drawCalibratedArt(ctx, 'pixi-river-garden', x, y, p.size);
+    if (p.art === 'bank-sedge-a-v1') G.sprDraw(ctx, p.art, x, y, { w: p.size });
+    else G.drawCalibratedArt(ctx, p.art, x, y, p.size);
   },
 };

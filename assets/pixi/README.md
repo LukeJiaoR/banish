@@ -24,3 +24,27 @@ a9fcf8360c0a1b5ed6d34397d9872ad10dbc95a2b4967f480b57b2fd3d89acee  courtyard-hous
 ```
 
 `village-plan.json` 是样板村的作者布局和初始条件；`river-village.json` 是由它构建、通过游戏存档校验的可玩存档。更新美术本身不需要重建存档。
+
+## 河畔院落切片 · v2
+
+本轮同样使用内置 `image_gen`，以 A 图及原院落为画风参考，分别生成粮仓、水井、铁匠铺和土路纹理。四个源文件完整复制到这里；透明 PNG 的 alpha 和不透明土纹理的原始像素均保留。逐字提示词与工具模式保存在 [courtyard-prompts.json](courtyard-prompts.json)。
+
+| 文件 | 源尺寸 | 锚点 / 源跨度 | 世界显示宽度 |
+| --- | --- | --- | --- |
+| `granary-v2.png` | 1536×1024 | (788,990) / 1240 | 152 |
+| `well-v2.png` | 1536×1024 | (777,938) / 768 | 64 |
+| `smithy-v2.png` | 1536×1024 | (775,945) / 1360 | 168 |
+| `path-earth-v2.png` | 1254×1254 | 四格连续纹理，无脚点 | 地表缓存使用 |
+
+院落民居本轮显示基准宽度 144；已有四坡小民居使用 112 的基准宽度，继续按真实在家状态选择已有空屋／有人素材。建筑的预览与落地共用同一规格，不修改逻辑占地。
+
+源标识依次为 `exec-3e3f539e-3ef0-4a15-a190-bc42d41261af.png`、`exec-262932cd-fe7b-466c-aafa-b82981d3a561.png`、`exec-98c8cc47-db64-4c15-8d39-ac2fa4d761aa.png`、`exec-c7663fb6-bd12-4ec3-8ad2-f2c434690713.png`。
+
+```text
+fe18bccefa2d95172166a93a20dd7d64593eecd0f8b38f444a128af1a3e034db  granary-v2.png
+670253d7594b07d2cb2a32dd932cd5cb1280efef21eb3cf4e54fa250409d2d10  well-v2.png
+0515f5a4c322bc3b5bf62790282a8f33ec29fa38f016d20a27cbb6d38b577bbf  smithy-v2.png
+85ff296ce26a37be0cd19a3c8f8a3c2c604422d8c38c99a131747c2a9a5a4dc7  path-earth-v2.png
+```
+
+`courtyard-plan.json` / `courtyard-village.json` 使用独立切片入口和独立存档键，重建命令为 `node tools/build-pixi-village.cjs courtyard`。
