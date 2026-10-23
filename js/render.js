@@ -227,6 +227,7 @@ G.drawMountainHover = function(ctx,w,x,y) {
 // Original A-style source pixels stay intact. Calibrated source-space anchors,
 // not canvas edges, land on the existing world footpoints. No save/RNG changes.
 G.A_ART = Object.freeze({
+ 'storage-a-v2': {source:[768,768], anchor:[654*768/1254,1154*768/1254], span:1232*768/1254},
  'woodcutter-a-idle': {source:[1056,704], anchor:[543.125,657.9375], span:754.1875},
  'woodcutter-a-processing-v2': {source:[1056,704], anchor:[543.125,662.75], span:772.0625, contact:[515.625,462.6875]},
  'house-a-v2-square-empty': {source:[1536,1024], anchor:[768,975], span:1056},
@@ -262,6 +263,13 @@ G.woodcutterArtName=function(b){
  return processing?'woodcutter-a-processing-v2':'woodcutter-a-idle';
 };
 G.sprDraw = function (ctx, name, cx, by, opts) {
+  // Completed storage and its pending preview share this exact footpoint path.
+  // The existing roof-width budget leaves masonry inset from the logical 3x3
+  // occupancy. Never stretch artwork to force painted edges onto the grid.
+  if(name==='storage'&&opts?.w){
+    const art=G.drawCalibratedArt(ctx,'storage-a-v2',cx,by,opts.w);
+    if(art)return art; // Missing/malformed art retains the original warehouse.
+  }
   const im = G.SPR && G.SPR.get(name);
   if (!im || !im.width) return null;
   const sz = (opts && opts.w) ? { w: opts.w } : (G.SPRITE_SIZES[name] || {});
