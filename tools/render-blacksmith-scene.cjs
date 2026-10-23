@@ -28,9 +28,9 @@ const G=context.G;G.autosave=()=>{};G.ui={refreshPlacement(){},refreshHarvest(){
   }
  }
  // Paired native-scale drawBuilding views keep camera/footpoint identical.
- const canvas=createCanvas(880,500),ctx=canvas.getContext('2d');ctx.fillStyle='#e7e3ce';ctx.fillRect(0,0,880,500);
+ const canvas=createCanvas(1000,730),ctx=canvas.getContext('2d');ctx.fillStyle='#e7e3ce';ctx.fillRect(0,0,1000,730);
  for(const z of [1,2])for(const [i,name] of ['blacksmith-a-idle','blacksmith'].entries()){
-  const x=220+i*440,y=z===1?160:440;G.drawCalibratedArt(ctx,name,x,y,128*z);ctx.fillStyle='#253d31';ctx.font='15px sans-serif';ctx.fillText(name+' / '+z+'x',x-140,y+24);
+  const x=250+i*500,y=z===1?230:680;const drawn=G.drawCalibratedArt(ctx,name,x,y,(b.w+b.h)*32*z);assert(Math.abs(drawn[0]-(b.w+b.h)*32*z*G.BUILD_SPR_W[b.type])<1e-9,'paired art must use the real building footprint at native zoom');ctx.fillStyle='#253d31';ctx.font='15px sans-serif';ctx.fillText(name+' / '+z+'x',x-140,y+24);
  }
  fs.writeFileSync(path.join(out,'paired-calibration.png'),canvas.toBuffer('image/png'));
  fs.writeFileSync(path.join(out,'report.json'),JSON.stringify(report,null,2));console.log('16 real-frame scenes and paired calibration, save unchanged');
