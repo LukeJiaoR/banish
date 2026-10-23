@@ -1,0 +1,26 @@
+{
+  "preceding_slice": "PR162 blacksmith tree b6f80e82849409aeee6f14ff0927dda2a3fa00e6",
+  "generator": "built-in image_gen precise-object-edit",
+  "source": {
+    "path": "docs/art-assets/tailor-state/idle-source.png",
+    "sha256": "e710e8996fb3f9f6b5d6d362e65a8a0e89dfbe06b775735adb9cf2b9f3836544",
+    "size": [
+      1221,
+      1289
+    ]
+  },
+  "runtime": {
+    "path": "assets/a-style/tailor-a-idle.png",
+    "sha256": "66795b70e8f6d3dece316a06fd43f37ffa01824a498bc1c6a860d29dbc107126",
+    "size": [
+      512,
+      540
+    ]
+  },
+  "preservedProcessing": {
+    "path": "assets/buildings/tailor.png",
+    "sha256": "88bef9564ddce884656579a27b41d639dade4e0f1e961e7b010b4ed01481e6dc"
+  },
+  "export": "@napi-rs/canvas scaling only",
+  "boundary": "Layout preserved visually, not a pixel-locked local edit; no production/save/inventory changes."
+}
