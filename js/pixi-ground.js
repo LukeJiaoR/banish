@@ -7,18 +7,40 @@
   const groundTile = G.drawGroundTile;
   const drawCoast = G.coastPresentation.draw;
   const coastActive = G.coastPresentation.active;
+  const fillTerrain = G.fillTerrainSurface;
   const soil = '#c5b083';
   const snowy = () => G.game.season === 3;
+  const summer = () => G.game.season === 1;
+
+  G.fillTerrainSurface = function (c, name, x, y) {
+    if (name === 'meadow_summer') {
+      const image = G.SPR.get(name);
+      if (image?.width && c.createPattern) {
+        let entries = G.terrainPatterns.get(c);
+        if (!entries) { entries = new Map(); G.terrainPatterns.set(c, entries); }
+        let entry = entries.get(name);
+        if (!entry || entry.image !== image) {
+          const pattern = c.createPattern(image, 'repeat');
+          // Grass blades need to survive the ground cache's downsampling.
+          // Keep this shared pattern so the coast uses the identical density.
+          if (pattern?.setTransform) pattern.setTransform({ a: 16 * 64 / image.width, b: 0, c: 0, d: 16 * 64 / image.height, e: 0, f: 0 });
+          entry = { image, pattern }; entries.set(name, entry);
+        }
+      }
+    }
+    return fillTerrain(c, name, x, y);
+  };
 
   function material(c) {
     const image = G.SPR.get(textureKey);
     if (!image?.width || !c.createPattern) return soil;
+    const repeat = summer() ? 12 : 4;
     let entry = patterns.get(c);
-    if (!entry || entry.image !== image) {
+    if (!entry || entry.image !== image || entry.repeat !== repeat) {
       const pattern = c.createPattern(image, 'repeat');
-      // One seamless image spans four map cells, irrespective of source size.
-      if (pattern?.setTransform) pattern.setTransform({ a: 4 / image.width, b: 0, c: 0, d: 4 / image.height, e: 0, f: 0 });
-      entry = { image, pattern }; patterns.set(c, entry);
+      // Source gravel was compressed below one cache pixel at four cells.
+      if (pattern?.setTransform) pattern.setTransform({ a: repeat / image.width, b: 0, c: 0, d: repeat / image.height, e: 0, f: 0 });
+      entry = { image, pattern, repeat }; patterns.set(c, entry);
     }
     return entry.pattern || soil;
   }
@@ -97,8 +119,10 @@
     if (!count) return;
     c.lineCap = c.lineJoin = 'round';
     c.save();
-    for (const [width, color, alpha] of [[1.10, 'rgba(183,153,101,.045)', 1], [.99, 'rgba(183,153,101,.085)', 1],
-      [.88, 'rgba(193,167,119,.17)', 1], [.78, 'rgba(193,167,119,.22)', 1], [.66, earth, .86]]) {
+    const bands = summer() ? [[1.04, earth, .06], [.90, earth, .16], [.78, earth, .32], [.64, earth, .88]] :
+      [[1.10, 'rgba(183,153,101,.045)', 1], [.99, 'rgba(183,153,101,.085)', 1],
+        [.88, 'rgba(193,167,119,.17)', 1], [.78, 'rgba(193,167,119,.22)', 1], [.66, earth, .86]];
+    for (const [width, color, alpha] of bands) {
       c.globalAlpha = alpha; c.lineWidth = width; c.strokeStyle = color; c.stroke();
     }
     c.restore();
@@ -110,7 +134,10 @@
     c.save(); c.transform(32, 16, -32, 16, 0, 0);
     allowedSurface(c, w, bounds);
     const earth = material(c);
-    yards(c, w, bounds, earth); roads(c, w, bounds, earth);
+    // Summer buildings meet the real meadow/road surface, without a repeated
+    // surrounding soil plinth. Their sprite bases and contact shadows own it.
+    if (!summer()) yards(c, w, bounds, earth);
+    roads(c, w, bounds, earth);
     c.restore();
   };
   // Dry maps need the same existing clipped repair pass as river maps, since

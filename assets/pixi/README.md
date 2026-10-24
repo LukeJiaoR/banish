@@ -48,3 +48,13 @@ fe18bccefa2d95172166a93a20dd7d64593eecd0f8b38f444a128af1a3e034db  granary-v2.png
 ```
 
 `courtyard-plan.json` / `courtyard-village.json` 使用独立切片入口和独立存档键，重建命令为 `node tools/build-pixi-village.cjs courtyard`。
+
+## 阴影与材质修正
+
+`courtyard-house-v2-matte.png` 使用内置 `image_gen` 编辑原院落，保留主体结构与透视，减少灰瓦细碎亮边，调整灰墙、木材和檐下暗部。源图完整复制，未脚本裁剪、调色或处理 alpha；旧版保留。实际尺寸 1536×1024，落地锚点 (800,991)，基准跨度 1280、世界宽度 144。逐字提示词、参考图和工具模式见 [material-prompts.json](material-prompts.json)。
+
+生成源：`exec-5207083b-8553-4347-8b4e-01b4762a7df2.png`。
+
+SHA-256：`ef55ac2803d6619d1a84467f0fe2108d56d4fcfc2dd96b2318cad59cbe384d18`。
+
+源 PNG 的透明像素带有隐藏 RGB，检查时必须同时看 alpha，不能把透明区域的色彩当成游戏内的可见光晕。地面投影在 Pixi 独立图层生成，未烘焙进新素材。

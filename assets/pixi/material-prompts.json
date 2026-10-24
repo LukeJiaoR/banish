@@ -1,0 +1,11 @@
+{
+  "mode": "built-in image_gen",
+  "date": "2026-10-24",
+  "asset": "courtyard-house-v2-matte.png",
+  "source": "exec-5207083b-8553-4347-8b4e-01b4762a7df2.png",
+  "references": [
+    "courtyard-house-v1.png",
+    "../../docs/ui-reference/selected-a.png"
+  ],
+  "prompt": "Use case: style-transfer. Asset type: production transparent sprite for an existing 2D isometric village game, displayed only about 180 pixels wide. Input image 1 is the exact EDIT TARGET; input image 2 is the art direction reference only. Edit ONLY the surface materials and light response of the courtyard house in image 1. Preserve its exact architecture, silhouette, pixel framing, camera, orientation, building size and position, all ground-contact points, courtyard gate, plants and small props. Keep the 1536 by 1024 landscape canvas and the existing frontmost threshold near source pixel (800,978). Match the quiet hand-painted material grouping in reference A: matte weathered dark grey fired-clay roof tiles, broad coherent shadow shapes instead of bright yellow outlines around every tile, chalky off-white lime plaster with restrained age marks, sun-faded warm timber, muted natural foliage. Sunlight remains from upper left; subtle cooler ambient fill and deeper restrained occlusion directly under eaves, in door recesses and at wall/stone contacts. Reduce the synthetic glossy miniature appearance and tiny high-contrast speckled highlights; keep the structure readable when reduced to game size. No blanket blur; keep clean silhouette and important architectural edges, with calmer internal detail. Preserve the small existing stone paving only. Background is genuinely transparent. No external glow, no backdrop, no ground island added, no long cast shadow (the game renders it separately), no text, no UI, no characters."
+}

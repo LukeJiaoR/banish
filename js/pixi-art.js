@@ -2,7 +2,7 @@
 // Art direction for the independent entry only. Shared source images, explicit
 // source-space pivots and deterministic low props; no simulation or save edits.
 G.A_ART = Object.freeze({ ...G.A_ART,
-  'pixi-courtyard': { source: [1536, 1024], anchor: [800, 978], span: 1280 },
+  'pixi-courtyard': { source: [1536, 1024], anchor: [800, 991], span: 1280 },
   'pixi-river-garden': { source: [1536, 1024], anchor: [780, 923], span: 1350 },
   'pixi-granary': { source: [1536, 1024], anchor: [788, 990], span: 1240 },
   'pixi-well': { source: [1536, 1024], anchor: [777, 938], span: 768 },
@@ -11,7 +11,7 @@ G.A_ART = Object.freeze({ ...G.A_ART,
 // Painted roofs may overhang their logical plots; all four assets share a
 // doorway/eave scale instead of making every sprite fill its entire canvas.
 const villageArt = {
-  house: { key: 'pixi-courtyard', file: 'courtyard-house-v1.png', width: 144 },
+  house: { key: 'pixi-courtyard', file: 'courtyard-house-v2-matte.png', width: 144 },
   storage: { key: 'pixi-granary', file: 'granary-v2.png', width: 152 },
   well: { key: 'pixi-well', file: 'well-v2.png', width: 64 },
   blacksmith: { key: 'pixi-smithy', file: 'smithy-v2.png', width: 168 },
