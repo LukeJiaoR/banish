@@ -52,6 +52,8 @@
     ],
   };
   models['house-a-v2-square-occupied'] = models['house-a-v2-square-empty'];
+  models['house-square-v3-empty'] = models['house-a-v2-square-empty'];
+  models['house-square-v3-occupied'] = models['house-a-v2-square-empty'];
   models['woodcutter-a-processing-v2'] = models['woodcutter-a-idle'];
 
   function hull(points) {

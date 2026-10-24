@@ -3,6 +3,13 @@
 // source of truth; only its cached presentation is replaced here.
 (() => {
   const textureKey = 'pixi-path-earth-v2';
+  const meadowKey = 'pixi-meadow-summer-v3';
+  const spriteGet = G.SPR.get;
+  // The ground tiles and continuous coast must read the same material. Keep
+  // it under a private key so the original asynchronous load cannot replace it.
+  G.SPR.get = function (name) {
+    return (name === 'meadow_summer' && this.map.get(meadowKey)) || spriteGet.call(this, name);
+  };
   const patterns = new WeakMap();
   const groundTile = G.drawGroundTile;
   const drawCoast = G.coastPresentation.draw;
@@ -145,11 +152,11 @@
   G.coastPresentation.active = (c, w) => !snowy() || coastActive(c, w);
 
   G.pixiGround = {
-    ready: new Promise(resolve => {
+    ready: Promise.all([[textureKey, 'path-earth-v2.png'], [meadowKey, 'meadow-summer-v3.png']].map(([key, file]) => new Promise(resolve => {
       const image = new Image(); image.decoding = 'async';
-      image.onload = () => { G.SPR.map.set(textureKey, image); G.needGround = true; resolve(); };
-      image.onerror = () => { G.SPR.failed.push(textureKey); resolve(); };
-      image.src = 'assets/pixi/path-earth-v2.png';
-    }),
+      image.onload = () => { G.SPR.map.set(key, image); G.needGround = true; resolve(); };
+      image.onerror = () => { G.SPR.failed.push(key); resolve(); };
+      image.src = 'assets/pixi/' + file;
+    }))),
   };
 })();

@@ -7,6 +7,8 @@ G.A_ART = Object.freeze({ ...G.A_ART,
   'pixi-granary': { source: [1536, 1024], anchor: [788, 990], span: 1240 },
   'pixi-well': { source: [1536, 1024], anchor: [777, 938], span: 768 },
   'pixi-smithy': { source: [1536, 1024], anchor: [775, 945], span: 1360 },
+  'pixi-house-empty': G.A_ART['house-a-v2-square-empty'],
+  'pixi-house-occupied': G.A_ART['house-a-v2-square-occupied'],
 });
 // Painted roofs may overhang their logical plots; all four assets share a
 // doorway/eave scale instead of making every sprite fill its entire canvas.
@@ -16,11 +18,17 @@ const villageArt = {
   well: { key: 'pixi-well', file: 'well-v2.png', width: 64 },
   blacksmith: { key: 'pixi-smithy', file: 'smithy-v2.png', width: 168 },
 };
+const smallHouseArt = {
+  'house-a-v2-square-empty': { key: 'pixi-house-empty', file: 'house-square-v3-empty.png' },
+  'house-a-v2-square-occupied': { key: 'pixi-house-occupied', file: 'house-square-v3-occupied.png' },
+};
 function plotArt(type, x, y, building) {
   // Reuse the existing small hip-roof dwelling for two of the starter plots.
   // The home/away variant still follows the actual household's presence.
   if (type === 'house' && (x + y) % 3 === 1) {
     const key = building ? G.houseArtName(building) : 'house-a-v2-square-empty';
+    const matte = smallHouseArt[key];
+    if (matte && G.SPR.get(matte.key)) return { key: matte.key, width: 112 };
     if (key && G.SPR.get(key)) return { key, width: 112 };
   }
   return villageArt[type];
@@ -58,7 +66,7 @@ G.drawCitizen = function (ctx, citizen, time, homes) {
 
 G.pixiArt = {
   paths: { ...Object.fromEntries(Object.entries(villageArt).map(([type, art]) => [type, 'assets/pixi/' + art.file])), woodcutter: 'assets/a-style/woodcutter-a-idle.png', tailor: 'assets/a-style/tailor-a-idle.png' },
-  ready: Promise.all([...Object.values(villageArt).map(art => [art.key, art.file]), ['pixi-river-garden', 'river-garden-v1.png']].map(([key, file]) => new Promise(resolve => {
+  ready: Promise.all([...Object.values(villageArt), ...Object.values(smallHouseArt)].map(art => [art.key, art.file]).concat([['pixi-river-garden', 'river-garden-v1.png']]).map(([key, file]) => new Promise(resolve => {
     const image = new Image(); image.decoding = 'async';
     image.onload = () => { G.SPR.map.set(key, image); resolve(); };
     image.onerror = () => { G.SPR.failed.push(key); resolve(); };

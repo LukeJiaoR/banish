@@ -1,0 +1,64 @@
+{
+  "mode": "built-in image_gen",
+  "date": "2026-10-24",
+  "processing": "Selected generated PNG files copied byte-for-byte. No scripted repainting, resizing, color grading or alpha edits.",
+  "assets": [
+    {
+      "asset": "meadow-summer-v3.png",
+      "source": "exec-57ac2c88-c72e-4a0c-836c-ddb0045e51a1.png",
+      "sha256": "39e1af4007e7874fc85deae68ea73106037046ec4574b7d4190f826feba82755",
+      "size": [
+        1254,
+        1254
+      ],
+      "transparent_background": false,
+      "generation": {
+        "source": "exec-3e1db911-43d5-4d05-8944-d05655ebcbcf.png",
+        "references": [
+          "../terrain-v2/meadow_summer.png",
+          "../../docs/ui-reference/selected-a.png"
+        ],
+        "prompt": "Use case: stylized-concept. Asset type: production seamless ground texture for a hand-painted 2:1 isometric Jiangnan village game. Input image 1 is the old grass material color reference ONLY; input image 2 is the game art-direction reference ONLY, do not reproduce its UI or composition. Primary request: one perfectly tileable square flat TOP-DOWN summer village meadow material, fully opaque edge to edge. Muted warm olive-green midtones, a little warm ochre earth showing between short grass, no large dirt islands. Use small purposeful hand-painted strokes clustered into sparse short grass tufts, separated by quiet areas of low-contrast ground, as in the village reference. Keep the overall lightness close to the old grass (average RGB about 98,120,53); shade variation restrained. Designed to repeat over sixteen 64-pixel world cells, about 1024 world pixels per texture; individual grass marks should be only 2–5 pixels at the 1024-square source scale and read around 1–3 screen pixels in the normal game view. Make the surface coherent with matte plaster, fired clay roofs and sun-faded timber. Avoid fuzzy cloud-like mottling, photographic lawn filaments, evenly sprinkled white highlights, sharp dark speckles, giant leaves, grass clumps with large directional shadows or excessive density. Ambient diffuse light only: NO cast shadows, vignette, perspective, horizon, grid, border, frame, stones, flowers, trees, structures, lettering or UI. Seamless opposite edges, no conspicuous repeating motif. 1024 by 1024 square image."
+      },
+      "refinement": {
+        "references": [
+          "exec-3e1db911-43d5-4d05-8944-d05655ebcbcf.png",
+          "../terrain-v2/meadow_summer.png"
+        ],
+        "prompt": "Use case: style-transfer.\nAsset type: opaque, seamless, square ground texture for a hand-painted isometric village game.\nInput images: Image 1 is the exact EDIT TARGET, a generated meadow texture. Image 2 is the old meadow COLOR REFERENCE only.\nPrimary request: precisely recolor Image 1 to the quieter green palette and low contrast of Image 2. Preserve the hand-painted short-grass brushwork and seamless pattern layout of Image 1. The current yellow/ochre patches and bright yellow grass tips are much too yellow and high contrast in the game; make them subdued olive greens with only a small hint of warm dry earth. Keep most of the surface calm green. Target overall average RGB approximately (98,120,53) rather than (129,134,48). Darker, greener, less golden, no global haze or fog.\nConstraints: color and contrast adjustment only. Keep the exact square image framing, small stroke scale, edge-to-edge coverage and opposite-edge seamless tiling. No new objects, no bigger grass tufts, no cast shadows, no vignettes, no perspective, no flowers, no rocks, no text, no UI. The final ground should support muted grey roofs and chalky plaster without competing with them. Opaque RGB PNG."
+      }
+    },
+    {
+      "asset": "house-square-v3-empty.png",
+      "source": "exec-1984189b-5da7-4f83-b410-cfa278396579.png",
+      "sha256": "96a6ddbad661356e1ba3c51b71fd14a303d9d31d4c78c2713171a0e00fe73ad8",
+      "size": [
+        1536,
+        1024
+      ],
+      "transparent_background": true,
+      "references": [
+        "../a-style/house-a-v2-square-empty.png",
+        "courtyard-house-v2-matte.png",
+        "../../docs/ui-reference/selected-a.png"
+      ],
+      "prompt": "Use case: style-transfer. Asset type: production transparent building sprite for an existing hand-painted isometric village game. Input image 1 is the exact EDIT TARGET, the empty square hip-roof dwelling. Input image 2 is the matching matte courtyard MATERIAL AND LIGHTING reference only. Input image 3 is overall village art direction only. Change ONLY surface paint and light response in image 1; preserve its exact architecture, silhouette, four roof corners, roof apex, window shutters CLOSED, door CLOSED, stone steps and foundations, camera, framing, orientation and ground-contact points. Preserve the 1536 by 1024 image canvas; the frontmost stone footing stays at source (768,975). Match the courtyard material groups: charcoal-grey MATTE fired-clay roof with fewer, quieter highlights and coherent shade planes; remove bright golden piping around individual tiles while retaining roof rows and important edges. Off-white warm chalky lime plaster with modest irregular weathering, no bright white crackle webbing; faded brown warm timber instead of vivid orange outlines, natural muted grey footing stones instead of bright yellow-white stones. Low specularity, restrained medium-scale brushwork, readable at only 112 world pixels wide. Upper-left sun consistent with reference; cool soft fill, deeper eaves and door recesses, restrained contact darks. Do not blur the whole image, flatten the building, add props, open doors/windows, add lamps, add people or add shadows extending onto the ground. Preserve genuine background transparency, with no glow, halo, vignette, background color, ground island, labels, text or UI."
+    },
+    {
+      "asset": "house-square-v3-occupied.png",
+      "source": "exec-597e6722-cb44-43a6-bdfe-4e08dbf0964a.png",
+      "sha256": "ed8d932f3eab2c688db811e98361dfa7ed8e53fd7c05b8f7f78a451b0886f881",
+      "size": [
+        1536,
+        1024
+      ],
+      "transparent_background": true,
+      "references": [
+        "../a-style/house-a-v2-square-occupied.png",
+        "house-square-v3-empty.png",
+        "courtyard-house-v2-matte.png"
+      ],
+      "prompt": "Use case: style-transfer.\nAsset type: transparent isometric small Chinese village house sprite, occupied state, paired with an existing empty state.\nInput images: Image 1 is the exact occupied-house EDIT TARGET. Image 2 is the approved matte empty-house EXTERIOR MATERIAL MATCH. Image 3 is a courtyard-house material and light reference.\nPrimary request: change only the target's exterior surface materials and exterior highlight response to match Image 2 precisely. This is a state pair: the outside shell must have the same muted charcoal tile, faded warm brown timber, chalky plaster and cool grey stone as Image 2.\nInvariants: keep the exact target architecture, silhouette, all four roof corners, roof apex and finial, wall edges, isometric camera, framing and object size unchanged. Keep both occupied window shutters open, the door open, the little basket by the entrance, the visible warm interior lamp flames and their small local light pools. Keep the exact steps and masonry footing. Do not change the pose, layout or proportions.\nMaterials: matte grey clay roof with coherent subdued tile-row highlights; remove gold piping and metallic shine from exterior tiles. Faded timber rather than glowing orange wood. Warm off-white plaster with restrained broad weathering instead of a dense bright crackle web. Cool muted grey stone rather than shiny limestone. Preserve useful deep eave and recess shading and small painterly material marks at game scale; no blanket blur.\nLighting: upper-left sun, cool ambient fill. Warm orange light is limited to interior openings and the nearby inner wood; it must not make the entire exterior orange.\nComposition: exact 1536x1024 landscape canvas. Frontmost central stone footing stays at pixel (768,975), identical to the target. Keep all existing edges aligned.\nBackground: genuinely transparent PNG, preserve clean alpha. No new ground island or cast shadow, halo, surrounding glow, vignette, props, people, text or watermark."
+    }
+  ]
+}
