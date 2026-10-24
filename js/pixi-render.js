@@ -15,8 +15,9 @@ G.createPixiRenderer = async function (canvas) {
   app.stop(); // main.js owns the only simulation/render loop.
 
   const ground = new PIXI.Container(), objects = new PIXI.Container();
+  const shadows = G.createPixiShadowLayer();
   const under = new PIXI.Sprite(), over = new PIXI.Sprite();
-  app.stage.addChild(ground, under, objects, over);
+  app.stage.addChild(ground, shadows.container, under, objects, over);
   const surface = document.createElement('canvas');
   const context = surface.getContext('2d');
   const layers = [under, over].map(sprite => {
@@ -30,10 +31,11 @@ G.createPixiRenderer = async function (canvas) {
   let nextId = 1, frameId = 0, world = null, groundChanged = true;
   const id = object => { if (!ids.has(object)) ids.set(object, nextId++); return ids.get(object); };
   const stats = { backend: 'PixiJS ' + PIXI.VERSION + ' / WebGL', frames: 0,
-    objects: 0, nativeImages: 0, rasterSegments: 0, rasterUploads: 0, groundUploads: 0 };
+    objects: 0, nativeImages: 0, shadowSprites: 0, rasterSegments: 0, rasterUploads: 0, groundUploads: 0 };
 
   function destroyEntry(entry) {
     for (const node of entry.nodes) if (node.raster) node.texture.destroy(true);
+    entry.shadow?.destroy(); // The per-art mask texture remains shared.
     entry.container.destroy({ children: true });
   }
   function clearGround() {
@@ -178,11 +180,13 @@ G.createPixiRenderer = async function (canvas) {
           else if (a.length === 4) [dx, dy, dw, dh] = a;
           else { [dx, dy] = a; dw = sw; dh = sh; }
           const node = nodeAt(entry, false), m = c.getTransform();
+          node.image = image;
           node.sprite.texture = imageTexture(image, a.length === 8 ? [sx, sy, sw, sh] : null);
-          node.sprite.setFromMatrix(new PIXI.Matrix(m.a * dw / sw / r, m.b * dw / sw / r,
+          node.matrix = new PIXI.Matrix(m.a * dw / sw / r, m.b * dw / sw / r,
             m.c * dh / sh / r, m.d * dh / sh / r,
             (m.a * dx + m.c * dy + m.e) / r - bounds.left,
-            (m.b * dx + m.d * dy + m.f) / r - bounds.top));
+            (m.b * dx + m.d * dy + m.f) / r - bounds.top);
+          node.sprite.setFromMatrix(node.matrix);
           node.sprite.alpha = c.globalAlpha; stats.nativeImages++;
         };
         if (key === 'save') return () => { stack.push(clips.slice()); c.save(); };
@@ -211,22 +215,26 @@ G.createPixiRenderer = async function (canvas) {
   }
 
   const backend = {
-    app, context, stats,
+    app, context, stats, shadows,
     resize(width, height) {
       app.renderer.resize(width, height);
       surface.width = Math.floor(width * G.dpr); surface.height = Math.floor(height * G.dpr);
     },
     beginFrame(changed) {
       frameId++; groundChanged = changed;
-      stats.nativeImages = stats.rasterSegments = stats.rasterUploads = 0;
+      stats.nativeImages = stats.shadowSprites = stats.rasterSegments = stats.rasterUploads = 0;
       if (world !== G.world) {
         for (const entry of entries.values()) destroyEntry(entry);
         entries.clear(); clearGround(); world = G.world; groundChanged = true;
       }
       clearSurface();
-      for (const entry of entries.values()) entry.container.visible = false;
+      for (const entry of entries.values()) {
+        entry.container.visible = false;
+        if (entry.shadow) entry.shadow.visible = false;
+      }
       ground.position.set(G.cam.x, G.cam.y); ground.scale.set(G.cam.z);
       objects.position.copyFrom(ground.position); objects.scale.copyFrom(ground.scale);
+      shadows.beginFrame();
     },
     drawGround() {
       if (!groundChanged && ground.children.length) return;
@@ -259,6 +267,7 @@ G.createPixiRenderer = async function (canvas) {
       entry.container.zIndex = backend.paintIndex++;
       entry.cursor = 0; entry.seen = frameId;
       paintItem(entry, bounds, ctx => it.k === 11 ? G.pixiArt.draw(ctx, it) : G.drawSceneItem(ctx, it, now, homes));
+      if (shadows.draw(entry, it, bounds)) stats.shadowSprites++;
     },
     paintIndex: 0,
     finish() {

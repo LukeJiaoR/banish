@@ -18,7 +18,11 @@ python3 dev-server.py 8624
 
 ### 阴影与材质修正
 
-撤回了整张建筑与树木 Sprite 压扁生成的地面投影：画面纵深不能当成物体高度，原方法把屋顶、墙面与地基一起翻压，形成扁平的重复暗块。当前保留源素材的墙根、台阶和树根接触暗部。可信的长投影仍需与素材相机、光源配套的独立阴影遮罩，尚未制作。
+`js/pixi-shadows.js` 为院落、小民居、粮仓、水井、铁匠铺和伐木棚制作了独立的地面投影遮罩。低模顶点按源图的石基、立柱、屋檐与屋脊校准，记录图像坐标和独立的竖直高度；地面点保持原位，高处沿统一右下光向投到地面。院落分主屋、厢房与矮墙，井亭保留屋顶和立柱之间的空隙，不使用逻辑占地生成大块底影。树木以树干、分枝和椭球树冠投影近似，冬季移除树冠。
+
+遮罩按实际投影范围留足边缘，每类素材只生成一次，添加约 1–2 世界像素的柔边，复用原图绘制矩阵对齐。所有可见投影先以不透明遮罩合并，再由 Pixi AlphaFilter 统一施加 .32 透明度，重叠处不会重复加深。滤镜范围使用相机反变换后的本地视口坐标；直接传屏幕矩形会在本版本 Pixi 中被再次变换而跳过滤镜。投影位于地面之上、场景物体之下，离屏对象和世界切换沿用对象清理流程，静止帧不上传新遮罩。
+
+制作依据：[Sweet Transit 开发者的独立阴影层说明](https://www.gamedeveloper.com/programming/deep-dive-designing-sweet-transit-and-the-unique-challenges-of-programming-in-2d)、[Factorio 的树影分层与重叠合并](https://www.factorio.com/blog/post/fff-227)、[Microsoft 的平面阴影投影](https://learn.microsoft.com/en-us/windows/win32/api/directxmath/nf-directxmath-xmmatrixshadow)。当前是固定光向的地面投影近似，未制作物体之间的投影和精细树叶遮罩；其它未校准建筑保持原表现。
 
 大于等于 256 像素的静态图像启用一次性 mipmap，减少 1536 像素源图降至游戏尺寸时的瓦片与树叶采样碎点；动态 Canvas 分段维持原缓存方式。接口依据是 [PixiJS TextureSource 文档](https://pixijs.com/8.x/guides/components/textures)，在当前固定的 8.22.0 WebGL 后端确认大图具有 11 级 mip。
 
@@ -26,11 +30,11 @@ python3 dev-server.py 8624
 
 这些是二维素材与采样修正。尚未制作法线、粗糙度或实时三维光照。没有按逻辑占地统一画 AO 外框，因为井、粮仓等素材实际底座小于占地，外框会露在基脚之外。
 
-撤回投影后验证：修改脚本语法、差异空白检查通过。桌面 Chromium WebGL 加载 13 栋建筑、15 位居民；暂停连续渲染前后序列化结果一致，静止帧无分段纹理上传。390×844、DPR 2 渲染为 780×1688，无横向溢出；两种尺寸的页面与 WebGL 错误均为 0，素材无加载失败。未重复运行前轮模拟测试，因为本次仅删除独立入口的错误表现层。
+投影验证：修改脚本语法、差异空白检查通过。桌面 Chromium WebGL 加载 13 栋建筑、15 位居民；暂停连续渲染前后序列化结果一致，静止帧无分段纹理上传。可见投影数与节点数均为 134，移出画面为 0、移回恢复 134。同一暂停镜头开关投影，四处建筑／树旁草地样点的像素亮度降低约 19–20%，非阴影路面样点不变。390×844、DPR 2 渲染为 780×1688，无横向溢出；两种尺寸的页面与 WebGL 错误均为 0，素材无加载失败。未重复运行前轮模拟测试，本次仅改独立入口的渲染。
 
-![撤回错误投影后的实景](courtyard-lighting-desktop.png)
+![独立地面投影实景](courtyard-shadows-desktop.png)
 
-![手机实景](courtyard-lighting-mobile.png)
+![手机地面投影实景](courtyard-shadows-mobile.png)
 
 ![院落切片实际渲染](courtyard-desktop.png)
 
