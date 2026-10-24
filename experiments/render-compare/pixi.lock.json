@@ -1,0 +1,13 @@
+{
+  "name": "pixi.js",
+  "version": "8.22.0",
+  "license": "MIT",
+  "verifiedAt": "2026-10-21",
+  "release": "https://github.com/pixijs/pixijs/releases/tag/v8.22.0",
+  "documentation": "https://pixijs.download/v8.22.0/docs/index.html",
+  "licenseUrl": "https://raw.githubusercontent.com/pixijs/pixijs/v8.22.0/LICENSE",
+  "url": "https://cdn.jsdelivr.net/npm/pixi.js@8.22.0/dist/pixi.min.js",
+  "integrity": "sha384-sQhAUuZTvdanRcBHbVCTasnEWH28GGEK87FJGPj/JaqwL/15KWQwKe7whTHdCkwm",
+  "sha256": "06d9ef9823e743518793083c296d801e752db128cb1f519fbabe37e1259567ea",
+  "bytes": 840663
+}
