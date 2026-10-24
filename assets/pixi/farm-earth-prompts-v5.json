@@ -1,0 +1,14 @@
+{
+  "mode": "built-in image_gen",
+  "date": "2026-10-24",
+  "asset": "farm-earth-v5.png",
+  "source": "exec-6030bd1b-d34c-480a-b01a-1462aba3ffc0.png",
+  "size": [
+    1254,
+    1254
+  ],
+  "transparent_background": false,
+  "sha256": "416652689999505c09810580b92b4211900eab497447763bd8d59cb6c865c6f5",
+  "processing": "Generated RGB PNG copied byte-for-byte. No scripted repainting, grading, cropping or resizing.",
+  "prompt": "Use case: stylized-concept.\nAsset type: one seamless opaque TOP-DOWN cultivated-earth material for a painterly 2:1 isometric Chinese village game.\nPrimary request: a square 1024x1024 tileable texture of freshly hand-cultivated rich loamy soil. It must read as uneven friable EARTH, with a few shallow sowing furrows and small broken clods, not a flat sanded surface. The game projects this flat texture into isometric perspective; DO NOT draw an isometric diamond, field border or perspective into the image.\nMaterial: warm muted medium-dark umber and cocoa-brown loam, cooler deep-brown damp crevices and slightly lighter dry crumb edges. Subtle patches of moisture and natural crumb-size variation. Matte porous earthy brushwork, rounded irregular broken clods about 12–30 pixels across at source scale, smaller soil grit between. Shallow relief only, no tall mounds, no loose rock piles. Use small purposeful painterly brush marks, with readable medium-scale forms at a tiny game display size; no photographic noise.\nFurrow layout: exactly EIGHT shallow broadly horizontal planting grooves running across the image in the X direction. Center heights at 6.25%,18.75%,31.25%,43.75%,56.25%,68.75%,81.25%,93.75% of image height. The grooves are 18–35 source pixels wide with gentle broken earthy sides; vary their edges and local depth, sometimes interrupted by soil crumbs. The row centers should remain roughly in those positions for game plant alignment. Make grooves organically dug, not scored straight ruler lines. Ground between grooves is irregular crumbled earth, no evenly lit smooth bands, no parallel wooden planks, no corduroy or carpet appearance. Keep overall row contrast modest; crevice occlusion is local, not eight black trenches.\nLighting and color: restrained diffuse daylight, small soft shadows inside crevices only, medium warm soil around average RGB roughly (102,75,47), with useful darker/lighter variation. Avoid bright orange, pale sandy tan, yellow road gravel or uniform brown fill. No vignette or large lighting gradient.\nConstraints: perfectly tileable opposite edges, especially continuous grooves left to right. Fully opaque edge-to-edge. No borders, frame, raised platform, grass or plants, plant roots, seeds, stones, pebbles, large cracks, water, paths, footprints, tools, buildings, people, labels, UI or text. A production ground MATERIAL, not a complete scene."
+}

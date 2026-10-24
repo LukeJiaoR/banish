@@ -1,9 +1,30 @@
 'use strict';
 // Independent-entry farm dressing; crop state and scene ordering stay shared.
 (() => {
+  const soilKey = 'pixi-farm-earth-v5';
+  function farmOutline(ctx, b, inner) {
+    const corners = [[b.x, b.y], [b.x + b.w, b.y],
+      [b.x + b.w, b.y + b.h], [b.x, b.y + b.h]];
+    const normals = [[0, 1], [-1, 0], [0, -1], [1, 0]], corner = .06 + inner;
+    ctx.beginPath();
+    for (let side = 0; side < 4; side++) {
+      const a = corners[side], z = corners[(side + 1) % 4];
+      const steps = Math.ceil((side % 2 ? b.h : b.w) * 4);
+      for (let i = 0; i < steps; i++) {
+        const inset = i ? .02 + inner + G.h2(G.world.seed + 967 + side, b.x + i, b.y) * .04 : corner;
+        let x = a[0] + (z[0] - a[0]) * i / steps + normals[side][0] * inset;
+        let y = a[1] + (z[1] - a[1]) * i / steps + normals[side][1] * inset;
+        if (side % 2) y = Math.max(b.y + corner, Math.min(b.y + b.h - corner, y));
+        else x = Math.max(b.x + corner, Math.min(b.x + b.w - corner, x));
+        if (!side && !i) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+    }
+    ctx.closePath();
+  }
+
   const drawFarmGround = G.drawFarmGround;
   G.drawFarmGround = function (ctx, b, bounds) {
-    const image = G.SPR.get('pixi-path-earth-v2');
+    const image = G.SPR.get(soilKey);
     if (G.PAL[G.game.season].snow || !image?.width || !ctx.createPattern)
       return drawFarmGround(ctx, b, bounds);
 
@@ -15,19 +36,19 @@
 
     const earth = ctx.createPattern(image, 'repeat');
     if (!earth?.setTransform) return drawFarmGround(ctx, b, bounds);
-    earth.setTransform({ a: 8 / image.width, b: 0, c: 0, d: 8 / image.height, e: 0, f: 0 });
+    earth.setTransform({ a: 4 / image.width, b: 0, c: 0, d: 4 / image.height, e: 0, f: 0 });
     ctx.save();
-    // One exact footprint in tile space keeps the image anchored to the world
-    // and removes the old repeated diamond edges, including on legacy fields.
+    // Eight painted furrows per four cells meet the roots at y=.25/.75.
+    // Both narrow edge layers follow the real field, never the camera bounds.
     ctx.transform(32, 16, -32, 16, 0, 0);
-    ctx.fillStyle = earth; ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
-    ctx.fillStyle = 'rgba(102,72,43,.68)'; ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
-    ctx.beginPath();
-    for (let y = y0; y < y1; y++) for (const offset of [.25, .75]) {
-      ctx.moveTo(x0, y + offset); ctx.lineTo(x1, y + offset);
-    }
-    ctx.strokeStyle = 'rgba(87,61,38,.18)'; ctx.lineWidth = .028; ctx.stroke();
-    ctx.restore();
+    ctx.beginPath(); ctx.rect(x0, y0, x1 - x0, y1 - y0); ctx.clip();
+    const alpha = ctx.globalAlpha;
+    ctx.fillStyle = earth; ctx.globalAlpha = alpha * .4;
+    farmOutline(ctx, b, 0); ctx.fill();
+    ctx.globalAlpha = alpha;
+    farmOutline(ctx, b, .04); ctx.fill(); ctx.clip();
+    // Keep the soil outline clip while returning to screen-space cell overlays.
+    ctx.transform(1 / 64, -1 / 64, 1 / 32, 1 / 32, 0, 0);
 
     for (const f of b.farm) {
       if (f.x < x0 || f.x >= x1 || f.y < y0 || f.y >= y1) continue;
@@ -46,6 +67,7 @@
         ctx.restore();
       }
     }
+    ctx.restore();
   };
 
   // Soil belongs to the ground pass. These transparent plants contain no
@@ -72,11 +94,12 @@
     }
   };
   G.pixiFarms = {
-    ready: Promise.all(stages.map(stage => new Promise(resolve => {
-      const key = 'pixi-wheat-' + stage.name, image = new Image(); image.decoding = 'async';
+    ready: Promise.all(stages.map(stage => ['pixi-wheat-' + stage.name, 'wheat-' + stage.name + '-v2.png'])
+      .concat([[soilKey, 'farm-earth-v5.png']]).map(([key, file]) => new Promise(resolve => {
+      const image = new Image(); image.decoding = 'async';
       image.onload = () => { G.SPR.map.set(key, image); resolve(); };
       image.onerror = () => { G.SPR.failed.push(key); resolve(); };
-      image.src = 'assets/pixi/wheat-' + stage.name + '-v2.png';
+      image.src = 'assets/pixi/' + file;
     }))),
   };
 })();
