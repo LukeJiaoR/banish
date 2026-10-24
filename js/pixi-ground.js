@@ -52,6 +52,41 @@
     return entry.pattern || soil;
   }
 
+  let shoulderTexture;
+  function shoulderMaterial(c, earth) {
+    const image = G.SPR.get(textureKey);
+    if (!image?.width) return earth;
+    if (!shoulderTexture || shoulderTexture.image !== image) {
+      // One small material × alpha tile, prepared once. Periodic interpolation
+      // makes its 2–5 px edge breaks continuous across world/cache boundaries.
+      const size = 384, grid = 128, step = size / grid;
+      const canvas = document.createElement('canvas'); canvas.width = canvas.height = size;
+      const out = canvas.getContext('2d'); out.drawImage(image, 0, 0, size, size);
+      const pixels = out.getImageData(0, 0, size, size), values = new Float32Array(grid * grid);
+      for (let i = 0; i < values.length; i++) values[i] = G.h2(947, i % grid, Math.floor(i / grid));
+      const smooth = t => t * t * (3 - 2 * t);
+      for (let y = 0; y < size; y++) {
+        const iy = Math.floor(y / step), fy = smooth(y / step - iy), nextY = (iy + 1) % grid;
+        for (let x = 0; x < size; x++) {
+          const ix = Math.floor(x / step), fx = smooth(x / step - ix), nextX = (ix + 1) % grid;
+          const a = values[iy * grid + ix] * (1 - fx) + values[iy * grid + nextX] * fx;
+          const b = values[nextY * grid + ix] * (1 - fx) + values[nextY * grid + nextX] * fx;
+          const alpha = smooth(Math.max(0, Math.min(1, (a * (1 - fy) + b * fy - .25) / .5)));
+          pixels.data[(y * size + x) * 4 + 3] = Math.round(alpha * 96);
+        }
+      }
+      out.putImageData(pixels, 0, 0);
+      shoulderTexture = { image, canvas, patterns: new WeakMap() };
+    }
+    let pattern = shoulderTexture.patterns.get(c);
+    if (!pattern) {
+      pattern = c.createPattern(shoulderTexture.canvas, 'repeat');
+      if (pattern?.setTransform) pattern.setTransform({ a: 12 / 384, b: 0, c: 0, d: 12 / 384, e: 0, f: 0 });
+      if (pattern) shoulderTexture.patterns.set(c, pattern);
+    }
+    return pattern || earth;
+  }
+
   const dirt = (w, x, y) => x >= 0 && y >= 0 && x < w.N && y < w.N &&
     w.road[y * w.N + x] === 1 && w.water[y * w.N + x] !== 1 &&
     !w.rock[y * w.N + x] && !w.mountain[y * w.N + x];
@@ -126,7 +161,7 @@
     if (!count) return;
     c.lineCap = c.lineJoin = 'round';
     c.save();
-    const bands = summer() ? [[1.04, earth, .06], [.90, earth, .16], [.78, earth, .32], [.64, earth, .88]] :
+    const bands = summer() ? [[1.04, shoulderMaterial(c, earth), 1], [.64, earth, .88]] :
       [[1.10, 'rgba(183,153,101,.045)', 1], [.99, 'rgba(183,153,101,.085)', 1],
         [.88, 'rgba(193,167,119,.17)', 1], [.78, 'rgba(193,167,119,.22)', 1], [.66, earth, .86]];
     for (const [width, color, alpha] of bands) {

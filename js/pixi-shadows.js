@@ -87,12 +87,12 @@
       [-.40,-.04,.42,.28,.13,.13],[-.19,-.04,.68,.30,.14,.15],
       [.07,-.02,.82,.24,.11,.12],[.32,.02,.60,.28,.13,.14],[.43,.04,.34,.24,.12,.13],
     ];
-    const polygons = [];
+    const wood = [], crown = [];
     const root = [ax, ay], fork = [ax + light[0] * h * .40, ay + light[1] * h * .40];
     function branch(a, b, width) {
       const length = Math.hypot(b[0] - a[0], b[1] - a[1]);
       const dx = (b[1] - a[1]) / length * width, dy = (a[0] - b[0]) / length * width;
-      polygons.push([[a[0]+dx,a[1]+dy],[b[0]+dx,b[1]+dy],[b[0]-dx,b[1]-dy],[a[0]-dx,a[1]-dy]]);
+      wood.push([[a[0]+dx,a[1]+dy],[b[0]+dx,b[1]+dy],[b[0]-dx,b[1]-dy],[a[0]-dx,a[1]-dy]]);
     }
     branch(root, fork, h * .018);
     for (const [x,y,z,rx,ry,rz] of lobes) {
@@ -112,9 +112,9 @@
         const t = i * Math.PI / 16, u = Math.cos(t) * r1, v = Math.sin(t) * r2;
         ellipse.push([cx + u * co - v * si, cy + u * si + v * co]);
       }
-      polygons.push(ellipse);
+      crown.push(ellipse);
     }
-    return polygons;
+    return { wood, crown, height: h };
   }
 
   G.createPixiShadowLayer = function () {
@@ -126,10 +126,13 @@
     function mask(image) {
       const name = image.src?.split('/').pop()?.replace(/\.png$/, '');
       if (cache.has(name)) return cache.get(name);
-      const polygons = models[name]?.map(volume => hull(volume.map(cast))) || treePolygons(name);
+      const building = models[name]?.map(volume => hull(volume.map(cast)));
+      const tree = building ? null : treePolygons(name);
+      const polygons = building || (tree && tree.wood.concat(tree.crown));
       if (!polygons) { cache.set(name, null); return null; }
       const points = polygons.flat(), span = G.A_ART[name]?.span || G.A_ART[name]?.height || image.width;
-      const blur = span * .009, pad = blur * 3;
+      const blur = span * .009, crownBlur = tree?.crown.length ? tree.height * .025 : blur;
+      const pad = Math.max(blur, crownBlur) * 3;
       const x = Math.floor(Math.min(...points.map(p => p[0])) - pad);
       const y = Math.floor(Math.min(...points.map(p => p[1])) - pad);
       const width = Math.ceil(Math.max(...points.map(p => p[0])) + pad - x);
@@ -138,15 +141,21 @@
       const solid = document.createElement('canvas'), soft = document.createElement('canvas');
       solid.width = soft.width = Math.ceil(width * scale);
       solid.height = soft.height = Math.ceil(height * scale);
-      const c = solid.getContext('2d');
-      c.setTransform(scale, 0, 0, scale, -x * scale, -y * scale); c.fillStyle = '#182722';
-      for (const polygon of polygons) {
-        c.beginPath(); c.moveTo(...polygon[0]);
-        for (const p of polygon.slice(1)) c.lineTo(...p);
-        c.closePath(); c.fill();
+      const c = solid.getContext('2d'), out = soft.getContext('2d');
+      // High crowns have a softer penumbra; keep roots and branches tight.
+      // Both groups still share one cached mask before the layer's alpha.
+      const groups = tree ? [[tree.crown, crownBlur], [tree.wood, blur]] : [[polygons, blur]];
+      for (const [group, radius] of groups) {
+        if (!group.length) continue;
+        c.resetTransform(); c.clearRect(0, 0, solid.width, solid.height);
+        c.setTransform(scale, 0, 0, scale, -x * scale, -y * scale); c.fillStyle = '#182722';
+        for (const polygon of group) {
+          c.beginPath(); c.moveTo(...polygon[0]);
+          for (const p of polygon.slice(1)) c.lineTo(...p);
+          c.closePath(); c.fill();
+        }
+        out.filter = 'blur(' + radius * scale + 'px)'; out.drawImage(solid, 0, 0);
       }
-      const out = soft.getContext('2d');
-      out.filter = 'blur(' + blur * scale + 'px)'; out.drawImage(solid, 0, 0);
       const texture = PIXI.Texture.from(soft);
       texture.source.autoGenerateMipmaps = true;
       const result = { texture, x, y, scale };
