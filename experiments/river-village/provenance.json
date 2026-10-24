@@ -1,0 +1,45 @@
+{
+  "baselineCommit": "985a6a239c250b2ee8156827dff3077468a83545",
+  "verifiedVia": "GitHub fetch_file blob identities compared to local git hash-object, 2026-10-21",
+  "runtime": [
+    {
+      "path": "js/core.js",
+      "sha": "9c6180bb88ca48c4962211a95c6eb5428183f328"
+    },
+    {
+      "path": "js/defs.js",
+      "sha": "4251971327d5812309320211cc3b5573f6f9adf9"
+    },
+    {
+      "path": "js/map.js",
+      "sha": "d570941c3e6808f746f0776d0807dc50f5027c24"
+    },
+    {
+      "path": "js/sim.js",
+      "sha": "2df33cedad25bf986eded496ee7be8c378914954"
+    },
+    {
+      "path": "js/fire.js",
+      "sha": "09cb38177bbc199f28ba62efa01356c8cfdd7606"
+    },
+    {
+      "path": "js/supply.js",
+      "sha": "6667804485e1781cdd7d253af941e779d5fa5118"
+    },
+    {
+      "path": "js/sprites.js",
+      "sha": "ec7c6d7ecc8f22ad15bf74bf7ee471fb1944dfab"
+    },
+    {
+      "path": "js/render.js",
+      "sha": "74c736d4c1be3a12c3f800b65f54f1a834882e00"
+    },
+    {
+      "path": "js/main.js",
+      "sha": "cda84d139ae299388ddcc2c5a63dc78f13e89c4b"
+    }
+  ],
+  "evidence": "Native @napi-rs/canvas only. Browser launch blocked in this execution environment; physical device performance unverified.",
+  "assetPolicy": "Source PNGs unchanged; in-memory source-alpha silhouette derivatives only.",
+  "adoption": "Experiment only; not A-quality acceptance and no production runtime changes."
+}
