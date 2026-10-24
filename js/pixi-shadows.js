@@ -23,6 +23,12 @@
       [[278,700],[768,960],[1260,700],[768,460],
         [215,385,350],[768,130,350],[1322,375,350],[768,575,350],[768,95,630]],
     ],
+    'wood-house-square-v4-empty': [
+      // Timber sill and corner feet, inset from the shared [774,947] front foot.
+      // Eaves and ridge keep the original camera and height.
+      [[278,700],[774,932],[1260,735],[764,503],
+        [215,385,350],[768,130,350],[1322,375,350],[768,575,350],[768,95,630]],
+    ],
     'granary-v2': [
       [[405,675],[847,838],[1208,675],[767,512],
         [330,378,260],[850,585,260],[1280,378,260],[760,171,260],[794,98,545]],
@@ -54,6 +60,8 @@
   models['house-a-v2-square-occupied'] = models['house-a-v2-square-empty'];
   models['house-square-v3-empty'] = models['house-a-v2-square-empty'];
   models['house-square-v3-occupied'] = models['house-a-v2-square-empty'];
+  models['wood-house-courtyard-v4'] = models['courtyard-house-v2-matte'];
+  models['wood-house-square-v4-occupied'] = models['wood-house-square-v4-empty'];
   models['woodcutter-a-processing-v2'] = models['woodcutter-a-idle'];
 
   function hull(points) {

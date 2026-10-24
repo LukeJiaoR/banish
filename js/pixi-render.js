@@ -17,7 +17,8 @@ G.createPixiRenderer = async function (canvas) {
   const ground = new PIXI.Container(), objects = new PIXI.Container();
   const shadows = G.createPixiShadowLayer();
   const under = new PIXI.Sprite(), over = new PIXI.Sprite();
-  app.stage.addChild(ground, shadows.container, under, objects, over);
+  // Farm/economy soil on the underlay must receive the same ground shadows.
+  app.stage.addChild(ground, under, shadows.container, objects, over);
   const surface = document.createElement('canvas');
   const context = surface.getContext('2d');
   const layers = [under, over].map(sprite => {

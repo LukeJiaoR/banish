@@ -16,7 +16,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     G.saveToServer = G.loadFromServer = G.deleteServerSave = () => Promise.reject(new Error('PixiJS 独立版使用本机存档与文件导入导出'));
     G.deleteServerSaveQuiet = () => {};
     G.pixi = await G.createPixiRenderer(document.getElementById('game'));
-    await Promise.all([G.pixiArt.ready, G.pixiGround.ready]);
+    await Promise.all([G.pixiArt.ready, G.pixiGround.ready, G.pixiFarms.ready]);
     let startingVillage = false;
     if (!classic && !localStorage.getItem(G.AUTOSAVE_KEY) && !window.__REPLAY_SAVE) {
       const response = await fetch('assets/pixi/' + (courtyard ? 'courtyard-village.json' : 'river-village.json'));

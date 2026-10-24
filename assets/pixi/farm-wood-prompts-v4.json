@@ -1,0 +1,130 @@
+{
+  "mode": "built-in image_gen",
+  "date": "2026-10-24",
+  "processing": "Selected PNGs copied byte-for-byte. Generated alpha preserved. No scripted repainting, resizing, recoloring, masking or cropping. Runtime sprites use measured root/ground anchors.",
+  "assets": [
+    {
+      "asset": "wheat-ripe-v2.png",
+      "size": [
+        1536,
+        1024
+      ],
+      "sha256": "a739183369f115c8a46d3eb83eb77894f4d1468ef145bc6b400a0811608fb055",
+      "source": "exec-49a22da6-dbca-4e88-bec2-89dcb7a85c7e.png",
+      "transparent_background": true,
+      "generation": {
+        "source": "exec-91d4652b-9a70-4252-8295-3c9c24c1739c.png",
+        "prompt": "Use case: stylized-concept.\nAsset type: one production transparent crop-cell sprite for a hand-painted 2:1 isometric Chinese village game.\nPrimary request: REPLACE the visual design of repeated rocky soil mounds with ONLY living wheat plants. Ground soil is rendered separately by the game. Draw exactly six small wheat tufts in two parallel rows of three, seen from the fixed 2:1 isometric game camera. These tufts together occupy ONE ground cell, not an entire farm. The background and all the area between the roots must be genuinely transparent.\nComposition: 1536x1024 landscape canvas. The invisible flat ground diamond has corners at (768,460), (1248,700), (768,940), (288,700). These are guides only: DO NOT draw the diamond, soil or any base. Arrange the six root centers inside this footprint as two rows at coordinates about (744,568), (888,640), (1032,712), (504,688), (648,760), (792,832). Keep these root positions fixed; the plants grow vertically UP from them. All plants fully inside canvas. Leave transparent padding. Tiny clustered plants, designed to be readable when the entire ground footprint is 64 world pixels wide. Root points stay small and clean.\nStyle: warm, restrained painterly 2D strategy game art; purposeful broad brushwork that reads at small scale, matte leaf surfaces, muted warm olive greens, upper-left diffuse sunlight and quiet cool shadows inside plant clumps. Natural variation of blade lean without random rotation of the ground footprint.\nCritical avoid: NO soil, dirt, rocks, stones, pebbles, raised beds, mounds, ground island, pedestal, tray, tile border, grid, grass lawn, cast shadow on the ground, glow, outline, UI, lettering, characters, tools, animals or scenery. NO thick succulent or corn leaves. Real alpha transparency, not a painted checkerboard.\n\nGrowth stage: ripe harvest-ready wheat, slender warm straw-gold stems with distinctive plump wheat ears and a few muted olive lower blades, 65–75 cm tall, not corn or maize. each tuft about 420–470 image pixels tall. Keep the exact specified root footprint and canvas. The artwork contains only the six wheat tufts."
+      },
+      "refinement": {
+        "references": [
+          "exec-91d4652b-9a70-4252-8295-3c9c24c1739c.png"
+        ],
+        "prompt": "Use case: precise-object-edit.\nAsset type: a SINGLE tuft crop sprite for a 2D hand-painted isometric village game.\nInput image 1 is the EDIT TARGET with six separate wheat tufts at the same growth stage.\nPrimary request: isolate ONLY ONE representative complete wheat tuft from this image. Keep just the UPPERMOST CENTRAL tuft, including its full leaves and all stems down to the tiny root point. Remove the other five tufts and ALL their disconnected leaf fragments. The final image must contain exactly ONE coherent wheat tuft. Preserve that tuft's growth stage, colors, painterly style, blade shapes and seed-head presence or absence. Do not add soil or rocks.\nReframe that one tuft to the center of a 1536x1024 canvas. Its root-center point is at exactly (768,940), the tuft extends vertically upward, and its uppermost tip is at about y100; leave clean transparent margins on all sides. Do not draw this coordinate guide. The game will scale this SINGLE tuft to the correct growth-stage height.\nBackground: genuinely transparent alpha everywhere outside the plant, including between leaves. No ground, mound, roots below ground, soil, pebble, shadow on the ground, halo, fog, extra seedlings, frame, text or UI. The output is one complete standalone plant tuft, not six plants, not a field, not a spritesheet."
+      }
+    },
+    {
+      "asset": "wheat-stage0-v2.png",
+      "size": [
+        1536,
+        1024
+      ],
+      "sha256": "f2d2aff3cf00924c49b36ffa94df06692ca6c7e7694f611fea6b84466510c02a",
+      "source": "exec-af261853-4910-4b29-8776-1be71461d99f.png",
+      "transparent_background": true,
+      "generation": {
+        "source": "exec-380253ba-5727-4357-9206-08375897ce63.png",
+        "prompt": "Use case: stylized-concept.\nAsset type: one production transparent crop-cell sprite for a hand-painted 2:1 isometric Chinese village game.\nPrimary request: REPLACE the visual design of repeated rocky soil mounds with ONLY living wheat plants. Ground soil is rendered separately by the game. Draw exactly six small wheat tufts in two parallel rows of three, seen from the fixed 2:1 isometric game camera. These tufts together occupy ONE ground cell, not an entire farm. The background and all the area between the roots must be genuinely transparent.\nComposition: 1536x1024 landscape canvas. The invisible flat ground diamond has corners at (768,460), (1248,700), (768,940), (288,700). These are guides only: DO NOT draw the diamond, soil or any base. Arrange the six root centers inside this footprint as two rows at coordinates about (744,568), (888,640), (1032,712), (504,688), (648,760), (792,832). Keep these root positions fixed; the plants grow vertically UP from them. All plants fully inside canvas. Leave transparent padding. Tiny clustered plants, designed to be readable when the entire ground footprint is 64 world pixels wide. Root points stay small and clean.\nStyle: warm, restrained painterly 2D strategy game art; purposeful broad brushwork that reads at small scale, matte leaf surfaces, muted warm olive greens, upper-left diffuse sunlight and quiet cool shadows inside plant clumps. Natural variation of blade lean without random rotation of the ground footprint.\nCritical avoid: NO soil, dirt, rocks, stones, pebbles, raised beds, mounds, ground island, pedestal, tray, tile border, grid, grass lawn, cast shadow on the ground, glow, outline, UI, lettering, characters, tools, animals or scenery. NO thick succulent or corn leaves. Real alpha transparency, not a painted checkerboard.\n\nGrowth stage: newly emerged wheat seedlings, 2–3 short fine blades per tuft, only 6–10 cm tall, very low and sparse, no seed heads. each tuft about 70–100 image pixels tall. Keep the exact specified root footprint and canvas. The artwork contains only the six wheat tufts."
+      },
+      "refinement": {
+        "references": [
+          "exec-380253ba-5727-4357-9206-08375897ce63.png"
+        ],
+        "prompt": "Use case: precise-object-edit.\nAsset type: a SINGLE tuft crop sprite for a 2D hand-painted isometric village game.\nInput image 1 is the EDIT TARGET with six separate wheat tufts at the same growth stage.\nPrimary request: isolate ONLY ONE representative complete wheat tuft from this image. Keep just the UPPERMOST CENTRAL tuft, including its full leaves and all stems down to the tiny root point. Remove the other five tufts and ALL their disconnected leaf fragments. The final image must contain exactly ONE coherent wheat tuft. Preserve that tuft's growth stage, colors, painterly style, blade shapes and seed-head presence or absence. Do not add soil or rocks.\nReframe that one tuft to the center of a 1536x1024 canvas. Its root-center point is at exactly (768,940), the tuft extends vertically upward, and its uppermost tip is at about y100; leave clean transparent margins on all sides. Do not draw this coordinate guide. The game will scale this SINGLE tuft to the correct growth-stage height.\nBackground: genuinely transparent alpha everywhere outside the plant, including between leaves. No ground, mound, roots below ground, soil, pebble, shadow on the ground, halo, fog, extra seedlings, frame, text or UI. The output is one complete standalone plant tuft, not six plants, not a field, not a spritesheet."
+      }
+    },
+    {
+      "asset": "wheat-stage1-v2.png",
+      "size": [
+        1536,
+        1024
+      ],
+      "sha256": "1ffc347a497313964fe70a2bca28046e6f07201000a559843d31c6137a5e6d7a",
+      "source": "exec-301400b5-a7a5-4160-8409-81d10a8e1d67.png",
+      "transparent_background": true,
+      "generation": {
+        "source": "exec-dce06873-fe11-4a19-b4d0-1d3a7cd0194f.png",
+        "prompt": "Use case: stylized-concept.\nAsset type: one production transparent crop-cell sprite for a hand-painted 2:1 isometric Chinese village game.\nPrimary request: REPLACE the visual design of repeated rocky soil mounds with ONLY living wheat plants. Ground soil is rendered separately by the game. Draw exactly six small wheat tufts in two parallel rows of three, seen from the fixed 2:1 isometric game camera. These tufts together occupy ONE ground cell, not an entire farm. The background and all the area between the roots must be genuinely transparent.\nComposition: 1536x1024 landscape canvas. The invisible flat ground diamond has corners at (768,460), (1248,700), (768,940), (288,700). These are guides only: DO NOT draw the diamond, soil or any base. Arrange the six root centers inside this footprint as two rows at coordinates about (744,568), (888,640), (1032,712), (504,688), (648,760), (792,832). Keep these root positions fixed; the plants grow vertically UP from them. All plants fully inside canvas. Leave transparent padding. Tiny clustered plants, designed to be readable when the entire ground footprint is 64 world pixels wide. Root points stay small and clean.\nStyle: warm, restrained painterly 2D strategy game art; purposeful broad brushwork that reads at small scale, matte leaf surfaces, muted warm olive greens, upper-left diffuse sunlight and quiet cool shadows inside plant clumps. Natural variation of blade lean without random rotation of the ground footprint.\nCritical avoid: NO soil, dirt, rocks, stones, pebbles, raised beds, mounds, ground island, pedestal, tray, tile border, grid, grass lawn, cast shadow on the ground, glow, outline, UI, lettering, characters, tools, animals or scenery. NO thick succulent or corn leaves. Real alpha transparency, not a painted checkerboard.\n\nGrowth stage: young vegetative wheat plants, several narrow arcing grass blades per tuft, 20–30 cm tall, fresh muted olive green, no seed heads. each tuft about 180–230 image pixels tall. Keep the exact specified root footprint and canvas. The artwork contains only the six wheat tufts."
+      },
+      "refinement": {
+        "references": [
+          "exec-dce06873-fe11-4a19-b4d0-1d3a7cd0194f.png"
+        ],
+        "prompt": "Use case: precise-object-edit.\nAsset type: a SINGLE tuft crop sprite for a 2D hand-painted isometric village game.\nInput image 1 is the EDIT TARGET with six separate wheat tufts at the same growth stage.\nPrimary request: isolate ONLY ONE representative complete wheat tuft from this image. Keep just the UPPERMOST CENTRAL tuft, including its full leaves and all stems down to the tiny root point. Remove the other five tufts and ALL their disconnected leaf fragments. The final image must contain exactly ONE coherent wheat tuft. Preserve that tuft's growth stage, colors, painterly style, blade shapes and seed-head presence or absence. Do not add soil or rocks.\nReframe that one tuft to the center of a 1536x1024 canvas. Its root-center point is at exactly (768,940), the tuft extends vertically upward, and its uppermost tip is at about y100; leave clean transparent margins on all sides. Do not draw this coordinate guide. The game will scale this SINGLE tuft to the correct growth-stage height.\nBackground: genuinely transparent alpha everywhere outside the plant, including between leaves. No ground, mound, roots below ground, soil, pebble, shadow on the ground, halo, fog, extra seedlings, frame, text or UI. The output is one complete standalone plant tuft, not six plants, not a field, not a spritesheet."
+      }
+    },
+    {
+      "asset": "wheat-stage2-v2.png",
+      "size": [
+        1536,
+        1024
+      ],
+      "sha256": "4817587e521d7be545aea82b007cb27d4ba9d71930fc4c72234eb1d5181f7a5f",
+      "source": "exec-7e71a43d-6477-4557-b5e5-d001279009ed.png",
+      "transparent_background": true,
+      "generation": {
+        "source": "exec-61a467fb-49b3-432f-9da3-6e5ce033e592.png",
+        "prompt": "Use case: stylized-concept.\nAsset type: one production transparent crop-cell sprite for a hand-painted 2:1 isometric Chinese village game.\nPrimary request: REPLACE the visual design of repeated rocky soil mounds with ONLY living wheat plants. Ground soil is rendered separately by the game. Draw exactly six small wheat tufts in two parallel rows of three, seen from the fixed 2:1 isometric game camera. These tufts together occupy ONE ground cell, not an entire farm. The background and all the area between the roots must be genuinely transparent.\nComposition: 1536x1024 landscape canvas. The invisible flat ground diamond has corners at (768,460), (1248,700), (768,940), (288,700). These are guides only: DO NOT draw the diamond, soil or any base. Arrange the six root centers inside this footprint as two rows at coordinates about (744,568), (888,640), (1032,712), (504,688), (648,760), (792,832). Keep these root positions fixed; the plants grow vertically UP from them. All plants fully inside canvas. Leave transparent padding. Tiny clustered plants, designed to be readable when the entire ground footprint is 64 world pixels wide. Root points stay small and clean.\nStyle: warm, restrained painterly 2D strategy game art; purposeful broad brushwork that reads at small scale, matte leaf surfaces, muted warm olive greens, upper-left diffuse sunlight and quiet cool shadows inside plant clumps. Natural variation of blade lean without random rotation of the ground footprint.\nCritical avoid: NO soil, dirt, rocks, stones, pebbles, raised beds, mounds, ground island, pedestal, tray, tile border, grid, grass lawn, cast shadow on the ground, glow, outline, UI, lettering, characters, tools, animals or scenery. NO thick succulent or corn leaves. Real alpha transparency, not a painted checkerboard.\n\nGrowth stage: taller wheat in the stem-elongation stage, narrow blades with a few small immature green wheat ears, 45–60 cm tall, muted green. each tuft about 340–390 image pixels tall. Keep the exact specified root footprint and canvas. The artwork contains only the six wheat tufts."
+      },
+      "refinement": {
+        "references": [
+          "exec-61a467fb-49b3-432f-9da3-6e5ce033e592.png"
+        ],
+        "prompt": "Use case: precise-object-edit.\nAsset type: a SINGLE tuft crop sprite for a 2D hand-painted isometric village game.\nInput image 1 is the EDIT TARGET with six separate wheat tufts at the same growth stage.\nPrimary request: isolate ONLY ONE representative complete wheat tuft from this image. Keep just the UPPERMOST CENTRAL tuft, including its full leaves and all stems down to the tiny root point. Remove the other five tufts and ALL their disconnected leaf fragments. The final image must contain exactly ONE coherent wheat tuft. Preserve that tuft's growth stage, colors, painterly style, blade shapes and seed-head presence or absence. Do not add soil or rocks.\nReframe that one tuft to the center of a 1536x1024 canvas. Its root-center point is at exactly (768,940), the tuft extends vertically upward, and its uppermost tip is at about y100; leave clean transparent margins on all sides. Do not draw this coordinate guide. The game will scale this SINGLE tuft to the correct growth-stage height.\nBackground: genuinely transparent alpha everywhere outside the plant, including between leaves. No ground, mound, roots below ground, soil, pebble, shadow on the ground, halo, fog, extra seedlings, frame, text or UI. The output is one complete standalone plant tuft, not six plants, not a field, not a spritesheet."
+      }
+    },
+    {
+      "asset": "wood-house-courtyard-v4.png",
+      "size": [
+        1536,
+        1024
+      ],
+      "sha256": "1dbb1571f4d2027025755642b3ee1626ea5f5a66e9ac2b0d397731df8e41aab1",
+      "source": "exec-3db863f1-4ea2-4ea6-ba75-d1d075f4ac4a.png",
+      "transparent_background": true,
+      "references": [
+        "courtyard-house-v2-matte.png"
+      ],
+      "prompt": "Use case: precise-object-edit.\nAsset type: a production transparent wooden-house sprite for a hand-painted 2:1 isometric Chinese village game.\nInput image 1 is the exact EDIT TARGET. Primary request: rebuild the residential walls and courtyard enclosure as a clearly WOODEN vernacular home rather than the current white plaster / stone-looking home. Keep the existing architecture and exact silhouette: same main tiled gable roof, smaller left wing, their ridge/eave/corner positions, doors and windows, open courtyard and entrance, original fixed isometric view and framing. Preserve the 1536x1024 canvas, object scale, and frontmost footing near (800,991); source ground footprint and roof placement must stay aligned for the game's existing calibrated shadow.\nMaterials to change decisively: replace ALL white plaster exterior wall faces with aged warm medium-brown timber plank siding. Show readable broad horizontal boards, dark timber uprights and joints, subtle wood grain and a few natural knots. The large right wall must read as wood boards, not tan plaster or brick. Replace the pale courtyard walls with low timber plank and post fencing in the SAME silhouette. Turn most of the conspicuous broad masonry footings into dark weathered timber sill beams, with only sparse small cool-grey footing stones at ground contact; preserve exact footprint and stairs placement. Keep the courtyard walkway understated, with some worn earthen surface instead of a bright stone podium. Preserve the door, lattice windows, clay pots, bench and sparse plants.\nRetain the subdued matte charcoal grey clay-tile roofs with coherent planes and a few quiet highlights. Warm brown wood must dominate the walls at game scale; no orange varnish or metallic gloss. Upper-left sun with cool quiet ambient fill, readable darker eaves and joints, painterly 2D detail consistent with the target. This is a humble wood house, not a shrine or stone manor.\nConstraints: structural shape and ground-contact coordinates preserved. Real transparent alpha background preserved, no added ground island, long cast shadow, halo, fog, text, UI or people. No white plaster, cream masonry walls, brick wall pattern, all-stone foundation, bright gold roof piping, oversaturated orange wood or photorealism."
+    },
+    {
+      "asset": "wood-house-square-v4-empty.png",
+      "size": [
+        1536,
+        1024
+      ],
+      "sha256": "326af75bde6c9df49224e370feeec9701cd054f71f0449dfb9647fcc8810d7af",
+      "source": "exec-a412eff9-f196-4afb-aea7-84c11b3cd735.png",
+      "transparent_background": true,
+      "references": [
+        "house-square-v3-empty.png"
+      ],
+      "prompt": "Use case: precise-object-edit.\nAsset type: production transparent wooden-house sprite, empty / closed state, in a painterly 2:1 isometric Chinese village game.\nInput image 1 is the exact EDIT TARGET. Primary request: remake this as an unmistakable humble WOOD HOUSE: all currently white plaster wall panels become aged warm medium-brown horizontal timber boards. Readable broad plank seams, natural wood grain, a few subtle knots, darker timber uprights and sill beams. The large right wall must be entirely wooden boards, not beige stucco or stone. Replace the tall conspicuous two-course stone base with weathered dark-brown timber foundation / sill panels in the same outer geometry and a few sparse low cool-grey stone feet; preserve the exact front stone steps and ground footprint. Warm matte brown wood should be obvious at a display width of only 112 pixels.\nInvariants: keep exact building silhouette, hip roof structure, apex, all four roof corners, tile rows and restrained matte charcoal-grey roof palette, eave coordinates, door/window placement, CLOSED door, CLOSED shutters, camera, orientation and framing. Keep 1536x1024 canvas, frontmost footing at (768,975), same scale and source ground coordinates so it aligns with the existing calibrated ground shadow. Do not move or resize the house.\nLighting/style: upper-left sun with cool ambient fill, subdued painterly game art, coherent material planes, restrained medium-scale brush marks, deeper eave and plank-joint occlusion. Grey fired-clay roof; no bright gold piping. Wood is warm brown but not glowing orange, varnished or shiny.\nBackground: preserve real transparent alpha. No new props, people, ground island, halo, fog, cast shadow beyond the house, text, UI or watermark. No white/cream plaster or large stone/brick wall areas. Do not open the door or shutters in this empty-state image."
+    },
+    {
+      "asset": "wood-house-square-v4-occupied.png",
+      "size": [
+        1536,
+        1024
+      ],
+      "sha256": "6b9ec1cebe20dfb1387559b55901366236dcdf865f22127285af36a4488f8b58",
+      "source": "exec-8f125201-03d6-405e-affe-716a2c23bb55.png",
+      "transparent_background": true,
+      "references": [
+        "wood-house-square-v4-empty.png",
+        "house-square-v3-occupied.png"
+      ],
+      "prompt": "Use case: precise-object-edit.\nAsset type: production transparent wooden-house sprite, occupied state, matching the supplied empty-state asset exactly.\nInput image 1 is the exact EDIT TARGET, the new wooden house. Image 2 is ONLY a reference for how its existing door and window shutters should open and for the small local interior lamplight.\nPrimary request: create the occupied version of Image 1 by opening the door and both wooden window shutters, revealing a little warm interior lamplight. Make only these local opening/state edits. Preserve absolutely the wooden plank siding, all wood grain and joints, dark timber sill base, sparse stone feet, grey roof, all architecture, silhouette, exact roof/eave/ground coordinates, orientation, camera, 1536x1024 canvas and object scale of Image 1. The pair must switch in a game without the building moving or changing materials. The same stone steps and wall edges remain at exactly the same source coordinates. Do NOT restore the white plaster or stone foundation from Image 2.\nLighting: keep Image 1 exterior upper-left daylight and muted warm-brown matte timber. The interior flame/light is small and local to the open door and windows, with no blanket orange glow. Painterly village-game art.\nBackground: preserve genuine alpha transparency. No new ground island, props, basket, people, fog, halo, ground cast shadow, text, UI or watermark. Exact same exterior shell as Image 1."
+    }
+  ]
+}

@@ -2,25 +2,26 @@
 // Art direction for the independent entry only. Shared source images, explicit
 // source-space pivots and deterministic low props; no simulation or save edits.
 G.A_ART = Object.freeze({ ...G.A_ART,
-  'pixi-courtyard': { source: [1536, 1024], anchor: [800, 991], span: 1280 },
+  'pixi-courtyard': { source: [1536, 1024], anchor: [805, 993], span: 1280 },
   'pixi-river-garden': { source: [1536, 1024], anchor: [780, 923], span: 1350 },
   'pixi-granary': { source: [1536, 1024], anchor: [788, 990], span: 1240 },
   'pixi-well': { source: [1536, 1024], anchor: [777, 938], span: 768 },
   'pixi-smithy': { source: [1536, 1024], anchor: [775, 945], span: 1360 },
-  'pixi-house-empty': G.A_ART['house-a-v2-square-empty'],
-  'pixi-house-occupied': G.A_ART['house-a-v2-square-occupied'],
+  // The timber sill ends above the old masonry plinth; both states share its foot.
+  'pixi-house-empty': { source: [1536, 1024], anchor: [774, 947], span: 1056 },
+  'pixi-house-occupied': { source: [1536, 1024], anchor: [774, 947], span: 1056 },
 });
 // Painted roofs may overhang their logical plots; all four assets share a
 // doorway/eave scale instead of making every sprite fill its entire canvas.
 const villageArt = {
-  house: { key: 'pixi-courtyard', file: 'courtyard-house-v2-matte.png', width: 144 },
+  house: { key: 'pixi-courtyard', file: 'wood-house-courtyard-v4.png', width: 144 },
   storage: { key: 'pixi-granary', file: 'granary-v2.png', width: 152 },
   well: { key: 'pixi-well', file: 'well-v2.png', width: 64 },
   blacksmith: { key: 'pixi-smithy', file: 'smithy-v2.png', width: 168 },
 };
 const smallHouseArt = {
-  'house-a-v2-square-empty': { key: 'pixi-house-empty', file: 'house-square-v3-empty.png' },
-  'house-a-v2-square-occupied': { key: 'pixi-house-occupied', file: 'house-square-v3-occupied.png' },
+  'house-a-v2-square-empty': { key: 'pixi-house-empty', file: 'wood-house-square-v4-empty.png' },
+  'house-a-v2-square-occupied': { key: 'pixi-house-occupied', file: 'wood-house-square-v4-occupied.png' },
 };
 function plotArt(type, x, y, building) {
   // Reuse the existing small hip-roof dwelling for two of the starter plots.
