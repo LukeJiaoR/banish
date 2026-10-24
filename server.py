@@ -163,7 +163,7 @@ class Handler(SimpleHTTPRequestHandler):
             if real == private or real.startswith(private + os.sep):
                 return False
         rel = os.path.relpath(real, root)
-        return (rel in ('.', 'index.html', 'style.css') or
+        return (rel in ('.', 'index.html', 'pixi.html', 'style.css') or
                 rel.split(os.sep)[0] in ('js', 'assets', 'styles'))
 
     def translate_path(self, path):

@@ -18,10 +18,12 @@
 <link rel="stylesheet" href="styles/jade-layout.css?v=reference-8">
 <link rel="stylesheet" href="styles/desktop-workspace.css?v=workspace-1">
 <link rel="stylesheet" href="styles/harvest-map.css?v=direct-1">
+<link rel="stylesheet" href="styles/pixi.css">
 </head>
 <body>
   <div id="meal-transition-notice" role="status" hidden></div>
 <canvas id="game"></canvas>
+<div id="pixi-startup" role="status"><strong>归园</strong><p>正在准备小镇…</p></div>
 
 <div id="hud">
   <div id="topbar" aria-label="小镇概况与系统操作">
@@ -322,10 +324,13 @@
 
 <script>
 /* 全局错误收集（调试用） */
+window.BANISH_PIXI = true;
+window.BANISH_PIXI_PRIMARY = true;
 window.__errs = [];
 window.addEventListener('error', e => window.__errs.push((e.message || '') + ' @ ' + (e.filename || '').split('/').pop() + ':' + e.lineno));
 window.addEventListener('unhandledrejection', e => window.__errs.push('promise: ' + e.reason));
 </script>
+<script src="js/vendor/pixi-8.22.0.min.js"></script>
 <script src="js/core.js"></script>
 <script src="js/defs.js"></script>
 <script src="js/map.js"></script>
@@ -341,5 +346,11 @@ window.addEventListener('unhandledrejection', e => window.__errs.push('promise: 
 <script src="js/main.js"></script>
 <script src="js/navigation.js"></script>
 <script src="js/jade-layout.js?v=reference-8"></script>
+<script src="js/pixi-shadows.js"></script>
+<script src="js/pixi-render.js"></script>
+<script src="js/pixi-ground.js"></script>
+<script src="js/pixi-art.js"></script>
+<script src="js/pixi-farms.js"></script>
+<script src="js/pixi-boot.js"></script>
 </body>
 </html>

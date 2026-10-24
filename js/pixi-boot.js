@@ -1,20 +1,23 @@
 'use strict';
-// A separate entry point and storage namespace: importing/exporting a file is
-// the explicit way to transfer a town between Canvas and Pixi editions.
+// The primary entry keeps the game's existing saves and classic opening.
+// Preview entries retain their own storage namespaces and authored villages.
 window.addEventListener('DOMContentLoaded', async () => {
   const startup = document.getElementById('pixi-startup');
   try {
     const params = new URLSearchParams(location.search);
-    const classic = params.get('start') === 'classic';
+    const primary = !!window.BANISH_PIXI_PRIMARY;
+    const classic = primary || params.get('start') === 'classic';
     const courtyard = !classic && params.get('scene') === 'courtyard';
-    const prefix = classic ? 'banish_pixi' : courtyard ? 'banish_pixi_courtyard' : 'banish_pixi_village';
-    G.SAVE_KEY = prefix + '_save_v1';
-    G.AUTOSAVE_KEY = prefix + '_autosave_v1';
-    G.RECOVERY_SAVE_KEY = G.AUTOSAVE_KEY + '_recovery';
-    G.serverSaves.available = false;
-    G.probeServerSaves = () => { G.serverSaves.available = false; };
-    G.saveToServer = G.loadFromServer = G.deleteServerSave = () => Promise.reject(new Error('PixiJS 独立版使用本机存档与文件导入导出'));
-    G.deleteServerSaveQuiet = () => {};
+    if (!primary) {
+      const prefix = classic ? 'banish_pixi' : courtyard ? 'banish_pixi_courtyard' : 'banish_pixi_village';
+      G.SAVE_KEY = prefix + '_save_v1';
+      G.AUTOSAVE_KEY = prefix + '_autosave_v1';
+      G.RECOVERY_SAVE_KEY = G.AUTOSAVE_KEY + '_recovery';
+      G.serverSaves.available = false;
+      G.probeServerSaves = () => { G.serverSaves.available = false; };
+      G.saveToServer = G.loadFromServer = G.deleteServerSave = () => Promise.reject(new Error('PixiJS 独立版使用本机存档与文件导入导出'));
+      G.deleteServerSaveQuiet = () => {};
+    }
     G.pixi = await G.createPixiRenderer(document.getElementById('game'));
     await Promise.all([G.pixiArt.ready, G.pixiGround.ready, G.pixiFarms.ready]);
     let startingVillage = false;
@@ -33,7 +36,8 @@ window.addEventListener('DOMContentLoaded', async () => {
       G.ui.refreshHUD();
       if (startingVillage) G.ui.toast(courtyard ? '青玉 · 河畔院落：15位居民、土路与院落。点击右上角继续经营。' : '青玉 · 河湾村：15位居民、已建院落与农田。点击右上角继续经营。', 'good');
     }
-    document.querySelector('#pixi-edition small').textContent = classic ? '经典开局 · 独立存档' : courtyard ? '河畔院落 · 独立存档' : '青玉样板村 · 独立存档';
+    const edition = document.querySelector('#pixi-edition small');
+    if (edition) edition.textContent = classic ? '经典开局 · 独立存档' : courtyard ? '河畔院落 · 独立存档' : '青玉样板村 · 独立存档';
     window.dispatchEvent(new Event('banish-ready'));
     startup.remove();
   } catch (error) {
